@@ -36,6 +36,63 @@
 #endif
 
 static HardwareSerial gpsSerial(GPS_UART_NUM);
+
+/* ── GPS port bracket, incl. UART0 handover ──────────────────────────────────
+ * On Halehound the GPS module's TX lands on GPIO 1, which is UART0's TX. That
+ * pin is picked on purpose (GPIO 3 is driven by the USB-UART bridge and would
+ * fight the GPS), but UART0 holds GPIO 1 as a push-pull output, so the console
+ * has to let go of the pad before UART2 can read it.
+ *
+ * Every gpsSerial begin/end goes through gpsPortOpen/gpsPortClose so the
+ * handover can never be skipped at one call site. USB serial is dead while the
+ * GPS is open; it comes back on close. */
+#if defined(HALEHOUND_GPS_STEALS_UART0) && HALEHOUND_GPS_STEALS_UART0
+
+#include "driver/gpio.h"
+
+#ifndef HALEHOUND_CONSOLE_BAUD
+#define HALEHOUND_CONSOLE_BAUD 115200
+#endif
+
+static bool s_uart0Parked = false;
+
+static void gpsUart0Release() {
+  if (s_uart0Parked) {
+    return;
+  }
+  Serial.flush();
+  Serial.end();
+  /* Drop the UART0 matrix routing and leave the pad as a plain input so the
+   * GPS is the only driver on the net. */
+  gpio_reset_pin((gpio_num_t)GPS_UART_RX);
+  pinMode(GPS_UART_RX, INPUT);
+  s_uart0Parked = true;
+}
+
+static void gpsUart0Restore() {
+  if (!s_uart0Parked) {
+    return;
+  }
+  gpio_reset_pin((gpio_num_t)GPS_UART_RX);
+  Serial.begin(HALEHOUND_CONSOLE_BAUD);
+  s_uart0Parked = false;
+}
+
+#else
+static void gpsUart0Release() {}
+static void gpsUart0Restore() {}
+#endif
+
+static void gpsPortOpen() {
+  gpsSerial.end();
+  gpsUart0Release();
+  gpsSerial.begin(GPS_UART_BAUD, SERIAL_8N1, GPS_UART_RX, GPS_UART_TX);
+}
+
+static void gpsPortClose() {
+  gpsSerial.end();
+  gpsUart0Restore();
+}
 static TFT_eSprite gScanPanel(&tft);
 static bool gScanPanelReady = false;
 static int gScanPanelAllocW = 0;
@@ -1266,8 +1323,7 @@ void session() {
   navAltM = NAN;
   rmcNavValid = false;
 
-  gpsSerial.end();
-  gpsSerial.begin(GPS_UART_BAUD, SERIAL_8N1, GPS_UART_RX, GPS_UART_TX);
+  gpsPortOpen();
 
   const int panelH = tft.height() - kGfxTop;
   (void)ensureScanPanelSprite(tft.width(), panelH);
@@ -1300,7 +1356,7 @@ void session() {
   // Do not delete gScanPanel here — releasing ~140 KiB fragments heap and often
   // prevents createSprite() from succeeding when re-entering this screen.
 
-  gpsSerial.end();
+  gpsPortClose();
   drainButtons();
 }
 
@@ -3426,8 +3482,7 @@ static void wardBgTask(void* /*param*/) {
   navAltM = NAN;
   rmcNavValid = false;
 
-  gpsSerial.end();
-  gpsSerial.begin(GPS_UART_BAUD, SERIAL_8N1, GPS_UART_RX, GPS_UART_TX);
+  gpsPortOpen();
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(80);
@@ -3439,7 +3494,7 @@ static void wardBgTask(void* /*param*/) {
   File logf = SD.open(path, FILE_WRITE);
   if (!logf) {
     s_bgPath[0] = '\0';
-    gpsSerial.end();
+    gpsPortClose();
     s_bgTask = nullptr;
     vTaskDelete(nullptr);
     return;
@@ -3473,7 +3528,7 @@ static void wardBgTask(void* /*param*/) {
   logf.close();
   WiFi.scanDelete();
   WiFi.disconnect();
-  gpsSerial.end();
+  gpsPortClose();
   s_bgPath[0] = '\0';
   s_bgTask = nullptr;
   vTaskDelete(nullptr);
@@ -3640,8 +3695,7 @@ void session() {
     lastGsvMs = 0;
     lastNavMs = 0;
 
-    gpsSerial.end();
-    gpsSerial.begin(GPS_UART_BAUD, SERIAL_8N1, GPS_UART_RX, GPS_UART_TX);
+    gpsPortOpen();
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
     delay(80);
@@ -3652,7 +3706,7 @@ void session() {
       if (wardWaitStartupFailureDismiss("Wardriver", "Could not create log file on SD.")) {
         s_wardRetrySession = true;
       }
-      gpsSerial.end();
+      gpsPortClose();
       return;
     }
     fgFile = true;
@@ -3664,7 +3718,7 @@ void session() {
         s_wardRetrySession = true;
       }
       logf.close();
-      gpsSerial.end();
+      gpsPortClose();
       return;
     }
     wardLogPushf("CSV %s", path);
@@ -3938,7 +3992,7 @@ void session() {
               logf.close();
               fgFile = false;
               WiFi.scanDelete();
-              gpsSerial.end();
+              gpsPortClose();
               wardStartBackground();
               s_wardFgSessionForStatusBar = false;
               drawStatusBar(readBatteryVoltage(), true);
@@ -4014,7 +4068,7 @@ void session() {
     logf.close();
     WiFi.scanDelete();
     WiFi.disconnect();
-    gpsSerial.end();
+    gpsPortClose();
   }
 
   feature_exit_requested = false;
