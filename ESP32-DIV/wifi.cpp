@@ -614,13 +614,9 @@ void setChannel(int newChannel) {
   esp_wifi_set_promiscuous(true);
 }
 
+// Dead: never called, and the body only wrote to discarded locals.
 void draw() {
-  double multiplicator = getMultiplicator();
-  int len;
-  int rssi;
 
-  if (pkts[MAX_X - 1] > 0) rssi = rssiSum / (int)pkts[MAX_X - 1];
-  else rssi = rssiSum;
 }
 
 static bool uiDrawn = false;
@@ -1556,10 +1552,6 @@ static int s_knownNetworkCount = 0;
 
 static int iconX[ICON_NUM] = {210, 10};
 static int iconY = STATUS_BAR_Y_OFFSET;
-static const unsigned char* icons[ICON_NUM] = {
-  bitmap_icon_power,
-  bitmap_icon_go_back
-};
 
 void scrollTerminal() {
   const int cap = deauthVisibleLines();
@@ -3817,7 +3809,6 @@ void startAttack() {
     Serial.println("Access Point started");
     Serial.print("IP Address: ");
     Serial.println(WiFi.softAPIP());
-    int ip = WiFi.softAPIP();
     displayPrint("Access Point started", GREEN, false);
 
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
@@ -3931,7 +3922,6 @@ void runUI() {
   static unsigned long lastAnimationTime = 0;
   static int animationState = 0;
   static int activeIcon = -1;
-  static unsigned long lastSpamTime = 0;
 
   switch (animationState) {
     case 0:
@@ -4693,7 +4683,6 @@ void runUI() {
   static unsigned long lastAnimationTime = 0;
   static int animationState = 0;
   static int activeIcon = -1;
-  static unsigned long lastSpamTime = 0;
 
   switch (animationState) {
     case 0:
@@ -5381,7 +5370,6 @@ void runUI() {
   static unsigned long lastAnimationTime = 0;
   static int animationState = 0;
   static int activeIcon = -1;
-  static unsigned long lastSpamTime = 0;
 
   switch (animationState) {
     case 0:
@@ -5626,7 +5614,7 @@ static volatile int s_revealIndex = -1;
 static char s_pendingSsid[33] = {0};
 static portMUX_TYPE s_revealMux = portMUX_INITIALIZER_UNLOCKED;
 
-static void drawRevealScreen();
+__attribute__((unused)) static void drawRevealScreen();
 static void drawRevealScreen(bool fullRedraw);
 static void updateRevealStats();
 static void updateNavLabels(bool onRevealScreen);
@@ -6233,7 +6221,7 @@ static void drawRevealScreen(bool fullRedraw) {
   drawTabBar(buttons[0], false, "", true, buttons[1], false);
 }
 
-static void drawRevealScreen() {
+__attribute__((unused)) static void drawRevealScreen() {
   drawRevealScreen(true);
 }
 
@@ -8141,7 +8129,7 @@ static void stopPortal();
 static void maybeSwitchAp();
 static void sendNextBeacon();
 static void hopIfNeeded();
-static void paintTextLine(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color);
+__attribute__((unused)) static void paintTextLine(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color);
 static void invalidateHeaderCache();
 static void tickBeaconRate();
 static void truncSsid(char* out, size_t n, const char* ssid, size_t maxChars);
@@ -8344,7 +8332,7 @@ static bool paintInfoRow(int y, char* cache, size_t cacheSz, const char* text, u
   return true;
 }
 
-static void paintTextLine(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color) {
+__attribute__((unused)) static void paintTextLine(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color) {
   (void)paintTextLineEx(y, x, w, cache, cacheSz, text, color);
 }
 
@@ -9722,7 +9710,6 @@ void runUI() {
   static unsigned long lastAnimationTime = 0;
   static int animationState = 0;
   static int activeIcon = -1;
-  static unsigned long lastSpamTime = 0;
 
   switch (animationState) {
     case 0:

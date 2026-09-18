@@ -571,7 +571,7 @@ static void rfidPrintWrappedStepBg(int x, int y, int maxWidth, const char* text,
   }
 }
 
-static void rfidPrintWrappedStep(int x, int y, int maxWidth, const char* text, int lineStepPx) {
+__attribute__((unused)) static void rfidPrintWrappedStep(int x, int y, int maxWidth, const char* text, int lineStepPx) {
   rfidPrintWrappedStepBg(x, y, maxWidth, text, lineStepPx, UI_TEXT, FEATURE_BG);
 }
 
@@ -937,7 +937,7 @@ static void rfidSetFeatureInfo(const char* title, const char* body) {
   s_featureInfoAvailable = s_featureInfoBody[0] != '\0';
 }
 
-static int rfidInfoPanelPageCount(const char* body) {
+__attribute__((unused)) static int rfidInfoPanelPageCount(const char* body) {
   return rfidInfoPanelPageCountForLines(body, rfidDetailLinesPerPage());
 }
 
@@ -949,7 +949,7 @@ static bool rfidDetailTagNeedsPill(const char* tagLabel) {
          strcmp(tagLabel, "SCAN") != 0 && strcmp(tagLabel, "RESULT") != 0;
 }
 
-static void rfidDrawInfoPanel(const char* tagLabel, const char* body, int page, int pageCount,
+__attribute__((unused)) static void rfidDrawInfoPanel(const char* tagLabel, const char* body, int page, int pageCount,
                               int linesPerPage) {
   const int detailBottom = rfidDetailBottom();
   const int detailTop = rfidEffectiveDetailTop();
@@ -1394,7 +1394,7 @@ static void rfidResultAndDismiss(const char* title, const char* sub, const char*
 }
 
 /** @return true = primary (right) action, false = back */
-static bool rfidRunTwoButtonDialog(const char* title, const char* sub, const char* body,
+__attribute__((unused)) static bool rfidRunTwoButtonDialog(const char* title, const char* sub, const char* body,
                                    const char* primaryLabel, FeatureUI::ButtonStyle primaryStyle) {
   rfidLayoutFull(title, sub, body, true, primaryLabel, primaryStyle, false);
   for (;;) {

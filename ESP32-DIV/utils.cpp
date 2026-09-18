@@ -641,7 +641,6 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
       tft.drawBitmap(wardGpsX, iconY, bitmap_icon_satellite, iconW, iconW, TFT_ORANGE);
     }
 
-    uint16_t wifiColor = (wifiDevices > 0) ? GREEN : TFT_WHITE;
     uint16_t bleColor  = (bleDevices  > 0) ? TFT_CYAN  : TFT_WHITE;
 
     int wifiStrength = 0;
@@ -1774,7 +1773,6 @@ static void drawAccentWidget(uint8_t preset, bool ) {
   wipeAccentWidgetArea();
 
   Rect r = rowRect(2);
-  int right = r.x + r.w - 6;
   int ty = r.y + (r.h / 2 - 6);
 
   setLabelFont();
@@ -1864,7 +1862,7 @@ static Rect saveRect(){
   const int gap = 8;
   return makeRect(b.x + b.w + gap, b.y, b.w, b.h);
 }
-static void drawFooterButton(const Rect& b, const char* label, uint16_t body, uint16_t edge){
+__attribute__((unused)) static void drawFooterButton(const Rect& b, const char* label, uint16_t body, uint16_t edge){
 
   FeatureUI::ButtonStyle style =
     (body == UI.accent) ? FeatureUI::ButtonStyle::Primary : FeatureUI::ButtonStyle::Secondary;

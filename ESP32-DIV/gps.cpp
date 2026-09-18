@@ -947,7 +947,7 @@ void clampListScroll() {
   }
 }
 
-static const char* viewModeTag(ViewMode m) {
+__attribute__((unused)) static const char* viewModeTag(ViewMode m) {
   switch (m) {
     case ViewMode::Combined:
       return "Split";
@@ -1957,7 +1957,7 @@ static const char* wardAuthLabel(wifi_auth_mode_t t) {
   }
 }
 
-static const char* wardRadioModeLabel(WardRadioMode m) {
+__attribute__((unused)) static const char* wardRadioModeLabel(WardRadioMode m) {
   switch (m) {
     case WardRadioMode::WiFi:
       return "WiFi only";
@@ -3671,9 +3671,6 @@ void session() {
 
   WardPage page = WardPage::Main;
   bool fgLog = true;
-  uint32_t linesWritten = 0;
-  uint32_t scanCount = 0;
-  uint32_t lastScanMs = 0;
   uint32_t lastUiMs = 0;
   char path[48] = "";
 
@@ -4052,9 +4049,6 @@ void session() {
 
     if (!bgWas) {
       s_fgScanPaused = !fgLog || page != WardPage::Main || (uint32_t)(now - s_lastWardInputMs) < 650u;
-      linesWritten = s_fgLines;
-      scanCount = s_fgScans;
-      lastScanMs = now;
     }
 
     delay(4);

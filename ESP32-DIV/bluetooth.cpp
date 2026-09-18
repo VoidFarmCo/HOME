@@ -137,7 +137,7 @@ static void bleWaitButtonRelease(int pin) {
   delay(kBleNavDebounceMs);
 }
 
-static void bleWaitNavRelease(int pin1, int pin2 = -1, int pin3 = -1) {
+__attribute__((unused)) static void bleWaitNavRelease(int pin1, int pin2 = -1, int pin3 = -1) {
   while (isButtonPressed(pin1) ||
          (pin2 >= 0 && isButtonPressed(pin2)) ||
          (pin3 >= 0 && isButtonPressed(pin3))) {
@@ -3237,21 +3237,15 @@ void configureRadio(RF24 &radio, const byte* channels, size_t size) {
 }
 
 void initializeRadiosMultiMode() {
-  bool radio1Active = false;
-  bool radio2Active = false;
-  bool radio3Active = false;
 
   if (radio1.begin()) {
     configureRadio(radio1, channelGroup1, sizeof(channelGroup1));
-    radio1Active = true;
   }
   if (radio2.begin()) {
     configureRadio(radio2, channelGroup2, sizeof(channelGroup2));
-    radio2Active = true;
   }
   if (radio3.begin()) {
     configureRadio(radio3, channelGroup3, sizeof(channelGroup3));
-    radio3Active = true;
   }
 }
 
@@ -3267,10 +3261,6 @@ void initializeRadios() {
 }
 
 void updateTFT() {
-  static bool previousJammerState = false;
-  static bool prevNRF1State = false;
-  static bool prevNRF2State = false;
-  static int previousMode = -1;
 
   const int bodyH = bleContentBottom() - 39;
   if (bodyH > 0) {
@@ -5130,21 +5120,15 @@ void configureRadio(RF24 &radio, const byte* channels, size_t size) {
 }
 
 void initializeRadiosMultiMode() {
-  bool radio1Active = false;
-  bool radio2Active = false;
-  bool radio3Active = false;
 
   if (radio1.begin()) {
     configureRadio(radio1, channelGroup1, sizeof(channelGroup1));
-    radio1Active = true;
   }
   if (radio2.begin()) {
     configureRadio(radio2, channelGroup2, sizeof(channelGroup2));
-    radio2Active = true;
   }
   if (radio3.begin()) {
     configureRadio(radio3, channelGroup3, sizeof(channelGroup3));
-    radio3Active = true;
   }
 }
 
@@ -5397,7 +5381,7 @@ static void mjSharedPublish(const uint8_t* addr, uint8_t ch, bool vulnerable, co
     if (idx < 0) {
       idx = 0;
     }
-    memset(&g_mjShared[idx], 0, sizeof(MjSharedTarget));
+    g_mjShared[idx] = MjSharedTarget{};
     memcpy(g_mjShared[idx].addr, addr, 5);
     g_mjShared[idx].used = true;
   }
@@ -5411,7 +5395,7 @@ static void mjSharedPublish(const uint8_t* addr, uint8_t ch, bool vulnerable, co
   }
 }
 
-static int mjSharedCount() {
+__attribute__((unused)) static int mjSharedCount() {
   int n = 0;
   for (int i = 0; i < kMjSharedMax; i++) {
     if (g_mjShared[i].used) {
@@ -7668,7 +7652,7 @@ static void mjNoteDevice(const uint8_t* addr, uint8_t ch, MjVendor vendor, bool 
     if (idx < 0) {
       return;
     }
-    memset(&s_devices[idx], 0, sizeof(MjDevice));
+    s_devices[idx] = MjDevice{};
     memcpy(s_devices[idx].addr, addr, 5);
     s_devices[idx].used = true;
     s_devices[idx].hits = 0;
@@ -8423,7 +8407,6 @@ static void injPollScanPacket() {
   // Also try HID at p0 (if full payload landed).
   uint8_t addr[5] = {(uint8_t)s_prefixByte, 0x00, 0x00, payload[0], payload[1]};
   const uint8_t* hid = payload + 2;
-  int hidLen = 10;
   bool ok = injLooksLikeLogitech(hid, 10);
   if (!ok && injLooksLikeLogitech(payload, 10)) {
     // Payload already starts with HID — address incomplete; still store fingerprint addr

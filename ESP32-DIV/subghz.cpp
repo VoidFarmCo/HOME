@@ -89,7 +89,7 @@ namespace {
     return false;
   }
 
-  static bool findLatestExportPath(String& outPath) {
+  __attribute__((unused)) static bool findLatestExportPath(String& outPath) {
 
     for (int i = 9999; i >= 0; i--) {
       char buf[48];
@@ -780,7 +780,7 @@ static void replayFreqPrev() {
   updateDisplay();
 }
 
-static void replayToggleAuto() {
+__attribute__((unused)) static void replayToggleAuto() {
   autoScanEnabled = !autoScanEnabled;
   if (autoScanEnabled) {
     replayBeginAutoScan();
@@ -1797,7 +1797,7 @@ static void profileSelectPrev() {
   updateSelectionUI(oldIdx, false);
 }
 
-static void profileRefreshSd() {
+__attribute__((unused)) static void profileRefreshSd() {
   refreshSdIndex(true);
   selectedValid = false;
   cacheDirty = true;

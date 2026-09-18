@@ -166,12 +166,60 @@ truncates safely, so these are cosmetic unless a count genuinely gets large.
 **`-Wdeprecated-declarations` x2**: `tcpip_adapter_init()` at `wifi.cpp:284`.
 Works on IDF 4.4, gone in IDF 5. Relevant if the fork ever moves to core 3.x.
 
-## Where this leaves things
+## Cleanup pass
 
-`-w` is still in the build. The 181 remaining warnings are dominated by
-`-Wmissing-field-initializers` and unused-symbol noise, so switching the
-default build to `-Wall` today would just be a wall of text nobody reads.
+`tools/silence_unused.py` cleared all 47 `-Wunused-*` warnings in the sketch,
+and the two `memset` calls became value-initialization. Sketch warnings went
+144 -> 92; under `-Wall` alone, ~92 -> 39.
 
-The useful order is: clear the unused-symbol and missing-initializer noise,
-then turn `-Wall -Wextra` on for real so the next `-Warray-bounds` shows up
-the day it is written instead of being found by an archaeology session.
+Functions and variables got different treatment on purpose.
+
+The 14 unused **functions** are marked `__attribute__((unused))`, not deleted.
+They cost nothing to keep: the platform builds with `-ffunction-sections
+-fdata-sections` and links with `--gc-sections`, and none of them appear in
+the linked image. Deleting them would buy zero bytes and cost a conflict on
+every `git merge upstream/main`, which this fork is built to keep cheap.
+(C++11 here, so `__attribute__((unused))` rather than `[[maybe_unused]]`.)
+
+The unused **variables** are deleted outright -- locals and file-scope
+statics, small self-contained edits.
+
+Two things are worth knowing about that script. Its edits are pinned to line
+numbers *and* an expected substring, because matching on line text alone
+silently breaks the build: `int rssi;`, `int right = r.x + r.w - 6;` and
+`static unsigned long lastSpamTime = 0;` each appear verbatim in other
+functions where the variable is read. And `PacketMonitor::draw()` turned out
+to be dead in full -- nothing calls it, and every line of its body wrote to a
+local that was then discarded -- so its body is now empty.
+
+## What is still in the way of turning -w off
+
+39 warnings in the sketch under `-Wall`:
+
+| | count | |
+|---|---|---|
+| macro redefinition | 22 | always on, not `-Wall`-gated |
+| `-Wformat-truncation=` | 14 | |
+| `-Wdeprecated-declarations` | 2 | `tcpip_adapter_init` |
+| lambda capture of static | 1 | always on |
+
+The distinction matters. The 23 "always on" warnings are not produced by
+`-Wall` at all -- they appear at *any* warning level the moment `-w` comes
+out. They are the real blocker to dropping `-w`, and `-Wall` is not what is
+holding things up.
+
+Two pieces of work remain, in this order:
+
+1. **The macro redefinitions (22).** `#undef` before each redefinition would
+   silence them mechanically without changing a single value, but that is the
+   same move as `-zmuldefs` -- quieting the symptom. The honest fix is giving
+   these per-screen constants real scope, which also removes the `MAX_LINES`
+   expression hazard described above. That is a refactor across 20-odd sites
+   in `wifi.cpp` and `bluetooth.cpp`.
+
+2. **`-Wformat-truncation` (14).** Mechanical: widen the destination buffers,
+   checking each is not sized to a layout constraint.
+
+After those, `-w` can come out of `build.extra_flags.esp32` and `-Wall
+-Wextra` can go in, and the next `-Warray-bounds` shows up the day it is
+written rather than in an archaeology session.
