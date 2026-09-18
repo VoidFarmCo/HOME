@@ -3091,7 +3091,12 @@ static void cpSendDeauthFrame() {
   memcpy(cp_deauth_frame, cp_deauth_frame_default, 26);
   memcpy(&cp_deauth_frame[10], cp_target_ap.bssid, 6);
   memcpy(&cp_deauth_frame[16], cp_target_ap.bssid, 6);
-  cp_deauth_frame[26] = 7;
+  // Removed: `cp_deauth_frame[26] = 7;` wrote one byte past this 26-byte
+  // array. The reason code lives at offsets 24-25 (the template sets it to
+  // 1), and the send below only transmits 26 bytes, so the write never
+  // reached the air -- it only corrupted whatever followed the array. To
+  // actually send reason 7 (class-3 frame from nonassociated STA), set
+  // cp_deauth_frame[24].
   Deauther::wsl_bypasser_send_raw_frame(cp_deauth_frame, 26);
 
   memcpy(cp_deauth_frame, cp_deauth_frame_default, 26);
@@ -3099,7 +3104,12 @@ static void cpSendDeauthFrame() {
   memcpy(&cp_deauth_frame[16], cp_target_ap.bssid, 6);
 
   memset(&cp_deauth_frame[4], 0xFF, 6);
-  cp_deauth_frame[26] = 7;
+  // Removed: `cp_deauth_frame[26] = 7;` wrote one byte past this 26-byte
+  // array. The reason code lives at offsets 24-25 (the template sets it to
+  // 1), and the send below only transmits 26 bytes, so the write never
+  // reached the air -- it only corrupted whatever followed the array. To
+  // actually send reason 7 (class-3 frame from nonassociated STA), set
+  // cp_deauth_frame[24].
   Deauther::wsl_bypasser_send_raw_frame(cp_deauth_frame, 26);
 
   cp_deauth_packet_count += 2;
@@ -4313,7 +4323,8 @@ void wsl_bypasser_send_deauth_frame(const wifi_ap_record_t *ap_record, uint8_t c
     memcpy(deauth_frame, deauth_frame_default, sizeof(deauth_frame_default));
     memcpy(&deauth_frame[10], ap_record->bssid, 6);
     memcpy(&deauth_frame[16], ap_record->bssid, 6);
-    deauth_frame[26] = 7;
+    // Removed: `deauth_frame[26] = 7;` -- one byte past this 26-byte array.
+    // Reason code is at offsets 24-25; see the note in cpSendDeauthFrame().
 
     wsl_bypasser_send_raw_frame(deauth_frame, sizeof(deauth_frame));
 }

@@ -112,6 +112,13 @@ setup() {
     cp "$CORE_DIR/platform.txt" "$CORE_DIR/platform.txt.orig"
   fi
   cp "$REPO/Libraries/platform.txt" "$CORE_DIR/platform.txt"
+
+  # The platform bakes -Werror=all into both of its raised warning levels, so
+  # `--warnings all` turns the first unused function into a failed build and
+  # you never see the rest. Make the top level report rather than abort, which
+  # is what `tools/build.sh warnings` relies on.
+  sed -i 's|^compiler\.warning_flags\.all=.*|compiler.warning_flags.all=-Wall -Wextra|' \
+    "$CORE_DIR/platform.txt"
   echo "== platform.txt patched (stock kept as platform.txt.orig) =="
 
   # TFT_eSPI and the CC1101 driver must come from the repo, not Library
@@ -140,14 +147,30 @@ compile() {
   arduino-cli compile -b "$FQBN" --build-path "$BUILD_PATH" "$REPO/ESP32-DIV"
 }
 
+# Build with -Wall -Wextra instead of upstream's -w. Takes a full rebuild.
+# Expect ~180 warnings; docs/halehound/warnings.md says which ones matter.
+#
+# --warnings on its own does nothing here. build.extra_flags is appended after
+# compiler.warning_flags in the compile recipe, so upstream's -w wins whatever
+# level you ask for -- that is presumably why it was put there. Overriding
+# build.extra_flags.esp32 to drop -w is what actually lets warnings through.
+warnings() {
+  rm -rf "$BUILD_PATH-warnings"
+  arduino-cli compile --warnings all -b "$FQBN" \
+    --build-property "build.extra_flags.esp32=-DARDUINO_USB_CDC_ON_BOOT=0" \
+    --build-path "$BUILD_PATH-warnings" "$REPO/ESP32-DIV" 2>&1 \
+    | grep -E "warning:|Sketch uses|Global variables"
+}
+
 upload() {
   local port="${1:?usage: tools/build.sh upload <port>}"
   arduino-cli upload -b "$FQBN" -p "$port" --input-dir "$BUILD_PATH" "$REPO/ESP32-DIV"
 }
 
 case "${1:-compile}" in
-  setup)   setup ;;
-  compile) compile ;;
-  upload)  shift; upload "$@" ;;
-  *) echo "usage: tools/build.sh [setup|compile|upload <port>]" >&2; exit 2 ;;
+  setup)    setup ;;
+  compile)  compile ;;
+  warnings) warnings ;;
+  upload)   shift; upload "$@" ;;
+  *) echo "usage: tools/build.sh [setup|compile|warnings|upload <port>]" >&2; exit 2 ;;
 esac

@@ -101,7 +101,9 @@ frames can be injected, which is load-bearing and cannot be done with
 `--wrap`. It was also swallowing 30 unrelated duplicate symbols, one of them a
 real bug; those are fixed during setup. See
 [docs/halehound/zmuldefs.md](docs/halehound/zmuldefs.md). `-w` still silences
-every compiler warning in the build.
+every compiler warning; `tools/build.sh warnings` turns them back on, and
+[docs/halehound/warnings.md](docs/halehound/warnings.md) says which of the 181
+matter.
 
 **The vendored CC1101 driver is patched during setup.** It shipped a dead
 copy-paste clone of itself (`..._JT_DRV.cpp`, a second `class
@@ -122,7 +124,9 @@ hardware.
   hand GPIO 1 between the console and the GPS
 - `tools/check_pinmap.py` — pin map checker
 - `tools/build.sh` — pinned, isolated toolchain, build, and CC1101 patches
+- `wifi.cpp` — removed an out-of-bounds write in both deauth frame builders
 - `docs/halehound/zmuldefs.md` — what `-zmuldefs` was hiding
+- `docs/halehound/warnings.md` — what `-w` was hiding
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
 None of this is tested on hardware yet. It compiles, the board profile is
