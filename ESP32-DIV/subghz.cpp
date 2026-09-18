@@ -5,6 +5,7 @@
 #include "config.h"
 #include "icon.h"
 #include "shared.h"
+#include "SpiBus.h"
 
 
 namespace {
@@ -2212,6 +2213,9 @@ void saveSetup() {
     setTouchButtonInputEnabled(true);
     subghzSetProfileNavLabels();
 
+    // No reclaim on this path: before arbitration the CC1101 inherited
+    // whatever clock the last feature left on the bus.
+    SpiBus::claim(SpiBus::Dev::Cc1101);
     ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
     ELECHOUSE_cc1101.setGDO(CC1101_GDO0, CC1101_GDO2);
 
@@ -2743,6 +2747,8 @@ void subjammerSetup() {
     drawStatusBar(readBatteryVoltage(), true);
     subghzRedrawNavChrome();
 
+    // As in saveSetup(): this path never reclaimed the bus either.
+    SpiBus::claim(SpiBus::Dev::Cc1101);
     ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
 
     ELECHOUSE_cc1101.Init();

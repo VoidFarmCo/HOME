@@ -12,6 +12,7 @@
 #include "gps.h"
 #include "shared.h"
 #include "utils.h"
+#include "SpiBus.h"
 
 
 bool notificationVisible = false;
@@ -877,31 +878,10 @@ void sdRetryMount() {
   s_sdMountGaveUp = false;
 }
 
-/** Deselect every other SPI slave that shares the SD bus so none holds MISO. */
-static void sdRaiseCsPin(int pin) {
-  if (pin < 0) {
-    return;
-  }
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH);
-}
-
 static void sdReleaseOtherChipSelects() {
-#if defined(CC1101_CS)
-  sdRaiseCsPin(CC1101_CS);
-#endif
-#if defined(PN532_SS)
-  sdRaiseCsPin(PN532_SS);
-#endif
-#if defined(CSN_PIN_1)
-  sdRaiseCsPin(CSN_PIN_1);
-#endif
-#if defined(CSN_PIN_2)
-  sdRaiseCsPin(CSN_PIN_2);
-#endif
-#if defined(CSN_PIN_3)
-  sdRaiseCsPin(CSN_PIN_3);
-#endif
+  // Every chip select on the shared bus, including the touch controller's,
+  // which this list used to miss.
+  SpiBus::deselectAll();
   // Scanner bit-bangs CE/CSN on these pins; keep CE low / CSN high after leaving.
 #if defined(CE_PIN_3)
   pinMode(CE_PIN_3, OUTPUT);
@@ -1106,6 +1086,9 @@ void holdSdInactiveOnSharedSpi() {
   digitalWrite(SD_CS, HIGH);
 #endif
 #if !TOUCH_SHARES_TFT_SPI
+  // Same settings as before, but routed through the bus owner so the SD
+  // profile lives in exactly one place.
+  SpiBus::release(SpiBus::Dev::Sd);
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
   SPI.setFrequency(4000000);
@@ -1170,15 +1153,14 @@ void reclaimSharedSpiBus() {
 #endif // BOARD_HAS_ESP32S3
 #if defined(SD_SCLK) && defined(SD_MISO) && defined(SD_MOSI) && defined(SD_CS)
 #if defined(CC1101_SCK) && defined(CC1101_MISO) && defined(CC1101_MOSI) && defined(CC1101_CS)
-  // Prefer CC1101 CS as SPI SS — same data pins as SD on DIV V2, but matches
-  // what ELECHOUSE SpiStart() will bind on the next Init().
-  SPI.begin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
+  // Leave the bus pointed at the CC1101, which is what ELECHOUSE SpiStart()
+  // will bind on the next Init(). This used to be an inline SPI.begin() plus
+  // three setters; it is the Cc1101 profile verbatim, so it now goes through
+  // the owner and the state gets recorded rather than being implied.
+  SpiBus::claim(SpiBus::Dev::Cc1101);
 #else
-  SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
+  SpiBus::claim(SpiBus::Dev::Sd);
 #endif
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setBitOrder(MSBFIRST);
-  SPI.setFrequency(4000000);
 #endif
 #else
 #if defined(SD_SCLK) && defined(SD_MISO) && defined(SD_MOSI) && defined(SD_CS)
@@ -1191,12 +1173,12 @@ void reclaimSharedSpiBus() {
 void restoreSdAfterSharedSpi() {
   // Full reclaim + remount for menu/SD features after leaving SPI radios.
   reclaimSharedSpiBus();
+  // reclaim leaves the bus pointed at the CC1101; take it for the card before
+  // trying to mount, rather than relying on SD.begin to sort the bus out.
+  SpiBus::claim(SpiBus::Dev::Sd);
   delay(5);
   if (sdTryBeginOrder()) {
     s_sdFsMounted = true;
-#if !TOUCH_SHARES_TFT_SPI
-    SPI.setFrequency(4000000);
-#endif
   }
   requestStatusBarRedraw();
 }

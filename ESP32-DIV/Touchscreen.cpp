@@ -1,5 +1,6 @@
 #include "SettingsStore.h"
 #include "Touchscreen.h"
+#include "SpiBus.h"
 #include <TFT_eSPI.h>
 
 extern TFT_eSPI tft;
@@ -61,7 +62,17 @@ static bool readSharedTouchSample(int16_t& x, int16_t& y, int16_t& z, uint16_t z
 
 static void ensureTouchSpiReady() {
 #if !TOUCH_SHARES_TFT_SPI
+  // This begin() only does anything the first time. SPIClass::begin() returns
+  // immediately once _spi is set, so it cannot re-attach the pins after a
+  // radio or the SD card has pointed the bus elsewhere -- which is exactly
+  // what used to happen, and why touch stopped responding after the first
+  // feature that touched the shared bus.
   touchscreenSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
+  if (SpiBus::touchSharesRadioBus()) {
+    // Cheap no-op while touch still holds the bus; re-points the GPIO matrix
+    // back at T_CLK/T_DIN/T_OUT when something else took it.
+    SpiBus::claim(SpiBus::Dev::Touch);
+  }
 #endif
 }
 

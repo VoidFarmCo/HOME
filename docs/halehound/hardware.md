@@ -88,10 +88,12 @@ pin. RCSwitch's `enableTransmit`/`enableReceive` agree. Nothing to change.
 GPIO 35 being input-only is a useful accident here: the assignment physically
 cannot be made backwards without the transmit path silently failing.
 
-## Not yet addressed
+## SPI bus
 
-SPI bus arbitration is still upstream's approach: `sdReleaseOtherChipSelects()`
-in `utils.cpp` raises every other chip select before touching the SD card, and
-each driver configures the bus for itself on entry. Four devices with different
-clock ceilings share VSPI, and there is no single owner of the bus settings.
-This is the next structural piece.
+Done, and it turned out to be five devices rather than four: the XPT2046 touch
+controller is on the same peripheral as the radios and the SD card, and on a
+CYD it is the only input device. The conflict that matters is the GPIO matrix
+rather than the clock — MISO can only be sourced from one pad, and touch reads
+GPIO 39 while everything else reads GPIO 19.
+
+`SpiBus` now owns the bus. See [spi-bus.md](spi-bus.md).

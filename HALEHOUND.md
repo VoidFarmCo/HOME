@@ -125,8 +125,11 @@ hardware.
 - `tools/check_pinmap.py` — pin map checker
 - `tools/build.sh` — pinned, isolated toolchain, build, and CC1101 patches
 - `wifi.cpp` — removed an out-of-bounds write in both deauth frame builders
+- `SpiBus.{h,cpp}` — single owner for the shared VSPI bus, and the fix for
+  touch losing the bus to the radios
 - `docs/halehound/zmuldefs.md` — what `-zmuldefs` was hiding
 - `docs/halehound/warnings.md` — what `-w` was hiding
+- `docs/halehound/spi-bus.md` — the bus map, and why touch was losing it
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
 None of this is tested on hardware yet. It compiles, the board profile is

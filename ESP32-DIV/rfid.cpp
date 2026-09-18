@@ -11,6 +11,7 @@
 #include "icon.h"
 #include "utils.h"
 #include "shared.h"
+#include "SpiBus.h"
 
 #ifndef RFID_UID_CLONE
 #define RFID_UID_CLONE 1
@@ -41,6 +42,9 @@ enum CardType { UNKNOWN, MIFARE_CLASSIC, MIFARE_ULTRALIGHT, NTAG, MIFARE_DESFIRE
 enum class RfidUiEvt { None, Back, Primary };
 
 static void rfidAttachBus() {
+  // Hands the pads to the bit-bang driver: the peripheral is detached from
+  // them rather than pointed at them, and every other chip select is parked.
+  SpiBus::claim(SpiBus::Dev::Pn532);
   // Adafruit_PN532 is constructed for software SPI (bitbang). Do NOT call
   // SPI.begin(PN532_*) here: on DIV V2 the PN532 MOSI/MISO pins are swapped
   // vs the SD/CC1101 bus, and remapping hardware SPI that way leaves the SD
@@ -54,6 +58,7 @@ static void rfidAttachBus() {
 
 /** Release PN532 bitbang pins and remount SD on the shared SPI bus. */
 static void rfidRestoreBus() {
+  SpiBus::release(SpiBus::Dev::Pn532);
   restoreSdAfterSharedSpi();
 }
 

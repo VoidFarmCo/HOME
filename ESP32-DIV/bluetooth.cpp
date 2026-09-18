@@ -6,6 +6,7 @@
 #include "icon.h"
 #include "shared.h"
 #include "utils.h"
+#include "SpiBus.h"
 
 #ifdef TFT_BLACK
 #undef TFT_BLACK
@@ -4931,10 +4932,7 @@ void scannerSetup() {
   Print("[+] Scanner ready", UI_WARN, false);
   redrawTouchButtonBar();
 
-  SPI.begin(NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI, NRF24_SPI_SS);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setFrequency(10000000);
-  SPI.setBitOrder(MSBFIRST);
+  SpiBus::claim(SpiBus::Dev::Nrf24);
 
   pinMode(CE, OUTPUT);
   pinMode(CSN, OUTPUT);
@@ -5556,14 +5554,7 @@ static void esbFlushRx() {
 }
 
 static void esbInitRadioSpi() {
-#if defined(SD_SCLK) && defined(SD_MISO) && defined(SD_MOSI)
-  SPI.begin(NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI, NRF24_SPI_SS);
-#else
-  SPI.begin();
-#endif
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setFrequency(10000000);
-  SPI.setBitOrder(MSBFIRST);
+  SpiBus::claim(SpiBus::Dev::Nrf24);
 }
 
 static void esbApplyChannel(uint8_t ch) {
@@ -5594,10 +5585,7 @@ static bool esbSwitchToSdSpi() {
   esbDisable();
   digitalWrite(CSN, HIGH);
 #if defined(SD_SCLK) && defined(SD_MISO) && defined(SD_MOSI) && defined(SD_CS)
-  SPI.begin(SD_SCLK, SD_MISO, SD_MOSI, SD_CS);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setBitOrder(MSBFIRST);
-  SPI.setFrequency(4000000);
+  SpiBus::claim(SpiBus::Dev::Sd);
   return true;
 #else
   return false;
@@ -6432,10 +6420,7 @@ static void rpFlushTx() {
 }
 
 static void rpInitSpi() {
-  SPI.begin(NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI, NRF24_SPI_SS);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setFrequency(10000000);
-  SPI.setBitOrder(MSBFIRST);
+  SpiBus::claim(SpiBus::Dev::Nrf24);
 }
 
 static void rpApplyChannel(uint8_t ch) {
@@ -7266,10 +7251,7 @@ static void mjFlushRx() {
 }
 
 static void mjInitRadioSpi() {
-  SPI.begin(NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI, NRF24_SPI_SS);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setFrequency(10000000);
-  SPI.setBitOrder(MSBFIRST);
+  SpiBus::claim(SpiBus::Dev::Nrf24);
 }
 
 static void mjApplyChannel(uint8_t ch) {
@@ -8143,10 +8125,7 @@ static void injFlushTx() {
 }
 
 static void injInitSpi() {
-  SPI.begin(NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI, NRF24_SPI_SS);
-  SPI.setDataMode(SPI_MODE0);
-  SPI.setFrequency(10000000);
-  SPI.setBitOrder(MSBFIRST);
+  SpiBus::claim(SpiBus::Dev::Nrf24);
 }
 
 static uint8_t injLogitechChecksum(const uint8_t* p, int len) {
