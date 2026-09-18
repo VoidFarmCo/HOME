@@ -94,11 +94,20 @@ sat right there, and only that one multilib was affected, so the default build
 worked and `-fno-rtti` did not. Override the location with `HH_ARDUINO_ROOT`
 if you must, but keep it short.
 
-**The patched `platform.txt`.** Upstream ships one and the build needs it, but
-only one of its three changes is load-bearing: `-DNFC_INTERFACE_SPI` puts the
-PN532 library into SPI mode. The other two are `-zmuldefs` (tolerate duplicate
-symbols at link) and `-w` (silence every warning). Those hide problems rather
-than fix them and are worth revisiting.
+**The patched `platform.txt`.** Upstream ships one and the build needs it.
+`-DNFC_INTERFACE_SPI` puts the PN532 library into SPI mode. `-zmuldefs` lets
+`wifi.cpp` override the IDF's `ieee80211_raw_frame_sanity_check` so raw 802.11
+frames can be injected, which is load-bearing and cannot be done with
+`--wrap`. It was also swallowing 30 unrelated duplicate symbols, one of them a
+real bug; those are fixed during setup. See
+[docs/halehound/zmuldefs.md](docs/halehound/zmuldefs.md). `-w` still silences
+every compiler warning in the build.
+
+**The vendored CC1101 driver is patched during setup.** It shipped a dead
+copy-paste clone of itself (`..._JT_DRV.cpp`, a second `class
+ELECHOUSE_CC1101` and 29 duplicate globals) and declared its hardware-SPI flag
+as a global named `spi`, which collided with TFT_eSPI's `SPIClass spi`. See
+the same document.
 
 ## Scope
 
@@ -112,7 +121,8 @@ hardware.
 - `gps.cpp` — `gpsPortOpen()`/`gpsPortClose()` bracket every UART open/close and
   hand GPIO 1 between the console and the GPS
 - `tools/check_pinmap.py` — pin map checker
-- `tools/build.sh` — pinned, isolated toolchain and build
+- `tools/build.sh` — pinned, isolated toolchain, build, and CC1101 patches
+- `docs/halehound/zmuldefs.md` — what `-zmuldefs` was hiding
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
 None of this is tested on hardware yet. It compiles, the board profile is

@@ -57,6 +57,35 @@ LIBS=(
   "PCF8574@0.4.5"
 )
 
+# ── Two fixes to the vendored CC1101 driver ─────────────────────────────────
+# Both were being absorbed silently by -zmuldefs in upstream's platform.txt.
+# See docs/halehound/zmuldefs.md for how they were found.
+patch_cc1101() {
+  local lib="$1"
+
+  # 1. ELECHOUSE_CC1101_SRC_JT_DRV.{cpp,h} is a copy-paste clone of the whole
+  #    driver: same `class ELECHOUSE_CC1101`, its own `ELECHOUSE_cc1101` object,
+  #    and 29 duplicate globals. Nothing in the firmware includes its header.
+  #    Two different classes sharing one name in a single program is an ODR
+  #    violation; the linker was picking whichever came first.
+  rm -f "$lib/ELECHOUSE_CC1101_SRC_JT_DRV.cpp" "$lib/ELECHOUSE_CC1101_SRC_JT_DRV.h"
+
+  # 2. The driver declares its hardware-SPI flag as a *global* named `spi`:
+  #       bool spi = 0;
+  #    TFT_eSPI declares its bus object with the same name and linkage:
+  #       SPIClass spi = SPIClass(HSPI);
+  #    The linker folded them onto one address, so the 1-byte flag landed on
+  #    SPIClass::_spi_num (int8_t, offset 0). setSpiPin() does `spi = 1`, which
+  #    wrote 1 = FSPI into the display's bus number, and `if (spi == 0)` read
+  #    that field back instead of the flag. File-local linkage separates them.
+  if grep -q '^bool spi = 0;$' "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp"; then
+    sed -i 's|^bool spi = 0;$|static bool spi = 0;   // halehound: was global, collided with TFT_eSPI|' \
+      "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp"
+  fi
+  grep -q '^static bool spi = 0;' "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp" \
+    || { echo "patch_cc1101: 'spi' patch did not apply" >&2; exit 1; }
+}
+
 setup() {
   mkdir -p "$ARDUINO_DIRECTORIES_DATA" "$ARDUINO_DIRECTORIES_USER/libraries" \
            "$ARDUINO_DIRECTORIES_DOWNLOADS"
@@ -69,8 +98,16 @@ setup() {
   #   -DNFC_INTERFACE_SPI   puts the Adafruit PN532 library in SPI mode
   #   -zmuldefs             tells the linker to tolerate duplicate symbols
   #   -w                    silences every compiler warning
-  # The first is load-bearing. The other two paper over problems rather than
-  # fixing them and are worth revisiting once the fork settles.
+  #
+  # -zmuldefs has to stay. wifi.cpp defines ieee80211_raw_frame_sanity_check
+  # to return 0, overriding the IDF's copy in libnet80211.a so raw 802.11
+  # frames can be injected. --wrap cannot substitute: the caller
+  # (esp_wifi_80211_tx) lives in the same object file, so the call never
+  # becomes an undefined reference for --wrap to intercept.
+  #
+  # It was also absorbing 30 collisions that had nothing to do with that, one
+  # of them a real bug. Those are fixed in patch_cc1101 above, so the flag now
+  # covers only the case it was meant for. -w still hides everything.
   if [ ! -f "$CORE_DIR/platform.txt.orig" ]; then
     cp "$CORE_DIR/platform.txt" "$CORE_DIR/platform.txt.orig"
   fi
@@ -87,6 +124,8 @@ setup() {
   unzip -q -o "$REPO/Libraries/SmartRC-CC1101-Driver-Lib-master.zip" -d "$LIB"
   mv "$LIB/SmartRC-CC1101-Driver-Lib-master" "$LIB/SmartRC-CC1101-Driver-Lib"
   cp "$REPO/Libraries/User_Setup cyd.h" "$LIB/TFT_eSPI/User_Setup.h"
+
+  patch_cc1101 "$LIB/SmartRC-CC1101-Driver-Lib"
 
   echo "== pinned libraries =="
   arduino-cli lib install "${LIBS[@]}"
