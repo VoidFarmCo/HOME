@@ -1,0 +1,2 @@
+# Project-local Arduino libraries (installed by tools/build.sh setup)
+.arduino/

@@ -50,12 +50,55 @@ Upstream is an Arduino sketch, so `arduino-cli` is the path of least
 resistance. PlatformIO would mean restructuring the tree first.
 
 ```bash
-arduino-cli core install esp32:esp32
+tools/build.sh setup
 ```
 
-Libraries are hand-assembled; see upstream's `Libraries/` (TFT_eSPI needs
-`User_Setup cyd.h` copied over its `User_Setup.h`, and the CC1101 driver ships
-as a zip).
+```bash
+tools/build.sh
+```
+
+```bash
+tools/build.sh upload COM7
+```
+
+`setup` is a one-time ~1 GB download. It installs everything into its own root
+rather than a global Arduino install, so it cannot disturb other projects.
+
+Current size: **1825489 bytes, 92% of the app partition**, 34% of RAM. That is
+tight. Any real feature work needs either a bigger partition scheme or
+trimming upstream modules that Halehound does not use.
+
+### Things that will bite you
+
+**esp32 core 2.0.10, exactly.** Upstream documents this and means it. The 3.x
+line is IDF 5, which dropped `esp_event_loop.h` — `config.h` includes it, so
+3.x fails on the first file.
+
+**Library versions are pinned, and not for neatness.** Library Manager hands
+you the newest, and three of these broke their APIs: ArduinoJson 7 dropped
+`StaticJsonDocument` and `createNestedObject`, NimBLE 2.x dropped
+`NimBLEAdvertisedDeviceCallbacks` and `NimBLESecurity` and renamed the
+`NimBLEHIDDevice` accessors, and arduinoFFT 2.x replaced the `arduinoFFT`
+class with `ArduinoFFT<T>`. Between them that is roughly twenty compile
+errors that look like code bugs and are not.
+
+**TFT_eSPI and the CC1101 driver must come from `Libraries/`.** Upstream
+customised both. `User_Setup cyd.h` has to land as TFT_eSPI's `User_Setup.h`.
+
+**Windows MAX_PATH.** The toolchain deliberately lives at `~/.hh-esp32`, not
+inside the repo. The esp32 core compiles with `-fno-rtti`, which selects the
+`no-rtti` libstdc++ multilib, and with the core inside this repo the path to
+`.../xtensa-esp32-elf/no-rtti/bits/error_constants.h` came to 259 characters —
+one under the 260 limit. The compiler reported the header as missing while it
+sat right there, and only that one multilib was affected, so the default build
+worked and `-fno-rtti` did not. Override the location with `HH_ARDUINO_ROOT`
+if you must, but keep it short.
+
+**The patched `platform.txt`.** Upstream ships one and the build needs it, but
+only one of its three changes is load-bearing: `-DNFC_INTERFACE_SPI` puts the
+PN532 library into SPI mode. The other two are `-zmuldefs` (tolerate duplicate
+symbols at link) and `-w` (silence every warning). Those hide problems rather
+than fix them and are worth revisiting.
 
 ## Scope
 
@@ -69,4 +112,8 @@ hardware.
 - `gps.cpp` — `gpsPortOpen()`/`gpsPortClose()` bracket every UART open/close and
   hand GPIO 1 between the console and the GPS
 - `tools/check_pinmap.py` — pin map checker
+- `tools/build.sh` — pinned, isolated toolchain and build
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
+
+None of this is tested on hardware yet. It compiles, the board profile is
+confirmed present in the flash image, and that is all that is currently known.
