@@ -2488,7 +2488,7 @@ static void updateHeader(bool force) {
   tft.setTextFont(1);
   tft.setTextSize(1);
 
-  char found[24];
+  char found[32];
   if (s_hitCount <= 0) {
     snprintf(found, sizeof(found), "No suspects yet");
   } else if (s_hitCount == 1) {

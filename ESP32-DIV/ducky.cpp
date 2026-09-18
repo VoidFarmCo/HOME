@@ -744,7 +744,7 @@ static void drawListHints(int hintY) {
   tft.setTextFont(1);
   tft.setTextColor(UI_TEXT, COL_BG);
 
-  char counter[20];
+  char counter[24];
   snprintf(counter, sizeof(counter), "%d/%d", sel + 1, (int)items.size());
   int counterWidth = tft.textWidth(counter, 1);
   tft.drawString(counter, DISPLAY_WIDTH - counterWidth - PADDING, hintY, 1);

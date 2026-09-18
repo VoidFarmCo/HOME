@@ -346,9 +346,27 @@ void formatUtcFromField(const char* field) {
     strncpy(utcStr, "--:--:--", sizeof(utcStr));
     return;
   }
-  int h = (field[0] - '0') * 10 + (field[1] - '0');
-  int m = (field[2] - '0') * 10 + (field[3] - '0');
-  int s = (field[4] - '0') * 10 + (field[5] - '0');
+  // This is a raw NMEA field off the serial line and the length check
+  // above is the only thing it has passed. On non-digit bytes the arithmetic
+  // below produces values well outside 0-99, and the formatted result runs
+  // past utcStr. Reject anything that is not six digits.
+  for (int i = 0; i < 6; i++) {
+    if (field[i] < '0' || field[i] > '9') {
+      strncpy(utcStr, "--:--:--", sizeof(utcStr));
+      return;
+    }
+  }
+  const int h = (field[0] - '0') * 10 + (field[1] - '0');
+  const int m = (field[2] - '0') * 10 + (field[3] - '0');
+  const int s = (field[4] - '0') * 10 + (field[5] - '0');
+  // Six digits still permit impossible times, e.g. "99:99:99". Rejecting
+  // them keeps garbage off the display, and it is also the only form of the
+  // bound gcc 8 can follow here -- it does not carry the digit loop above
+  // through to these reads, so without this it still sees %02d as unbounded.
+  if (h < 0 || h > 23 || m < 0 || m > 59 || s < 0 || s > 59) {
+    strncpy(utcStr, "--:--:--", sizeof(utcStr));
+    return;
+  }
   snprintf(utcStr, sizeof(utcStr), "%02d:%02d:%02d", h, m, s);
 }
 
@@ -2879,6 +2897,11 @@ static bool wardDdMmYyToIso(const char* ddmmyy, char* iso, size_t isoSz) {
   }
   int d0 = 0, m0 = 0, y0 = 0;
   if (sscanf(ddmmyy, "%d/%d/%d", &d0, &m0, &y0) != 3) {
+    return false;
+  }
+  // sscanf returns whatever magnitude it parsed. Unbounded, these overrun
+  // iso and write a nonsense date into the wigle export either way.
+  if (d0 < 1 || d0 > 31 || m0 < 1 || m0 > 12 || y0 < 0 || y0 > 99) {
     return false;
   }
   int yFull = y0;

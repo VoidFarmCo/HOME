@@ -4387,7 +4387,7 @@ void drawScanScreen() {
         tft.setCursor(10, LIST_HEADER_Y);
         tft.println("Networks:");
 
-        char page_buf[20];
+        char page_buf[32];
         snprintf(page_buf, sizeof(page_buf), "Page %d/%d",
                  current_page + 1, max(1, (network_count + perPage - 1) / perPage));
         tft.setCursor(180, LIST_HEADER_Y);
@@ -5076,7 +5076,7 @@ void drawScanScreen() {
         tft.setCursor(10, LIST_HEADER_Y);
         tft.println("Networks:");
 
-        char page_buf[20];
+        char page_buf[32];
         snprintf(page_buf, sizeof(page_buf), "Page %d/%d",
                  current_page + 1, max(1, (network_count + perPage - 1) / perPage));
         tft.setCursor(180, LIST_HEADER_Y);
@@ -6023,7 +6023,7 @@ static void drawScanScreen(bool fullRedraw) {
   tft.setCursor(10, LIST_HEADER_Y);
   tft.println("Hidden SSIDs:");
 
-  char page_buf[20];
+  char page_buf[32];
   snprintf(page_buf, sizeof(page_buf), "Page %d/%d",
            s_currentPage + 1, max(1, (s_count + perPage - 1) / perPage));
   tft.setCursor(180, LIST_HEADER_Y);
@@ -6878,7 +6878,7 @@ static void drawScanScreen(bool fullRedraw) {
   tft.setCursor(10, LIST_HEADER_Y);
   tft.println("WPS Networks:");
 
-  char page_buf[20];
+  char page_buf[32];
   snprintf(page_buf, sizeof(page_buf), "Page %d/%d",
            s_currentPage + 1, max(1, (s_count + perPage - 1) / perPage));
   tft.setCursor(180, LIST_HEADER_Y);
@@ -7345,7 +7345,7 @@ static void drawApRow(int i, int y, bool isSel) {
     snprintf(name, sizeof(name), "(hidden)");
   }
 
-  char left[28];
+  char left[48];
   snprintf(left, sizeof(left), "%02d: %s", i + 1, name);
 
   char right[28];
@@ -7372,7 +7372,7 @@ static void drawApRow(int i, int y, bool isSel) {
 }
 
 static void drawHostRow(int i, int y, bool isSel) {
-  char left[28];
+  char left[48];
   IPAddress ip(s_hosts[i].ip);
   snprintf(left, sizeof(left), "%02d: %d.%d.%d.%d",
            i + 1, ip[0], ip[1], ip[2], ip[3]);
@@ -7461,7 +7461,7 @@ static void drawListCommon(bool fullRedraw, int count, const char* header,
   tft.setCursor(10, LIST_HEADER_Y);
   tft.println(header);
 
-  char page_buf[20];
+  char page_buf[32];
   snprintf(page_buf, sizeof(page_buf), "Page %d/%d",
            s_currentPage + 1, max(1, (count + perPage - 1) / perPage));
   tft.setCursor(180, LIST_HEADER_Y);
@@ -8608,7 +8608,7 @@ static void karmaHandleLoginPost() {
     strncpy(s_lastPass, pass.c_str(), sizeof(s_lastPass) - 1);
     s_lastPass[sizeof(s_lastPass) - 1] = '\0';
     s_credCount++;
-    char buf[48];
+    char buf[80];
     snprintf(buf, sizeof(buf), "[!] cred %s / %s", s_lastUser, s_lastPass);
     logLine(buf, ORANGE);
   }
@@ -10328,7 +10328,7 @@ void drawNetworkList(int startIndex, int numNetworks, NetworkInfo* networks, int
       y += NETWORK_ROW_HEIGHT;
     }
 
-    char page_buf[20];
+    char page_buf[32];
     snprintf(page_buf, sizeof(page_buf), "Page %d/%d", start_index / FW_NETWORKS_PER_PAGE + 1, (numNetworks + FW_NETWORKS_PER_PAGE - 1) / FW_NETWORKS_PER_PAGE);
     tft.setCursor(180, 50);
     tft.setTextColor(GREEN);

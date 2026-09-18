@@ -159,9 +159,27 @@ would be correct.
 `if (v > 255) v = 255;`, which can never be true. The clamp is dead; anything
 over 255 was already truncated at the call boundary.
 
-**`-Wformat-truncation=` x14**: `snprintf` into buffers that a wide `%d` could
-overflow, e.g. `"Page %d/%d"` into 20 bytes with `int` arguments. `snprintf`
-truncates safely, so these are cosmetic unless a count genuinely gets large.
+**`-Wformat-truncation=` x14** (fixed): `snprintf` into buffers a wide `%d`
+could overflow. Twelve were buffer sizing -- six identical `char page_buf[20]`
+holding `"Page %d/%d"`, which needs 29 bytes worst case; `char buf[48]` for
+`"[!] cred %s / %s"` over two `char[32]`, which needs 75. Widened to the worst
+case the format can produce. `snprintf` was truncating safely, so nothing
+changes except in cases that were being silently cut.
+
+The other two were not sizing problems, and widening would have been the wrong
+fix. Both parse NMEA straight off the GPS serial line and neither checks it
+got a number, so the values reaching `%02d` are genuinely unbounded:
+`formatUtcFromField` does digit arithmetic on arbitrary bytes, and
+`wardDdMmYyToIso` formats whatever `sscanf("%d/%d/%d")` returns. Both now
+validate, which bounds the output, silences the warning, and stops a
+malformed sentence writing a nonsense timestamp or a garbage date into the
+wigle export.
+
+One wrinkle worth recording: in `formatUtcFromField` the digit loop alone did
+not satisfy gcc 8, which does not carry the loop's range information through
+to the `field[i]` reads at the `snprintf`. An explicit `h`/`m`/`s` range check
+immediately before the call does, and rejecting impossible times like
+`99:99:99` is worth having regardless.
 
 **`-Wdeprecated-declarations` x2**: `tcpip_adapter_init()` at `wifi.cpp:284`.
 Works on IDF 4.4, gone in IDF 5. Relevant if the fork ever moves to core 3.x.
@@ -217,9 +235,16 @@ Two pieces of work remain, in this order:
    expression hazard described above. That is a refactor across 20-odd sites
    in `wifi.cpp` and `bluetooth.cpp`.
 
-2. **`-Wformat-truncation` (14).** Mechanical: widen the destination buffers,
-   checking each is not sized to a layout constraint.
+2. ~~**`-Wformat-truncation` (14).**~~ Done.
 
-After those, `-w` can come out of `build.extra_flags.esp32` and `-Wall
--Wextra` can go in, and the next `-Warray-bounds` shows up the day it is
+### -Wall itself is now clean
+
+Sketch warnings are down to 78, and **`-Wall` contributes none of them**. The
+25 that show up under it break down as 23 always-on and 2 default-on
+(`tcpip_adapter_init`); neither group is produced by `-Wall`.
+
+So `-Wall` is no longer what is in the way. `-w` is. Removing it exposes those
+25 whatever warning level is set, and 22 of them are the macro redefinitions.
+Fix those and the build goes quiet, at which point `-w` comes out,
+`-Wall -Wextra` goes in, and the next `-Warray-bounds` shows up the day it is
 written rather than in an archaeology session.

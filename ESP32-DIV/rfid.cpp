@@ -347,7 +347,7 @@ static void rfidDrawInfoOverlay(const char* featureTitle, const char* body, int 
   tft.drawString("Info", RF_PAD_X, headerY);
 
   if (pageCount > 1) {
-    char pageLabel[12];
+    char pageLabel[24];
     snprintf(pageLabel, sizeof(pageLabel), "%d/%d", page + 1, pageCount);
     const int pw = (int)tft.textWidth(pageLabel) + 14;
     rfidDrawInfoPill(TFT_WIDTH - RF_PAD_X - pw, headerY, pw, pageLabel);
