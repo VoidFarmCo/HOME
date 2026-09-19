@@ -16,6 +16,19 @@
 #
 # The archive is still an explicit include list rather than "everything
 # except", because the list is the record of what belongs to this fork.
+#
+# Verifying one of these: extract it somewhere else, wipe the build tree, and
+# build from scratch. The image should come back byte-identical, which is
+# what -ffile-prefix-map in build.sh buys.
+#
+# Extract to a SHORT path -- C:\pv or similar -- and delete it afterwards.
+# Somewhere deep like a temp directory fails: NimBLE's sources sit far enough
+# down that a relative ../include/ resolves past Windows' 259-character
+# limit, and the error is a header reported missing when it is right there.
+# A junction from a short path to a deep one is not a way round it either:
+# the compiler canonicalises through the junction, so the real path lands in
+# the ELF's debug info, -ffile-prefix-map misses it, and the image quietly
+# stops matching its published digest.
 # None of that is needed to build the firmware and none of it is ours, so the
 # archive is an explicit include list rather than "everything except".
 set -euo pipefail
