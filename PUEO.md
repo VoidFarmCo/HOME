@@ -175,8 +175,28 @@ actually works here. Kept on purpose, not by neglect.
 
 ## Changes so far
 
+New in 0.2.1, the first release since 0.1.0 whose compiled image actually
+differs in something other than the version string:
+
+- `SpotterSignatures.h` — the community Flock OUI collections, checked
+  before being trusted. `flock-you` carries 32 WiFi prefixes and
+  `flock-finder` 31, 30 of them shared, for a union of 33; all are in,
+  along with the `Flock Camera net.` and bare `Flock` SSIDs, the
+  `FS Ext Battery` and `DfuTarg` BLE names, XUNTONG's company ID on the
+  Penguin pack, and the Raven GATT UUIDs. Every prefix was resolved against
+  the IEEE MA-L registry first, which is why nearly all of them land on
+  `Weak`: 23 belong to Liteon and 2 to Espressif, blocks that are in a very
+  large amount of unrelated consumer hardware. Each carries the assignee
+  the registry names rather than the word "Flock", and earns its place by
+  corroborating a Flock SSID or a Penguin advertisement rather than by
+  firing alone. 688 bytes of flash, no RAM.
+- `docs/pueo/nrf24-fit-test.scad` — a test print for the one enclosure
+  pocket with no nominal slack: a clearance ladder, and a slice of the base
+  taken as an `intersection()` with `base()` so it cannot drift from the
+  real part
+
 New in 0.2.0, all of it design work rather than firmware — the compiled
-image is unchanged from 0.1.0 apart from the version string:
+image was unchanged from 0.1.0 apart from the version string:
 
 - `docs/pueo/pcb-design.md` — grew from a sketch into the carrier-board
   design: netlist, power tree, load budget, placement and the module
