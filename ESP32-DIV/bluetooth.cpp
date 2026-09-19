@@ -2354,45 +2354,76 @@ struct Hit {
   bool dirty;
 };
 
+/* Which radio a module actually speaks, which decides whether this feature
+ * can ever see it. See the note below the table. `Both` is an honest
+ * "sold under this name in both flavours and this table cannot tell them
+ * apart". */
+enum class Radio : uint8_t { Ble, Classic, Both };
+
 struct Signature {
   const char* needle;  // normalized (A-Z0-9 only)
   const char* label;
   uint8_t threat;
+  Radio radio;
 };
 
 // Default names used on hobbyist BT/BLE serial modules commonly found in
 // Bluetooth-enabled card skimmers (SparkFun/Marauder research). A hit means
 // a suspicious module is nearby — not proof of a skimmer.
+//
+// ORDER IS LOAD-BEARING. The match below is strstr() against the normalised
+// name and the first hit wins, so a longer needle has to come before any
+// shorter one it contains: BTHC05 before HC05, MLTBT05 before BT05, CC41A
+// before CC41, BT04A before BT04. Adding a signature in the wrong place
+// silently relabels devices rather than failing.
+//
+// The Radio column is the uncomfortable part. This feature scans BLE only —
+// BLEDevice::getScan() and nothing else — so the Classic entries below can
+// never match. They are kept because they are correct about what a skimmer
+// contains, and marked because the table otherwise reads as a promise this
+// scanner does not keep: eleven of these twenty-eight are Classic, including
+// seven of the eight rated 5.
+//
+// It is not a small fix. NimBLE has no Bluetooth Classic support at all, and
+// ensureBleStackReady() calls esp_bt_controller_mem_release(CLASSIC_BT) to
+// reclaim ~30 KB before init, which cannot be undone without a reboot.
+// Reaching the Classic modules means Bluedroid instead of NimBLE. See
+// docs/pueo/skimmer-hunter.md.
 static const Signature s_sigs[] = {
-  {"FREE2MOVE", "FREE2MOVE", 5},
-  {"BTHC05", "BT-HC05", 5},
-  {"BTHC06", "BT-HC06", 5},
-  {"MLTBT05", "MLT-BT05", 4},
-  {"BT04A", "BT04-A", 4},
-  {"BTSPP", "BT-SPP", 4},
-  {"CC41A", "CC41-A", 4},
-  {"SPPCA", "SPP-CA", 4},
-  {"LINVOR", "LINVOR", 4},
-  {"HC03", "HC-03", 5},
-  {"HC04", "HC-04", 5},
-  {"HC05", "HC-05", 5},
-  {"HC06", "HC-06", 5},
-  {"HC08", "HC-08", 5},
-  {"BT04", "BT-04", 4},
-  {"BT05", "BT-05", 4},
-  {"BT06", "BT-06", 4},
-  {"BT08", "BT-08", 4},
-  {"CC41", "CC41", 4},
-  {"HM10", "HM-10", 3},
-  {"HM11", "HM-11", 3},
-  {"HM19", "HM-19", 3},
-  {"AT09", "AT-09", 3},
-  {"JDY08", "JDY-08", 4},
-  {"JDY10", "JDY-10", 4},
-  {"JDY16", "JDY-16", 4},
-  {"JDY23", "JDY-23", 4},
-  {"JDY31", "JDY-31", 4},
+  {"FREE2MOVE", "FREE2MOVE", 5, Radio::Classic},
+  {"BTHC05", "BT-HC05", 5, Radio::Classic},
+  {"BTHC06", "BT-HC06", 5, Radio::Classic},
+  {"MLTBT05", "MLT-BT05", 4, Radio::Ble},
+  {"BT04A", "BT04-A", 4, Radio::Both},
+  {"BTSPP", "BT-SPP", 4, Radio::Classic},   // SPP is a Classic profile
+  {"CC41A", "CC41-A", 4, Radio::Ble},
+  {"SPPCA", "SPP-CA", 4, Radio::Classic},
+  {"LINVOR", "LINVOR", 4, Radio::Classic},  // HC-06 firmware branding
+  {"HC03", "HC-03", 5, Radio::Classic},
+  {"HC04", "HC-04", 5, Radio::Classic},
+  {"HC05", "HC-05", 5, Radio::Classic},
+  {"HC06", "HC-06", 5, Radio::Classic},
+  {"HC08", "HC-08", 5, Radio::Ble},         // the one 5 this can actually see
+  {"BT04", "BT-04", 4, Radio::Both},
+  {"BT05", "BT-05", 4, Radio::Ble},
+  {"BT06", "BT-06", 4, Radio::Ble},
+  {"BT08", "BT-08", 4, Radio::Both},
+  {"CC41", "CC41", 4, Radio::Ble},
+  {"HM10", "HM-10", 3, Radio::Ble},
+  {"HM11", "HM-11", 3, Radio::Ble},
+  {"HM19", "HM-19", 3, Radio::Ble},
+  {"AT09", "AT-09", 3, Radio::Ble},
+  {"JDY08", "JDY-08", 4, Radio::Ble},
+  {"JDY10", "JDY-10", 4, Radio::Ble},
+  {"JDY16", "JDY-16", 4, Radio::Ble},
+  {"JDY23", "JDY-23", 4, Radio::Ble},
+  {"JDY31", "JDY-31", 4, Radio::Classic},   // JDY-3x are SPP, unlike JDY-0x/1x/2x
 };
+
+/* Counted rather than asserted in prose, so that adding a Classic signature
+ * without noticing is caught here rather than in the field. */
+constexpr size_t kSigCount = sizeof(s_sigs) / sizeof(s_sigs[0]);
+static_assert(kSigCount == 28, "signature count changed; update the note above");
 
 static int iconX[ICON_NUM] = {10};
 static int iconY = STATUS_BAR_Y_OFFSET;
