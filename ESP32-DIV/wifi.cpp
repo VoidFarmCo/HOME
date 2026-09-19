@@ -281,7 +281,15 @@ static void ptmStartRadioAndPcapOnce() {
   wifi_mode_t wm = WIFI_MODE_NULL;
   const esp_err_t gm = esp_wifi_get_mode(&wm);
   if (gm == ESP_ERR_WIFI_NOT_INIT) {
+    // Deprecated on IDF 4.4, where it is a shim over esp_netif_init() plus the
+    // default netif setup, and gone entirely in IDF 5. Suppressed rather than
+    // swapped because the replacement is not a straight substitution and this
+    // sits in the WiFi bring-up path, which there is no way to test yet. This
+    // is one of the things that has to be dealt with to move to core 3.x.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     tcpip_adapter_init();
+#pragma GCC diagnostic pop
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_err_t err = esp_wifi_init(&cfg);
     if (err != ESP_OK) {
@@ -622,12 +630,12 @@ void draw() {
 static bool uiDrawn = false;
 
 void runUI() {
-#define SCREEN_WIDTH  240
-#define SCREEN_HEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 3
+  constexpr int SCREEN_WIDTH = 240;
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 3;
 
   static int iconX[ICON_NUM] = {170, 210, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -1254,12 +1262,13 @@ void beaconSpam() {
 static bool uiDrawn = false;
 
 void runUI() {
-#define SCREEN_WIDTH  240
+  constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 3
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 3;
 
   static int iconX[ICON_NUM] = {10, 190, 220};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -1511,7 +1520,7 @@ void beaconSpamLoop() {
 
 namespace DeauthDetect {
 
-#define LINE_HEIGHT 12
+constexpr int LINE_HEIGHT = 12;
 static constexpr int DEAUTH_TERM_CAPACITY = 24;
 
 static int deauthVisibleLines() {
@@ -1520,14 +1529,15 @@ static int deauthVisibleLines() {
 
 #define MAX_NETWORKS ESP32DIV_MAX_WIFI_NETWORKS
 #define MAX_CHANNELS 14
-#define MAX_SSID_LENGTH 8
+constexpr int MAX_SSID_LENGTH = 8;
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
 
 bool stopScan = false;
 bool exitMode = false;
@@ -1979,12 +1989,13 @@ namespace WifiScan {
 #define TFT_WIDTH 240
 #define TFT_HEIGHT 320
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
 
 int currentIndex = 0;
 int listStartIndex = 0;
@@ -2153,7 +2164,7 @@ const unsigned long scanTimeout = 2000;
 unsigned long lastButtonPress = 0;
 const unsigned long debounceTime = 200;
 
-#define MAX_SSID_LENGTH 10
+constexpr int MAX_SSID_LENGTH = 10;
 
 // Deauther-like list geometry (bigger rows + paging + bottom tab bar).
 static constexpr int LIST_HEADER_Y = 50;
@@ -2707,7 +2718,7 @@ void wifiscanLoop() {
 namespace CaptivePortal {
 
 #define CP_LINE_HEIGHT 12
-#define MAX_LINES 23
+constexpr int MAX_LINES = 23;
 
 static unsigned long cportalLastBtnMs = 0;
 static const unsigned long cportalDebounceMs = 200;
@@ -3889,12 +3900,13 @@ void handleCredList(int x, int y) {
 static bool uiDrawn = false;
 
 void runUI() {
-#define SCREEN_WIDTH  240
+  constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 6
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 6;
 
   static int iconX[ICON_NUM] = {90, 130, 170, 210, 50, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -4204,8 +4216,8 @@ void cportalLoop() {
 
 namespace Deauther {
 
-#define SCREEN_WIDTH  240
-#define SCREEN_HEIGHT 320
+constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_HEIGHT = 320;
 
 static unsigned long deautherLastButtonPress = 0;
 static const unsigned long deautherDebounceTime = 200;
@@ -4654,12 +4666,13 @@ void handleTouch() {
 static bool uiDrawn = false;
 
 void runUI() {
-#define SCREEN_WIDTH  240
+  constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 2;
 
   static int iconX[ICON_NUM] = {220, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -4857,8 +4870,8 @@ void deautherLoop() {
 
 namespace ProbeRequestFlood {
 
-#define SCREEN_WIDTH  240
-#define SCREEN_HEIGHT 320
+constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_HEIGHT = 320;
 
 // Larger row height = easier touch selection.
 static constexpr int LIST_HEADER_Y = 50;
@@ -5341,12 +5354,13 @@ void handleTouch() {
 }
 
 void runUI() {
-#define SCREEN_WIDTH  240
+  constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 2;
 
   static int iconX[ICON_NUM] = {220, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -5544,12 +5558,13 @@ void probeRequestFloodLoop() {
 
 namespace HiddenSsidReveal {
 
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_HEIGHT = 320;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
 
 static constexpr int LIST_HEADER_Y = 50;
 static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
@@ -6671,11 +6686,12 @@ void hiddenSsidLoop() {
 
 namespace WpsScanner {
 
-#define SCREEN_WIDTH 240
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+constexpr int SCREEN_WIDTH = 240;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
 
 static constexpr int LIST_HEADER_Y = 50;
 static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
@@ -7143,11 +7159,12 @@ void wpsScannerLoop() {
 
 namespace ArpScanner {
 
-#define SCREEN_WIDTH 240
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+constexpr int SCREEN_WIDTH = 240;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
 
 static constexpr int LIST_HEADER_Y = 50;
 static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
@@ -8026,12 +8043,13 @@ void arpScannerLoop() {
 
 namespace KarmaAttack {
 
-#define SCREEN_WIDTH 240
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
-#define LINE_HEIGHT 12
+constexpr int SCREEN_WIDTH = 240;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
+constexpr int LINE_HEIGHT = 12;
 
 static constexpr int TERM_CAPACITY = 24;
 static constexpr int CARDS_Y = 42;
@@ -9245,8 +9263,8 @@ namespace FirmwareUpdate {
 
 const char* host = "esp32";
 
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 320
+constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_HEIGHT = 320;
 
 #define BUTTON_WIDTH 230
 #define BUTTON_HEIGHT 20
@@ -9682,12 +9700,13 @@ static void fwStoreFooter(const FeatureUI::Button* src, uint8_t count) {
 }
 
 void runUI() {
-#define SCREEN_WIDTH  240
+  constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 1
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 1;
 
   static int iconX[ICON_NUM] = {10};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -10533,7 +10552,10 @@ void performWebOTAUpdate() {
       }
       performWebOTAUpdate();
     }
-  }, [&inUpdate, &totalUploaded]() {
+  // totalUploaded is a function-local static, so it has static storage
+  // duration and the lambda reaches it without being captured. Capturing it
+  // was never meaningful.
+  }, [&inUpdate]() {
     HTTPUpload& upload = server.upload();
     if (upload.status == UPLOAD_FILE_START) {
       tft.fillRect(0, 37, 240, 320, TFT_BLACK);

@@ -1,2 +1,6 @@
 # Project-local Arduino libraries (installed by tools/build.sh setup)
 .arduino/
+
+# Python bytecode from the tools/
+__pycache__/
+*.pyc

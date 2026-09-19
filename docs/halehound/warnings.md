@@ -226,25 +226,77 @@ The distinction matters. The 23 "always on" warnings are not produced by
 out. They are the real blocker to dropping `-w`, and `-Wall` is not what is
 holding things up.
 
-Two pieces of work remain, in this order:
+Both remaining pieces are now done. See "Scoping the UI constants" below.
 
-1. **The macro redefinitions (22).** `#undef` before each redefinition would
-   silence them mechanically without changing a single value, but that is the
-   same move as `-zmuldefs` -- quieting the symptom. The honest fix is giving
-   these per-screen constants real scope, which also removes the `MAX_LINES`
-   expression hazard described above. That is a refactor across 20-odd sites
-   in `wifi.cpp` and `bluetooth.cpp`.
+### -w is off, -Wall is on
 
-2. ~~**`-Wformat-truncation` (14).**~~ Done.
+`tools/build.sh setup` now strips `-w` from `build.extra_flags.esp32` and the
+normal build runs `--warnings more`, which is plain `-Wall`. **The sketch is
+clean under it.**
 
-### -Wall itself is now clean
+The build filters warnings coming from TFT_eSPI and the ESP-IDF headers (35 of
+them, repeated per translation unit) and prints a count instead. They are not
+ours to fix, and a build that always prints noise is a build nobody reads.
+`tools/build.sh warnings` still shows everything, and `-Wextra` is not the
+default because 52 `-Wmissing-field-initializers` remain.
 
-Sketch warnings are down to 78, and **`-Wall` contributes none of them**. The
-25 that show up under it break down as 23 always-on and 2 default-on
-(`tcpip_adapter_init`); neither group is produced by `-Wall`.
+## Scoping the UI constants
 
-So `-Wall` is no longer what is in the way. `-w` is. Removing it exposes those
-25 whatever warning level is set, and 22 of them are the macro redefinitions.
-Fix those and the build goes quiet, at which point `-w` comes out,
-`-Wall -Wextra` goes in, and the next `-Warray-bounds` shows up the day it is
-written rather than in an archaeology session.
+The 22 redefinition warnings are gone, along with the `MAX_LINES` hazard.
+
+Every one of the 154 definitions already sat inside a namespace or a function
+body -- these macros were being used as scoped constants by people who had no
+scoped constants. So the fix was a straight swap:
+
+```c
+#define ICON_NUM 3          ->   constexpr int ICON_NUM = 3;
+#define MAX_LINES (H / L)   ->   constexpr int MAX_LINES = (H / L);
+```
+
+Same names, so no use site changed and the diff is the definition lines only.
+The derived ones now evaluate once, where they are written, which is what
+removes the hazard: `MAX_LINES` can no longer re-resolve against a
+`SCREEN_HEIGHT` from further down the file.
+
+`STATUS_BAR_Y_OFFSET` needed one extra step. `shared.h` defines it as a macro
+(default 0), and a live macro rewrites the declaration itself into
+`constexpr int 0 = 20;`. Each site gets an `#undef` first. Uses above that
+point still see the header's 0, exactly as before.
+
+### Proving it changed nothing
+
+A refactor that can silently resize an array, with no hardware to test on,
+needs more than "it compiles". Three gates:
+
+`tools/macro_value_check.py` recomputes every derived-macro use twice -- with
+the operand values in effect at the use, and with those in effect at the
+definition -- and compares. 13 uses, no differences. Had any differed, that
+would have been a live bug the macros were hiding rather than a reason not to
+proceed.
+
+`tools/macro_containment_check.py` walks braces to find each definition's
+block and checks that every use it governs falls inside. 511 uses, no escapes.
+Worth noting its first run reported three, all false: two were the macro names
+appearing in a comment (`subghz.cpp` has one that reads "Avoid jammer/replay
+macros (SCREEN_WIDTH, ICON_NUM, …) leaking into this scope" -- someone hit
+this before and worked around it with `k`-prefixed locals), and one was brace
+drift, verified by hand to be inside `namespace FirmwareUpdate`.
+
+Then the real check: **all 14,157 symbols in the linked image are identical in
+size before and after**, and the image is the same 1824493 bytes. The compiler
+produced functionally identical output. No array resized, no loop bound moved,
+no constant changed value.
+
+### What is left
+
+Under `-Wall`: nothing in the sketch.
+
+Under `-Wextra`, 53: 52 `-Wmissing-field-initializers` and one `-Wtype-limits`
+(the dead `if (v > 255)` on a `uint8_t` in `applyBrightness`). Clearing those
+would let `-Wextra` become the default too.
+
+Two suppressions were added deliberately rather than fixed:
+`tcpip_adapter_init()` is wrapped in a `#pragma GCC diagnostic ignored` with a
+note -- it is a shim on IDF 4.4 and gone in IDF 5, the replacement is not a
+straight substitution, and it sits in the WiFi bring-up path with no way to
+test it yet. That one is on the list for any move to core 3.x.

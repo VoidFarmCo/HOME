@@ -1272,7 +1272,7 @@ namespace Terminal {
 #define TOP_FIXED_AREA 86
 #define DISPLAY_WIDTH 240
 #define DISPLAY_HEIGHT 320
-#define SCREEN_WIDTH 240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
 
 static bool uiDrawn = false;
@@ -1361,10 +1361,11 @@ static void terminalHandleNavButtons() {
 
 void runUI() {
 
-    #define STATUS_BAR_Y_OFFSET 20
-    #define STATUS_BAR_HEIGHT 16
-    #define ICON_SIZE 16
-    #define ICON_NUM 3
+    #undef STATUS_BAR_Y_OFFSET
+    constexpr int STATUS_BAR_Y_OFFSET = 20;
+    constexpr int STATUS_BAR_HEIGHT = 16;
+    constexpr int ICON_SIZE = 16;
+    constexpr int ICON_NUM = 3;
 
     static int iconX[ICON_NUM] = {210, 170, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;

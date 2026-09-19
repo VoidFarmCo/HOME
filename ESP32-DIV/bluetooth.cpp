@@ -157,9 +157,9 @@ static void bleSetSpooferNavLabels() {
 
 namespace BleSpoofer {
 
-#define SCREEN_HEIGHT 250
-#define LINE_HEIGHT 12
-#define MAX_LINES (SCREEN_HEIGHT / LINE_HEIGHT)
+constexpr int SCREEN_HEIGHT = 250;
+constexpr int LINE_HEIGHT = 12;
+constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
 String spooferBuffer[MAX_LINES];
 uint16_t colorspooferBuffer[MAX_LINES];
@@ -167,12 +167,13 @@ int spooferlineIndex = 0;
 
 static bool uiDrawn = false;
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 5
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 5;
 
 static int iconX[ICON_NUM] = {90, 130, 170, 210, 10};
 static int iconY = STATUS_BAR_Y_OFFSET;
@@ -958,12 +959,13 @@ void exit() {
 namespace SourApple {
 static bool uiDrawn = false;
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 1
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 1;
 
 static int iconX[ICON_NUM] = {10};
 static int iconY = STATUS_BAR_Y_OFFSET;
@@ -974,7 +976,7 @@ BLEAdvertising *Advertising;
 
 uint8_t packet[17];
 
-#define MAX_LINES 30
+constexpr int MAX_LINES = 30;
 String lines[MAX_LINES];
 int currentLine = 0;
 int lineNumber = 1;
@@ -1197,11 +1199,12 @@ void exit() {
 
 namespace AirTagSpoofer {
 
-#define SCREEN_WIDTH 240
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 1
+constexpr int SCREEN_WIDTH = 240;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 1;
 
 static constexpr int INFO_Y = 42;
 static constexpr int ROW_H = 16;
@@ -1733,11 +1736,12 @@ void exit() {
 
 namespace AirTagSniffer {
 
-#define SCREEN_WIDTH 240
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 1
+constexpr int SCREEN_WIDTH = 240;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 1;
 
 static constexpr int HDR_Y = 42;
 static constexpr int COL_Y = 58;
@@ -2331,11 +2335,12 @@ void exit() {
 
 namespace BleSkimmer {
 
-#define SCREEN_WIDTH 240
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 1
+constexpr int SCREEN_WIDTH = 240;
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 1;
 
 static constexpr int HDR_Y = 40;
 static constexpr int LIST_Y = 58;
@@ -3139,9 +3144,9 @@ byte channelGroup1[] = {2, 5, 8, 11};
 byte channelGroup2[] = {26, 29, 32, 35};
 byte channelGroup3[] = {80, 83, 86, 89};
 
-#define SCREEN_HEIGHT 320
-#define LINE_HEIGHT 12
-#define MAX_LINES (SCREEN_HEIGHT / LINE_HEIGHT)
+constexpr int SCREEN_HEIGHT = 320;
+constexpr int LINE_HEIGHT = 12;
+constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
 String Buffer[MAX_LINES];
 uint16_t Buffercolor[MAX_LINES];
@@ -3400,12 +3405,13 @@ namespace BleSniffer { void exit(); }
 
 namespace BleScan {
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 2
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 2;
 
 BLEScan* bleScan;
 BLEScanResults bleResults;
@@ -4073,9 +4079,9 @@ static constexpr int kScannerLogBoxTop = kScannerStatusY + kScannerStatusBoxH + 
 static constexpr int kScannerLogStartY = kScannerLogBoxTop + kScannerBoxHeaderH;
 static constexpr int kScannerLogEndY = kScannerLogBoxTop + kScannerLogBoxH - 2;
 
-#define SCREEN_HEIGHT 180
-#define LINE_HEIGHT 12
-#define MAX_LINES (SCREEN_HEIGHT / LINE_HEIGHT)
+constexpr int SCREEN_HEIGHT = 180;
+constexpr int LINE_HEIGHT = 12;
+constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
 String Buffer[MAX_LINES];
 uint16_t Buffercolor[MAX_LINES];
@@ -4308,12 +4314,12 @@ void scan() {
 }
 
 void runUI() {
-#define SCREEN_WIDTH  240
-#define SCREEN_HEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 3
+  constexpr int SCREEN_WIDTH = 240;
+  #undef STATUS_BAR_Y_OFFSET
+  constexpr int STATUS_BAR_Y_OFFSET = 20;
+  constexpr int STATUS_BAR_HEIGHT = 16;
+  constexpr int ICON_SIZE = 16;
+  constexpr int ICON_NUM = 3;
 
   static int iconX[ICON_NUM] = {170, 210, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
@@ -5007,9 +5013,9 @@ byte channelGroup1[] = {2, 5, 8, 11};
 byte channelGroup2[] = {26, 29, 32, 35};
 byte channelGroup3[] = {80, 83, 86, 89};
 
-#define SCREEN_HEIGHT 320
-#define LINE_HEIGHT 12
-#define MAX_LINES (SCREEN_HEIGHT / LINE_HEIGHT)
+constexpr int SCREEN_HEIGHT = 320;
+constexpr int LINE_HEIGHT = 12;
+constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
 String Buffer[MAX_LINES];
 uint16_t Buffercolor[MAX_LINES];
@@ -8834,12 +8840,13 @@ void exit() {
 
 namespace BleSniffer {
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define STATUS_BAR_Y_OFFSET 20
-#define STATUS_BAR_HEIGHT 16
-#define ICON_SIZE 16
-#define ICON_NUM 3
+#undef STATUS_BAR_Y_OFFSET
+constexpr int STATUS_BAR_Y_OFFSET = 20;
+constexpr int STATUS_BAR_HEIGHT = 16;
+constexpr int ICON_SIZE = 16;
+constexpr int ICON_NUM = 3;
 
 static bool uiDrawn = false;
 
@@ -8852,8 +8859,8 @@ static const unsigned char* icons[ICON_NUM] = {
 
 #define HEADER_HEIGHT 20
 #define STATUS_DOT_SIZE 8
-#define LINE_HEIGHT 16
-#define MAX_LINES 16
+constexpr int LINE_HEIGHT = 16;
+constexpr int MAX_LINES = 16;
 #define MAX_DEVICES 32
 #define SCAN_INTERVAL 5000
 #define MAX_LINE_LENGTH 38

@@ -113,10 +113,16 @@ setup() {
   fi
   cp "$REPO/Libraries/platform.txt" "$CORE_DIR/platform.txt"
 
-  # The platform bakes -Werror=all into both of its raised warning levels, so
-  # `--warnings all` turns the first unused function into a failed build and
-  # you never see the rest. Make the top level report rather than abort, which
-  # is what `tools/build.sh warnings` relies on.
+  # Drop upstream's -w. It lived in build.extra_flags, which the compile
+  # recipe appends *after* compiler.warning_flags, so it overrode whatever
+  # --warnings asked for. The sketch is -Wall clean now, so it can go.
+  sed -i 's|^build\.extra_flags\.esp32=-w |build.extra_flags.esp32=|' "$CORE_DIR/platform.txt"
+
+  # The platform bakes -Werror=all into both raised levels, so `--warnings`
+  # turned the first unused function into a failed build instead of a report.
+  # `more` is the normal build (-Wall), `all` adds -Wextra for the noisy sweep.
+  sed -i 's|^compiler\.warning_flags\.more=.*|compiler.warning_flags.more=-Wall|' \
+    "$CORE_DIR/platform.txt"
   sed -i 's|^compiler\.warning_flags\.all=.*|compiler.warning_flags.all=-Wall -Wextra|' \
     "$CORE_DIR/platform.txt"
   echo "== platform.txt patched (stock kept as platform.txt.orig) =="
@@ -141,23 +147,47 @@ setup() {
   echo "setup complete. core: $CORE_DIR"
 }
 
+# -Wall is on and the sketch is expected to stay clean under it. If this
+# prints a warning, that is the whole point -- fix it rather than lowering the
+# level again.
+#
+# Warnings from TFT_eSPI and the ESP-IDF headers are filtered out. They are
+# not ours to fix, they repeat once per translation unit, and a build that
+# always prints noise is a build nobody reads. `tools/build.sh warnings`
+# shows everything.
 compile() {
   python "$REPO/tools/check_pinmap.py"
   echo
-  arduino-cli compile -b "$FQBN" --build-path "$BUILD_PATH" "$REPO/ESP32-DIV"
+  local log="$HH_ARDUINO_ROOT/compile.log"
+  mkdir -p "$HH_ARDUINO_ROOT"
+  local rc=0
+  arduino-cli compile --warnings more -b "$FQBN" \
+    --build-path "$BUILD_PATH" "$REPO/ESP32-DIV" >"$log" 2>&1 || rc=$?
+
+  grep -E "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*(warning|error):" "$log" || true
+  grep -E "^(Sketch uses|Global variables)" "$log" || true
+
+  local ours external
+  ours=$(grep -cE "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*warning:" "$log" || true)
+  external=$(( $(grep -c "warning:" "$log" || true) - ours ))
+  if [ "$ours" -eq 0 ]; then
+    echo "sketch is -Wall clean ($external library/core warnings filtered)"
+  else
+    echo "$ours sketch warning(s) above -- these are ours"
+  fi
+
+  if [ "$rc" -ne 0 ]; then
+    grep -E "error:|Error during build" "$log" | head -20
+    return "$rc"
+  fi
 }
 
-# Build with -Wall -Wextra instead of upstream's -w. Takes a full rebuild.
-# Expect ~180 warnings; docs/halehound/warnings.md says which ones matter.
-#
-# --warnings on its own does nothing here. build.extra_flags is appended after
-# compiler.warning_flags in the compile recipe, so upstream's -w wins whatever
-# level you ask for -- that is presumably why it was put there. Overriding
-# build.extra_flags.esp32 to drop -w is what actually lets warnings through.
+# The wider sweep: -Wall -Wextra. Still noisy -- around 53 warnings, dominated
+# by -Wmissing-field-initializers, which is why -Wextra is not the default.
+# docs/halehound/warnings.md has the breakdown.
 warnings() {
   rm -rf "$BUILD_PATH-warnings"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "build.extra_flags.esp32=-DARDUINO_USB_CDC_ON_BOOT=0" \
     --build-path "$BUILD_PATH-warnings" "$REPO/ESP32-DIV" 2>&1 \
     | grep -E "warning:|Sketch uses|Global variables"
 }

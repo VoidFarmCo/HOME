@@ -100,10 +100,10 @@ if you must, but keep it short.
 frames can be injected, which is load-bearing and cannot be done with
 `--wrap`. It was also swallowing 30 unrelated duplicate symbols, one of them a
 real bug; those are fixed during setup. See
-[docs/halehound/zmuldefs.md](docs/halehound/zmuldefs.md). `-w` still silences
-every compiler warning; `tools/build.sh warnings` turns them back on, and
-[docs/halehound/warnings.md](docs/halehound/warnings.md) says which of the 181
-matter.
+[docs/halehound/zmuldefs.md](docs/halehound/zmuldefs.md). `-w` is **gone** --
+`setup` strips it and the normal build runs `-Wall`, which the sketch is clean
+under. `tools/build.sh warnings` adds `-Wextra` for the wider sweep. See
+[docs/halehound/warnings.md](docs/halehound/warnings.md).
 
 **The vendored CC1101 driver is patched during setup.** It shipped a dead
 copy-paste clone of itself (`..._JT_DRV.cpp`, a second `class
@@ -129,6 +129,8 @@ hardware.
   touch losing the bus to the radios
 - `docs/halehound/zmuldefs.md` — what `-zmuldefs` was hiding
 - `docs/halehound/warnings.md` — what `-w` was hiding
+- `wifi.cpp`, `bluetooth.cpp`, `subghz.cpp`, `utils.cpp` — the per-screen UI
+  macros are scoped constants now, so `-w` could come off
 - `docs/halehound/spi-bus.md` — the bus map, and why touch was losing it
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 

@@ -458,9 +458,9 @@ namespace replayat {
 #define ADDR_PROFILE_START 1300
 #define MAX_PROFILES       5
 
-#define SCREEN_WIDTH  240
+constexpr int SCREEN_WIDTH = 240;
 #define SCREENHEIGHT 320
-#define SCREEN_HEIGHT 320
+constexpr int SCREEN_HEIGHT = 320;
 
 static bool uiDrawn = false;
 
@@ -1208,10 +1208,11 @@ void loadProfileCount() {
 
 void runUI() {
 
-    #define STATUS_BAR_Y_OFFSET 20
-    #define STATUS_BAR_HEIGHT 16
-    #define ICON_SIZE 16
-    #define ICON_NUM 6
+    #undef STATUS_BAR_Y_OFFSET
+    constexpr int STATUS_BAR_Y_OFFSET = 20;
+    constexpr int STATUS_BAR_HEIGHT = 16;
+    constexpr int ICON_SIZE = 16;
+    constexpr int ICON_NUM = 6;
 
     static int iconX[ICON_NUM] = {90, 130, 170, 210, 50, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
@@ -1608,8 +1609,8 @@ static bool uiDrawn = false;
 #define MAX_PROFILES       5
 #define MAX_NAME_LENGTH    16
 
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 320
+constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_HEIGHT = 320;
 
 RCSwitch mySwitch = RCSwitch();
 struct __attribute__((packed)) Profile {
@@ -2101,10 +2102,11 @@ void deleteProfile(int index) {
 }
 
 void runUI() {
-    #define STATUS_BAR_Y_OFFSET 20
-    #define STATUS_BAR_HEIGHT 16
-    #define ICON_SIZE 16
-    #define ICON_NUM 4
+    #undef STATUS_BAR_Y_OFFSET
+    constexpr int STATUS_BAR_Y_OFFSET = 20;
+    constexpr int STATUS_BAR_HEIGHT = 16;
+    constexpr int ICON_SIZE = 16;
+    constexpr int ICON_NUM = 4;
 
     static int iconX[ICON_NUM] = {130, 170, 210, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
@@ -2323,8 +2325,8 @@ static bool uiDrawn = false;
 static unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 200;
 
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 64
+constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_HEIGHT = 64;
 
 static constexpr uint8_t JAM_BTN_LEFT  = 4;
 static constexpr uint8_t JAM_BTN_RIGHT = 5;
@@ -2595,12 +2597,13 @@ void updateDisplay() {
 }
 
 void runUI() {
-    #define SCREEN_WIDTH  240
+    constexpr int SCREEN_WIDTH = 240;
     #define SCREENHEIGHT 320
-    #define STATUS_BAR_Y_OFFSET 20
-    #define STATUS_BAR_HEIGHT 16
-    #define ICON_SIZE 16
-    #define ICON_NUM 6
+    #undef STATUS_BAR_Y_OFFSET
+    constexpr int STATUS_BAR_Y_OFFSET = 20;
+    constexpr int STATUS_BAR_HEIGHT = 16;
+    constexpr int ICON_SIZE = 16;
+    constexpr int ICON_NUM = 6;
 
     static int iconX[ICON_NUM] = {50, 90, 130, 170, 210, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
