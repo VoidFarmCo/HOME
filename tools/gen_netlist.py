@@ -70,7 +70,7 @@ USBC_Y = -62.0              # scad USBC_Y, right wall
 NETS = [
     ("GND", [("J1", "1"), ("J1", "2"), ("J1", "14"),
              ("J2", "GND"), ("J3", "GND"), ("J4", "GND"), ("J5", "GND"),
-             ("U1", "GND"), ("U2", "OUT-"), ("U3", "GND"),
+             ("U1", "VIN-"), ("U1", "OUT-"), ("U2", "OUT-"), ("U3", "GND"),
              ("R1", "-"), ("C1", "2"), ("C2", "2"), ("C3", "2"),
              ("C4", "2"), ("C5", "2"), ("C6", "2"), ("C7", "2"),
              ("TP5", "1")],
@@ -86,10 +86,10 @@ NETS = [
      "battery positive into the protection, 1.0 mm trace"),
     ("BATT_NEG", [("BT1", "-"), ("U2", "B-")],
      "battery negative. ONLY these two nodes: it is not system ground"),
-    ("+VSYS",    [("U2", "OUT+"), ("U1", "VIN"), ("U3", "VIN")],
+    ("+VSYS",    [("U2", "OUT+"), ("U1", "VIN+"), ("U3", "VIN")],
      "protected battery rail feeding both converters, 1.0 mm trace"),
 
-    ("+5V_SW", [("U1", "VOUT"), ("J1", "3"), ("J4", "VCC"),
+    ("+5V_SW", [("U1", "OUT+"), ("J1", "3"), ("J4", "VCC"),
                 ("C6", "1"), ("TP1", "1")],
      "boost output, feeds the CYD and the PN532, 1.0 mm trace"),
 
@@ -148,7 +148,11 @@ BOM = [
     ("J3",  1, "Header 2x4 2.54mm", "NRF24L01+PA+LNA module [verify pinout]"),
     ("J4",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
     ("J5",  1, "Header 1x5 2.54mm", "GT-U7 GPS [verify pinout]"),
-    ("U1",  1, "MT3608 boost module", "VBAT -> 5V, size for 1 A continuous"),
+    ("U1",  1, "MT3608 boost module, ~36x17mm",
+     "+VSYS -> 5V, 1 A continuous. OUTPUT IS A MULTI-TURN TRIMPOT: set to "
+     "5.00 V on the bench BEFORE connecting J1. Ships at an arbitrary "
+     "setting and goes to ~28 V. Its own micro-USB is unused and stays "
+     "inside the case [verify dimensions]"),
     ("U2",  1, "TP4056 + DW01/FS8205 protection, 27x17mm",
      "micro-USB, 1 A charge (module R3, typically 1.2k). Load on OUT+/OUT-, "
      "not B+. Protection trips ~3 A, above the 1.6 A peak. IN+/IN- pads are "

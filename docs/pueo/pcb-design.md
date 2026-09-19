@@ -275,6 +275,43 @@ Worth generalising: the enclosure was laid out from module outlines, and an
 outline tells you nothing about which terminal is which. Expect the other
 datasheets to move things too.
 
+## The MT3608, and a bring-up order that matters
+
+Pin names are `VIN+`/`VIN-`/`OUT+`/`OUT-`, not the `VIN`/`VOUT`/`GND` the
+netlist first assumed. `VIN-` and `OUT-` are the same node on a boost, so
+both land on ground.
+
+Two things about this module are worth more than a pin correction.
+
+**The output is a multi-turn trimpot, not a fixed 5 V.** These ship at an
+arbitrary setting and the MT3608 will happily produce about 28 V. Connecting
+J1 to an unadjusted module destroys the CYD, and the ESP32 behind it,
+instantly and permanently.
+
+So the assembly order is not a preference:
+
+```
+1.  Power the boost from the battery with NOTHING connected to OUT+
+2.  Meter OUT+ to ground, turn the trimpot to 5.00 V
+3.  Only then fit J1
+```
+
+TP1 exists on `+5V_SW` for exactly this. Worth a line of silkscreen next to
+the pot saying `SET 5V FIRST`, because the person who assembles the second
+one in a year will not remember.
+
+**It has its own micro-USB jack**, which this design does not use — the boost
+is fed from `+VSYS`. The enclosure cuts only one USB opening, at the TP4056,
+so the boost's connector ends up inside the case. That is the right outcome
+(two identical micro-USB sockets, one charging and one backfeeding the boost
+input, is a support question waiting to happen) but it does occupy space and
+wants clearance from anything it could short against.
+
+The MT3608 silicon is SOT-23-6, 2.9 x 1.6 mm, 0.95 mm pitch, if integrating
+it ever becomes tempting. The recommendation above still stands: the module
+costs about a dollar and comes with its inductor, diode and feedback network
+already laid out and working.
+
 ### Enclosure changes this implies
 
 Not yet applied to `halehound_v3.scad`:
