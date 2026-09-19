@@ -190,7 +190,9 @@ Constraints that follow:
   board SMAs exactly there.
 - **PN532 needs a 1.4 mm floor window** under its coil at (0, 18). Keep
   copper — especially ground pour — out of that footprint's area on both
-  layers, or the field is attenuated by your own board.
+  layers, or the field is attenuated by your own board. Now confirmed at the full
+  43 x 41 extent, so the keepout and the floor window are both correctly
+  sized -- the module is exactly as large as the design assumed.
 - **USB-C on the right wall** at y = −62, 20 × 7 cutout.
 - **GPS antenna slot** top centre, 21 mm wide, 1.6 mm floor.
 - Battery pocket at (−16, -23) is 45 × 34 and must stay clear of copper.
@@ -329,7 +331,8 @@ NRF24 PA+LNA     41 x 15.5       ?           listing text; 41 appears to
                                              include the SMA body
 3.3V buck        20 x 12         ?           assumed
 GT-U7 GPS        28 x 27         ?           assumed
-PN532 V3         43 x 41         ?           assumed
+PN532 V3         43 x 41         ?           confirmed, matches the
+                                             footprint already assumed
 LiPo pack        45 x 34         ?           assumed
 ```
 
@@ -393,7 +396,45 @@ it. So the conflict does not block layout; it does mean the 2.4 mm worst
 case is the real margin under the boost converter, not the 10 mm the
 earlier figure implied.
 
-And the MT3608 is not the tallest thing here anyway. The NRF24 with its PA/LNA can and its SMA is taller, and
+And the MT3608 is not the tallest thing here anyway.
+
+### The PN532 pays for height twice
+
+Copper keepout solves one half of the NFC problem. The other half is
+distance, and a carrier board makes it worse rather than better.
+
+The base thins its floor to 1.4 mm under the coil specifically so the field
+can reach through the case. That budget assumed the module sitting on the
+pocket floor. Put it on a carrier instead and the coil moves up by the board
+plus whatever holds it:
+
+```
+  soldered direct              1.6 mm further from the outside surface
+  low-profile socket 5.0       6.6 mm
+  standard socket 8.5         10.1 mm
+```
+
+Read range on a PN532 is a couple of centimetres to begin with. Ten
+millimetres of added standoff is a large fraction of it, and it is spent on
+nothing the user gets back.
+
+So the PN532 is the one module with a reason not to be socketed, which cuts
+against the swappability argument that applies to the radios. Three ways
+out, none free:
+
+1.  **Solder it down** and accept 1.6 mm. Cheapest, loses the ability to
+    swap a module whose counterfeit rate is not low.
+2.  **Cut it out of the carrier entirely** -- leave it on the floor in its
+    existing pocket and run a short flying lead to the board. Keeps the
+    range, adds a cable and an assembly step.
+3.  **Window the carrier** so the PN532 hangs through a cutout at floor
+    level while its header still lands on the board. Best of both, and the
+    most work to get right.
+
+Option 3 is the interesting one because the board already needs a keepout
+over that area -- turning a copper keepout into an actual hole costs
+nothing in routing terms. It does mean the 43 x 41 region stops carrying
+structure, which matters for a board that is 80 mm wide. The NRF24 with its PA/LNA can and its SMA is taller, and
 the SMA axis is fixed at 5 mm above the pocket floor by the case wall. That
 constraint and a carrier board are in direct tension: raising the modules by
 a PCB plus a socket raises their SMAs too, and the bulkhead holes do not
