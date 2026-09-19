@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build the Halehound firmware with a pinned, isolated toolchain.
+# Build the Pueo firmware with a pinned, isolated toolchain.
 #
 #   tools/build.sh setup    install core + libraries (once, ~1 GB)
 #   tools/build.sh          compile
 #   tools/build.sh upload COM7
 #
 # Nothing here touches a global Arduino install. The core lives under
-# $HH_ARDUINO_ROOT (default ~/.hh-esp32) and the libraries under .arduino/user
+# $PUEO_ARDUINO_ROOT (default ~/.pueo-esp32) and the libraries under .arduino/user
 # in the repo.
 set -euo pipefail
 
@@ -19,12 +19,12 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # came to 259 characters with the core inside the repo -- one under the 260
 # limit, so the compiler reported the header as missing when it was right
 # there. Everything else built. Keep this root short.
-HH_ARDUINO_ROOT="${HH_ARDUINO_ROOT:-$HOME/.hh-esp32}"
+PUEO_ARDUINO_ROOT="${PUEO_ARDUINO_ROOT:-$HOME/.pueo-esp32}"
 
-export ARDUINO_DIRECTORIES_DATA="$HH_ARDUINO_ROOT/data"
+export ARDUINO_DIRECTORIES_DATA="$PUEO_ARDUINO_ROOT/data"
 export ARDUINO_DIRECTORIES_USER="$REPO/.arduino/user"
-export ARDUINO_DIRECTORIES_DOWNLOADS="$HH_ARDUINO_ROOT/downloads"
-BUILD_PATH="$HH_ARDUINO_ROOT/build"
+export ARDUINO_DIRECTORIES_DOWNLOADS="$PUEO_ARDUINO_ROOT/downloads"
+BUILD_PATH="$PUEO_ARDUINO_ROOT/build"
 
 # arduino-cli's winget install does not land on the Git Bash PATH.
 if ! command -v arduino-cli >/dev/null 2>&1; then
@@ -59,7 +59,7 @@ LIBS=(
 
 # ── Two fixes to the vendored CC1101 driver ─────────────────────────────────
 # Both were being absorbed silently by -zmuldefs in upstream's platform.txt.
-# See docs/halehound/zmuldefs.md for how they were found.
+# See docs/pueo/zmuldefs.md for how they were found.
 patch_cc1101() {
   local lib="$1"
 
@@ -79,7 +79,7 @@ patch_cc1101() {
   #    wrote 1 = FSPI into the display's bus number, and `if (spi == 0)` read
   #    that field back instead of the flag. File-local linkage separates them.
   if grep -q '^bool spi = 0;$' "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp"; then
-    sed -i 's|^bool spi = 0;$|static bool spi = 0;   // halehound: was global, collided with TFT_eSPI|' \
+    sed -i 's|^bool spi = 0;$|static bool spi = 0;   // pueo: was global, collided with TFT_eSPI|' \
       "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp"
   fi
   grep -q '^static bool spi = 0;' "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp" \
@@ -161,8 +161,8 @@ setup() {
 compile() {
   python "$REPO/tools/check_pinmap.py"
   echo
-  local log="$HH_ARDUINO_ROOT/compile.log"
-  mkdir -p "$HH_ARDUINO_ROOT"
+  local log="$PUEO_ARDUINO_ROOT/compile.log"
+  mkdir -p "$PUEO_ARDUINO_ROOT"
   local rc=0
   arduino-cli compile --warnings all -b "$FQBN" \
     --build-path "$BUILD_PATH" "$REPO/ESP32-DIV" >"$log" 2>&1 || rc=$?
@@ -195,6 +195,17 @@ warnings() {
     | grep -E "warning:|Sketch uses|Global variables"
 }
 
+# Single flash image at offset 0: bootloader + partition table + app.
+# This is what QEMU wants as its flash drive, and it is also the one-file
+# artifact to hand someone who just wants to flash the thing.
+merge() {
+  local esptool
+  esptool=$(ls "$ARDUINO_DIRECTORIES_DATA"/packages/esp32/tools/esptool_py/*/esptool.exe 2>/dev/null | head -1)
+  [ -n "$esptool" ] || { echo "esptool not found; run setup first" >&2; return 1; }
+  "$esptool" --chip esp32 merge_bin -o "$BUILD_PATH/pueo-merged.bin"     --flash_mode dio --flash_freq keep --flash_size 4MB     0x1000  "$BUILD_PATH/ESP32-DIV.ino.bootloader.bin"     0x8000  "$BUILD_PATH/ESP32-DIV.ino.partitions.bin"     0x10000 "$BUILD_PATH/ESP32-DIV.ino.bin"
+  echo "merged image: $BUILD_PATH/pueo-merged.bin"
+}
+
 upload() {
   local port="${1:?usage: tools/build.sh upload <port>}"
   arduino-cli upload -b "$FQBN" -p "$port" --input-dir "$BUILD_PATH" "$REPO/ESP32-DIV"
@@ -204,6 +215,7 @@ case "${1:-compile}" in
   setup)    setup ;;
   compile)  compile ;;
   warnings) warnings ;;
+  merge)    merge ;;
   upload)   shift; upload "$@" ;;
-  *) echo "usage: tools/build.sh [setup|compile|warnings|upload <port>]" >&2; exit 2 ;;
+  *) echo "usage: tools/build.sh [setup|compile|warnings|merge|upload <port>]" >&2; exit 2 ;;
 esac

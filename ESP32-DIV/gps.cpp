@@ -38,7 +38,7 @@
 static HardwareSerial gpsSerial(GPS_UART_NUM);
 
 /* ── GPS port bracket, incl. UART0 handover ──────────────────────────────────
- * On Halehound the GPS module's TX lands on GPIO 1, which is UART0's TX. That
+ * On Pueo the GPS module's TX lands on GPIO 1, which is UART0's TX. That
  * pin is picked on purpose (GPIO 3 is driven by the USB-UART bridge and would
  * fight the GPS), but UART0 holds GPIO 1 as a push-pull output, so the console
  * has to let go of the pad before UART2 can read it.
@@ -46,12 +46,12 @@ static HardwareSerial gpsSerial(GPS_UART_NUM);
  * Every gpsSerial begin/end goes through gpsPortOpen/gpsPortClose so the
  * handover can never be skipped at one call site. USB serial is dead while the
  * GPS is open; it comes back on close. */
-#if defined(HALEHOUND_GPS_STEALS_UART0) && HALEHOUND_GPS_STEALS_UART0
+#if defined(PUEO_GPS_STEALS_UART0) && PUEO_GPS_STEALS_UART0
 
 #include "driver/gpio.h"
 
-#ifndef HALEHOUND_CONSOLE_BAUD
-#define HALEHOUND_CONSOLE_BAUD 115200
+#ifndef PUEO_CONSOLE_BAUD
+#define PUEO_CONSOLE_BAUD 115200
 #endif
 
 static bool s_uart0Parked = false;
@@ -74,7 +74,7 @@ static void gpsUart0Restore() {
     return;
   }
   gpio_reset_pin((gpio_num_t)GPS_UART_RX);
-  Serial.begin(HALEHOUND_CONSOLE_BAUD);
+  Serial.begin(PUEO_CONSOLE_BAUD);
   s_uart0Parked = false;
 }
 

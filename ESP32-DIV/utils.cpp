@@ -13,6 +13,7 @@
 #include "shared.h"
 #include "utils.h"
 #include "SpiBus.h"
+#include "Branding.h"
 
 
 bool notificationVisible = false;
@@ -1220,46 +1221,51 @@ void loading(int frameDelay, uint16_t color, int16_t x, int16_t y, int repeats, 
 }
 
 void displayLogo(uint16_t color, int displayTime) {
-  int16_t bitmapWidth = 150;
-  int16_t bitmapHeight = 150;
-  int16_t screenWidth = tft.width();
-  int16_t screenHeight = tft.height();
-  int16_t logoX = (screenWidth - bitmapWidth) / 2;
-  int16_t logoY = (screenHeight - bitmapHeight) / 2 - 20;
+  const int16_t screenWidth  = tft.width();
+  const int16_t screenHeight = tft.height();
 
-  tft.fillRect(logoX, logoY, bitmapWidth, bitmapHeight, TFT_BLACK);
-  tft.drawBitmap(logoX, logoY, bitmap_icon_cifer, bitmapWidth, bitmapHeight, color);
+  // Text block is centred as a whole. With a logo it sits below the artwork;
+  // without one it takes the middle of the screen.
+  int16_t textY;
+
+#ifdef PUEO_LOGO_BITMAP
+  const int16_t logoX = (screenWidth - PUEO_LOGO_W) / 2;
+  const int16_t logoY = (screenHeight - PUEO_LOGO_H) / 2 - 20;
+  tft.fillRect(logoX, logoY, PUEO_LOGO_W, PUEO_LOGO_H, TFT_BLACK);
+  tft.drawBitmap(logoX, logoY, PUEO_LOGO_BITMAP, PUEO_LOGO_W, PUEO_LOGO_H, color);
+  textY = logoY + PUEO_LOGO_H + 10;
+#else
+  // No artwork yet. Upstream's logo is deliberately not used as a stand-in --
+  // drawing CiferTech's mark under the name Pueo would misattribute it.
+  textY = screenHeight / 2 - 30;
+#endif
 
   tft.setTextColor(color);
   tft.setTextFont(1);
+  tft.setTextDatum(TC_DATUM);   // centre each line on its own width
 
-  tft.setTextSize(2);
-  int16_t textX = screenWidth / 3.5;
-  int16_t textY = logoY + bitmapHeight + 10;
-  tft.setCursor(textX, textY);
-  tftPrintObf(OBF_PN, sizeof(OBF_PN));
+  const int16_t cx = screenWidth / 2;
+
+  tft.setTextSize(3);
+  tft.drawString(PUEO_NAME, cx, textY);
+  textY += 26;
 
   tft.setTextSize(1);
-  textX = screenWidth / 3.5;
-  textY += 20;
-  tft.setCursor(textX, textY);
-  tft.print("by ");
-  tftPrintObf(OBF_DN, sizeof(OBF_DN));
+  tft.drawString(PUEO_TAGLINE, cx, textY);
+  textY += 16;
 
-  textX = screenWidth / 2.5;
-  textY += 50;
-  tft.setCursor(textX, textY);
-  // Version is intentionally NOT obfuscated.
-  tft.print(ESP32DIV_VERSION);
+  tft.drawString(ESP32DIV_VERSION, cx, textY);
+  textY += 22;
+
+  tft.drawString(PUEO_UPSTREAM, cx, textY);
+
+  tft.setTextDatum(TL_DATUM);   // leave the datum as the rest of the UI expects
 
   Serial.println("==================================");
-  serialPrintObf(OBF_PN, sizeof(OBF_PN), true);
-  Serial.print("Developed by: "); serialPrintObf(OBF_DN, sizeof(OBF_DN), true);
-  // Version is intentionally NOT obfuscated.
+  Serial.println(PUEO_NAME " - " PUEO_TAGLINE);
   Serial.print("Version:      "); Serial.println(ESP32DIV_VERSION);
-  Serial.print("Contact:      "); serialPrintObf(OBF_EM, sizeof(OBF_EM), true);
-  Serial.print("GitHub:       "); serialPrintObf(OBF_GH, sizeof(OBF_GH), true);
-  Serial.print("Website:      "); serialPrintObf(OBF_WB, sizeof(OBF_WB), true);
+  Serial.println(PUEO_UPSTREAM);
+  Serial.print("Upstream:     "); Serial.println(PUEO_UPSTREAM_URL);
   Serial.println("==================================");
 
   delay(displayTime);

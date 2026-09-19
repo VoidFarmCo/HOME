@@ -3,15 +3,15 @@
 // Select the hardware target.
 // Leave all lines commented to use the ESP32-DIV V2 wiring.
 
-#define BOARD_HALEHOUND
+#define BOARD_PUEO
 // #define BOARD_CYD
 // #define BOARD_ESP32_DIV_V1
 // #define BOARD_ESP32_DIV_V2
 
-// Halehound is a CYD with its own radio wiring. The overlay defines BOARD_CYD
+// Pueo is a CYD with its own radio wiring. The overlay defines BOARD_CYD
 // for us and overrides the external-radio pins before shared.h's defaults run.
-#if defined(BOARD_HALEHOUND)
-#include "board_halehound.h"
+#if defined(BOARD_PUEO)
+#include "board_pueo.h"
 #endif
 
 // Set to 0 to hide the on-screen touch nav bar (5 footer buttons).

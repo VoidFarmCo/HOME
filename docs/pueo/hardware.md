@@ -1,4 +1,4 @@
-# Halehound hardware
+# Pueo hardware
 
 CYD ESP32-2432S028R with four external peripherals, in a custom 85 x 170 x 20
 enclosure. The pin map below is fixed; the case is already printed around it.
@@ -57,7 +57,7 @@ RF24 driver is polled throughout. Leave the pin off the board.
 ## One NRF24, three radio objects
 
 `bluetooth.cpp` instantiates `radio1`/`radio2`/`radio3` for the multi-channel
-BLE jammer modes. Halehound has one module, so `CE_PIN_2`/`_3` and
+BLE jammer modes. Pueo has one module, so `CE_PIN_2`/`_3` and
 `CSN_PIN_2`/`_3` are aliased onto the same pads as `_1`. Those modes will run
 degraded on a single radio rather than failing to build. They are outside the
 initial feature set anyway.

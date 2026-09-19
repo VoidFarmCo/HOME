@@ -1,6 +1,6 @@
 #pragma once
 /* ─────────────────────────────────────────────────────────────────────────────
- * Halehound — custom handheld, CYD ESP32-2432S028R base.
+ * Pueo — custom handheld, CYD ESP32-2432S028R base.
  *
  * This is an OVERLAY, not a new board branch. Every pin macro in shared.h is
  * wrapped in #ifndef, and BoardConfig.h is included before those defaults are
@@ -26,7 +26,7 @@
 #define BOARD_CYD
 
 #ifndef ESP32DIV_BOARD_NAME
-#define ESP32DIV_BOARD_NAME "Halehound (CYD 2.8)"
+#define ESP32DIV_BOARD_NAME "Pueo (CYD 2.8)"
 #endif
 
 /* ── CC1101 SubGHz ──────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@
  * One module, not three. Stock CYD defaults put CSN_PIN_1 on 17 (we need that
  * for the PN532), CSN_PIN_2 on 27 (collides with CC1101 CS) and CSN_PIN_3 on
  * 25 (collides with the XPT2046 touch clock — a real bug on the stock CYD
- * profile, not just a Halehound problem).
+ * profile, not just a Pueo problem).
  *
  * radio2/radio3 in bluetooth.cpp are aliased onto the same physical module.
  * The three-radio BLE jammer modes therefore run degraded on one radio; they
@@ -62,7 +62,7 @@
 #define CE_PIN_3  CE_PIN_1
 #define CSN_PIN_3 CSN_PIN_1
 
-#define HALEHOUND_NRF24_MODULE_COUNT 1
+#define PUEO_NRF24_MODULE_COUNT 1
 
 /* ── PN532 V3 (SPI mode: DIP CH1=OFF, CH2=ON) ───────────────────────────────
  * Stock CYD default is SS 25, which is the XPT2046 touch clock. Moved to 17. */
@@ -87,4 +87,4 @@
 
 /* Set when GPS_UART_RX sits on a UART0 pin and the console has to be torn
  * down first. Checked in gps.cpp. */
-#define HALEHOUND_GPS_STEALS_UART0 1
+#define PUEO_GPS_STEALS_UART0 1

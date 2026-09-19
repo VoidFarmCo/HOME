@@ -25,7 +25,7 @@
  * no help either: it early-returns whenever _spi is already non-null, so a
  * second begin() with different pins does nothing at all.
  *
- * See docs/halehound/spi-bus.md for how the current behaviour was traced.
+ * See docs/pueo/spi-bus.md for how the current behaviour was traced.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 #include <Arduino.h>

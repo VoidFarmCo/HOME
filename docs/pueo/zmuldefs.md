@@ -9,7 +9,7 @@ Reproduce with:
 
 ```bash
 sed -i 's/^compiler\.c\.elf\.libs\.esp32=-zmuldefs /compiler.c.elf.libs.esp32=/' \
-  "$HH_ARDUINO_ROOT/data/packages/esp32/hardware/esp32/2.0.10/platform.txt"
+  "$PUEO_ARDUINO_ROOT/data/packages/esp32/hardware/esp32/2.0.10/platform.txt"
 ```
 
 ## 1. The one that is intentional

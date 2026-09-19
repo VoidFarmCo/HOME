@@ -1,4 +1,4 @@
-# Halehound
+# Pueo
 
 Fork of [CiferTech's ESP32-DIV](https://github.com/cifertech/ESP32-DIV) for a
 custom handheld built on a CYD ESP32-2432S028R.
@@ -17,10 +17,10 @@ retained.
 ## Layout
 
 ```
-ESP32-DIV/board_halehound.h   board profile: pin overrides + rationale
-ESP32-DIV/BoardConfig.h       board selection (BOARD_HALEHOUND is on)
+ESP32-DIV/board_pueo.h   board profile: pin overrides + rationale
+ESP32-DIV/BoardConfig.h       board selection (BOARD_PUEO is on)
 tools/check_pinmap.py         resolves the pin macros, flags collisions
-docs/halehound/hardware.md    pin map, wiring decisions, known upstream bugs
+docs/pueo/hardware.md    pin map, wiring decisions, known upstream bugs
 ```
 
 The board profile is an *overlay*, not a fourth board branch. Every pin macro
@@ -66,7 +66,7 @@ rather than a global Arduino install, so it cannot disturb other projects.
 
 Current size: **1825489 bytes, 92% of the app partition**, 34% of RAM. That is
 tight. Any real feature work needs either a bigger partition scheme or
-trimming upstream modules that Halehound does not use.
+trimming upstream modules that Pueo does not use.
 
 ### Things that will bite you
 
@@ -85,13 +85,13 @@ errors that look like code bugs and are not.
 **TFT_eSPI and the CC1101 driver must come from `Libraries/`.** Upstream
 customised both. `User_Setup cyd.h` has to land as TFT_eSPI's `User_Setup.h`.
 
-**Windows MAX_PATH.** The toolchain deliberately lives at `~/.hh-esp32`, not
+**Windows MAX_PATH.** The toolchain deliberately lives at `~/.pueo-esp32`, not
 inside the repo. The esp32 core compiles with `-fno-rtti`, which selects the
 `no-rtti` libstdc++ multilib, and with the core inside this repo the path to
 `.../xtensa-esp32-elf/no-rtti/bits/error_constants.h` came to 259 characters —
 one under the 260 limit. The compiler reported the header as missing while it
 sat right there, and only that one multilib was affected, so the default build
-worked and `-fno-rtti` did not. Override the location with `HH_ARDUINO_ROOT`
+worked and `-fno-rtti` did not. Override the location with `PUEO_ARDUINO_ROOT`
 if you must, but keep it short.
 
 **The patched `platform.txt`.** Upstream ships one and the build needs it.
@@ -100,9 +100,9 @@ if you must, but keep it short.
 frames can be injected, which is load-bearing and cannot be done with
 `--wrap`. It was also swallowing 30 unrelated duplicate symbols, one of them a
 real bug; those are fixed during setup. See
-[docs/halehound/zmuldefs.md](docs/halehound/zmuldefs.md). `-w` is **gone** --
+[docs/pueo/zmuldefs.md](docs/pueo/zmuldefs.md). `-w` is **gone** --
 `setup` strips it and the build runs `-Wall -Wextra`, which the sketch is
-clean under. See [docs/halehound/warnings.md](docs/halehound/warnings.md).
+clean under. See [docs/pueo/warnings.md](docs/pueo/warnings.md).
 
 **The vendored CC1101 driver is patched during setup.** It shipped a dead
 copy-paste clone of itself (`..._JT_DRV.cpp`, a second `class
@@ -118,7 +118,7 @@ hardware.
 
 ## Changes so far
 
-- `board_halehound.h` — board profile, resolving all pin conflicts
+- `board_pueo.h` — board profile, resolving all pin conflicts
 - `gps.cpp` — `gpsPortOpen()`/`gpsPortClose()` bracket every UART open/close and
   hand GPIO 1 between the console and the GPS
 - `tools/check_pinmap.py` — pin map checker
@@ -126,11 +126,11 @@ hardware.
 - `wifi.cpp` — removed an out-of-bounds write in both deauth frame builders
 - `SpiBus.{h,cpp}` — single owner for the shared VSPI bus, and the fix for
   touch losing the bus to the radios
-- `docs/halehound/zmuldefs.md` — what `-zmuldefs` was hiding
-- `docs/halehound/warnings.md` — what `-w` was hiding
+- `docs/pueo/zmuldefs.md` — what `-zmuldefs` was hiding
+- `docs/pueo/warnings.md` — what `-w` was hiding
 - `wifi.cpp`, `bluetooth.cpp`, `subghz.cpp`, `utils.cpp` — the per-screen UI
   macros are scoped constants now, so `-w` could come off
-- `docs/halehound/spi-bus.md` — the bus map, and why touch was losing it
+- `docs/pueo/spi-bus.md` — the bus map, and why touch was losing it
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
 None of this is tested on hardware yet. It compiles, the board profile is
