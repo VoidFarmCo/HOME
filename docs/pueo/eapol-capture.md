@@ -43,14 +43,21 @@ in the pcap.** The gap is recognition and workflow, not capture.
 
 Both found while scoping, both invisible until looked for.
 
-**The promiscuous filter is global, and Packet Monitor never sets it.**
-`esp_wifi_set_promiscuous_filter` is called in exactly two places, both in
-`wifi.cpp`, and both set `WIFI_PROMIS_FILTER_MASK_MGMT`. Packet Monitor sets
-a callback and enables promiscuous mode without touching the filter, so it
-inherits whatever the last feature left behind. Enter the captive portal or
-the probe sniffer, leave, then enter Packet Monitor, and it silently sees
-management frames only -- no data frames, no EAPOL, no error. Any EAPOL mode
-has to set the mask it wants, explicitly, every time it starts.
+**The promiscuous filter is global, and Packet Monitor never set it.**
+*Fixed; kept here because the reasoning is the useful part.*
+`esp_wifi_set_promiscuous_filter` was called in exactly two places, both in
+`wifi.cpp`, and both set `WIFI_PROMIS_FILTER_MASK_MGMT`. Packet Monitor set
+a callback and enabled promiscuous mode without touching the filter, so it
+inherited whatever the last feature left behind. Enter the captive portal or
+the probe sniffer, leave, then enter Packet Monitor, and it silently saw
+management frames only -- no data frames, no EAPOL, no error.
+
+Every feature that reads frames now states what it wants each time it
+starts. Packet Monitor asks for `MASK_ALL`; the deauth detector, the
+hidden-SSID listener and Spotter ask for `MASK_MGMT`, which is all their
+callbacks look at. The two beacon-spam sites are left alone deliberately:
+they enable promiscuous mode in order to transmit and never install a
+callback, so the filter does not reach them.
 
 **The snapshot length is 512 on this board.** `ESP32DIV_PCAP_SNAP_LEN` is
 2324 on the ESP32-S3 and 512 everywhere else, and Pueo is a CYD. That is
@@ -178,8 +185,8 @@ say so in a way that is easy to fix and hard to guess.
 
 ## Phasing
 
-1. Set the promiscuous filter explicitly wherever data frames are wanted.
-   Fixes a live hazard whether or not the rest is built.
+1. **Done.** Set the promiscuous filter explicitly wherever frames are read.
+   A live hazard fixed whether or not the rest is built. 72 bytes.
 2. Header-length parsing and the ethertype check, bounds-checked, with the
    test harness above. No behaviour yet.
 3. Key Information classification and the per-AP flags.
