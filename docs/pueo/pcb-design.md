@@ -312,6 +312,60 @@ it ever becomes tempting. The recommendation above still stands: the module
 costs about a dollar and comes with its inductor, diode and feedback network
 already laid out and working.
 
+## Height, and the pockets problem
+
+The MT3608 module is **36 x 17 x 6.25 mm** with a 25-turn trimpot. The
+footprint matches what the enclosure already assumes, so nothing moves. The
+height is the first real figure in a budget that has been running on
+assumption, and it surfaces something structural.
+
+Vertical space in the base:
+
+```
+  base outer height              20.00 mm
+  floor less pocket depth         2.00 mm
+  pocket floor to base top       18.00 mm    everything lives in here
+```
+
+Stack-up with a carrier board underneath:
+
+```
+  PCB 1.6 + soldered direct        + 6.25 =  7.85 mm    fits easily
+  PCB 1.6 + low-profile socket 5.0 + 6.25 = 12.85 mm    fits
+  PCB 1.6 + standard 2.54 socket 8.5 + 6.25 = 16.35 mm  fits, 1.65 mm spare
+```
+
+All three fit, but only just in the third case, and the MT3608 is not the
+tallest thing here. The NRF24 with its PA/LNA can and its SMA is taller, and
+the SMA axis is fixed at 5 mm above the pocket floor by the case wall. That
+constraint and a carrier board are in direct tension: raising the modules by
+a PCB plus a socket raises their SMAs too, and the bulkhead holes do not
+move.
+
+**Which is the real finding: the enclosure is built for modules sitting
+directly on the floor.** It cuts an individual pocket per module, at
+per-module depth. A carrier board is one flat plane spanning all of them, so
+those pockets stop being useful and start being obstructions, and the SMA
+height stops lining up.
+
+That is not an argument against the board. It means the base needs revising
+alongside it:
+
+```
+per-module pockets   ->  one flat shelf at a single height for the PCB
+mounting bosses      ->  positioned for PCB holes, not module corners
+SMA_Z = 5.0          ->  recomputed from PCB + socket + module-SMA height
+```
+
+Worth resolving before layout rather than after, because SMA height drives
+where the radio modules sit vertically, which drives socket choice, which
+drives whether the radios are swappable or soldered down.
+
+**Current recommendation**: low-profile sockets for the radios, so a dead PA
+module can still be replaced, and solder the power modules directly since
+they will not be swapped. That splits the difference on height and keeps the
+part that actually fails serviceable.
+
 ### Enclosure changes this implies
 
 Not yet applied to `halehound_v3.scad`:
@@ -320,7 +374,11 @@ Not yet applied to `halehound_v3.scad`:
 MODULES[1]   26 x 19  ->  27 x 17        TP4056 pocket
 USBC_W 20, USBC_HT 7  ->  micro-USB      ~8 x 3 mm jack, so the cutout is
                                          oversized and mis-shaped
+per-module pockets    ->  flat PCB shelf  see the height section above
+SMA_Z 5.0             ->  recompute       once socket height is chosen
 ```
+
+MT3608 at 36 x 17 needs no change; the enclosure already has it right.
 
 ## Before laying anything out
 
