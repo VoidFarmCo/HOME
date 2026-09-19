@@ -1745,9 +1745,21 @@ static constexpr unsigned long BTN_DEBOUNCE_MS = 220;
 static constexpr unsigned long UI_MS = 250;
 static constexpr int LINE_LEN = 36;
 
+/* Apple's offline-finding advertisement comes in two forms under the same
+ * type byte, and the difference is the whole point of this feature.
+ *
+ * The long form carries the rotating public key and is what a device
+ * broadcasts once it is *separated* from its owner -- a tag in someone
+ * else's bag. The short form is an online status ping, and every iPhone,
+ * iPad and Mac taking part in Find My emits it. Treating both as "FindMy",
+ * which is what this did, produces a list that is mostly other people's
+ * phones.
+ *
+ * They are told apart by the length byte that follows the type. */
 enum HitKind : uint8_t {
-  HIT_FIND_MY = 0,  // Apple Offline Finding 0x12
+  HIT_FIND_MY = 0,  // 0x12, long form: separated, carrying a key
   HIT_NEW_AT = 1,   // Continuity 0x07 prefix 0x05 (New AirTag)
+  HIT_NEARBY = 2,   // 0x12, short form: an Apple device reporting itself
 };
 
 struct Hit {
@@ -1793,12 +1805,35 @@ static int rowsPerPage() {
   return h / ROW_H;
 }
 
-static const char* kindLabel(uint8_t kind) {
+/* Battery level and the maintained flag come out of the status byte of a
+ * separated advertisement: the top two bits are battery, and bit 2 is set
+ * while the tag has been near its owner recently.
+ *
+ * Those positions come from public research on Find My rather than from
+ * anything Apple documents, and nothing here has been checked against a
+ * real tag. Treat them the way SpotterSignatures.h asks an OUI to be
+ * treated: a hint. The raw byte stays in Hit::status either way, so a
+ * future reader can re-decode it without re-capturing.
+ *
+ * Shown as "Sep F*": separated, battery Full, maintained. The letters run
+ * F, M, L, V for full, medium, low and very low. A dot rather than a star
+ * means not maintained, which is the more interesting state -- a tag that
+ * has been away from its owner for a while. */
+static void typeText(uint8_t kind, uint8_t status, char* out, size_t outSz) {
   switch (kind) {
-    case HIT_FIND_MY: return "FindMy";
-    case HIT_NEW_AT:  return "NewAT";
-    default:          return "Apple";
+    case HIT_NEARBY:
+      snprintf(out, outSz, "Near");
+      return;
+    case HIT_NEW_AT:
+      snprintf(out, outSz, "NewAT");
+      return;
+    default:
+      break;
   }
+  static const char kBatt[4] = {'F', 'M', 'L', 'V'};
+  snprintf(out, outSz, "Sep %c%c",
+           kBatt[(status >> 6) & 0x03],
+           (status & 0x04) ? '*' : '.');
 }
 
 static void updateNavLabels() {
@@ -1873,8 +1908,10 @@ static void updateHeader(bool force) {
 }
 
 static void formatRow(const Hit& h, char* out, size_t outSz) {
+  char type[8];
+  typeText(h.kind, h.status, type, sizeof(type));
   snprintf(out, outSz, "%-6s %02X:%02X:%02X:%02X:%02X:%02X %4d",
-           kindLabel(h.kind),
+           type,
            h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
            (int)h.rssi);
 }
@@ -2026,8 +2063,16 @@ static bool parseAppleAdv(const uint8_t* data, size_t len,
   }
   const uint8_t appleType = data[2];
   if (appleType == 0x12) {
-    *kindOut = HIT_FIND_MY;
-    *statusOut = (len > 4) ? data[4] : 0;
+    if (len < 5) {
+      return false;                   // no status byte to read
+    }
+    *statusOut = data[4];
+    /* 0x19 is the separated form: status, then twenty-two bytes of public
+     * key and its two spare bits, then a hint. The short form is 0x02. Any
+     * length at or above the long one is treated as separated rather than
+     * demanding an exact match, since the field is a length and not a
+     * version. */
+    *kindOut = (data[3] >= 0x19) ? HIT_FIND_MY : HIT_NEARBY;
     return true;
   }
   // Continuity Proximity Pairing â€” New AirTag prefix 0x05.
@@ -2089,7 +2134,10 @@ static void startScan() {
   }
   s_scan->stop();
   s_scan->setAdvertisedDeviceCallbacks(&s_callbacks, true);
-  s_scan->setActiveScan(true);
+  /* Passive. An AirTag advertises non-connectable and non-scannable, so a
+   * scan request buys nothing here and is only this device announcing
+   * itself to the room. Spotter makes the same choice for the same reason. */
+  s_scan->setActiveScan(false);
   s_scan->setInterval(80);
   s_scan->setWindow(60);
   s_scan->setDuplicateFilter(false);
