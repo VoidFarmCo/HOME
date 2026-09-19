@@ -190,6 +190,58 @@ actually works here. Kept on purpose, not by neglect.
 
 ## Changes so far
 
+New in 0.2.2. Two threads: a detection path that survives a camera changing
+its address, and the end of a licence conflict the project inherited.
+
+- `ESP32-DIV/Nrf24Raw.{h,cpp}` @ the nRF24L01+ register interface, and the
+  end of the RF24 dependency. RF24 is GPL-2.0-only and cannot lawfully share
+  a binary with arduinoFFT (GPL-3.0-or-later) or NimBLE-Arduino
+  (Apache-2.0), a conflict inherited from upstream's dependency set and
+  carried since 0.1.0. It was the only GPLv2-only thing in the tree, so
+  removing it resolves the whole thing and the merged image is distributable
+  again. Almost nothing used it: MouseJack, the ESB paths and the skimmer
+  detector already drove the registers directly, and RF24 survived only in
+  the two jammers. 3,476 bytes smaller, and verified by deleting the library
+  from the tree and rebuilding byte-identically
+- **The jammers hop on purpose now.** They configured three RF24 objects
+  over three channel groups, which reads as twelve channels across three
+  radios and was neither: the board profile maps all three chip selects onto
+  one module, and the loop inside `configureRadio` called
+  `startConstCarrier` once per channel with each call replacing the last.
+  The hopping that did work was in the feature loops, picking a random
+  channel every iteration and writing it three times. Now round-robin on a
+  4 ms dwell, written once
+- **Relicensed to GPL-3.0-or-later**, with upstream's MIT notice kept
+  verbatim in `LICENSE.MIT`. See `docs/pueo/licensing.md`, which has the
+  dependency table, the grants it is read from, and why "version 2" and
+  "version 2 or later" were the whole question
+- `Spotter` **fingerprints the probe-request element set.** An FNV-1a over
+  the information elements a device emits, which the chipset and driver
+  decide rather than the network being looked for, so it survives the MAC
+  randomisation that defeats the OUI table. Element ids always contribute;
+  contents only where they belong to the device rather than to that
+  particular probe, which means the SSID and the channel are deliberately
+  left out. No signature table ships: the values need captures off real
+  hardware. Four steps of `docs/pueo/ie-fingerprinting.md`, the fifth
+  waiting on a camera
+- **One camera is one row when it changes address.** `findOrAdd` folds a new
+  address into an existing row on a fingerprint match, but only when both
+  addresses are locally administered @ two cameras of one model share an
+  element set, and merging on the fingerprint alone would report one where
+  there are two. The row also shows whether the address is made up, how many
+  times it has changed, and how long the device has been in range
+- **Capture to SD**, on the Log button, off until it is switched on. One row
+  per device rather than per frame, and every device rather than only the
+  matched ones, because a fingerprint that already matched is one you
+  already have. A capture of the air around you is a list of the people near
+  you; it stays on the card
+- `tools/fuzz_ie_walk.py`, `tools/check_spotter_merge.py`,
+  `tools/check_spotter_capture.py` @ the parts that cannot be tried on
+  hardware that does not exist, held down by model instead. 65,543 frames
+  through the element walk with no out-of-bounds read, sixteen merge rules,
+  and sixteen capture rules including that an SSID with a quote and a
+  newline cannot forge rows in somebody's capture
+
 New in 0.2.1, the first release since 0.1.0 whose compiled image actually
 differs in something other than the version string:
 
@@ -209,25 +261,10 @@ differs in something other than the version string:
   the registry names rather than the word "Flock", and earns its place by
   corroborating a Flock SSID or a Penguin advertisement rather than by
   firing alone. 688 bytes of flash, no RAM.
-- `docs/pueo/ie-fingerprinting.md` — scope for the detection path that
-  survives MAC randomisation, which is the thing that will eventually make
-  the OUI table above beside the point. Design only, nothing built. It also
-  records why the signature table has to start empty: the values need a
-  capture from real hardware, and the one project that has them is GPL
-  against this fork's MIT
 - `docs/pueo/nrf24-fit-test.scad` — a test print for the one enclosure
   pocket with no nominal slack: a clearance ladder, and a slice of the base
   taken as an `intersection()` with `base()` so it cannot drift from the
   real part
-- `ESP32-DIV/Nrf24Raw.{h,cpp}` — the nRF24L01+ register interface, and the
-  end of the RF24 dependency. RF24 is GPL-2.0-only and could not share a
-  binary with arduinoFFT or NimBLE-Arduino, a conflict the project had
-  carried since 0.1.0. Almost nothing used it: MouseJack, the ESB paths and
-  the skimmer detector already drove the registers directly, and RF24
-  survived only in the two jammers. Those now hop properly as well — the old
-  code started a constant carrier once per channel in a loop where each call
-  replaced the last, across three driver objects that Pueo's board profile
-  maps onto one chip. 3,476 bytes smaller
 - `tools/build.sh` — stopped shipping the build machine's home directory
   inside the firmware. NimBLE's assert macros bake `__FILE__` in, so the
   absolute path of every asserting source file was in the image: seventeen
