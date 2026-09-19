@@ -207,7 +207,7 @@ Module positions are already fixed by the enclosure (origin = case centre):
 | TP4056 charger | 26.6, -62 | 26 × 19 |
 | MP2307 buck | -29, -48 | 17.9 × 12 |
 | LiPo pack | -16, -23 | 45 × 34 |
-| ATGM336H GPS | 24, -21 | 16 × 13 |
+| ATGM336H GPS | 0, 52 | 16 × 13 |
 | PN532 V3 | 0, 18 | 43 × 41 |
 | CC1101 HW-863 | -23, 61.5 | 15 × 40 |
 | NRF24 PA+LNA | 22, 61 | 16 × 41 |
@@ -490,22 +490,46 @@ is measured through whatever path the cable can actually take:
 Straight-line is the optimistic case; the cable has to route around modules,
 so treat anything past about 75 mm as doubtful.
 
-So the enclosure's existing top-centre antenna slot cannot be fed from where
-the GPS module currently sits. Two ways to fix it, and the shrink makes the
-first one cheap:
+### Where it went
 
-1.  **Move the module up.** It is now 16 x 13 and has no antenna on top, so
-    it can tuck almost anywhere. Put it within reach of wherever the antenna
-    wants to be.
-2.  **Move the antenna.** With a pigtail it can lie flat against a wall or
-    the inside of the lid, which is a better GPS position than the floor
-    anyway.
+**J5 moved from (24, -21) to (0, 52).** The antenna slot the enclosure
+already cuts sits hard against the inside of the top wall, centred, so the
+antenna lands at about (0, 80). From the new position the run is **28 mm**
+against 90 mm of cable -- comfortable even after routing around things, with
+enough left over that the excess has to be coiled somewhere.
 
-There is an argument for not putting it top-centre regardless: that is
-directly between the two SMA bulkheads, so the GPS antenna would sit between
-a 433 MHz transmitter and a 2.4 GHz PA. GPS L1 is at 1575 MHz and receives
-at around -130 dBm. The pigtail is what makes moving it away possible, which
-is a freedom the patch-antenna assumption did not have.
+The two radios leave a corridor between them:
+
+```
+  CC1101 right edge    x = -15.50
+  NRF24  left edge     x = +14.25     29.75 mm of clear corridor
+  PN532  top edge      y = +38.50
+```
+
+A 16 mm module centred in 29.75 mm has room on both sides, and y = 52 sets
+the clearances evenly:
+
+```
+  to CC1101   7.50 mm
+  to NRF24    6.25 mm
+  to PN532    7.00 mm
+```
+
+All three beat the 2 mm that is the tightest gap elsewhere on the board.
+Biasing left, toward the CC1101 and away from the 2.4 GHz PA, was the
+obvious temptation -- but it buys about a millimetre of separation while
+cutting the CC1101 gap to 2.5 mm, which is a bad trade. Centred is better.
+
+This leaves 28 x 27 of floor free at the old position, next to the battery.
+Nothing needs it yet.
+
+One thing the move does not fix: the antenna still ends up between the two
+SMA bulkheads, so a -130 dBm L1 receiver sits between a 433 MHz transmitter
+and a 2.4 GHz PA. The pigtail means it *could* go elsewhere -- flat against
+a side wall or the inside of the lid -- which is a freedom the patch-antenna
+assumption never had. That is an enclosure decision rather than a board one,
+and it can be made later without moving J5 again: 90 mm of cable reaches
+most of the upper half of the case from (0, 52).
 
 So the PN532 is the one module with a reason not to be socketed, which cuts
 against the swappability argument that applies to the radios. Three ways
@@ -559,6 +583,10 @@ Not yet applied to `halehound_v3.scad`:
 
 ```
 MODULES[1]   26 x 19  ->  27 x 17        TP4056 pocket
+MODULES[4]   28 x 27 at (24,-21)          GPS pocket: shrink and move to
+             ->  16 x 13 at (0, 52)       the corridor between the radios
+GPS_D 5      ->  7                        the antenna board is 6 mm deep
+                                          and will not fit a 5 mm recess
 USBC_W 20, USBC_HT 7  ->  micro-USB      ~8 x 3 mm jack, so the cutout is
                                          oversized and mis-shaped
 per-module pockets    ->  flat PCB shelf  see the height section above

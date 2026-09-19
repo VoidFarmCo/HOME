@@ -59,10 +59,11 @@ MODULES = [
     ("3.3V buck",      "U3",  -29.0, -48.0, 17.9, 12),
     ("LiPo pack",      "BT1", -16.0, -23.0, 45, 34),
     # ATGM336H, not the GT-U7 that was assumed: 16 x 13 with the antenna on
-    # a 90 mm u.FL pigtail rather than a patch on the module. Frees roughly
-    # 550 mm2 of floor, but the pigtail will not reach the top wall from
-    # here -- see pcb-design.md.
-    ("ATGM336H GPS",   "J5",   24.0, -21.0, 16, 13),
+    # a 90 mm u.FL pigtail rather than a patch on the module. Moved up from
+    # (24, -21), where the pigtail could not reach the top-wall antenna slot
+    # at (0, 80). Centred in the 29.75 mm corridor between the two radios:
+    # 7.5 mm to the CC1101, 6.25 mm to the NRF24, 7.0 mm to the PN532.
+    ("ATGM336H GPS",   "J5",    0.0,  52.0, 16, 13),
     ("PN532 V3",       "J4",    0.0,  18.0, 43, 41),
     # 28 x 15 PCB, 38 x 15 overall -- the SMA jack is soldered to the module
     # edge, so the antenna position is fixed by where the module sits.
