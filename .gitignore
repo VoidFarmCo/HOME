@@ -7,3 +7,6 @@ __pycache__/
 
 # Source artwork is kept; intermediate renders are not
 art/*_render_*.png
+
+# Release artefacts
+dist/

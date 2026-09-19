@@ -1259,7 +1259,7 @@ void displayLogo(uint16_t color, int displayTime) {
   tft.drawString(PUEO_TAGLINE, cx, textY);
   textY += 16;
 
-  tft.drawString(ESP32DIV_VERSION, cx, textY);
+  tft.drawString(PUEO_VERSION, cx, textY);
   textY += 22;
 
   tft.drawString(PUEO_UPSTREAM, cx, textY);
@@ -1268,7 +1268,8 @@ void displayLogo(uint16_t color, int displayTime) {
 
   Serial.println("==================================");
   Serial.println(PUEO_NAME " - " PUEO_TAGLINE);
-  Serial.print("Version:      "); Serial.println(ESP32DIV_VERSION);
+  Serial.print("Version:      "); Serial.println(PUEO_VERSION);
+  Serial.print("Forked from:  ESP32-DIV "); Serial.println(ESP32DIV_VERSION);
   Serial.println(PUEO_UPSTREAM);
   Serial.print("Upstream:     "); Serial.println(PUEO_UPSTREAM_URL);
   Serial.println("==================================");
