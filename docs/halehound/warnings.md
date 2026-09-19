@@ -289,14 +289,72 @@ no constant changed value.
 
 ### What is left
 
-Under `-Wall`: nothing in the sketch.
+Nothing. The sketch is clean under `-Wall -Wextra`, and that is what
+`tools/build.sh` runs.
 
-Under `-Wextra`, 53: 52 `-Wmissing-field-initializers` and one `-Wtype-limits`
-(the dead `if (v > 255)` on a `uint8_t` in `applyBrightness`). Clearing those
-would let `-Wextra` become the default too.
+Clearing the last 53 took four `= {0}` initializers and one real bug.
 
-Two suppressions were added deliberately rather than fixed:
-`tcpip_adapter_init()` is wrapped in a `#pragma GCC diagnostic ignored` with a
-note -- it is a shim on IDF 4.4 and gone in IDF 5, the replacement is not a
-straight substitution, and it sits in the WiFi bring-up path with no way to
-test it yet. That one is on the list for any move to core 3.x.
+The 52 `-Wmissing-field-initializers` were all one idiom, in four places:
+
+```c
+wifi_ap_record_t ap_record = {0};   ->   = {}
+wifi_config_t    ap_config = {0};   ->   = {}
+```
+
+Both spellings zero every member. `{0}` reads as "initialise the first field
+and leave 25 alone", which is what `-Wextra` objects to; `{}` says initialise
+all of them. Identical output.
+
+The single `-Wtype-limits` was not cosmetic.
+
+```c
+static bool applyBrightness(uint8_t v){
+  if (v > 255) v = 255;
+```
+
+`v` is a `uint8_t`, so the clamp can never fire -- that is all the warning
+says. The reason it is there is the interesting part:
+
+```c
+if (sel==0 && s.brightness<255) { applyBrightness(s.brightness+8); }
+```
+
+`s.brightness` is a `uint8_t`. `s.brightness + 8` promotes to `int`, and the
+`uint8_t` parameter truncated it mod 256 at the call boundary -- before the
+clamp could see it. So brightness 248..254, all of which pass the caller's
+`< 255` guard, arrived as 0..6, and pressing "brighter" near maximum dropped
+the backlight to almost off.
+
+The clamp was written to prevent exactly that and sat one scope too late to
+do it. `applyBrightness` now takes an `int` and clamps both ends, which is
+what it was always trying to be.
+
+That is a behaviour change, unlike everything else in this pass: stepping up
+from 250 now gives 255 instead of 2.
+
+### Verification
+
+The macro work and this pass together changed **one** symbol in the linked
+image:
+
+```
+- 0000002e _ZN13AppSettingsUIL15applyBrightnessEh
++ 00000036 _ZN13AppSettingsUIL15applyBrightnessEi
+```
+
+The brightness fix. The other 14,156 symbols are identical in size, which is
+what you want from a refactor: if anything else had moved, it would have been
+a bug introduced rather than removed.
+
+### Two suppressions, on purpose
+
+`tcpip_adapter_init()` is wrapped in `#pragma GCC diagnostic ignored
+"-Wdeprecated-declarations"` with a note. It is a shim on IDF 4.4 and gone in
+IDF 5, the replacement is not a straight substitution, and it sits in the WiFi
+bring-up path with no way to test it yet. On the list for any move to core
+3.x.
+
+The normal build filters warnings from TFT_eSPI and the ESP-IDF headers -- 40
+of them, repeated per translation unit -- and prints the count instead. They
+are not ours to fix, and a build that always prints noise is a build nobody
+reads. `tools/build.sh warnings` shows everything unfiltered.

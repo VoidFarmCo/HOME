@@ -1948,12 +1948,20 @@ static void redrawIfChanged() {
   uiDirty = false;
 }
 
-static bool applyBrightness(uint8_t v){
+static bool applyBrightness(int v){
+  // Takes int, not uint8_t. The step-up caller passes s.brightness + 8, which
+  // is an int, and a uint8_t parameter truncated it mod 256 before the clamp
+  // below could ever see it -- so brightness 248..254 (all of which pass the
+  // caller's `< 255` guard) arrived here as 0..6 and stepping up near maximum
+  // dropped the backlight to almost off. The clamp was written to stop that
+  // and sat one scope too late to do it. -Wtype-limits flagged it as dead.
   if (v > 255) v = 255;
+  if (v < 0) v = 0;
+  const uint8_t b = (uint8_t)v;
   auto& s = settings();
-  if (s.brightness == v) return false;
-  s.brightness = v;
-  ::setBrightness(v);
+  if (s.brightness == b) return false;
+  s.brightness = b;
+  ::setBrightness(b);
   dirtySettings = true;
   uiDirty = true;
   lastChangeMs = millis();

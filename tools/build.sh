@@ -107,7 +107,9 @@ setup() {
   #
   # It was also absorbing 30 collisions that had nothing to do with that, one
   # of them a real bug. Those are fixed in patch_cc1101 above, so the flag now
-  # covers only the case it was meant for. -w still hides everything.
+  # covers only the case it was meant for.
+  #
+  # -w is stripped below: the sketch is clean under -Wall -Wextra now.
   if [ ! -f "$CORE_DIR/platform.txt.orig" ]; then
     cp "$CORE_DIR/platform.txt" "$CORE_DIR/platform.txt.orig"
   fi
@@ -115,12 +117,13 @@ setup() {
 
   # Drop upstream's -w. It lived in build.extra_flags, which the compile
   # recipe appends *after* compiler.warning_flags, so it overrode whatever
-  # --warnings asked for. The sketch is -Wall clean now, so it can go.
+  # --warnings asked for. Nothing needs hiding now.
   sed -i 's|^build\.extra_flags\.esp32=-w |build.extra_flags.esp32=|' "$CORE_DIR/platform.txt"
 
   # The platform bakes -Werror=all into both raised levels, so `--warnings`
   # turned the first unused function into a failed build instead of a report.
-  # `more` is the normal build (-Wall), `all` adds -Wextra for the noisy sweep.
+  # Both builds use `all` (-Wall -Wextra); `more` is left as plain -Wall for
+  # anyone who wants to drop -Wextra temporarily.
   sed -i 's|^compiler\.warning_flags\.more=.*|compiler.warning_flags.more=-Wall|' \
     "$CORE_DIR/platform.txt"
   sed -i 's|^compiler\.warning_flags\.all=.*|compiler.warning_flags.all=-Wall -Wextra|' \
@@ -147,7 +150,7 @@ setup() {
   echo "setup complete. core: $CORE_DIR"
 }
 
-# -Wall is on and the sketch is expected to stay clean under it. If this
+# -Wall -Wextra, and the sketch is expected to stay clean under both. If this
 # prints a warning, that is the whole point -- fix it rather than lowering the
 # level again.
 #
@@ -161,7 +164,7 @@ compile() {
   local log="$HH_ARDUINO_ROOT/compile.log"
   mkdir -p "$HH_ARDUINO_ROOT"
   local rc=0
-  arduino-cli compile --warnings more -b "$FQBN" \
+  arduino-cli compile --warnings all -b "$FQBN" \
     --build-path "$BUILD_PATH" "$REPO/ESP32-DIV" >"$log" 2>&1 || rc=$?
 
   grep -E "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*(warning|error):" "$log" || true
@@ -171,7 +174,7 @@ compile() {
   ours=$(grep -cE "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*warning:" "$log" || true)
   external=$(( $(grep -c "warning:" "$log" || true) - ours ))
   if [ "$ours" -eq 0 ]; then
-    echo "sketch is -Wall clean ($external library/core warnings filtered)"
+    echo "sketch is -Wall -Wextra clean ($external library/core warnings filtered)"
   else
     echo "$ours sketch warning(s) above -- these are ours"
   fi
@@ -182,9 +185,9 @@ compile() {
   fi
 }
 
-# The wider sweep: -Wall -Wextra. Still noisy -- around 53 warnings, dominated
-# by -Wmissing-field-initializers, which is why -Wextra is not the default.
-# docs/halehound/warnings.md has the breakdown.
+# Same warning level as the normal build, but nothing filtered: library and
+# core warnings included. Use it when a warning is suspected to come from a
+# library rather than the sketch.
 warnings() {
   rm -rf "$BUILD_PATH-warnings"
   arduino-cli compile --warnings all -b "$FQBN" \

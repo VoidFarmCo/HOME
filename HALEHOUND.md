@@ -101,9 +101,8 @@ frames can be injected, which is load-bearing and cannot be done with
 `--wrap`. It was also swallowing 30 unrelated duplicate symbols, one of them a
 real bug; those are fixed during setup. See
 [docs/halehound/zmuldefs.md](docs/halehound/zmuldefs.md). `-w` is **gone** --
-`setup` strips it and the normal build runs `-Wall`, which the sketch is clean
-under. `tools/build.sh warnings` adds `-Wextra` for the wider sweep. See
-[docs/halehound/warnings.md](docs/halehound/warnings.md).
+`setup` strips it and the build runs `-Wall -Wextra`, which the sketch is
+clean under. See [docs/halehound/warnings.md](docs/halehound/warnings.md).
 
 **The vendored CC1101 driver is patched during setup.** It shipped a dead
 copy-paste clone of itself (`..._JT_DRV.cpp`, a second `class

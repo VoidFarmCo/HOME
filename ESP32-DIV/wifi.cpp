@@ -4439,7 +4439,9 @@ bool scanNetworks() {
     }
 
     for (int i = 0; i < network_count; i++) {
-        wifi_ap_record_t ap_record = {0};
+        // `= {}` not `= {0}`: both zero every member, but the latter reads
+        // as "initialise the first field" and -Wextra flags the other 25.
+        wifi_ap_record_t ap_record = {};
         memcpy(ap_record.bssid, WiFi.BSSID(i), 6);
         strncpy((char*)ap_record.ssid, WiFi.SSID(i).c_str(), sizeof(ap_record.ssid));
         ap_record.rssi = WiFi.RSSI(i);
@@ -4844,7 +4846,7 @@ void deautherLoop() {
         if (checkApChannel(selectedAp.bssid, &new_channel)) {
             if (new_channel != selectedChannel) {
                 selectedChannel = new_channel;
-                wifi_config_t ap_config = {0};
+                wifi_config_t ap_config = {};
                 strncpy((char*)ap_config.ap.ssid, "ESP32-DIV", sizeof(ap_config.ap.ssid));
                 ap_config.ap.ssid_len = strlen("ESP32-DIV");
                 strncpy((char*)ap_config.ap.password, "deauth123", sizeof(ap_config.ap.password));
@@ -5129,7 +5131,9 @@ bool scanNetworks() {
     }
 
     for (int i = 0; i < network_count; i++) {
-        wifi_ap_record_t ap_record = {0};
+        // `= {}` not `= {0}`: both zero every member, but the latter reads
+        // as "initialise the first field" and -Wextra flags the other 25.
+        wifi_ap_record_t ap_record = {};
         memcpy(ap_record.bssid, WiFi.BSSID(i), 6);
         strncpy((char*)ap_record.ssid, WiFi.SSID(i).c_str(), sizeof(ap_record.ssid));
         ap_record.rssi = WiFi.RSSI(i);
@@ -5532,7 +5536,7 @@ void probeRequestFloodLoop() {
         if (checkApChannel(selectedAp.bssid, &new_channel)) {
             if (new_channel != selectedChannel) {
                 selectedChannel = new_channel;
-                wifi_config_t ap_config = {0};
+                wifi_config_t ap_config = {};
                 strncpy((char*)ap_config.ap.ssid, "ESP32-DIV", sizeof(ap_config.ap.ssid));
                 ap_config.ap.ssid_len = strlen("ESP32-DIV");
                 strncpy((char*)ap_config.ap.password, "deauth123", sizeof(ap_config.ap.password));
