@@ -57,6 +57,11 @@ void spotterSetup();
 void spotterLoop();
 void exit();
 
+/* Capture to SD. Off until the operator turns it on, and see the note in
+ * Spotter.cpp about what a capture of the air around you contains. */
+bool        captureActive();
+uint32_t    captureRows();
+
 /* Exposed for the UI and for logging. */
 int         hitCount();
 const Hit*  hitAt(int i);

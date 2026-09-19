@@ -1,10 +1,12 @@
 #include "Spotter.h"
 
+#include "SpiBus.h"
 #include "config.h"
 #include "icon.h"
 #include "shared.h"
 #include "utils.h"
 
+#include <SD.h>
 #include <esp_wifi.h>
 #include <string.h>
 #include <strings.h>
@@ -25,6 +27,55 @@ constexpr int      kRowH         = 30;
  * probe request carries nowhere near this many; the cap is there so that a
  * frame built to lie about its lengths ends the loop rather than running it. */
 constexpr int      kMaxIes       = 32;
+
+/* ── capture ──────────────────────────────────────────────────────────────
+ *
+ * There is no fingerprint table and there cannot be one until somebody
+ * stands next to a camera with this in their hand, so the useful thing to
+ * build first is the means of writing one down. Capture appends a row per
+ * device to a CSV on the card.
+ *
+ * It records every device it hears, not only the ones a signature matched.
+ * That is the entire point -- a fingerprint that already matched something
+ * is one you already have -- and it is also the reason this is off until it
+ * is switched on. A capture of the air around you is a list of the people
+ * near you: their phones, their watches, their cars. It stays on the card,
+ * nothing uploads it, and it is the operator's to delete.
+ *
+ * The frames arrive on the WiFi task and the card is written from the main
+ * one, so the two are joined by a ring. Deduplication happens on the
+ * producing side, because writing a row per frame would be hundreds a
+ * second and the interesting content is one row per device.
+ * ──────────────────────────────────────────────────────────────────────── */
+constexpr int kCapRing  = 24;    // records waiting to reach the card
+constexpr int kCapSeen  = 128;   // (address, fingerprint) pairs already written
+constexpr int kCapBatch = 8;     // rows moved per flush; bounds the stack copy
+
+struct CapRec {
+  uint32_t ms;
+  uint32_t fp;
+  uint8_t  mac[6];
+  int8_t   rssi;
+  uint8_t  chan;
+  uint8_t  ssidLen;
+  char     ssid[33];
+};
+
+CapRec   s_cap[kCapRing];
+uint8_t  s_capHead = 0;
+uint8_t  s_capTail = 0;
+uint32_t s_capDropped = 0;
+
+/* Direct-mapped rather than searched: this runs in the promiscuous callback
+ * inside the critical section, so it is one compare rather than 128. Two
+ * devices landing on the same slot take turns and get written twice, which
+ * costs a duplicate row and no correctness. */
+uint32_t s_capSeen[kCapSeen];
+
+bool     s_logging   = false;
+bool     s_logFailed = false;
+uint32_t s_logRows   = 0;
+File     s_logFile;
 
 Hit      s_hits[kMaxHits];
 int      s_hitCount = 0;
@@ -110,6 +161,149 @@ Hit* findOrAdd(const uint8_t* mac, bool viaBle, uint32_t fp) {
   h.rssiBest = -127;
   h.fingerprint = fp;
   return &h;
+}
+
+/* Called for every management frame, matched or not. Cheap on purpose: one
+ * hash, one compare, one memcpy, all inside the lock the table already
+ * uses. */
+void captureNote(const uint8_t* mac, int8_t rssi, uint32_t fp,
+                 const uint8_t* ssid, uint8_t ssidLen) {
+  if (!s_logging) {
+    return;
+  }
+
+  uint32_t key = fp;
+  for (int i = 0; i < 6; i++) {
+    key = fnv1a(key, mac[i]);
+  }
+  if (key == 0) {
+    key = 1;                            // 0 marks an empty slot
+  }
+
+  portENTER_CRITICAL(&s_mux);
+  const uint16_t slot = (uint16_t)(key % (uint32_t)kCapSeen);
+  if (s_capSeen[slot] != key) {
+    s_capSeen[slot] = key;
+
+    const uint8_t next = (uint8_t)((s_capHead + 1) % kCapRing);
+    if (next == s_capTail) {
+      s_capDropped++;                   // card is not keeping up; say so later
+    } else {
+      CapRec& r = s_cap[s_capHead];
+      r.ms   = millis();
+      r.fp   = fp;
+      memcpy(r.mac, mac, 6);
+      r.rssi = rssi;
+      r.chan = s_chan;
+      r.ssidLen = (ssidLen > 32) ? 32 : ssidLen;
+      if (r.ssidLen > 0 && ssid != nullptr) {
+        memcpy(r.ssid, ssid, r.ssidLen);
+      }
+      r.ssid[r.ssidLen] = '\0';
+      s_capHead = next;
+    }
+  }
+  portEXIT_CRITICAL(&s_mux);
+}
+
+/* Moves whatever is waiting onto the card. Runs on the main task, never in
+ * the callback: SD is on the shared SPI bus and a write is slow enough that
+ * doing it from the promiscuous handler would drop frames.
+ *
+ * The bus is claimed each time rather than held. Touch is on the same bus
+ * and re-claims it whenever it is polled, so holding would only mean fighting
+ * over it; claim() is idempotent and cheap when nothing else intervened. */
+void captureFlush() {
+  if (!s_logFile) {
+    return;                             // gated on the file, not on s_logging,
+  }                                     // so captureStop can drain after it
+                                        // has already stopped the producer
+
+  CapRec batch[kCapBatch];
+  int n = 0;
+  portENTER_CRITICAL(&s_mux);
+  while (s_capTail != s_capHead && n < kCapBatch) {
+    batch[n++] = s_cap[s_capTail];
+    s_capTail = (uint8_t)((s_capTail + 1) % kCapRing);
+  }
+  portEXIT_CRITICAL(&s_mux);
+
+  if (n == 0) {
+    return;
+  }
+
+  SpiBus::claim(SpiBus::Dev::Sd);
+  for (int i = 0; i < n; i++) {
+    const CapRec& r = batch[i];
+    char head[80];
+    snprintf(head, sizeof(head),
+             "%lu,%02X:%02X:%02X:%02X:%02X:%02X,%d,%08lX,%d,%u,",
+             (unsigned long)r.ms,
+             r.mac[0], r.mac[1], r.mac[2], r.mac[3], r.mac[4], r.mac[5],
+             (r.mac[0] & 0x02) ? 1 : 0,
+             (unsigned long)r.fp, (int)r.rssi, (unsigned)r.chan);
+    s_logFile.print(head);
+
+    /* The SSID is arbitrary bytes off the air going into a text file. Quote
+     * it, and pass through only printable ASCII that cannot end the field
+     * early -- a network named with a quote and a newline should not be able
+     * to forge rows in somebody's capture. */
+    s_logFile.print('"');
+    for (uint8_t k = 0; k < r.ssidLen; k++) {
+      const char c = r.ssid[k];
+      if (c >= 32 && c < 127 && c != '"') {
+        s_logFile.print(c);
+      } else {
+        s_logFile.print('.');
+      }
+    }
+    s_logFile.println('"');
+    s_logRows++;
+  }
+  s_logFile.flush();
+}
+
+bool captureStart() {
+  s_logFailed = false;
+
+  if (!isSDCardAvailable()) {
+    s_logFailed = true;
+    return false;
+  }
+
+  SpiBus::claim(SpiBus::Dev::Sd);
+  char path[32];
+  snprintf(path, sizeof(path), "/spotter_%lu.csv", (unsigned long)millis());
+  s_logFile = SD.open(path, FILE_WRITE);
+  if (!s_logFile) {
+    s_logFailed = true;
+    return false;
+  }
+  s_logFile.println("ms,mac,rnd,fp,rssi_dbm,ch,ssid");
+  s_logFile.flush();
+
+  portENTER_CRITICAL(&s_mux);
+  memset(s_capSeen, 0, sizeof(s_capSeen));
+  s_capHead = 0;
+  s_capTail = 0;
+  s_capDropped = 0;
+  portEXIT_CRITICAL(&s_mux);
+
+  s_logRows = 0;
+  s_logging = true;
+  return true;
+}
+
+void captureStop() {
+  s_logging = false;                    // the producer stops here
+  if (s_logFile) {
+    /* Drain what is still queued: the ring holds more than one batch. */
+    for (int i = 0; i < (kCapRing / kCapBatch) + 1; i++) {
+      captureFlush();
+    }
+    s_logFile.flush();
+    s_logFile.close();
+  }
 }
 
 /* Record a match. A second, different signature on the same device promotes
@@ -268,6 +462,10 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
     fp = 1;
   }
 
+  /* Before the signature tables, and regardless of them: a fingerprint is
+   * only worth capturing while it is still unknown. */
+  captureNote(src, rssi, fp, ssidVal, ssidLen);
+
   for (size_t i = 0; i < kOuiSigCount; i++) {
     if (memcmp(src, kOuiSigs[i].oui, 3) == 0) {
       record(src, rssi, kOuiSigs[i].kind, kOuiSigs[i].conf, kOuiSigs[i].label,
@@ -397,6 +595,15 @@ void drawHeader() {
   snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d",
            (unsigned)s_chan, (unsigned long)s_frames, s_hitCount);
   tft.drawString(buf, 8, 24);
+
+  if (s_logging) {
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    snprintf(buf, sizeof(buf), "REC %lu", (unsigned long)s_logRows);
+    tft.drawString(buf, 180, 24);
+  } else if (s_logFailed) {
+    tft.setTextColor(ORANGE, TFT_BLACK);
+    tft.drawString("no SD", 196, 24);
+  }
 }
 
 void drawList() {
@@ -510,8 +717,16 @@ void spotterSetup() {
   s_dirty = true;
   memset(s_hits, 0, sizeof(s_hits));
 
+  s_logging = false;
+  s_logFailed = false;
+  s_logRows = 0;
+  s_capHead = 0;
+  s_capTail = 0;
+  s_capDropped = 0;
+  memset(s_capSeen, 0, sizeof(s_capSeen));
+
   setTouchButtonInputEnabled(true);
-  setTouchNavLabels("Back", "Down", "", "Up", "");
+  setTouchNavLabels("Back", "Down", "", "Up", "Log");
 
   // Radio up in station mode, unassociated, purely to listen.
   WiFi.mode(WIFI_STA);
@@ -559,7 +774,19 @@ void spotterLoop() {
     s_scroll++;
     s_dirty = true;
     delay(120);
+  } else if (isButtonPressed(BTN_RIGHT)) {
+    if (s_logging) {
+      captureStop();
+    } else {
+      captureStart();                   // sets s_logFailed when there is no card
+    }
+    s_dirty = true;
+    delay(200);
+    while (isButtonPressed(BTN_RIGHT)) {
+    }
   }
+
+  captureFlush();
 
   if (s_dirty && (uint32_t)(now - s_lastDraw) >= kRedrawMs) {
     s_lastDraw = now;
@@ -573,6 +800,7 @@ void spotterLoop() {
 
 void exit() {
   s_running = false;
+  captureStop();                        // never leave a file open on the card
 
   esp_wifi_set_promiscuous(false);
   esp_wifi_set_promiscuous_rx_cb(nullptr);
@@ -593,5 +821,7 @@ int        hitCount()        { return s_hitCount; }
 const Hit* hitAt(int i)      { return (i >= 0 && i < s_hitCount) ? &s_hits[i] : nullptr; }
 uint32_t   framesSeen()      { return s_frames; }
 uint8_t    currentChannel()  { return s_chan; }
+bool       captureActive()   { return s_logging; }
+uint32_t   captureRows()     { return s_logRows; }
 
 }  // namespace Spotter

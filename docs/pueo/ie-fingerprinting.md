@@ -3,10 +3,11 @@
 Scope for a Spotter detection path that survives MAC randomisation, and the
 reason its signature table has to start empty.
 
-Steps 1 to 3 of the phasing at the end are built: the walk, the hash, the
-fingerprint on screen, and the three things that work without any signature
-table at all. Nothing matches against a signature yet, and nothing can until
-there are captures to match against.
+Steps 1 to 4 of the phasing at the end are built: the walk, the hash, the
+fingerprint on screen, the three things that work without any signature
+table at all, and the capture that a table would have to be built from.
+Nothing matches against a signature yet. Step 5 is the only one left and it
+is the one that needs a camera.
 
 ## Why
 
@@ -173,7 +174,15 @@ So `kIeSigs[]` ships empty, and the first useful thing built is not a
 detector but a way to see fingerprints at all:
 
 - the hash shown on the hit row, so it can be written down
-- a capture mode that appends `fingerprint, rssi, channel, mac, ssid` to SD
+- a capture mode writing `ms, mac, rnd, fp, rssi_dbm, ch, ssid` to a CSV on
+  the card, on the **Log** button, off until it is switched on
+
+Capture records every device it hears rather than only the ones a signature
+matched, which is the entire point -- a fingerprint that already matched
+something is one you already have. It is also why it is off by default. A
+capture of the air around you is a list of the people near you: their
+phones, their watches, their cars. It stays on the card, nothing uploads
+it, and it is the operator's to delete.
 
 Then a signature table is something an operator builds by standing near a
 known camera, which is the only honest way to arrive at one. It also matches
@@ -256,7 +265,15 @@ hardware it is meant to detect.
    device has been in range. None of it scores into the confidence -- a
    device being persistent is displayed, not believed, because what
    persistence is worth is a question for hardware to answer.
-4. SD capture mode.
+4. **Done.** SD capture mode. 1,532 bytes of flash and 1,800 of RAM, most of
+   the latter being the ring between the two tasks and the table of pairs
+   already written. Frames arrive on the WiFi task and the card is written
+   from the main one, so a full ring drops rather than blocking the sniffer;
+   deduplication happens on the producing side, because a row per frame
+   would be hundreds a second. `tools/check_spotter_capture.py` covers the
+   ring, the dedupe and the escaping -- an SSID is arbitrary bytes off the
+   air going into a text file, and a network named with a quote and a
+   newline should not be able to forge rows in somebody's capture.
 5. `kIeSigs[]`, populated from captures, once there are any.
 
 Steps 1 through 3 stand on their own. Step 5 is the only one that needs a
