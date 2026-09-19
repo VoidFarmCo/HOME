@@ -38,7 +38,7 @@ enum class Dev : uint8_t {
   Touch,    // XPT2046, driver manages its own clock via beginTransaction
   Sd,
   Cc1101,   // ELECHOUSE driver uses raw SPI.transfer(), so WE own its clock
-  Nrf24,    // RF24 manages its own clock via beginTransaction
+  Nrf24,    // Nrf24Raw uses bare SPI.transfer(), so WE own its clock
   Pn532,    // Adafruit_PN532 in software-SPI mode: bit-bangs these pads
   Count
 };

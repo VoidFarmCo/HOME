@@ -6,6 +6,7 @@
 #include "icon.h"
 #include "shared.h"
 #include "utils.h"
+#include "Nrf24Raw.h"
 #include "SpiBus.h"
 
 #ifdef TFT_BLACK
@@ -3119,22 +3120,40 @@ void exit() {
 
 namespace BleJammer {
 
-RF24 radio1(CE_PIN_1, CSN_PIN_1, 16000000);
-RF24 radio2(CE_PIN_2, CSN_PIN_2, 16000000);
-RF24 radio3(CE_PIN_3, CSN_PIN_3, 16000000);
-
 enum OperationMode { BLE_MODULE, Bluetooth_MODULE };
 OperationMode currentMode = BLE_MODULE;
 
 bool jammerActive = false;
 
-int bluetooth_channels[] = {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
-int ble_channels[] = {2, 26, 80};
+const byte bluetooth_channels[] = {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
+const byte ble_channels[] = {2, 26, 80};
 
-const byte BLE_channels[] = {2, 26, 80};
-byte channelGroup1[] = {2, 5, 8, 11};
-byte channelGroup2[] = {26, 29, 32, 35};
-byte channelGroup3[] = {80, 83, 86, 89};
+/* Round-robin with a dwell, rather than a fresh random pick every time round
+ * the loop.
+ *
+ * Random repeats channels and leaves others unvisited for long stretches; the
+ * set is small enough that walking it covers everything sooner. The dwell
+ * matters more: every hop takes CE down, retunes and waits 130 us for the
+ * synthesiser, so hopping on every iteration spent much of the time settling
+ * rather than transmitting. */
+constexpr uint32_t kHopDwellMs = 4;
+
+uint32_t s_lastHopMs = 0;
+size_t   s_hopIndex  = 0;
+
+void hopStep(const byte* channels, size_t count) {
+  if (count == 0) {
+    return;
+  }
+  const uint32_t now = millis();
+  if ((uint32_t)(now - s_lastHopMs) < kHopDwellMs) {
+    return;
+  }
+  s_lastHopMs = now;
+  s_hopIndex = (s_hopIndex + 1) % count;
+  Nrf24Raw::hopTo(channels[s_hopIndex]);
+}
+
 
 constexpr int SCREEN_HEIGHT = 320;
 constexpr int LINE_HEIGHT = 12;
@@ -3220,41 +3239,25 @@ void checkButtons() {
   }
 }
 
-void configureRadio(RF24 &radio, const byte* channels, size_t size) {
-  radio.setAutoAck(false);
-  radio.stopListening();
-  radio.setRetries(0, 0);
-  radio.setPALevel(RF24_PA_MAX, true);
-  radio.setDataRate(RF24_2MBPS);
-  radio.setCRCLength(RF24_CRC_DISABLED);
-
-  for (size_t i = 0; i < size; i++) {
-    radio.setChannel(channels[i]);
-    radio.startConstCarrier(RF24_PA_MAX, channels[i]);
-  }
-}
-
-void initializeRadiosMultiMode() {
-
-  if (radio1.begin()) {
-    configureRadio(radio1, channelGroup1, sizeof(channelGroup1));
-  }
-  if (radio2.begin()) {
-    configureRadio(radio2, channelGroup2, sizeof(channelGroup2));
-  }
-  if (radio3.begin()) {
-    configureRadio(radio3, channelGroup3, sizeof(channelGroup3));
-  }
-}
-
+/* One module, one carrier, started once.
+ *
+ * This used to configure three RF24 objects over three channel groups, which
+ * read as twelve channels across three radios. It was neither: Pueo maps all
+ * three chip selects onto the one module, and the loop inside the old
+ * configureRadio() called startConstCarrier() per channel, each call
+ * replacing the last, so only the final entry of each group survived. The
+ * hopping that actually happened was in the feature loop below, and still
+ * is -- it is just done once now instead of three times to the same chip. */
 void initializeRadios() {
-  if (jammerActive) {
-    initializeRadiosMultiMode();
-
-  } else {
-    radio1.powerDown();
-    radio2.powerDown();
-    radio3.powerDown();
+  if (!jammerActive) {
+    Nrf24Raw::powerDown();
+    return;
+  }
+  if (Nrf24Raw::begin()) {
+    const byte* set = (currentMode == BLE_MODULE) ? ble_channels : bluetooth_channels;
+    s_hopIndex = 0;
+    s_lastHopMs = millis();
+    Nrf24Raw::startConstCarrier(set[0]);
   }
 }
 
@@ -3365,18 +3368,10 @@ void blejamLoop() {
 
   if (jammerActive) {
     if (currentMode == BLE_MODULE) {
-      int randomIndex = random(0, sizeof(ble_channels) / sizeof(ble_channels[0]));
-      int channel = ble_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
+      hopStep(ble_channels, sizeof(ble_channels) / sizeof(ble_channels[0]));
     } else if (currentMode == Bluetooth_MODULE) {
-      int randomIndex = random(0, sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]));
-      int channel = bluetooth_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
+      hopStep(bluetooth_channels,
+              sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]));
     }
   }
 
@@ -4982,10 +4977,6 @@ void exit() {
 
 namespace ProtoKill {
 
-RF24 radio1(CE_PIN_1, CSN_PIN_1, 16000000);
-RF24 radio2(CE_PIN_2, CSN_PIN_2, 16000000);
-RF24 radio3(CE_PIN_3, CSN_PIN_3, 16000000);
-
 enum OperationMode { BLE_MODULE, Bluetooth_MODULE, WiFi_MODULE, VIDEO_TX_MODULE, RC_MODULE, USB_WIRELESS_MODULE, ZIGBEE_MODULE, NRF24_MODULE };
 OperationMode currentMode = WiFi_MODULE;
 
@@ -5000,10 +4991,55 @@ const byte rc_channels[] =               {1, 3, 5, 7};
 const byte zigbee_channels[] =           {11, 15, 20, 25};
 const byte nrf24_channels[] =            {76, 78, 79};
 
-const byte BLE_channels[] = {2, 26, 80};
-byte channelGroup1[] = {2, 5, 8, 11};
-byte channelGroup2[] = {26, 29, 32, 35};
-byte channelGroup3[] = {80, 83, 86, 89};
+/* Which set each mode walks. One place, so that adding a mode is a row
+ * here rather than another branch in the loop. */
+struct ChannelSet {
+  const byte* channels;
+  size_t      count;
+};
+
+ChannelSet channelsFor(OperationMode m) {
+  switch (m) {
+    case BLE_MODULE:       return {ble_channels, sizeof(ble_channels)};
+    case Bluetooth_MODULE: return {bluetooth_channels, sizeof(bluetooth_channels)};
+    case WiFi_MODULE:      return {WiFi_channels, sizeof(WiFi_channels)};
+    case VIDEO_TX_MODULE:  return {videoTransmitter_channels,
+                                   sizeof(videoTransmitter_channels)};
+    case RC_MODULE:        return {rc_channels, sizeof(rc_channels)};
+    case USB_WIRELESS_MODULE: return {usbWireless_channels,
+                                      sizeof(usbWireless_channels)};
+    case ZIGBEE_MODULE:    return {zigbee_channels, sizeof(zigbee_channels)};
+    case NRF24_MODULE:     return {nrf24_channels, sizeof(nrf24_channels)};
+  }
+  return {ble_channels, sizeof(ble_channels)};
+}
+
+/* Round-robin with a dwell, rather than a fresh random pick every time round
+ * the loop.
+ *
+ * Random repeats channels and leaves others unvisited for long stretches; the
+ * set is small enough that walking it covers everything sooner. The dwell
+ * matters more: every hop takes CE down, retunes and waits 130 us for the
+ * synthesiser, so hopping on every iteration spent much of the time settling
+ * rather than transmitting. */
+constexpr uint32_t kHopDwellMs = 4;
+
+uint32_t s_lastHopMs = 0;
+size_t   s_hopIndex  = 0;
+
+void hopStep(const byte* channels, size_t count) {
+  if (count == 0) {
+    return;
+  }
+  const uint32_t now = millis();
+  if ((uint32_t)(now - s_lastHopMs) < kHopDwellMs) {
+    return;
+  }
+  s_lastHopMs = now;
+  s_hopIndex = (s_hopIndex + 1) % count;
+  Nrf24Raw::hopTo(channels[s_hopIndex]);
+}
+
 
 constexpr int SCREEN_HEIGHT = 320;
 constexpr int LINE_HEIGHT = 12;
@@ -5101,41 +5137,19 @@ void prokillHandleNavButtons() {
   }
 }
 
-void configureRadio(RF24 &radio, const byte* channels, size_t size) {
-  radio.setAutoAck(false);
-  radio.stopListening();
-  radio.setRetries(0, 0);
-  radio.setPALevel(RF24_PA_MAX, true);
-  radio.setDataRate(RF24_2MBPS);
-  radio.setCRCLength(RF24_CRC_DISABLED);
-
-  for (size_t i = 0; i < size; i++) {
-    radio.setChannel(channels[i]);
-    radio.startConstCarrier(RF24_PA_MAX, channels[i]);
-  }
-}
-
-void initializeRadiosMultiMode() {
-
-  if (radio1.begin()) {
-    configureRadio(radio1, channelGroup1, sizeof(channelGroup1));
-  }
-  if (radio2.begin()) {
-    configureRadio(radio2, channelGroup2, sizeof(channelGroup2));
-  }
-  if (radio3.begin()) {
-    configureRadio(radio3, channelGroup3, sizeof(channelGroup3));
-  }
-}
-
+/* See the note in BleJammer::initializeRadios: one module, one carrier,
+ * started once, and the hopping lives in the feature loop. */
 void initializeRadios() {
   if (jammerActive) {
-    initializeRadiosMultiMode();
+    if (Nrf24Raw::begin()) {
+      const ChannelSet set = channelsFor(currentMode);
+      s_hopIndex = 0;
+      s_lastHopMs = millis();
+      Nrf24Raw::startConstCarrier(set.channels[0]);
+    }
 
   } else {
-    radio1.powerDown();
-    radio2.powerDown();
-    radio3.powerDown();
+    Nrf24Raw::powerDown();
   }
 }
 
@@ -5268,62 +5282,8 @@ void prokillLoop() {
   checkModeChange();
 
   if (jammerActive) {
-    if (currentMode == BLE_MODULE) {
-      int randomIndex = random(0, sizeof(ble_channels) / sizeof(ble_channels[0]));
-      int channel = ble_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == Bluetooth_MODULE) {
-      int randomIndex = random(0, sizeof(bluetooth_channels) / sizeof(bluetooth_channels[0]));
-      int channel = bluetooth_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == WiFi_MODULE) {
-      int randomIndex = random(0, sizeof(WiFi_channels) / sizeof(WiFi_channels[0]));
-      int channel = WiFi_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == USB_WIRELESS_MODULE) {
-      int randomIndex = random(0, sizeof(usbWireless_channels) / sizeof(usbWireless_channels[0]));
-      int channel = usbWireless_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == VIDEO_TX_MODULE) {
-      int randomIndex = random(0, sizeof(videoTransmitter_channels) / sizeof(videoTransmitter_channels[0]));
-      int channel = videoTransmitter_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == RC_MODULE) {
-      int randomIndex = random(0, sizeof(rc_channels) / sizeof(rc_channels[0]));
-      int channel = rc_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == ZIGBEE_MODULE) {
-      int randomIndex = random(0, sizeof(zigbee_channels) / sizeof(zigbee_channels[0]));
-      int channel = zigbee_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-
-    } else if (currentMode == NRF24_MODULE) {
-      int randomIndex = random(0, sizeof(nrf24_channels) / sizeof(nrf24_channels[0]));
-      int channel = nrf24_channels[randomIndex];
-      radio1.setChannel(channel);
-      radio2.setChannel(channel);
-      radio3.setChannel(channel);
-    }
+    const ChannelSet set = channelsFor(currentMode);
+    hopStep(set.channels, set.count);
   }
 
   // Yield to the scheduler so the idle task/watchdog and core-0 radio stack get
@@ -5333,15 +5293,13 @@ void prokillLoop() {
 
 void exit() {
   // Without this, leaving the feature keeps the radios running
-  // startConstCarrier(RF24_PA_MAX): a permanent full-power 2.4GHz transmission
+  // the constant carrier is a permanent full-power 2.4GHz transmission
   // that jams the ESP32's own WiFi/BLE and makes the whole device sluggish.
   jammerActive = false;
   modeChangeRequested = false;
   modeChangeRequested1 = false;
   jammerToggleRequested = false;
-  radio1.powerDown();
-  radio2.powerDown();
-  radio3.powerDown();
+  Nrf24Raw::powerDown();
   restoreSdAfterSharedSpi();
 }
 

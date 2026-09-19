@@ -42,8 +42,10 @@ constexpr int8_t kNoPin = -1;
  *          at all, so it runs at whatever the bus was left at. That is the one
  *          clock we genuinely own. 4 MHz sits under the CC1101's 6.5 MHz
  *          burst-access ceiling with margin.
- *   Nrf24  RF24 wraps its transfers in beginTransaction at its constructed
- *          speed, so ours is only the idle setting
+ *   Nrf24  Nrf24Raw issues bare SPI.transfer() like the CC1101 driver does,
+ *          so since RF24 was dropped this is the clock the part actually
+ *          runs at rather than an idle setting. 10 MHz is the nRF24L01+'s
+ *          documented SPI ceiling; it is a limit rather than a margin.
  */
 const Profile kProfiles[] = {
   /* None   */ {"none",   kNoPin, kNoPin, kNoPin, kNoPin, 0, SPI_MODE0, MSBFIRST, true},

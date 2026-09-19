@@ -3,12 +3,10 @@
 
 #include <Arduino.h>
 #include <PCF8574.h>
-#include <RF24.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <Wire.h>
 #include <XPT2046_Touchscreen.h>
-#include <nRF24L01.h>
 #include "BleCompat.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"

@@ -3,10 +3,11 @@
 Pueo's own code is **GPL-3.0-or-later** as of this document. Upstream's MIT
 notice is retained and those portions stay available under MIT.
 
-That is the easy half. The hard half is that **the merged binary cannot be
-distributed under any single licence as it stands**, and that has been true
-since 0.1.0. It is not caused by the relicence; the relicence is what made it
-worth looking at properly.
+The merged binary is now distributable under that licence too. It was not
+when this document was first written: the tree carried a GPL-2.0-only
+dependency that could not lawfully share a binary with two of the others, and
+had done since 0.1.0. Removing it is recorded below rather than quietly
+tidied away, because the reasoning is the useful part.
 
 ## What changed, and what did not
 
@@ -31,7 +32,7 @@ story and only the source says which.
 
 | Library | Grant | Where it says so |
 |---|---|---|
-| **RF24** 1.6.2 | **GPL-2.0-only** | `RF24.h`, `RF24.cpp`, `RF24_config.h` |
+| ~~RF24 1.6.2~~ | ~~GPL-2.0-only~~ | **removed — see below** |
 | **arduinoFFT** 1.6.2 | **GPL-3.0-or-later** | `arduinoFFT.h` |
 | NimBLE-Arduino | Apache-2.0 | `LICENSE` |
 | rc-switch | LGPL-2.1-or-later | `RCSwitch.h` |
@@ -41,7 +42,7 @@ story and only the source says which.
 | SmartRC-CC1101-Driver-Lib | MIT | `libs/.../VENDORED.md` |
 | TFT_eSPI | BSD-family, no notice in the shipped zip | — |
 
-The two in bold are the problem, and the exact wording is why:
+RF24 was the problem, and the exact wording is why:
 
 > RF24: "you can redistribute it and/or modify it under the terms of the GNU
 > General Public License **version 2** as published by the Free Software
@@ -55,67 +56,78 @@ grants nothing. It is an easy thing to misread, and worth reading twice.
 > arduinoFFT: "either version 3 of the License, or (at your option) any later
 > version."
 
-## The conflict
+## The conflict, and how it was resolved
 
 GPLv2-only and GPLv3 are incompatible. Each requires that the whole combined
-work be distributable under its own terms, and neither permits the other's.
-A binary containing both cannot satisfy either.
+work be distributable under its own terms, and neither permits the other. A
+binary containing both cannot satisfy either. The firmware linked both:
+`arduinoFFT` is instantiated in `wifi.cpp` and `subghz.cpp`, and RF24 was
+used by the two jammers.
 
-The firmware links both. `arduinoFFT` is instantiated in `wifi.cpp:351` and
-`subghz.cpp:484`; RF24 is throughout `bluetooth.cpp`, `utils.cpp` and
-`SpiBus.cpp`. So the merged image combines them, and has since 0.1.0.
+There was a second edge. Apache-2.0 is compatible with GPLv3 but **not** with
+GPLv2, on account of its patent-termination clause, and NimBLE-Arduino is
+Apache-2.0. So RF24 conflicted with NimBLE as well, and the set could not be
+resolved by declaring the whole thing GPLv2 either.
 
-There is a second edge. Apache-2.0 is compatible with GPLv3 but **not** with
-GPLv2, on account of its patent-termination clause. NimBLE-Arduino is
-Apache-2.0 and is linked. So RF24 conflicts with NimBLE as well, which means
-the set cannot be resolved by simply declaring the whole thing GPLv2 either.
+RF24 was the odd one out in every direction; everything else in the tree is
+permissive or GPLv3-compatible. **So it was removed.**
 
-RF24 is the odd one out in every direction. Everything else in the tree is
-either permissive or GPLv3-compatible.
+That turned out to be a much smaller job than it sounds, because almost
+nothing used it. MouseJack, the ESB paths and the skimmer detector already
+drove the chip's registers directly through two hand-rolled layers. RF24
+survived only in the two jammers, and only for ten methods, nine of which are
+a single register write each. `ESP32-DIV/Nrf24Raw.{h,cpp}` is now the one
+owner of that register interface, the jammers use it, and the build no longer
+installs the library.
+
+The result is 3,476 bytes *smaller*, and it builds byte-identically with the
+library deleted from the tree, which is how the removal was checked rather
+than assumed.
+
+With RF24 gone the remaining set is arduinoFFT (GPL-3.0-or-later),
+NimBLE-Arduino (Apache-2.0), rc-switch (LGPL-2.1-or-later) and a handful of
+MIT and BSD libraries. All of those are GPLv3-compatible, so the combined
+work is distributable as GPL-3.0-or-later, which is what this fork is
+licensed under.
 
 ## What that means in practice
 
-**The source archive is fine.** It contains this fork's own code and
-upstream's, both of which are ours to license, plus the vendored CC1101
-driver, which is MIT. Nothing in it is in conflict.
+**The source archive is fine**, and always was. It contains this fork's own
+code and upstream's, both of which are ours to license, plus the vendored
+CC1101 driver, which is MIT.
 
-**The merged binary is the problem.** Distributing it means distributing a
-combined work, and no licence covers that combination. Publishing it with the
-full source alongside — which this project does — addresses the *spirit* of
-GPL's source requirement but does not resolve an incompatibility between two
-dependencies. No amount of disclosure makes GPLv2-only and GPLv3 compatible.
+**The merged binary is fine as of the RF24 removal.** Distributing it means
+distributing a combined work, and GPL-3.0-or-later now covers that
+combination. The obligation that comes with it is the ordinary GPL one:
+whoever receives the binary must be able to get the corresponding source.
+This project publishes the archive alongside the image, which is what that
+takes.
 
-This is not a theoretical wrinkle in one respect: it is a licence
-infringement against RF24's or arduinoFFT's authors, whoever chooses to mind.
-It is theoretical in another: both are hobby libraries, the project is
-non-commercial, and nobody has complained. Those are different questions and
-only the first one is a matter of fact.
+Images published **before** the removal — 0.1.0, 0.2.0 and 0.2.1 — contain
+RF24 and are in the conflicted state described above. That is a licence
+infringement against RF24's or arduinoFFT's authors, whoever chooses to mind,
+and the tidy thing is to replace them with a build that is not.
 
-## Ways out
+## Ways out, and the one taken
 
-Ordered by how little they cost.
+**Replace RF24** — taken. It removed every edge at once, because nothing else
+in the tree is GPLv2-only. It was expected to cost a full nRF24L01+ driver;
+it cost one small file, because the features that do the interesting work
+with that chip never used the library in the first place.
 
-**Drop `arduinoFFT`.** It is used for exactly one thing in each of two
-features — a Hamming window, a forward transform and a magnitude conversion,
-three calls apiece. A small self-written radix-2 FFT, or any BSD/MIT one,
-removes the GPLv3 edge. That leaves RF24 GPLv2-only against NimBLE's
-Apache-2.0, so it is necessary but not sufficient.
+The others, recorded because they were real options and because they stay
+relevant if a GPLv2-only dependency ever appears again:
 
-**Replace RF24.** This is the real fix, and it removes every edge at once,
-because nothing else in the tree is GPLv2-only. The cost is a driver for the
-nRF24L01+ that the MouseJack, ESB replay and jammer features are written
-against. That is not a weekend, but the nRF24 is a simple part and the
-register interface is documented.
+**Drop `arduinoFFT`.** Used for exactly one thing in each of two features — a
+Hamming window, a forward transform, a magnitude conversion. A small radix-2
+FFT or any BSD/MIT one would remove the GPLv3 edge. It would have been
+necessary but not sufficient, since RF24 also conflicted with NimBLE.
 
-**Drop the NRF24 features.** Cheapest in effort, most expensive in product:
-it is a third of what the thing does.
+**Drop the NRF24 features.** Cheapest in effort, most expensive in product.
 
 **Ship source only, no binary.** Sidesteps the question by not distributing
-the combined work. Costs every user a 1 GB toolchain download, which is the
-reason the merged image exists in the first place.
-
-Doing nothing is also a position, as long as it is a chosen one rather than
-an assumed one. That is what this document is for.
+the combined work, at the cost of a 1 GB toolchain download for every user —
+which is the reason the merged image exists at all.
 
 ## What the relicence did and did not buy
 
@@ -124,9 +136,10 @@ is what the fingerprinting effort needs. `FlipDeFlock` is GPL-3.0-or-later,
 so its signature data can now be used here with attribution — its name and
 logo are separately restricted, see its `TRADEMARK.md`.
 
-**Did not:** fix the binary. RF24 is now incompatible with this project's own
-code as well as with two of its dependencies. The graph was already broken;
-this adds an edge to it rather than repairing one.
+**Did not, on its own:** fix the binary. Relicensing made RF24 incompatible
+with this project's own code as well as with two of its dependencies — it
+added an edge to an already-broken graph. Removing RF24 is what repaired it.
+Both steps were needed and only the second one was the fix.
 
 ## Redistribution gaps, while we are here
 

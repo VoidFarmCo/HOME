@@ -136,13 +136,12 @@ Upstream is MIT, Copyright (c) 2023 CiferTech, kept verbatim in
 [LICENSE.MIT](LICENSE.MIT). Those portions stay available under MIT from
 upstream, and the notice travels with any redistribution of this tree.
 
-> **Before you redistribute a compiled image, read
-> [docs/pueo/licensing.md](docs/pueo/licensing.md).** The firmware links
-> RF24 (GPL-2.0-*only*) alongside arduinoFFT (GPL-3.0-or-later) and
-> NimBLE-Arduino (Apache-2.0), and those cannot lawfully be combined in one
-> binary. The source is fine; the merged image is not, and has not been
-> since 0.1.0. It is inherited from upstream's dependency set, and
-> relicensing does not fix it.
+> Images published before the RF24 removal — 0.1.0, 0.2.0 and 0.2.1 — link
+> RF24, which is GPL-2.0-*only* and cannot lawfully share a binary with
+> arduinoFFT or NimBLE-Arduino. That conflict was inherited from upstream's
+> dependency set and had been there since 0.1.0. RF24 is gone now, nothing
+> else in the tree is GPLv2-only, and the combined work is distributable as
+> GPL-3.0-or-later. See [docs/pueo/licensing.md](docs/pueo/licensing.md).
 
 ## Credits
 

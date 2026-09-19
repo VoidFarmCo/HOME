@@ -49,7 +49,6 @@ LIBS=(
   "ArduinoJson@6.21.5"
   "NimBLE-Arduino@1.4.3"
   "arduinoFFT@1.6.2"
-  "RF24@1.6.2"
   "rc-switch@2.6.4"
   "XPT2046_Touchscreen@1.4.0"
   "Adafruit PN532@1.3.4"

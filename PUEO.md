@@ -32,17 +32,18 @@ This fork's own code is **GPL-3.0-or-later**; see `LICENSE`. Upstream is
 the notice travels with any redistribution of this tree.
 
 An earlier version of this section said that publishing binaries carries no
-source-disclosure obligation. **That was wrong.** It was true of upstream's
-own code and false of the thing that actually gets published: the merged
-image links RF24, which is GPL-2.0-*only*, and arduinoFFT, which is
-GPL-3.0-or-later, and those two cannot lawfully be combined in one binary at
-all. Apache-2.0 NimBLE-Arduino conflicts with RF24 for a second reason.
+source-disclosure obligation. **That was wrong**, and the correction is worth
+keeping visible. The merged image linked RF24, which is GPL-2.0-*only*,
+alongside arduinoFFT (GPL-3.0-or-later) and NimBLE-Arduino (Apache-2.0).
+GPLv2-only cannot lawfully share a binary with either, so no single licence
+covered what was being published, and none had since 0.1.0.
 
-The source archive is unaffected. The merged binary is not distributable
-under any single licence and has not been since 0.1.0. It is a problem
-inherited from upstream's dependency set rather than created here, and it is
-not fixed by relicensing — read `docs/pueo/licensing.md` before publishing
-another image, which sets out what the options cost.
+**RF24 is gone as of `Nrf24Raw`.** Nothing else in the tree is GPLv2-only, so
+the combined work is now distributable as GPL-3.0-or-later, with the ordinary
+GPL obligation that whoever receives the binary can get the source, which is
+what the archive beside it is for. Images published before that change
+(0.1.0, 0.2.0, 0.2.1) still contain RF24 and are still in the conflicted
+state. `docs/pueo/licensing.md` has the whole reasoning.
 
 ## Layout
 
@@ -218,6 +219,15 @@ differs in something other than the version string:
   pocket with no nominal slack: a clearance ladder, and a slice of the base
   taken as an `intersection()` with `base()` so it cannot drift from the
   real part
+- `ESP32-DIV/Nrf24Raw.{h,cpp}` — the nRF24L01+ register interface, and the
+  end of the RF24 dependency. RF24 is GPL-2.0-only and could not share a
+  binary with arduinoFFT or NimBLE-Arduino, a conflict the project had
+  carried since 0.1.0. Almost nothing used it: MouseJack, the ESB paths and
+  the skimmer detector already drove the registers directly, and RF24
+  survived only in the two jammers. Those now hop properly as well — the old
+  code started a constant carrier once per channel in a loop where each call
+  replaced the last, across three driver objects that Pueo's board profile
+  maps onto one chip. 3,476 bytes smaller
 - `tools/build.sh` — stopped shipping the build machine's home directory
   inside the firmware. NimBLE's assert macros bake `__FILE__` in, so the
   absolute path of every asserting source file was in the image: seventeen

@@ -16,8 +16,6 @@
 #include <SD.h>
 #include <Update.h>
 #include <ESPmDNS.h>
-#include <nRF24L01.h>
-#include <RF24.h>
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_wifi_types.h>
