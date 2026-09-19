@@ -175,6 +175,21 @@ actually works here. Kept on purpose, not by neglect.
 
 ## Changes so far
 
+New in 0.2.0, all of it design work rather than firmware — the compiled
+image is unchanged from 0.1.0 apart from the version string:
+
+- `docs/pueo/pcb-design.md` — grew from a sketch into the carrier-board
+  design: netlist, power tree, load budget, placement and the module
+  dimensions as datasheets arrived
+- `docs/pueo/pueo-enclosure.scad` — the enclosure, which until now was an
+  untracked file outside the repo while being what every dimension in the
+  design notes is measured against
+- `tools/gen_netlist.py` — generates the netlist, placement and BOM, and
+  checks every signal GPIO against `board_pueo.h` so the two cannot drift
+
+Carried over from 0.1.0, including several things the list here previously
+missed:
+
 - `board_pueo.h` — board profile, resolving all pin conflicts
 - `gps.cpp` — `gpsPortOpen()`/`gpsPortClose()` bracket every UART open/close and
   hand GPIO 1 between the console and the GPS
@@ -188,8 +203,15 @@ actually works here. Kept on purpose, not by neglect.
 - `wifi.cpp`, `bluetooth.cpp`, `subghz.cpp`, `utils.cpp` — the per-screen UI
   macros are scoped constants now, so `-w` could come off
 - `docs/pueo/spi-bus.md` — the bus map, and why touch was losing it
-- `docs/pueo/pcb-design.md` — carrier-board design input: why it cannot be a
-  shield, the J1 pinout, power budget and the enclosure-fixed placements
+- `Spotter.{h,cpp}`, `SpotterSignatures.h` — passive detection of ALPR
+  cameras and smart glasses from WiFi OUIs and BLE service UUIDs
+- `Branding.h` and the boot screen — the fork's own name, version and logo
+- `libs/SmartRC-CC1101-Driver-Lib/` — vendored, with `SpiEnd()` no longer
+  calling `SPI.end()` after every register access and tearing the peripheral
+  out from under touch and the SD card
+- IR removed — no IR LED or receiver exists on this board, so 140 KB of
+  protocol tables could never run. Flash went from 93% to 85%
+- `tools/make_release.sh` — source archive and merged flash image
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
 None of this is tested on hardware yet. It compiles, the board profile is

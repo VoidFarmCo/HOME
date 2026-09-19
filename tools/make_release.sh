@@ -36,6 +36,7 @@ INCLUDE=(
   "tools/build.sh"
   "tools/make_release.sh"
   "tools/check_pinmap.py"
+  "tools/gen_netlist.py"
   "tools/make_bitmap.py"
   "tools/make_placeholder_logo.py"
   "Libraries/platform.txt"
