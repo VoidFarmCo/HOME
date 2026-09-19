@@ -1,7 +1,24 @@
 // =====================================================
-//  PUEO - revised base
+//  PUEO enclosure - base and lid, both in this file
 //  85 x 170 x 20, zoned for RF/NFC/power separation
 //  every module below is editable - see MODULES list
+//
+//  THIS FILE CONTAINS BOTH PARTS. Which one renders is
+//  decided by PART, near the bottom. Opening the file
+//  in the GUI shows only the base, which is why the lid
+//  looks missing.
+//
+//    PART = "base"   the base           (default)
+//    PART = "lid"    the lid, alone
+//    PART = "both"   both, side by side, for looking at
+//                    -- do not export this one to print
+//
+//  From the command line:
+//    openscad -o base.stl pueo-enclosure.scad
+//    openscad -D 'PART="lid"' -o lid.stl pueo-enclosure.scad
+//
+//  In the GUI: edit PART below, or open the Customizer
+//  (Window > Customizer) and pick it there.
 // =====================================================
 
 /* ---------- envelope ---------- */
@@ -182,7 +199,9 @@ module penetrations() {
 }
 
 /* ---------- assembly ---------- */
-PART = "base";     // "base" or "lid"
+// "base", "lid", or "both". See the header. "both" is for viewing only:
+// it lays the two parts out side by side, which is not a printable STL.
+PART = "base";
 
 module base() {
     difference() {
@@ -228,4 +247,12 @@ module lid() {
 }
 
 
-if (PART == "base") base(); else lid();
+if (PART == "both") {
+    base();
+    // clear of the base, plus a 10 mm gap
+    translate([W + 10, 0, 0]) lid();
+} else if (PART == "lid") {
+    lid();
+} else {
+    base();
+}

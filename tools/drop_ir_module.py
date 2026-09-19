@@ -9,6 +9,16 @@ the bulk of it. Measured from the linked image before removal:
                           ------------
                           84957 bytes
 
+These are .text only. The whole-image delta is larger, because
+IRremoteESP8266's protocol tables are mostly rodata and none of it was
+counted above. Measured afterwards by building the parent commit and this
+one against identical libraries:
+
+    with IR            1829697 bytes  (93%)
+    without IR         1689945 bytes  (85%)
+                       ----------------
+    freed               139752 bytes  (plus 4472 of RAM)
+
 There is no IR LED and no IR receiver anywhere in the Pueo pin map, so none
 of that was ever reachable on this board. With flash at 93% it is the
 obvious thing to cut first.

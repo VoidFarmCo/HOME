@@ -74,8 +74,8 @@ and smart glasses, matching Wi-Fi OUIs and BLE service UUIDs against a
 signature table. It only listens — it never transmits.
 
 **IR is gone.** There is no IR LED or receiver on this board, so its
-protocol tables could never run here. Removing them took flash from 93% to
-85%.
+protocol tables could never run here. Removing them freed **139,752 bytes**
+of flash and 4,472 of RAM, taking the image from 93% to 85%.
 
 ## Building
 
