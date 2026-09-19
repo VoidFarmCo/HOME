@@ -187,6 +187,8 @@ actually works here. Kept on purpose, not by neglect.
 - `wifi.cpp`, `bluetooth.cpp`, `subghz.cpp`, `utils.cpp` — the per-screen UI
   macros are scoped constants now, so `-w` could come off
 - `docs/pueo/spi-bus.md` — the bus map, and why touch was losing it
+- `docs/pueo/pcb-design.md` — carrier-board design input: why it cannot be a
+  shield, the J1 pinout, power budget and the enclosure-fixed placements
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
 None of this is tested on hardware yet. It compiles, the board profile is
