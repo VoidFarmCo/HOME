@@ -75,6 +75,7 @@ INCLUDE=(
   "tools/fuzz_ie_walk.py"
   "tools/check_spotter_merge.py"
   "tools/check_spotter_capture.py"
+  "tools/check_eapol_locate.py"
   "tools/gen_netlist.py"
   "tools/make_bitmap.py"
   "tools/make_placeholder_logo.py"

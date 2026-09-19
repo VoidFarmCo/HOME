@@ -1,8 +1,9 @@
 # EAPOL capture
 
 Scope for recognising WPA handshakes in frames this firmware can already
-record. Step 1 of the phasing is built -- the promiscuous filter hazard
-below -- and nothing else is.
+record. Steps 1 and 2 of the phasing are built: the promiscuous filter
+hazard below, and the locator that finds the 802.1X payload. Nothing
+classifies, records or transmits yet.
 
 Split deliberately into a passive half and an active one, because they are
 different decisions and only the first is in the spirit of what Spotter
@@ -188,8 +189,13 @@ say so in a way that is easy to fix and hard to guess.
 
 1. **Done.** Set the promiscuous filter explicitly wherever frames are read.
    A live hazard fixed whether or not the rest is built. 72 bytes.
-2. Header-length parsing and the ethertype check, bounds-checked, with the
-   test harness above. No behaviour yet.
+2. **Done.** `ESP32-DIV/Eapol.{h,cpp}`: header-length parsing and the
+   ethertype check, bounds-checked, with `tools/check_eapol_locate.py`
+   holding it to account -- 80,134 checks, every header layout, every
+   truncation, and 80,000 random frames, with no read outside a frame.
+   Payload offsets come out 32, 34, 38 and 38 for 3-address, QoS,
+   4-address and QoS-with-HT-Control; the fixed-offset version knows the
+   first two. Nothing calls it yet.
 3. Key Information classification and the per-AP flags.
 4. Show the flags, and record to the existing pcap writer.
 5. Only then, and separately, the question of forcing a reassociation.
