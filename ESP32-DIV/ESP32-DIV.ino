@@ -8,7 +8,6 @@
 #include "Spotter.h"
 #include "ducky.h"
 #include "icon.h"
-#include "ir.h"
 #include "gps.h"
 #include "rfid.h"
 #include "shared.h"
@@ -139,14 +138,12 @@ const char *tools_submenu_items[tools_NUM_SUBMENU_ITEMS] = {
     "Back to Main Menu"};
 
 static constexpr uint8_t OTHER_LAYER_HOME = 0;
-static constexpr uint8_t OTHER_LAYER_IR   = 1;
-static constexpr uint8_t OTHER_LAYER_RFID = 2;
-static constexpr uint8_t OTHER_LAYER_GPS  = 3;
+static constexpr uint8_t OTHER_LAYER_RFID = 1;
+static constexpr uint8_t OTHER_LAYER_GPS  = 2;
 
-const int other_NUM_SUBMENU_ITEMS = 4;
+const int other_NUM_SUBMENU_ITEMS = 3;
 static constexpr int OTHER_GRID_COLS = 2;
 const char *other_submenu_items[other_NUM_SUBMENU_ITEMS] = {
-    "IR Remote",
     "RFID/NFC",
     "GPS",
     "Main Menu"};
@@ -167,13 +164,6 @@ const int gps_NUM_SUBMENU_ITEMS = 3;
 const char *gps_submenu_items[gps_NUM_SUBMENU_ITEMS] = {
     "Wardriver",
     "Satellite Scanner",
-    "Back to Main Menu"};
-
-const int ir_NUM_SUBMENU_ITEMS = 4;
-const char *ir_submenu_items[ir_NUM_SUBMENU_ITEMS] = {
-    "Record",
-    "Saved Profile",
-    "Universal Controller",
     "Back to Main Menu"};
 
 const int about_NUM_SUBMENU_ITEMS = 1;
@@ -271,7 +261,6 @@ const unsigned char *tools_submenu_icons[tools_NUM_SUBMENU_ITEMS] = {
 };
 
 const unsigned char *other_submenu_icons[other_NUM_SUBMENU_ITEMS] = {
-    bitmap_icon_led,
     bitmap_icon_rfid_chip,
     bitmap_icon_satellite,
     bitmap_icon_go_back
@@ -292,13 +281,6 @@ const unsigned char *rfid_submenu_icons[rfid_NUM_SUBMENU_ITEMS] = {
 const unsigned char *gps_submenu_icons[gps_NUM_SUBMENU_ITEMS] = {
     bitmap_icon_satellite,
     bitmap_icon_satellite_dish,
-    bitmap_icon_go_back
-};
-
-const unsigned char *ir_submenu_icons[ir_NUM_SUBMENU_ITEMS] = {
-    bitmap_icon_led,
-    bitmap_icon_list,
-    bitmap_icon_remote_control,
     bitmap_icon_go_back
 };
 
@@ -452,11 +434,7 @@ void updateActiveSubmenu() {
                 active_submenu_items = other_submenu_items;
                 active_submenu_size = other_NUM_SUBMENU_ITEMS;
                 active_submenu_icons = other_submenu_icons;
-            } else if (other_layer == OTHER_LAYER_IR) {
-                active_submenu_items = ir_submenu_items;
-                active_submenu_size = ir_NUM_SUBMENU_ITEMS;
-                active_submenu_icons = ir_submenu_icons;
-            } else if (other_layer == OTHER_LAYER_RFID) {
+                        } else if (other_layer == OTHER_LAYER_RFID) {
                 active_submenu_items = rfid_submenu_items;
                 active_submenu_size = rfid_NUM_SUBMENU_ITEMS;
                 active_submenu_icons = rfid_submenu_icons;
@@ -3884,14 +3862,6 @@ void handleOtherSubmenuButtons() {
                 handleButtons();
                 is_main_menu = false;
             } else if (current_submenu_index == 0) {
-                other_layer = OTHER_LAYER_IR;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-            } else if (current_submenu_index == 1) {
                 other_layer = OTHER_LAYER_RFID;
                 other_menu_grid_initialized = false;
                 last_other_menu_index = -1;
@@ -3899,7 +3869,7 @@ void handleOtherSubmenuButtons() {
                 updateActiveSubmenu();
                 submenu_initialized = false;
                 displaySubmenu();
-            } else if (current_submenu_index == 2) {
+            } else if (current_submenu_index == 1) {
                 other_layer = OTHER_LAYER_GPS;
                 other_menu_grid_initialized = false;
                 last_other_menu_index = -1;
@@ -3907,115 +3877,6 @@ void handleOtherSubmenuButtons() {
                 updateActiveSubmenu();
                 submenu_initialized = false;
                 displaySubmenu();
-            }
-        } else if (other_layer == OTHER_LAYER_IR) {
-            if (current_submenu_index == ir_NUM_SUBMENU_ITEMS - 1) {
-                other_layer = OTHER_LAYER_HOME;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                feature_active = false;
-                feature_exit_requested = false;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-                is_main_menu = false;
-            } else if (current_submenu_index == 0) {
-                current_submenu_index = 0;
-                in_sub_menu = true;
-                feature_active = true;
-                feature_exit_requested = false;
-                IRRemoteFeature::setup();
-                while (current_submenu_index == 0 && !feature_exit_requested) {
-                    current_submenu_index = 0;
-                    in_sub_menu = true;
-                    IRRemoteFeature::loop();
-                    if (featureExitButtonPressed()) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                        while (featureExitButtonPressed()) {
-                        }
-                        break;
-                    }
-                }
-                if (feature_exit_requested) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                }
-            } else if (current_submenu_index == 1) {
-                current_submenu_index = 1;
-                in_sub_menu = true;
-                feature_active = true;
-                feature_exit_requested = false;
-                IRSavedProfile::setup();
-                while (current_submenu_index == 1 && !feature_exit_requested) {
-                    current_submenu_index = 1;
-                    in_sub_menu = true;
-                    IRSavedProfile::loop();
-                    if (featureExitButtonPressed()) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                        while (featureExitButtonPressed()) {
-                        }
-                        break;
-                    }
-                }
-                if (feature_exit_requested) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                }
-            } else if (current_submenu_index == 2) {
-                current_submenu_index = 2;
-                in_sub_menu = true;
-                feature_active = true;
-                feature_exit_requested = false;
-                IRUniversalController::setup();
-                while (current_submenu_index == 2 && !feature_exit_requested) {
-                    current_submenu_index = 2;
-                    in_sub_menu = true;
-                    IRUniversalController::loop();
-                    if (featureExitButtonPressed()) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                        while (featureExitButtonPressed()) {
-                        }
-                        break;
-                    }
-                }
-                if (feature_exit_requested) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                }
             }
         } else if (other_layer == OTHER_LAYER_RFID) {
             if (current_submenu_index == rfid_NUM_SUBMENU_ITEMS - 1) {
@@ -4101,14 +3962,6 @@ void handleOtherSubmenuButtons() {
                 handleButtons();
                 is_main_menu = false;
             } else if (current_submenu_index == 0) {
-                other_layer = OTHER_LAYER_IR;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-            } else if (current_submenu_index == 1) {
                 other_layer = OTHER_LAYER_RFID;
                 other_menu_grid_initialized = false;
                 last_other_menu_index = -1;
@@ -4116,7 +3969,7 @@ void handleOtherSubmenuButtons() {
                 updateActiveSubmenu();
                 submenu_initialized = false;
                 displaySubmenu();
-            } else if (current_submenu_index == 2) {
+            } else if (current_submenu_index == 1) {
                 other_layer = OTHER_LAYER_GPS;
                 other_menu_grid_initialized = false;
                 last_other_menu_index = -1;
@@ -4124,115 +3977,6 @@ void handleOtherSubmenuButtons() {
                 updateActiveSubmenu();
                 submenu_initialized = false;
                 displaySubmenu();
-            }
-        } else if (other_layer == OTHER_LAYER_IR) {
-            if (current_submenu_index == ir_NUM_SUBMENU_ITEMS - 1) {
-                other_layer = OTHER_LAYER_HOME;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                feature_active = false;
-                feature_exit_requested = false;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-                is_main_menu = false;
-            } else if (current_submenu_index == 0) {
-                current_submenu_index = 0;
-                in_sub_menu = true;
-                feature_active = true;
-                feature_exit_requested = false;
-                IRRemoteFeature::setup();
-                while (current_submenu_index == 0 && !feature_exit_requested) {
-                    current_submenu_index = 0;
-                    in_sub_menu = true;
-                    IRRemoteFeature::loop();
-                    if (featureExitButtonPressed()) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                        while (featureExitButtonPressed()) {
-                        }
-                        break;
-                    }
-                }
-                if (feature_exit_requested) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                }
-            } else if (current_submenu_index == 1) {
-                current_submenu_index = 1;
-                in_sub_menu = true;
-                feature_active = true;
-                feature_exit_requested = false;
-                IRSavedProfile::setup();
-                while (current_submenu_index == 1 && !feature_exit_requested) {
-                    current_submenu_index = 1;
-                    in_sub_menu = true;
-                    IRSavedProfile::loop();
-                    if (featureExitButtonPressed()) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                        while (featureExitButtonPressed()) {
-                        }
-                        break;
-                    }
-                }
-                if (feature_exit_requested) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                }
-            } else if (current_submenu_index == 2) {
-                current_submenu_index = 2;
-                in_sub_menu = true;
-                feature_active = true;
-                feature_exit_requested = false;
-                IRUniversalController::setup();
-                while (current_submenu_index == 2 && !feature_exit_requested) {
-                    current_submenu_index = 2;
-                    in_sub_menu = true;
-                    IRUniversalController::loop();
-                    if (featureExitButtonPressed()) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                        while (featureExitButtonPressed()) {
-                        }
-                        break;
-                    }
-                }
-                if (feature_exit_requested) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                }
             }
         } else if (other_layer == OTHER_LAYER_RFID) {
             if (current_submenu_index == rfid_NUM_SUBMENU_ITEMS - 1) {

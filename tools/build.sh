@@ -52,7 +52,6 @@ LIBS=(
   "RF24@1.6.2"
   "rc-switch@2.6.4"
   "XPT2046_Touchscreen@1.4.0"
-  "IRremoteESP8266@2.9.0"
   "Adafruit PN532@1.3.4"
   "PCF8574@0.4.5"
 )

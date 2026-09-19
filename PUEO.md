@@ -79,9 +79,14 @@ tools/build.sh upload COM7
 `setup` is a one-time ~1 GB download. It installs everything into its own root
 rather than a global Arduino install, so it cannot disturb other projects.
 
-Current size: **1825489 bytes, 92% of the app partition**, 34% of RAM. That is
-tight. Any real feature work needs either a bigger partition scheme or
-trimming upstream modules that Pueo does not use.
+Current size: **1690265 bytes, 85% of the app partition**, 33% of RAM.
+
+It was at 93% before the IR module came out. Pueo has no IR LED and no IR
+receiver, so `ir.cpp` and the IRremoteESP8266 protocol tables it pulled in
+were 140 KB of code that could never run on this board. Trimming upstream
+modules this hardware cannot reach is the cheapest headroom available, and
+there is more of it: Ducky/BadUSB is the next-largest piece with no
+corresponding hardware.
 
 ### Emulation
 
