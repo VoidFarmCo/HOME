@@ -194,6 +194,12 @@ differs in something other than the version string:
   the registry names rather than the word "Flock", and earns its place by
   corroborating a Flock SSID or a Penguin advertisement rather than by
   firing alone. 688 bytes of flash, no RAM.
+- `docs/pueo/ie-fingerprinting.md` — scope for the detection path that
+  survives MAC randomisation, which is the thing that will eventually make
+  the OUI table above beside the point. Design only, nothing built. It also
+  records why the signature table has to start empty: the values need a
+  capture from real hardware, and the one project that has them is GPL
+  against this fork's MIT
 - `docs/pueo/nrf24-fit-test.scad` — a test print for the one enclosure
   pocket with no nominal slack: a clearance ladder, and a slice of the base
   taken as an `intersection()` with `base()` so it cannot drift from the
