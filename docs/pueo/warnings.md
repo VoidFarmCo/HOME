@@ -358,3 +358,37 @@ The normal build filters warnings from TFT_eSPI and the ESP-IDF headers -- 40
 of them, repeated per translation unit -- and prints the count instead. They
 are not ours to fix, and a build that always prints noise is a build nobody
 reads. `tools/build.sh warnings` shows everything unfiltered.
+
+## -Wunused-const-variable: tried, and not kept
+
+Two constants in `bluetooth.cpp` -- `SAMSUNG_COMPANY_ID` and
+`GOOGLE_FAST_PAIR_ID` -- were definitions with no readers, and `-Wall
+-Wextra` said nothing, because `-Wunused-const-variable` is in neither for
+C++. Adding it looked like a free win. It is not, and the reason is worth
+writing down so the experiment is not repeated.
+
+**At level 1 it catches nothing here.** The flag reaches the compile line --
+verified by reading the actual command rather than the report -- and it
+works on a standalone translation unit compiled with the identical flag
+list, warning on all four shapes of unused const. Put `SAMSUNG_COMPANY_ID`
+back in `bluetooth.cpp` and rebuild, and it is silent. The same file warns
+normally for `-Wunused-function`, so the file is being diagnosed; it is this
+particular check that does not fire. Level 1 means "main file only", and
+something about how the sketch is assembled appears to put these out of its
+reach.
+
+**At level 2 it catches everything.** Including `SAMSUNG_COMPANY_ID`, and
+6,014 warnings in total, of which **1,410 are in our own files**: 1,181 in
+`icon.h`, 141 in `shared.h`, 33 in `utils.h`. Those are headers defining
+constants for whichever translation unit needs them, which is not the
+mistake the flag was wanted for. Four real ones in `bluetooth.cpp` under
+1,406 that are not is worse than none.
+
+So the build stays `-Wall -Wextra`. The lesson is not about this flag:
+
+**A warning-clean build is not a build with nothing unused in it.** Unused
+`const` at namespace scope is invisible to it in C++, and an array written
+through subscripts and never read -- which is what the three spoofers do
+with their randomised addresses, see `docs/pueo/spoofers.md` -- is invisible
+to `-Wunused-but-set-variable`. Both were found by reading, and reading is
+still the thing that finds them.
