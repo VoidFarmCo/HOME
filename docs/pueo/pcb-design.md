@@ -203,6 +203,44 @@ and two or three spins before it works as well as a $4 module. Modules also
 let you swap a dead PA board in the field. The cost is height, which this
 enclosure has.
 
+## Generated inputs
+
+`tools/gen_netlist.py` emits into `dist/pcb/`:
+
+```
+netlist.txt        17 nets, 73 connections, net by net
+pueo-carrier.net   KiCad legacy netlist
+placement.csv      module centres in board coordinates
+bom.csv            25 parts
+```
+
+Pins are named functionally (VCC, SCK, CSN), not numbered. Module pin numbers
+come from datasheets, and none of these modules has a standard library
+footprint, so numbering them here would be inventing data. The netlist gives
+the connections; the datasheets give the numbers.
+
+The generator refuses to write anything that disagrees with
+`board_pueo.h`, so the netlist cannot drift from the firmware. It also
+rejects single-ended nets, which caught a real mistake: an initial `USB_VBUS`
+net had one endpoint, because the Type-C jack is on the TP4056 module rather
+than on this board.
+
+Enclosure coordinates convert to a top-left origin with Y downward:
+
+```
+kicad_x = enclosure_x + 40      board is 80 x 165 mm
+kicad_y = 82.5 - enclosure_y    the base interior, less 2.5 mm walls
+```
+
+Checked after generation: all eight modules sit inside the outline, none
+overlap, and the SMA positions land exactly on the J2 and J3 centres. The
+tightest gaps are 2 mm (PN532 to NRF24, and the buck to the battery), so
+there is little room to move anything without revisiting the enclosure.
+
+**The KiCad `.net` file has never been opened in KiCad** — it is not installed
+on the machine that generated it. `netlist.txt` is the deliverable; the
+`.net` is a convenience that may need hand-fixing.
+
 ## Before laying anything out
 
 **Build it by hand first and bring it up.** A PCB freezes the pin map, and
