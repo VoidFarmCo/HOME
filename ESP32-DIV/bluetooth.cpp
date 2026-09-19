@@ -210,14 +210,12 @@ const WatchModel samsungModels[] = {
 };
 const uint8_t samsungModelCount = 3;
 const uint8_t SAMSUNG_ADV_SIZE = 15;
-const uint16_t SAMSUNG_COMPANY_ID = 0x0075;
 const uint8_t SAMSUNG_ADV_TEMPLATE[SAMSUNG_ADV_SIZE] = {
   14, 0xFF, 0x75, 0x00, 0x01, 0x00, 0x02, 0x00, 0x01, 0x01, 0xFF, 0x00, 0x00, 0x43, 0x00
 };
 
 // Google device (14 bytes, single model)
 const uint8_t GOOGLE_ADV_SIZE = 14;
-const uint16_t GOOGLE_FAST_PAIR_ID = 0xFE2C;
 const uint8_t GOOGLE_ADV_TEMPLATE[GOOGLE_ADV_SIZE] = {
   0x03, 0x03, 0x2C, 0xFE, // Complete 16-bit Service UUIDs
   0x06, 0x16, 0x2C, 0xFE, 0x00, 0xB7, 0x27, // Service Data
@@ -754,6 +752,16 @@ void toggleAdvertising() {
     updateSpoofer();
   } else {
     if (attack_state == 1) {
+      /* Built, and then not used. Nothing here nor anywhere else in this file
+       * calls esp_ble_gap_set_rand_addr, NimBLEDevice::setOwnAddrType or
+       * ble_hs_id_set_rnd, so every advertisement below goes out from the
+       * ESP32's own fixed BLE address. A stream of different devices that
+       * all share one address is not a disguise.
+       *
+       * Left as it is rather than wired up: making the address rotate would
+       * make this harder to attribute, which is an increase in what the
+       * feature does rather than a correction. That is the owner's call, not
+       * a tidy-up. See docs/pueo/spoofers.md. */
       esp_bd_addr_t dummy_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
       for (int i = 0; i < 6; i++) {
         dummy_addr[i] = random(256);
@@ -761,6 +769,7 @@ void toggleAdvertising() {
           dummy_addr[i] |= 0xF0;
         }
       }
+      (void)dummy_addr;
 
       BLEAdvertisementData oAdvertisementData = getAdvertismentData();
       pAdvertising->addServiceUUID(devices_uuid);
@@ -1159,6 +1168,8 @@ void sourappleLoop() {
   tft.drawFastHLine(0, 19, 240, UI_LINE);
   runUI();
 
+  /* Same unused address as BleSpoofer::toggleAdvertising -- see the note
+   * there, and docs/pueo/spoofers.md. */
   esp_bd_addr_t dummy_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
   for (int i = 0; i < 6; i++) {
     dummy_addr[i] = random(256);
@@ -1166,6 +1177,7 @@ void sourappleLoop() {
       dummy_addr[i] |= 0xF0;
     }
   }
+  (void)dummy_addr;
   BLEAdvertisementData oAdvertisementData = getOAdvertisementData();
 
   Advertising->addServiceUUID(device_uuid);
@@ -1317,10 +1329,22 @@ static void buildProximityPacket() {
     s_packet[i++] = 0x00;
   }
 
+  /* s_mac is generated here and never applied to the radio -- nothing in
+   * this file sets a random address. It used to be printed on screen and in
+   * the log as though it were the address being transmitted from, which was
+   * the screen telling the operator something untrue. It is kept because
+   * it is what would be used if the address were ever set, and both
+   * displays now show the address actually in use instead. */
   for (int b = 0; b < 6; b++) {
     s_mac[b] = (uint8_t)random(256);
   }
   s_mac[0] |= 0xC0;
+}
+
+/* The address this radio is really advertising from. */
+static void realAddrText(char* out, size_t outSz) {
+  const std::string a = BLEDevice::getAddress().toString();
+  snprintf(out, outSz, "%s", a.c_str());
 }
 
 static void paintField(int x, int y, int w, char* cache, size_t cacheSz,
@@ -1415,8 +1439,7 @@ static void updateInfoFields(bool force) {
   }
 
   char mac[24];
-  snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
-           s_mac[0], s_mac[1], s_mac[2], s_mac[3], s_mac[4], s_mac[5]);
+  realAddrText(mac, sizeof(mac));
   char tx[16];
   snprintf(tx, sizeof(tx), "TX %lu", (unsigned long)s_txCount);
   const char* hint = s_running ? "Unlock iPhone, stay nearby" : "Press Start to begin";
@@ -1546,9 +1569,8 @@ static void burstOnce(bool forceLog) {
   if (forceLog || (now - s_lastLogMs >= LOG_INTERVAL_MS)) {
     s_lastLogMs = now;
     char line[LOG_LINE_LEN];
-    snprintf(line, sizeof(line), "[+] %s  %02X:%02X:%02X  #%lu",
-             modelName(s_modelIndex), s_mac[0], s_mac[1], s_mac[2],
-             (unsigned long)s_txCount);
+    snprintf(line, sizeof(line), "[+] %s  #%lu",
+             modelName(s_modelIndex), (unsigned long)s_txCount);
     logLine(line, ORANGE);
   }
 }
