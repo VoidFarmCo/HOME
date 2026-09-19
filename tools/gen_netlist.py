@@ -46,6 +46,10 @@ def to_kicad(x, y):
 
 # From halehound_v3.scad MODULES[]: (name, refdes, x, y, w, h)
 MODULES = [
+    # Two sources disagree: 36 x 17 x 6.25 and 30 x 17 x 14. Carrying the
+    # larger footprint, since an oversized pocket is slack and an undersized
+    # one is interference. Height is unresolved and matters more -- at 14 mm
+    # this module cannot be socketed, only soldered down.
     ("MT3608 boost",   "U1",  -19.0, -65.0, 36, 17),
     # 27 x 17 measured off the module, not the 26 x 19 the enclosure
     # assumes. Mounted rotated 180 deg from the usual photo so the USB
@@ -55,8 +59,12 @@ MODULES = [
     ("LiPo pack",      "BT1", -16.0, -23.0, 45, 34),
     ("GT-U7 GPS",      "J5",   24.0, -21.0, 28, 27),
     ("PN532 V3",       "J4",    0.0,  18.0, 43, 41),
-    ("HW-863 CC1101",  "J2",  -23.0,  61.5, 15, 40),
-    ("NRF24 PA+LNA",   "J3",   22.0,  61.0, 16, 41),
+    # 28 x 15 PCB, 38 x 15 overall -- the SMA jack is soldered to the module
+    # edge, so the antenna position is fixed by where the module sits.
+    ("HW-863 CC1101",  "J2",  -23.0,  61.5, 15, 38),
+    # 41 x 15.5 per the listing, the 41 including the SMA body. Exactly the
+    # length of the pocket the enclosure cuts, with zero clearance.
+    ("NRF24 PA+LNA",   "J3",   22.0,  61.0, 15.5, 41),
 ]
 
 SMA_X = [-23.0, 22.0]       # scad SMA_X, 45 mm apart

@@ -312,12 +312,58 @@ it ever becomes tempting. The recommendation above still stands: the module
 costs about a dollar and comes with its inductor, diode and feedback network
 already laid out and working.
 
+## Module dimensions
+
+Collected as datasheets and listings turn up. Footprints are mostly settled;
+heights are the gap, and heights are what the enclosure budget runs on.
+
+```
+module           footprint mm    height mm   source
+--------------   -------------   ---------   ------------------------------
+MT3608 boost     36 x 17  (?)    6.25 (?)    CONFLICT, see below
+                 30 x 17  (?)    14.0 (?)
+TP4056 charger   27 x 17         ?           measured off the module photo
+HW-863 CC1101    28 x 15         ?           listing drawing; 38 mm overall
+                                             with the board-mounted SMA
+NRF24 PA+LNA     41 x 15.5       ?           listing text; 41 appears to
+                                             include the SMA body
+3.3V buck        20 x 12         ?           assumed
+GT-U7 GPS        28 x 27         ?           assumed
+PN532 V3         43 x 41         ?           assumed
+LiPo pack        45 x 34         ?           assumed
+```
+
+Both radios land within a millimetre of what the enclosure already guessed:
+CC1101 at 15 wide against a 15 mm pocket, NRF24 at 15.5 against 16. Their
+pocket lengths (40 and 41) hold too, and the CC1101's 38 mm overall leaves
+2 mm. Nothing moves horizontally for either.
+
+The CC1101 drawing confirms something the enclosure was already built
+around: **the SMA jack is soldered to the module**, edge-mounted, with the
+2x4 pin header at the opposite end. The comment in `halehound_v3.scad` --
+"radios: vertical, board SMA against the top wall" -- had this right. It
+means the radio SMAs are not free to move: they sit wherever the module
+sits, which is the constraint the next section runs into.
+
 ## Height, and the pockets problem
 
-The MT3608 module is **36 x 17 x 6.25 mm** with a 25-turn trimpot. The
-footprint matches what the enclosure already assumes, so nothing moves. The
-height is the first real figure in a budget that has been running on
-assumption, and it surfaces something structural.
+**The MT3608 has two contradictory dimension sets and they disagree in the
+axis that matters.**
+
+```
+  36 x 17 x 6.25 mm     with a 25-turn trimpot
+  30 x 17 x 14 mm       Amazon listing, "Board Size (L*W*H)"
+```
+
+Width agrees. Length differs by 6 mm, height by more than double. The
+likely reading is that 6.25 mm is the bare PCB plus low components while
+14 mm is the overall height with the trimpot and inductor standing proud --
+the blue 3296-style multi-turn pot is tall on its own -- and that 30 vs 36
+is a variant difference. But that is a guess, and the conclusion flips on
+it, so it wants a caliper rather than a listing.
+
+The height is the first real figure in a budget that has been running on
+assumption, and it surfaces something structural either way.
 
 Vertical space in the base:
 
@@ -327,16 +373,27 @@ Vertical space in the base:
   pocket floor to base top       18.00 mm    everything lives in here
 ```
 
-Stack-up with a carrier board underneath:
+Stack-up with a carrier board underneath, both heights carried:
 
 ```
-  PCB 1.6 + soldered direct        + 6.25 =  7.85 mm    fits easily
-  PCB 1.6 + low-profile socket 5.0 + 6.25 = 12.85 mm    fits
-  PCB 1.6 + standard 2.54 socket 8.5 + 6.25 = 16.35 mm  fits, 1.65 mm spare
+                                    h=6.25    h=14.0
+  PCB 1.6 + soldered direct          7.85      15.60
+  PCB 1.6 + low-profile socket 5.0  12.85      20.60   over
+  PCB 1.6 + standard socket 8.5     16.35      24.10   over
 ```
 
-All three fit, but only just in the third case, and the MT3608 is not the
-tallest thing here. The NRF24 with its PA/LNA can and its SMA is taller, and
+At 6.25 mm every option fits. At 14 mm **only soldering directly to the
+carrier fits**, with 2.4 mm to spare, and sockets are off the table for this
+module entirely.
+
+The recommendation already on record -- sockets for the radios, power
+modules soldered direct -- survives either answer, which is the one piece of
+luck here. Had the plan been to socket the MT3608, 14 mm would have killed
+it. So the conflict does not block layout; it does mean the 2.4 mm worst
+case is the real margin under the boost converter, not the 10 mm the
+earlier figure implied.
+
+And the MT3608 is not the tallest thing here anyway. The NRF24 with its PA/LNA can and its SMA is taller, and
 the SMA axis is fixed at 5 mm above the pocket floor by the case wall. That
 constraint and a carrier board are in direct tension: raising the modules by
 a PCB plus a socket raises their SMAs too, and the bulkhead holes do not
@@ -378,7 +435,13 @@ per-module pockets    ->  flat PCB shelf  see the height section above
 SMA_Z 5.0             ->  recompute       once socket height is chosen
 ```
 
-MT3608 at 36 x 17 needs no change; the enclosure already has it right.
+MT3608 keeps its 36 x 17 pocket: if the board is really 30 mm the pocket is
+6 mm oversized, which is slack rather than interference, and oversizing is
+the safe direction to be wrong in until it can be measured.
+
+Both radio pockets stand as cut. CC1101 15 x 40 against a 15 x 38 module,
+NRF24 16 x 41 against 15.5 x 41 -- tight on the NRF24's length with no
+slack at all, so that one is worth a test print before committing.
 
 ## Before laying anything out
 
