@@ -1,0 +1,423 @@
+#include "Spotter.h"
+
+#include "config.h"
+#include "icon.h"
+#include "shared.h"
+#include "utils.h"
+
+#include <esp_wifi.h>
+#include <string.h>
+#include <strings.h>
+
+namespace Spotter {
+
+namespace {
+
+constexpr int      kMaxHits      = 48;
+constexpr uint32_t kHopMs        = 260;   // per-channel dwell
+constexpr uint8_t  kChanFirst    = 1;
+constexpr uint8_t  kChanLast     = 13;
+constexpr uint32_t kBleWindowMs  = 4000;  // BLE scan slice between WiFi hops
+constexpr uint32_t kRedrawMs     = 400;
+constexpr int      kRowH         = 30;
+
+Hit      s_hits[kMaxHits];
+int      s_hitCount = 0;
+uint32_t s_frames   = 0;
+uint8_t  s_chan     = kChanFirst;
+bool     s_running  = false;
+int      s_scroll   = 0;
+uint32_t s_lastHop  = 0;
+uint32_t s_lastDraw = 0;
+bool     s_dirty    = true;
+
+/* The promiscuous callback runs on the WiFi task, so anything it touches is
+ * shared. The table is only appended to and the UI only reads, but a hit
+ * arriving mid-redraw could still tear a row, hence the flag rather than
+ * drawing from the callback. */
+portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
+
+bool prefixMatch(const char* s, const char* prefix) {
+  if (!s || !prefix) {
+    return false;
+  }
+  return strncasecmp(s, prefix, strlen(prefix)) == 0;
+}
+
+/* Find or create the row for this MAC. Returns null when the table is full,
+ * which is deliberate: dropping new devices is better than evicting one the
+ * operator is currently looking at. */
+Hit* findOrAdd(const uint8_t* mac, bool viaBle) {
+  for (int i = 0; i < s_hitCount; i++) {
+    if (memcmp(s_hits[i].mac, mac, 6) == 0) {
+      return &s_hits[i];
+    }
+  }
+  if (s_hitCount >= kMaxHits) {
+    return nullptr;
+  }
+  Hit& h = s_hits[s_hitCount++];
+  memset(&h, 0, sizeof(h));
+  memcpy(h.mac, mac, 6);
+  h.firstMs = millis();
+  h.viaBle = viaBle;
+  h.kind = Kind::Unknown;
+  h.conf = Conf::Weak;
+  h.label = "?";
+  h.rssiBest = -127;
+  return &h;
+}
+
+/* Record a match. A second, different signature on the same device promotes
+ * it: two weak hints agreeing is worth more than either alone, which is the
+ * whole reason confidence is tracked rather than just a boolean. */
+void record(const uint8_t* mac, int8_t rssi, Kind kind, Conf conf,
+            const char* label, bool viaBle) {
+  portENTER_CRITICAL(&s_mux);
+  Hit* h = findOrAdd(mac, viaBle);
+  if (h) {
+    h->hits++;
+    h->lastMs = millis();
+    h->rssiLast = rssi;
+    if (rssi > h->rssiBest) {
+      h->rssiBest = rssi;
+    }
+    if (h->kind != Kind::Unknown && h->label != label) {
+      h->corroborated = true;
+    }
+    if ((uint8_t)conf >= (uint8_t)h->conf) {
+      h->conf = conf;
+      h->kind = kind;
+      h->label = label;
+    }
+    if (h->corroborated && h->conf == Conf::Likely) {
+      h->conf = Conf::Strong;
+    }
+    s_dirty = true;
+  }
+  portEXIT_CRITICAL(&s_mux);
+}
+
+/* ── WiFi ────────────────────────────────────────────────────────────────── */
+
+void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
+  if (!s_running || type != WIFI_PKT_MGMT) {
+    return;
+  }
+  const wifi_promiscuous_pkt_t* pkt = (const wifi_promiscuous_pkt_t*)buf;
+  const uint16_t len = pkt->rx_ctrl.sig_len;
+  if (len < 24) {
+    return;
+  }
+  const uint8_t* p = pkt->payload;
+  const uint8_t subtype = p[0] & 0xF0;
+
+  // 0x40 probe request, 0x80 beacon, 0x50 probe response.
+  if (subtype != 0x40 && subtype != 0x80 && subtype != 0x50) {
+    return;
+  }
+  s_frames++;
+
+  const uint8_t* src = p + 10;          // addr2, the transmitter
+  const int8_t rssi = pkt->rx_ctrl.rssi;
+
+  for (size_t i = 0; i < kOuiSigCount; i++) {
+    if (memcmp(src, kOuiSigs[i].oui, 3) == 0) {
+      record(src, rssi, kOuiSigs[i].kind, kOuiSigs[i].conf, kOuiSigs[i].label, false);
+      break;
+    }
+  }
+
+  /* SSID sits in the first information element. Probe requests put it at
+   * offset 24; beacons and probe responses carry 12 bytes of fixed
+   * parameters first. */
+  const uint16_t ieStart = (subtype == 0x40) ? 24 : 36;
+  if (len < (uint16_t)(ieStart + 2)) {
+    return;
+  }
+  if (p[ieStart] != 0x00) {             // element 0 = SSID
+    return;
+  }
+  uint8_t ssidLen = p[ieStart + 1];
+  if (ssidLen == 0 || ssidLen > 32 || len < (uint16_t)(ieStart + 2 + ssidLen)) {
+    return;
+  }
+  char ssid[33];
+  memcpy(ssid, p + ieStart + 2, ssidLen);
+  ssid[ssidLen] = '\0';
+
+  for (size_t i = 0; i < kSsidSigCount; i++) {
+    if (prefixMatch(ssid, kSsidSigs[i].prefix)) {
+      record(src, rssi, kSsidSigs[i].kind, kSsidSigs[i].conf, kSsidSigs[i].label, false);
+      break;
+    }
+  }
+}
+
+/* ── BLE ─────────────────────────────────────────────────────────────────── */
+
+class SpotterAdvCallbacks : public BLEAdvertisedDeviceCallbacks {
+  void onResult(BLEAdvertisedDevice* dev) override {
+    if (!s_running || !dev) {
+      return;
+    }
+
+    uint8_t mac[6] = {0};
+    const std::string addr = dev->getAddress().toString();
+    unsigned b[6] = {0};
+    if (sscanf(addr.c_str(), "%02x:%02x:%02x:%02x:%02x:%02x",
+               &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != 6) {
+      return;
+    }
+    for (int i = 0; i < 6; i++) {
+      mac[i] = (uint8_t)b[i];
+    }
+    const int8_t rssi = (int8_t)dev->getRSSI();
+
+    uint16_t company = 0;
+    if (dev->haveManufacturerData()) {
+      const std::string md = dev->getManufacturerData();
+      if (md.size() >= 2) {
+        // Company ID is little-endian in the first two bytes.
+        company = (uint16_t)((uint8_t)md[0] | ((uint8_t)md[1] << 8));
+      }
+    }
+
+    // Collect advertised 16-bit service UUIDs once.
+    uint16_t services[8];
+    uint8_t nServices = 0;
+    const uint8_t count = dev->getServiceUUIDCount();
+    for (uint8_t i = 0; i < count && nServices < 8; i++) {
+      const NimBLEUUID u = dev->getServiceUUID(i);
+      if (u.bitSize() == 16) {
+        services[nServices++] = (uint16_t)u.getNative()->u16.value;
+      }
+    }
+
+    for (size_t i = 0; i < kBleSigCount; i++) {
+      const BleSig& sig = kBleSigs[i];
+      const bool companyOk = (sig.company == 0) || (company == sig.company);
+      bool serviceOk = (sig.service == 0);
+      for (uint8_t j = 0; j < nServices && !serviceOk; j++) {
+        serviceOk = (services[j] == sig.service);
+      }
+      // A signature naming neither field would match everything.
+      if (sig.company == 0 && sig.service == 0) {
+        continue;
+      }
+      if (companyOk && serviceOk) {
+        record(mac, rssi, sig.kind, sig.conf, sig.label, true);
+        break;
+      }
+    }
+
+    const std::string name = dev->getName();
+    if (!name.empty()) {
+      for (size_t i = 0; i < kBleNameSigCount; i++) {
+        if (prefixMatch(name.c_str(), kBleNameSigs[i].prefix)) {
+          record(mac, rssi, kBleNameSigs[i].kind, kBleNameSigs[i].conf,
+                 kBleNameSigs[i].label, true);
+          break;
+        }
+      }
+    }
+  }
+};
+
+SpotterAdvCallbacks s_advCb;
+BLEScan* s_scan = nullptr;
+
+/* ── UI ──────────────────────────────────────────────────────────────────── */
+
+int contentBottom() {
+  return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : 320;
+}
+
+const char* kindText(Kind k) {
+  switch (k) {
+    case Kind::Alpr:      return "ALPR";
+    case Kind::Glasses:   return "GLASSES";
+    case Kind::Accessory: return "ACCESSORY";
+    default:              return "?";
+  }
+}
+
+uint16_t confColour(Conf c) {
+  switch (c) {
+    case Conf::Strong: return TFT_RED;
+    case Conf::Likely: return ORANGE;
+    default:           return TFT_DARKGREY;
+  }
+}
+
+void drawHeader() {
+  tft.fillRect(0, 20, 240, 18, TFT_BLACK);
+  tft.setTextFont(1);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  char buf[42];
+  snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d",
+           (unsigned)s_chan, (unsigned long)s_frames, s_hitCount);
+  tft.drawString(buf, 8, 24);
+}
+
+void drawList() {
+  const int top = 42;
+  const int bottom = contentBottom();
+  const int rows = (bottom - top) / kRowH;
+
+  tft.fillRect(0, top, 240, bottom - top, TFT_BLACK);
+  tft.setTextFont(1);
+
+  if (s_hitCount == 0) {
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.drawString("listening...", 8, top + 6);
+    tft.drawString("nothing matched yet", 8, top + 20);
+    return;
+  }
+
+  if (s_scroll > s_hitCount - rows) {
+    s_scroll = s_hitCount - rows;
+  }
+  if (s_scroll < 0) {
+    s_scroll = 0;
+  }
+
+  for (int i = 0; i < rows && (s_scroll + i) < s_hitCount; i++) {
+    const Hit& h = s_hits[s_scroll + i];
+    const int y = top + i * kRowH;
+
+    tft.setTextSize(1);
+    tft.setTextColor(confColour(h.conf), TFT_BLACK);
+    char line[44];
+    snprintf(line, sizeof(line), "%-9s %s", kindText(h.kind), h.label);
+    tft.drawString(line, 8, y);
+
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X %s %ddBm x%u",
+             h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
+             h.viaBle ? "BLE" : "WiFi", (int)h.rssiBest, (unsigned)h.hits);
+    tft.drawString(line, 8, y + 11);
+
+    if (h.corroborated) {
+      tft.setTextColor(TFT_RED, TFT_BLACK);
+      tft.drawString("**", 224, y);
+    }
+  }
+}
+
+void redraw(bool full) {
+  if (full) {
+    tft.fillScreen(TFT_BLACK);
+    drawStatusBar(readBatteryVoltage(), true);
+  }
+  drawHeader();
+  drawList();
+}
+
+void hopChannel() {
+  s_chan++;
+  if (s_chan > kChanLast) {
+    s_chan = kChanFirst;
+  }
+  esp_wifi_set_channel(s_chan, WIFI_SECOND_CHAN_NONE);
+}
+
+}  // namespace
+
+/* ── Feature entry points ────────────────────────────────────────────────── */
+
+void spotterSetup() {
+  s_hitCount = 0;
+  s_frames = 0;
+  s_scroll = 0;
+  s_chan = kChanFirst;
+  s_dirty = true;
+  memset(s_hits, 0, sizeof(s_hits));
+
+  setTouchButtonInputEnabled(true);
+  setTouchNavLabels("Back", "Down", "", "Up", "");
+
+  // Radio up in station mode, unassociated, purely to listen.
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(60);
+  esp_wifi_set_promiscuous(false);
+  esp_wifi_set_promiscuous_rx_cb(&onPacket);
+  esp_wifi_set_promiscuous(true);
+  esp_wifi_set_channel(s_chan, WIFI_SECOND_CHAN_NONE);
+
+  if (ensureBleStackReady()) {
+    s_scan = BLEDevice::getScan();
+    if (s_scan) {
+      s_scan->setAdvertisedDeviceCallbacks(&s_advCb, true);
+      s_scan->setActiveScan(false);   // passive: never ask, only listen
+      s_scan->setInterval(160);
+      s_scan->setWindow(160);
+    }
+  }
+
+  s_running = true;
+  s_lastHop = millis();
+  s_lastDraw = 0;
+  redraw(true);
+}
+
+void spotterLoop() {
+  const uint32_t now = millis();
+
+  if ((uint32_t)(now - s_lastHop) >= kHopMs) {
+    s_lastHop = now;
+    hopChannel();
+    s_dirty = true;
+  }
+
+  if (s_scan && !s_scan->isScanning()) {
+    s_scan->start(kBleWindowMs / 1000, nullptr, false);
+  }
+
+  if (isButtonPressed(BTN_UP)) {
+    s_scroll--;
+    s_dirty = true;
+    delay(120);
+  } else if (isButtonPressed(BTN_DOWN)) {
+    s_scroll++;
+    s_dirty = true;
+    delay(120);
+  }
+
+  if (s_dirty && (uint32_t)(now - s_lastDraw) >= kRedrawMs) {
+    s_lastDraw = now;
+    s_dirty = false;
+    drawHeader();
+    drawList();
+  }
+
+  delay(4);
+}
+
+void exit() {
+  s_running = false;
+
+  esp_wifi_set_promiscuous(false);
+  esp_wifi_set_promiscuous_rx_cb(nullptr);
+
+  if (s_scan) {
+    s_scan->stop();
+    s_scan->setAdvertisedDeviceCallbacks(nullptr);
+    s_scan->clearResults();
+    s_scan = nullptr;
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  requestStatusBarRedraw();
+}
+
+int        hitCount()        { return s_hitCount; }
+const Hit* hitAt(int i)      { return (i >= 0 && i < s_hitCount) ? &s_hits[i] : nullptr; }
+uint32_t   framesSeen()      { return s_frames; }
+uint8_t    currentChannel()  { return s_chan; }
+
+}  // namespace Spotter
