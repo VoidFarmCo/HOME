@@ -36,7 +36,7 @@
  * The ten-frame loading animation (bitmap_icon_skull_loading_1..10, 100x120)
  * is also upstream artwork and is still in use. Replace it the same way when
  * you have frames of your own. */
-// #define PUEO_LOGO_BITMAP bitmap_pueo_logo
+#define PUEO_LOGO_BITMAP bitmap_pueo_logo
 
 #define PUEO_LOGO_W 150
 #define PUEO_LOGO_H 150
