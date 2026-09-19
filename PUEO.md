@@ -1,11 +1,26 @@
 # Pueo
 
-Fork of [CiferTech's ESP32-DIV](https://github.com/cifertech/ESP32-DIV) for a
-custom handheld built on a CYD ESP32-2432S028R.
+Open-source firmware for a handheld multi-radio field tool built on the
+ESP32-2432S028R "cheap yellow display" — a 2.8" touchscreen ESP32 carrying a
+CC1101 for sub-GHz, an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and a
+GT-U7 for GPS, in a printed enclosure zoned to keep the radios apart. It
+covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
+clone, GPS wardriving and jam detection. It is a fork of CiferTech's
+ESP32-DIV, MIT licensed and staying that way, diverging mainly in the parts
+that decide whether the hardware works at all: a board profile that resolves
+the pin conflicts in the stock CYD map, a single owner for the SPI bus that
+the display, SD card and all three radios share, and a build that compiles
+clean under `-Wall -Wextra` rather than suppressing its own warnings.
 
-Fork point: `90f7967c4dc7bcd8c09ebdcf421886737516ddc2` (upstream main,
-2026-09-01, eleven commits past `v1.7.2`). Upstream is wired up as the
-`upstream` remote.
+> **Status: not yet run on hardware.** Everything here compiles and is
+> reasoned from the source, and several of the fixes are verified at the
+> symbol level, but no part of it has been flashed to a board. Treat feature
+> claims as inherited from upstream rather than tested.
+
+Lineage: forked from [CiferTech's ESP32-DIV](https://github.com/cifertech/ESP32-DIV)
+at `90f7967c4dc7bcd8c09ebdcf421886737516ddc2` (upstream main, 2026-09-01,
+eleven commits past `v1.7.2`). Upstream is kept as a read-only `upstream`
+remote for cherry-picking, but Pueo no longer tracks it.
 
 ## Licensing
 
