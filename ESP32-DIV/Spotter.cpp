@@ -21,6 +21,11 @@ constexpr uint32_t kBleWindowMs  = 4000;  // BLE scan slice between WiFi hops
 constexpr uint32_t kRedrawMs     = 400;
 constexpr int      kRowH         = 30;
 
+/* Tagged elements are walked with a hard cap as well as a length bound. A
+ * probe request carries nowhere near this many; the cap is there so that a
+ * frame built to lie about its lengths ends the loop rather than running it. */
+constexpr int      kMaxIes       = 32;
+
 Hit      s_hits[kMaxHits];
 int      s_hitCount = 0;
 uint32_t s_frames   = 0;
@@ -128,22 +133,55 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
     }
   }
 
-  /* SSID sits in the first information element. Probe requests put it at
-   * offset 24; beacons and probe responses carry 12 bytes of fixed
-   * parameters first. */
+  /* Tagged parameters start after the fixed header: probe requests have none,
+   * beacons and probe responses carry 12 bytes of them first.
+   *
+   * Everything past here is attacker-shaped. `ilen` is one byte off the air
+   * and an element is free to claim more than the frame actually holds, so
+   * each step is bounded against sig_len before anything is read, and the
+   * arithmetic is done in uint32_t so a large offset plus a large length
+   * cannot wrap back into range. A frame that lies ends the walk; it does
+   * not read past the buffer.
+   *
+   * The walk replaces reading the SSID straight off the front. It costs one
+   * pass and buys two things: SSID is found wherever it sits rather than
+   * only as the first element, and a zero-length SSID no longer ends
+   * processing of the frame. That second one matters for what comes next --
+   * a zero-length SSID is a wildcard probe, and those carry the full element
+   * set that fingerprinting will want. See docs/pueo/ie-fingerprinting.md.
+   *
+   * Detections are unchanged by this: the SSID table is still matched
+   * against a non-empty SSID and nothing else consumes the walk yet. */
   const uint16_t ieStart = (subtype == 0x40) ? 24 : 36;
-  if (len < (uint16_t)(ieStart + 2)) {
-    return;
+
+  const uint8_t* ssidVal = nullptr;
+  uint8_t        ssidLen = 0;
+
+  uint32_t off = ieStart;
+  for (int seen = 0; seen < kMaxIes; seen++) {
+    if (off + 2u > len) {
+      break;                            // no room for an id and a length
+    }
+    const uint8_t id   = p[off];
+    const uint8_t ilen = p[off + 1];
+    if (off + 2u + ilen > len) {
+      break;                            // claims more than the frame holds
+    }
+
+    if (id == 0x00 && ssidVal == nullptr) {
+      ssidVal = p + off + 2;
+      ssidLen = ilen;
+    }
+
+    off += 2u + ilen;
   }
-  if (p[ieStart] != 0x00) {             // element 0 = SSID
-    return;
+
+  if (ssidVal == nullptr || ssidLen == 0 || ssidLen > 32) {
+    return;                             // wildcard probe, or no SSID element
   }
-  uint8_t ssidLen = p[ieStart + 1];
-  if (ssidLen == 0 || ssidLen > 32 || len < (uint16_t)(ieStart + 2 + ssidLen)) {
-    return;
-  }
+
   char ssid[33];
-  memcpy(ssid, p + ieStart + 2, ssidLen);
+  memcpy(ssid, ssidVal, ssidLen);
   ssid[ssidLen] = '\0';
 
   for (size_t i = 0; i < kSsidSigCount; i++) {
