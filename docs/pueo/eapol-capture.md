@@ -1,7 +1,8 @@
 # EAPOL capture
 
 Scope for recognising WPA handshakes in frames this firmware can already
-record. Nothing here is built.
+record. Step 1 of the phasing is built -- the promiscuous filter hazard
+below -- and nothing else is.
 
 Split deliberately into a passive half and an active one, because they are
 different decisions and only the first is in the spirit of what Spotter
@@ -39,7 +40,7 @@ only `WIFI_PKT_MISC`, so `WIFI_PKT_DATA` goes straight to the queue. **A
 handshake that happens while Packet Monitor is recording is probably already
 in the pcap.** The gap is recognition and workflow, not capture.
 
-## Two things that have to be fixed first
+## Two things in the way, one of them now fixed
 
 Both found while scoping, both invisible until looked for.
 
