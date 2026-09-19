@@ -44,7 +44,7 @@ def to_kicad(x, y):
     return round(x + BOARD_W / 2, 2), round(BOARD_L / 2 - y, 2)
 
 
-# From halehound_v3.scad MODULES[]: (name, refdes, x, y, w, h)
+# From pueo-enclosure.scad MODULES[]: (name, refdes, x, y, w, h)
 MODULES = [
     # Two sources disagree: 36 x 17 x 6.25 and 30 x 17 x 14. Carrying the
     # larger footprint, since an oversized pocket is slack and an undersized

@@ -2,7 +2,7 @@
 
 Input for a KiCad project, not a layout. Everything here is derived from the
 firmware pin map (`ESP32-DIV/board_pueo.h`), the enclosure
-(`halehound_v3.scad`), and module datasheets. Figures that need checking
+(`docs/pueo/pueo-enclosure.scad`), and module datasheets. Figures that need checking
 against a meter are marked **[verify]**.
 
 ## What this board is
@@ -395,7 +395,7 @@ pocket lengths (40 and 41) hold too, and the CC1101's 38 mm overall leaves
 
 The CC1101 drawing confirms something the enclosure was already built
 around: **the SMA jack is soldered to the module**, edge-mounted, with the
-2x4 pin header at the opposite end. The comment in `halehound_v3.scad` --
+2x4 pin header at the opposite end. The comment in the enclosure --
 "radios: vertical, board SMA against the top wall" -- had this right. It
 means the radio SMAs are not free to move: they sit wherever the module
 sits, which is the constraint the next section runs into.
@@ -599,8 +599,9 @@ Done in `docs/pueo/pueo-enclosure.scad`. Both parts still render manifold.
 
 The enclosure now lives in this repo. It was a loose file in the parent
 directory, tracked by nothing, while being the thing every dimension in this
-document is measured against. The copy here is authoritative; the old
-`halehound_v3.scad` alongside it is a duplicate that will drift.
+document is measured against. The working copy alongside the repo has since
+been renamed to match, so both are `pueo-enclosure.scad`; the tracked one is
+authoritative and the two are currently in sync.
 
 ```
 MODULES[1]   26 x 19  ->  27 x 17         TP4056 pocket

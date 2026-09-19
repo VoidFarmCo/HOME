@@ -42,7 +42,7 @@ byte SS_PIN_M[max_modul];
 byte GDO0_M[max_modul];
 byte GDO2_M[max_modul];
 byte gdo_set=0;
-static bool spi = 0;   // halehound: was global, collided with TFT_eSPI
+static bool spi = 0;   // pueo: was global, collided with TFT_eSPI
 bool ccmode = 0;
 float MHz = 433.92;
 byte m4RxBw = 0;
