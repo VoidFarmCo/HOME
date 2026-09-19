@@ -86,6 +86,36 @@ patch_cc1101() {
     || { echo "patch_cc1101: 'spi' patch did not apply" >&2; exit 1; }
 }
 
+# ── Why -zmuldefs is no longer needed ───────────────────────────────────────
+# wifi.cpp defines ieee80211_raw_frame_sanity_check to return 0, overriding
+# the IDF's copy so esp_wifi_80211_tx accepts hand-built frames. Without that
+# the deauth and beacon features do nothing.
+#
+# The call is linker-resolved -- objdump shows .text.esp_wifi_80211_tx
+# referencing the symbol through a literal-pool R_XTENSA_32 plus an
+# ASM_EXPAND -- so the override does not need the whole link to tolerate
+# duplicate symbols. Weakening the IDF's definition is enough: a strong
+# definition beats a weak one, and everything else stays under normal
+# duplicate-symbol rules.
+#
+# (nm --undefined-only does NOT show this reference, because the symbol is
+# defined in the same object that calls it. Looking only at undefined imports
+# suggests nothing calls it, which is wrong.)
+#
+# Verify after a build: the linked symbol should be 7 bytes, our `return 0`,
+# not the IDF's ~200-byte original.
+weaken_ieee80211_symbol() {
+  local sdk="$CORE_DIR/tools/sdk/esp32/lib"
+  local lib="$sdk/libnet80211.a"
+  local objcopy
+  objcopy=$(ls "$ARDUINO_DIRECTORIES_DATA"/packages/esp32/tools/xtensa-esp32-elf-gcc/*/bin/xtensa-esp32-elf-objcopy.exe 2>/dev/null | head -1)
+  [ -n "$objcopy" ] || { echo "objcopy not found" >&2; return 1; }
+  [ -f "$lib.orig" ] || cp "$lib" "$lib.orig"
+  cp "$lib.orig" "$lib"
+  "$objcopy" --weaken-symbol=ieee80211_raw_frame_sanity_check "$lib"
+  echo "== libnet80211.a: ieee80211_raw_frame_sanity_check weakened =="
+}
+
 setup() {
   mkdir -p "$ARDUINO_DIRECTORIES_DATA" "$ARDUINO_DIRECTORIES_USER/libraries" \
            "$ARDUINO_DIRECTORIES_DOWNLOADS"
@@ -99,17 +129,8 @@ setup() {
   #   -zmuldefs             tells the linker to tolerate duplicate symbols
   #   -w                    silences every compiler warning
   #
-  # -zmuldefs has to stay. wifi.cpp defines ieee80211_raw_frame_sanity_check
-  # to return 0, overriding the IDF's copy in libnet80211.a so raw 802.11
-  # frames can be injected. --wrap cannot substitute: the caller
-  # (esp_wifi_80211_tx) lives in the same object file, so the call never
-  # becomes an undefined reference for --wrap to intercept.
-  #
-  # It was also absorbing 30 collisions that had nothing to do with that, one
-  # of them a real bug. Those are fixed in patch_cc1101 above, so the flag now
-  # covers only the case it was meant for.
-  #
-  # -w is stripped below: the sketch is clean under -Wall -Wextra now.
+  # Both -w and -zmuldefs are stripped below. See weaken_ieee80211_symbol and
+  # the warning-flag block for why each can go.
   if [ ! -f "$CORE_DIR/platform.txt.orig" ]; then
     cp "$CORE_DIR/platform.txt" "$CORE_DIR/platform.txt.orig"
   fi
@@ -118,6 +139,12 @@ setup() {
   # Drop upstream's -w. It lived in build.extra_flags, which the compile
   # recipe appends *after* compiler.warning_flags, so it overrode whatever
   # --warnings asked for. Nothing needs hiding now.
+
+  # Drop -zmuldefs too. weaken_ieee80211_symbol below makes the one duplicate
+  # that was load-bearing resolve on its own, and without the blanket flag the
+  # linker goes back to catching accidental duplicates -- which is how the
+  # TFT_eSPI/CC1101 `spi` collision hid for so long.
+  sed -i 's|^compiler\.c\.elf\.libs\.esp32=-zmuldefs |compiler.c.elf.libs.esp32=|'     "$CORE_DIR/platform.txt"
   sed -i 's|^build\.extra_flags\.esp32=-w |build.extra_flags.esp32=|' "$CORE_DIR/platform.txt"
 
   # The platform bakes -Werror=all into both raised levels, so `--warnings`
@@ -142,6 +169,8 @@ setup() {
   cp "$REPO/Libraries/User_Setup cyd.h" "$LIB/TFT_eSPI/User_Setup.h"
 
   patch_cc1101 "$LIB/SmartRC-CC1101-Driver-Lib"
+
+  weaken_ieee80211_symbol
 
   echo "== pinned libraries =="
   arduino-cli lib install "${LIBS[@]}"

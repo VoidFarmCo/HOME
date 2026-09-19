@@ -138,14 +138,6 @@ static void bleWaitButtonRelease(int pin) {
   delay(kBleNavDebounceMs);
 }
 
-__attribute__((unused)) static void bleWaitNavRelease(int pin1, int pin2 = -1, int pin3 = -1) {
-  while (isButtonPressed(pin1) ||
-         (pin2 >= 0 && isButtonPressed(pin2)) ||
-         (pin3 >= 0 && isButtonPressed(pin3))) {
-    delay(10);
-  }
-  delay(kBleNavDebounceMs);
-}
 
 namespace Scanner { void scannerHandleNavButtons(); }
 namespace ProtoKill { void prokillHandleNavButtons(); }
@@ -5399,15 +5391,6 @@ static void mjSharedPublish(const uint8_t* addr, uint8_t ch, bool vulnerable, co
   }
 }
 
-__attribute__((unused)) static int mjSharedCount() {
-  int n = 0;
-  for (int i = 0; i < kMjSharedMax; i++) {
-    if (g_mjShared[i].used) {
-      n++;
-    }
-  }
-  return n;
-}
 
 namespace EsbSniffer {
 

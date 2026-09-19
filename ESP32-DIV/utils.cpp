@@ -1851,12 +1851,6 @@ static Rect saveRect(){
   const int gap = 8;
   return makeRect(b.x + b.w + gap, b.y, b.w, b.h);
 }
-__attribute__((unused)) static void drawFooterButton(const Rect& b, const char* label, uint16_t body, uint16_t edge){
-
-  FeatureUI::ButtonStyle style =
-    (body == UI.accent) ? FeatureUI::ButtonStyle::Primary : FeatureUI::ButtonStyle::Secondary;
-  FeatureUI::drawButtonRect(b.x, b.y, b.w, b.h, label, style);
-}
 static void footerToast(const char* msg, uint16_t color){
   Rect b = backRect();
   int y = b.y - 18;

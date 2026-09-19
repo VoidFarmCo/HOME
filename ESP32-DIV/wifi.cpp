@@ -5633,7 +5633,6 @@ static volatile int s_revealIndex = -1;
 static char s_pendingSsid[33] = {0};
 static portMUX_TYPE s_revealMux = portMUX_INITIALIZER_UNLOCKED;
 
-__attribute__((unused)) static void drawRevealScreen();
 static void drawRevealScreen(bool fullRedraw);
 static void updateRevealStats();
 static void updateNavLabels(bool onRevealScreen);
@@ -6240,9 +6239,6 @@ static void drawRevealScreen(bool fullRedraw) {
   drawTabBar(buttons[0], false, "", true, buttons[1], false);
 }
 
-__attribute__((unused)) static void drawRevealScreen() {
-  drawRevealScreen(true);
-}
 
 static bool scanHiddenNetworks() {
   stopListening();
@@ -8151,7 +8147,6 @@ static void stopPortal();
 static void maybeSwitchAp();
 static void sendNextBeacon();
 static void hopIfNeeded();
-__attribute__((unused)) static void paintTextLine(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color);
 static void invalidateHeaderCache();
 static void tickBeaconRate();
 static void truncSsid(char* out, size_t n, const char* ssid, size_t maxChars);
@@ -8161,7 +8156,6 @@ static void drawStatCardsChrome();
 static void paintStatCardValue(int i, const char* value, uint16_t color);
 static int rssiBars(int8_t rssi);
 static void drawSignalBars(int x, int baseY, int bars);
-static bool paintTextLineEx(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color);
 static bool paintInfoRow(int y, char* cache, size_t cacheSz, const char* text, uint16_t color,
                          int textMaxW);
 
@@ -8298,37 +8292,6 @@ static bool bestSsidSnapshot(ProbeSsid& out) {
   return ok;
 }
 
-static bool paintTextLineEx(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color) {
-  if (!text) {
-    text = "";
-  }
-  if (cache && strcmp(cache, text) == 0) {
-    return false;
-  }
-
-  tft.setTextFont(1);
-  tft.setTextSize(1);
-  const int oldW = (cache && cache[0]) ? tft.textWidth(cache) : 0;
-  const int newW = text[0] ? tft.textWidth(text) : 0;
-  int clearW = oldW > newW ? oldW : newW;
-  clearW += 4;
-  if (clearW > w) {
-    clearW = w;
-  }
-  if (clearW < 1) {
-    clearW = 1;
-  }
-
-  tft.fillRect(x, y, clearW, LINE_HEIGHT, TFT_BLACK);
-  tft.setTextColor(color, TFT_BLACK);
-  tft.setCursor(x, y);
-  tft.print(text);
-  if (cache && cacheSz > 0) {
-    strncpy(cache, text, cacheSz - 1);
-    cache[cacheSz - 1] = '\0';
-  }
-  return true;
-}
 
 // Full-width row clear so AP / Top never ghost or overlay each other.
 static bool paintInfoRow(int y, char* cache, size_t cacheSz, const char* text, uint16_t color,
@@ -8354,9 +8317,6 @@ static bool paintInfoRow(int y, char* cache, size_t cacheSz, const char* text, u
   return true;
 }
 
-__attribute__((unused)) static void paintTextLine(int y, int x, int w, char* cache, size_t cacheSz, const char* text, uint16_t color) {
-  (void)paintTextLineEx(y, x, w, cache, cacheSz, text, color);
-}
 
 static void updateNavLabels(bool force) {
   if (!featureHasTouchNavBar()) {

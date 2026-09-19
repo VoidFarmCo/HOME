@@ -68,6 +68,33 @@ Current size: **1825489 bytes, 92% of the app partition**, 34% of RAM. That is
 tight. Any real feature work needs either a bigger partition scheme or
 trimming upstream modules that Pueo does not use.
 
+### Emulation
+
+`tools/build.sh merge` produces a single flash image at offset 0. Padded to
+4 MB it boots under Espressif's QEMU:
+
+```bash
+qemu-system-xtensa -nographic -machine esp32 -drive file=pueo-4mb.bin,if=mtd,format=raw
+```
+
+It gets as far as IDF core init and then stops:
+
+```
+assert failed: do_core_init startup.c:328 (flash_ret == ESP_OK)
+```
+
+That is `esp_flash_init_default_chip()` rejecting QEMU's emulated flash. The
+QEMU shipped with the current IDF installer is built against the IDF 5/6 line
+while this firmware is Arduino core 2.0.10, which is IDF 4.4 -- the flash chip
+detection does not line up. Nothing to do with the firmware: the ROM loader,
+the second-stage bootloader and the app image all load correctly first.
+
+Worth being clear about the ceiling even if that were fixed. QEMU models the
+CPU, RAM, UART and timers. It does not model the ILI9341, the XPT2046, the
+CC1101, the NRF24, the PN532 or the WiFi radio -- which is to say, all of the
+things actually worth testing here. A perfect boot under QEMU would prove
+`setup()` reaches the point where it touches hardware, and nothing beyond it.
+
 ### Things that will bite you
 
 **esp32 core 2.0.10, exactly.** Upstream documents this and means it. The 3.x

@@ -246,13 +246,7 @@ static int rfidEffectiveDetailTop() {
   return top;
 }
 
-static int rfidDetailBodyTop() { return rfidEffectiveDetailTop() + kRfidBoxHeaderH + 2; }
 
-static int rfidDetailLinesPerPage() {
-  const int bodyBottom = rfidDetailBottom() - 4;
-  const int n = (bodyBottom - rfidDetailBodyTop()) / kRfidLineHeight;
-  return n < 1 ? 1 : n;
-}
 
 static bool s_rfidBoxesDrawn = false;
 static bool s_rfidStatusStaticDrawn = false;
@@ -270,7 +264,6 @@ static uint16_t s_rfidStatusLineColor[kRfidStatusLineCount];
 static void rfidPrintWrappedPageBg(int x, int y, int maxWidth, const char* text, int lineStepPx,
                                    uint16_t fg, uint16_t bg, int firstLine, int maxLines);
 static int rfidCountWrappedLines(int maxWidth, const char* text);
-static bool rfidDetailTagNeedsPill(const char* tagLabel);
 
 static constexpr int kRfidInfoHeaderH = 18;
 static constexpr int kRfidInfoTitleH = 15;
@@ -522,63 +515,7 @@ static void rfidUpdateToolbarTitle(const char* title) {
   rfidRunToolbar(title);
 }
 
-static void rfidPrintWrappedStepBg(int x, int y, int maxWidth, const char* text, int lineStepPx,
-                                   uint16_t fg, uint16_t bg, int bottomY = TFT_HEIGHT) {
-  String message = text ? text : "";
-  int cursorY = y;
-  bool clipped = false;
 
-  while (message.length() > 0) {
-    if (cursorY > bottomY - lineStepPx) {
-      clipped = true;
-      break;
-    }
-
-    int nl = message.indexOf('\n');
-    String paragraph = (nl >= 0) ? message.substring(0, nl) : message;
-    message = (nl >= 0) ? message.substring(nl + 1) : "";
-
-    if (paragraph.length() == 0) {
-      cursorY += lineStepPx;
-      continue;
-    }
-
-    while (paragraph.length() > 0) {
-      if (cursorY > bottomY - lineStepPx) {
-        clipped = true;
-        break;
-      }
-
-      int lineEnd = (int)paragraph.length();
-      while (tft.textWidth(paragraph.substring(0, lineEnd)) > maxWidth && lineEnd > 1) {
-        lineEnd--;
-      }
-      if (lineEnd < (int)paragraph.length()) {
-        int lastSpace = paragraph.substring(0, lineEnd).lastIndexOf(' ');
-        if (lastSpace > 0) {
-          lineEnd = lastSpace;
-        }
-      }
-
-      tft.setTextColor(fg, bg);
-      tft.setCursor(x, cursorY);
-      tft.print(paragraph.substring(0, lineEnd));
-      paragraph = paragraph.substring(lineEnd);
-      paragraph.trim();
-      cursorY += lineStepPx;
-    }
-  }
-
-  if (clipped && bottomY >= y + lineStepPx) {
-    tft.setTextColor(UI_DIM_TEXT, bg);
-    tft.setCursor(x, bottomY - lineStepPx);
-    tft.print("...");
-  }
-}
-
-__attribute__((unused)) static void rfidPrintWrappedStep(int x, int y, int maxWidth, const char* text, int lineStepPx) {
-  rfidPrintWrappedStepBg(x, y, maxWidth, text, lineStepPx, UI_TEXT, FEATURE_BG);
-}
 
 static int rfidCountWrappedLines(int maxWidth, const char* text) {
   String message = text ? text : "";
@@ -942,48 +879,8 @@ static void rfidSetFeatureInfo(const char* title, const char* body) {
   s_featureInfoAvailable = s_featureInfoBody[0] != '\0';
 }
 
-__attribute__((unused)) static int rfidInfoPanelPageCount(const char* body) {
-  return rfidInfoPanelPageCountForLines(body, rfidDetailLinesPerPage());
-}
 
-static bool rfidDetailTagNeedsPill(const char* tagLabel) {
-  if (!tagLabel || !tagLabel[0]) {
-    return false;
-  }
-  return strcmp(tagLabel, "INFO") != 0 && strcmp(tagLabel, "PROGRESS") != 0 &&
-         strcmp(tagLabel, "SCAN") != 0 && strcmp(tagLabel, "RESULT") != 0;
-}
 
-__attribute__((unused)) static void rfidDrawInfoPanel(const char* tagLabel, const char* body, int page, int pageCount,
-                              int linesPerPage) {
-  const int detailBottom = rfidDetailBottom();
-  const int detailTop = rfidEffectiveDetailTop();
-  const int bodyTop = rfidDetailBodyTop();
-  tft.fillRect(5, detailTop + kRfidBoxHeaderH, TFT_WIDTH - 10, detailBottom - detailTop - kRfidBoxHeaderH - 1,
-               TFT_BLACK);
-  tft.setTextFont(1);
-  const int tagTop = detailTop + kRfidBoxHeaderH + 2;
-  int textTop = bodyTop;
-  if (pageCount > 1) {
-    tft.fillRoundRect(kRfidDetailPadX, tagTop, 62, RF_TAG_H, 7, DARK_GRAY);
-    tft.setTextColor(UI_ICON, DARK_GRAY);
-    tft.setCursor(kRfidDetailPadX + 6, tagTop + 3);
-    tft.printf("%d/%d", page + 1, pageCount);
-    textTop = tagTop + RF_TAG_H + RF_TAG_GAP;
-  } else if (rfidDetailTagNeedsPill(tagLabel)) {
-    int pillW = (int)tft.textWidth(tagLabel) + 14;
-    if (pillW < 48) {
-      pillW = 48;
-    }
-    tft.fillRoundRect(kRfidDetailPadX, tagTop, pillW, RF_TAG_H, 7, DARK_GRAY);
-    tft.setTextColor(UI_ICON, DARK_GRAY);
-    tft.setCursor(kRfidDetailPadX + 6, tagTop + 3);
-    tft.print(tagLabel);
-    textTop = tagTop + RF_TAG_H + RF_TAG_GAP;
-  }
-  rfidPrintWrappedPageBg(kRfidDetailPadX, textTop, kRfidDetailInnerW, body, kRfidLineHeight, UI_TEXT,
-                         TFT_BLACK, page * linesPerPage, linesPerPage);
-}
 
 static void rfidRefreshInfoPanel(const char* tagLabel, const char* body) {
   (void)tagLabel;
@@ -1272,65 +1169,6 @@ static void rfidTransitionToProgress(const char* title, const char* stepLine, co
   rfidPrint(String("[!] ") + stepLine, UI_TEXT, false);
 }
 
-static void rfidLayoutFull(const char* title, const char* subtitleOrNull, const char* body,
-                           bool twoButtons, const char* primaryLabel,
-                           FeatureUI::ButtonStyle primaryStyle, bool primaryDisabled) {
-  applyThemeToPalette(settings().theme);
-  rfidResetUiState();
-  rfidClearBody(TFT_BLACK);
-  drawStatusBar(readBatteryVoltage(), true);
-  s_rfidBandAux[0] = '\0';
-  rfidRunToolbar(title);
-
-  const int boxY = kRfidStatusY;
-  const int boxBottom = rfidDetailBottom();
-  const int boxH = boxBottom - boxY;
-  if (boxH > 12) {
-    tft.drawRoundRect(4, boxY, TFT_WIDTH - 8, boxH, 3, UI_LINE);
-    tft.setTextSize(1);
-    tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-    tft.drawString("Details", 8, boxY + 3);
-    const int innerX = kRfidDetailPadX;
-    const int innerW = kRfidDetailInnerW;
-    const bool hasSub = subtitleOrNull && subtitleOrNull[0];
-    int tagTop = boxY + kRfidBoxHeaderH + 4;
-    int bodyTop = tagTop + RF_TAG_H + RF_TAG_GAP;
-    if (hasSub) {
-      tft.setTextFont(1);
-      tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-      String sub = subtitleOrNull;
-      const bool wasLong = tft.textWidth(sub) > innerW;
-      while (sub.length() > 0 && tft.textWidth(wasLong ? sub + "..." : sub) > innerW) {
-        sub.remove(sub.length() - 1);
-      }
-      if (wasLong) {
-        sub += "...";
-      }
-      tft.setCursor(innerX, boxY + kRfidBoxHeaderH + 2);
-      tft.print(sub);
-      tagTop = boxY + kRfidBoxHeaderH + 16;
-      bodyTop = tagTop + RF_TAG_H + RF_TAG_GAP;
-    }
-    const char* tag = (primaryStyle == FeatureUI::ButtonStyle::Danger) ? "CAUTION" : "DETAILS";
-    tft.setTextFont(1);
-    tft.fillRoundRect(innerX, tagTop, 52, RF_TAG_H, 7, DARK_GRAY);
-    tft.setTextColor(UI_ICON, DARK_GRAY);
-    tft.setCursor(innerX + 6, tagTop + 3);
-    tft.print(tag);
-    rfidPrintWrappedStepBg(innerX, bodyTop, innerW, body, RF_BODY_LINE_PX, UI_TEXT, TFT_BLACK,
-                           boxBottom - 4);
-  }
-
-  rfidRedrawNavChrome();
-
-  if (twoButtons && primaryLabel) {
-    rfidDrawShellFooter2(primaryLabel, primaryStyle, primaryDisabled);
-    rfidDrawHint(true);
-  } else {
-    rfidDrawShellFooter1("Back");
-    rfidDrawHint(false);
-  }
-}
 
 static bool rfidSubtitleIsFailure(const char* sub) {
   if (!sub || !sub[0]) {
@@ -1398,24 +1236,6 @@ static void rfidResultAndDismiss(const char* title, const char* sub, const char*
   rfidPresentResult(title, sub, body);
 }
 
-/** @return true = primary (right) action, false = back */
-__attribute__((unused)) static bool rfidRunTwoButtonDialog(const char* title, const char* sub, const char* body,
-                                   const char* primaryLabel, FeatureUI::ButtonStyle primaryStyle) {
-  rfidLayoutFull(title, sub, body, true, primaryLabel, primaryStyle, false);
-  for (;;) {
-    if (rfidPumpSessionUi()) {
-      return false;
-    }
-    RfidUiEvt e = rfidPollFooter(s_rfFoot, 2, true);
-    if (e == RfidUiEvt::Back) {
-      return false;
-    }
-    if (e == RfidUiEvt::Primary) {
-      return true;
-    }
-    delay(8);
-  }
-}
 
 /** 2-box confirm: Back cancels, primary continues. */
 static bool rfidRunTwoBoxConfirm(const char* title, const char* statusLine, const char* statusDetail,

@@ -90,15 +90,6 @@ namespace {
     return false;
   }
 
-  __attribute__((unused)) static bool findLatestExportPath(String& outPath) {
-
-    for (int i = 9999; i >= 0; i--) {
-      char buf[48];
-      snprintf(buf, sizeof(buf), "%s%04u.bin", SUBGHZ_EXPORT_PREFIX, (unsigned)i);
-      if (SD.exists(buf)) { outPath = String(buf); return true; }
-    }
-    return false;
-  }
 
   static bool exportProfilesToSD(String& outPath, String* errOut = nullptr) {
     if (!subghzEnsureDir(SUBGHZ_DIR)) {
@@ -781,15 +772,6 @@ static void replayFreqPrev() {
   updateDisplay();
 }
 
-__attribute__((unused)) static void replayToggleAuto() {
-  autoScanEnabled = !autoScanEnabled;
-  if (autoScanEnabled) {
-    replayBeginAutoScan();
-  } else {
-    replayClearScanLock();
-  }
-  updateDisplay();
-}
 
 static void replayTrySave() {
   if (receivedValue == 0) {
@@ -1799,13 +1781,6 @@ static void profileSelectPrev() {
   updateSelectionUI(oldIdx, false);
 }
 
-__attribute__((unused)) static void profileRefreshSd() {
-  refreshSdIndex(true);
-  selectedValid = false;
-  cacheDirty = true;
-  deleteArmed = false;
-  updateDisplay();
-}
 
 void profileHandleNavButtons() {
   if (!featureHasTouchNavBar()) {

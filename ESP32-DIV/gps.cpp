@@ -965,18 +965,6 @@ void clampListScroll() {
   }
 }
 
-__attribute__((unused)) static const char* viewModeTag(ViewMode m) {
-  switch (m) {
-    case ViewMode::Combined:
-      return "Split";
-    case ViewMode::SkyOnly:
-      return "Sky";
-    case ViewMode::ListOnly:
-      return "Signals";
-    default:
-      return "?";
-  }
-}
 
 static inline bool navCooldownElapsed(uint32_t t) {
   return ((uint32_t)(t - lastViewBtnMs)) >= kNavCooldownMs;
@@ -1975,18 +1963,6 @@ static const char* wardAuthLabel(wifi_auth_mode_t t) {
   }
 }
 
-__attribute__((unused)) static const char* wardRadioModeLabel(WardRadioMode m) {
-  switch (m) {
-    case WardRadioMode::WiFi:
-      return "WiFi only";
-    case WardRadioMode::Ble:
-      return "BLE only";
-    case WardRadioMode::Both:
-      return "WiFi+BLE";
-    default:
-      return "?";
-  }
-}
 
 /** Short label for tight UI rows (avoids clipping on 240px). */
 static const char* wardRadioModeShort(WardRadioMode m) {
