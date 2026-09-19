@@ -193,6 +193,14 @@ actually works here. Kept on purpose, not by neglect.
 Per-release notes, in the form that ships in the archive, are in
 `CHANGELOG.txt`. What follows is the same ground with more of the reasoning.
 
+New in 0.2.3, tooling and documentation only — the compiled image is
+identical to 0.2.2 apart from the version string: `CHANGELOG.txt` ships in
+the archive and sits beside the downloads; `tools/make_release.sh` takes
+`PUEO_PUBLISH_DIR` to copy artifacts where they are served and verifies the
+copies; and it refuses to re-cut a version already in `dist/`, because doing
+so silently produced a different archive while the published digest stayed
+as it was.
+
 New in 0.2.2. Two threads: a detection path that survives a camera changing
 its address, and the end of a licence conflict the project inherited.
 

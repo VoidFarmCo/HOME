@@ -11,6 +11,29 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.3 - 2026-09-19
+------------------
+
+Tooling and documentation only. The compiled image is identical to 0.2.2
+apart from the version string.
+
+  * CHANGELOG.txt, this file, now ships inside the archive and sits beside
+    the downloads, so deciding whether to flash an image does not mean
+    unzipping the source first.
+  * tools/make_release.sh takes PUEO_PUBLISH_DIR: a directory to copy the
+    finished artifacts and the changelog into, verified with sha256sum -c
+    afterwards. An environment variable rather than a path in the file,
+    because the file ships inside the archive.
+  * The same script now refuses to re-cut a version already in dist/ unless
+    --force is given. Re-running it on a released version silently produced
+    a different archive - the script is itself inside the archive - while
+    the digest published beside it stayed as it was.
+  * How to verify an archive, and where, is written down in that script:
+    extract to a short path and delete it afterwards. A deep path fails on
+    Windows' 259-character limit, and a junction from a short path to a deep
+    one defeats -ffile-prefix-map and quietly breaks reproducibility.
+
+
 0.2.2 - 2026-09-19
 ------------------
 
