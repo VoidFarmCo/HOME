@@ -56,7 +56,7 @@ MODULES = [
     # jack faces +X, out through the right wall.
     ("TP4056 charger", "U2",   26.6, -62.0, 27, 17),
     # MP2307 "Mini-360": 17.9 x 12, adjustable via a single-turn trimpot.
-    ("3.3V buck",      "U3",  -29.0, -48.0, 17.9, 12),
+    ("MP2307 buck",    "U3",  -29.0, -48.0, 17.9, 12),
     ("LiPo pack",      "BT1", -16.0, -23.0, 45, 34),
     # ATGM336H, not the GT-U7 that was assumed: 16 x 13 with the antenna on
     # a 90 mm u.FL pigtail rather than a patch on the module. Moved up from
