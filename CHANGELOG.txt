@@ -11,6 +11,71 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.4 - 2026-09-19
+------------------
+
+Mostly reading what features already claimed, and fixing what turned out
+not to be true.
+
+WiFi:
+
+  * The promiscuous filter is global and sticky, and nothing set it back.
+    Two features asked for management frames only, so Packet Monitor - which
+    wants data frames, because it writes them to its pcap and counts them on
+    screen - saw management frames only if the captive portal or Karma had
+    run first in the same session. No error, no empty file, just a capture
+    missing everything that was not a beacon. Every feature that reads
+    frames now states what it wants each time it starts.
+  * Packet Monitor recognises WPA handshakes in the frames it was already
+    recording. ESP32-DIV/Eapol.{h,cpp} finds the 802.1X payload by computing
+    the header length from the frame control field rather than testing a
+    fixed offset, so it still works on a frame carrying a fourth address or
+    an HT Control field; the four messages are told apart by three bits of
+    the Key Information field, plus the Key Type bit so a group rekey is not
+    mistaken for M3. The header shows how many networks have M2 and M3.
+  * Forcing a handshake by deauthenticating a client is deliberately NOT
+    wired up. The decision logic exists, disarms on capture and after six
+    bursts, and nothing calls it - Packet Monitor runs in WIFI_MODE_NULL and
+    cannot transmit anyway. See docs/pueo/eapol-capture.md.
+
+Bluetooth:
+
+  * AirTag Sniffer can tell a separated tag from somebody's phone. Apple
+    uses type 0x12 for both the long form that carries the rotating public
+    key, which a device broadcasts once separated from its owner, and a
+    short online status ping that every participating iPhone and Mac emits.
+    They differ in the length byte, which the parser had and never read.
+    Battery and the maintained flag are decoded from the status byte, which
+    was being stored and never shown. Scanning is passive now: an AirTag
+    advertises non-connectable, so the scan requests bought nothing.
+  * BLE Scanner drew manufacturer and service data as text, with
+    String((char*)raw.c_str()), which stops at the first zero byte. Apple's
+    company identifier is 4C 00, so every Apple device displayed as the
+    single letter L. Both are hex now, capped to the row width. Tx Power is
+    guarded by haveTXPower() like the fields below it, rather than printing
+    whatever was left in the field.
+  * Skimmer Detect's signatures carry a Radio column. It scans BLE only, so
+    eleven of its twenty-eight names can never match, including seven of the
+    eight rated 5 - HC-05 and HC-06 among them. Kept and marked rather than
+    removed. The table's order is load-bearing and now says so.
+  * Sniffer's two alerts are annotated rather than changed. Jamming
+    Suspected fires on any device seen more than twenty times, a counter
+    that is never reset, so about two seconds of a normal beacon. MAC
+    Spoofing Suspected cannot detect a MAC change at all: the row is found
+    by matching that exact address. See docs/pueo/ble-sniffer.md.
+
+Sub-GHz:
+
+  * One frequency list instead of two identical copies in different
+    namespaces, which nothing kept in step.
+
+Tooling:
+
+  * tools/check_eapol.py and tools/check_airtag_parse.py, modelling the
+    parsers against synthetic frames behind a buffer that refuses any read
+    outside them.
+
+
 0.2.3 - 2026-09-19
 ------------------
 

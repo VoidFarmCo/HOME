@@ -193,6 +193,15 @@ actually works here. Kept on purpose, not by neglect.
 Per-release notes, in the form that ships in the archive, are in
 `CHANGELOG.txt`. What follows is the same ground with more of the reasoning.
 
+New in 0.2.4, mostly reading what features already claimed and fixing what
+turned out not to be true: the global promiscuous filter that let Packet
+Monitor silently capture management frames only; handshake recognition in
+the pcap it was already writing, with forcing one deliberately not wired up;
+AirTag Sniffer telling a separated tag from a passing phone; BLE Scanner no
+longer showing every Apple device as the letter `L`; the skimmer signatures
+marked with the radio they actually speak; and one sub-GHz frequency list
+where there were two. See `CHANGELOG.txt`.
+
 New in 0.2.3, tooling and documentation only — the compiled image is
 identical to 0.2.2 apart from the version string: `CHANGELOG.txt` ships in
 the archive and sits beside the downloads; `tools/make_release.sh` takes
