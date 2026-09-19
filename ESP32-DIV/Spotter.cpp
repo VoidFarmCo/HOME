@@ -733,6 +733,15 @@ void spotterSetup() {
   WiFi.disconnect();
   delay(60);
   esp_wifi_set_promiscuous(false);
+  /* Management frames only, stated rather than inherited: the filter is
+   * global and the feature that ran before this one may have set anything.
+   * onPacket returns on everything else, so asking for more would only cost
+   * callbacks. */
+  {
+    wifi_promiscuous_filter_t filt = {};
+    filt.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT;
+    esp_wifi_set_promiscuous_filter(&filt);
+  }
   esp_wifi_set_promiscuous_rx_cb(&onPacket);
   esp_wifi_set_promiscuous(true);
   esp_wifi_set_channel(s_chan, WIFI_SECOND_CHAN_NONE);

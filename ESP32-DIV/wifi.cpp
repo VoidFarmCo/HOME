@@ -22,6 +22,24 @@ static inline uint32_t wifiStaScanMsPerChannel() {
   return (uint32_t)constrain((long)WIFI_SCAN_ACTIVE_MS, 120L, 1500L);
 }
 
+/* The promiscuous filter is global and it is sticky: whatever one feature
+ * asks for stays in force for whichever feature runs next. Two features here
+ * set MASK_MGMT and nothing ever set it back, so Packet Monitor -- which
+ * wants data frames, because it writes them to its pcap -- would silently
+ * see management frames only if the captive portal or Karma had run first in
+ * the same session. No error, no empty file, just a capture missing
+ * everything that is not a beacon.
+ *
+ * So every feature that reads frames now states what it wants, every time it
+ * starts, rather than inheriting. The two beacon-spam sites are left alone
+ * deliberately: they enable promiscuous mode to transmit and never install a
+ * callback, so the filter does not reach them. */
+static void setPromiscFilter(uint32_t mask) {
+  wifi_promiscuous_filter_t filt = {};
+  filt.filter_mask = mask;
+  esp_wifi_set_promiscuous_filter(&filt);
+}
+
 namespace Deauther {
   extern void wsl_bypasser_send_raw_frame(const uint8_t *frame_buffer, int size);
 }
@@ -618,6 +636,7 @@ void setChannel(int newChannel) {
 
   esp_wifi_set_promiscuous(false);
   esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
+  setPromiscFilter(WIFI_PROMIS_FILTER_MASK_ALL);
   esp_wifi_set_promiscuous_rx_cb(&wifi_promiscuous);
   esp_wifi_set_promiscuous(true);
 }
@@ -848,6 +867,7 @@ void ptmLoop() {
 
   esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
 
+  setPromiscFilter(WIFI_PROMIS_FILTER_MASK_ALL);
   esp_wifi_set_promiscuous_rx_cb(&wifi_promiscuous);
   esp_wifi_set_promiscuous(true);
 
@@ -1716,6 +1736,7 @@ void analyzeNetworks(int n) {
 }
 
 static void deauthBeginListen() {
+  setPromiscFilter(WIFI_PROMIS_FILTER_MASK_MGMT);
   esp_wifi_set_promiscuous_rx_cb(snifferCallback);
   esp_wifi_set_promiscuous(true);
   s_phase = DeauthPhase::Listen;
@@ -5886,6 +5907,7 @@ static void startListening(bool withForce) {
   esp_wifi_start();
   esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
 
+  setPromiscFilter(WIFI_PROMIS_FILTER_MASK_MGMT);
   esp_wifi_set_promiscuous_rx_cb(snifferCallback);
   esp_wifi_set_promiscuous(true);
 
