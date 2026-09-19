@@ -4,16 +4,18 @@
 #   tools/make_release.sh            -> dist/pueo-<version>-src.zip
 #   tools/make_release.sh --with-bin -> also dist/pueo-<version>-merged.bin
 #
-# The repo tracks 36 MB, down from 254. Most of the remainder is still
-# inherited: upstream's GitHub Pages site under docs/ with its web flasher
-# and firmware bins, and the flash tool under tools/.
+# The repo tracks 9 MB, down from 254. What is left is the firmware, the
+# docs, the art, and the three files in Libraries/ that setup consumes.
 #
 # Removed along the way, all of it upstream's and none of it applicable to a
 # CYD carrier design: PCB and schematic exports for their own boards, nine
-# pre-compiled builds of their firmware, .elf and .map debug artifacts for
-# three variants, the GLB board models, and the library zips for board
-# variants Pueo does not target. Everything is still in the upstream remote,
-# recoverable with git show upstream/main:<path>.
+# pre-compiled builds of their firmware, .elf and .map debug artifacts, the
+# GLB board models, library zips for other board variants, their GitHub
+# Pages site with its web flasher, and both flash tools. Everything is still
+# in the upstream remote, recoverable with git show upstream/main:<path>.
+#
+# The archive is still an explicit include list rather than "everything
+# except", because the list is the record of what belongs to this fork.
 # None of that is needed to build the firmware and none of it is ours, so the
 # archive is an explicit include list rather than "everything except".
 set -euo pipefail

@@ -10,7 +10,7 @@
  * Display, touch, SD and UI behaviour follow the stock BOARD_CYD path, which
  * this header turns on. Only the external radio wiring differs.
  *
- * Physical map (see docs/hardware.md for the reasoning):
+ * Physical map (see docs/pueo/hardware.md for the reasoning):
  *
  *   VSPI (shared bus)   SCK 18   MOSI 23   MISO 19
  *     SD (onboard)      CS  5
