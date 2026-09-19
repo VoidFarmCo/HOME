@@ -17,7 +17,7 @@
  *     CC1101            CS  27      GDO0 22 (TX)   GDO2 35 (RX)
  *     NRF24L01+PA+LNA   CSN 4       CE   16        IRQ unconnected
  *     PN532 V3 (SPI)    SS  17
- *   GPS GT-U7           ESP32 RX on GPIO 1, GPS RX not connected
+ *   GPS ATGM336H        ESP32 RX on GPIO 1, GPS RX not connected
  *
  * GPIO 4/16/17 are the CYD's onboard RGB LED. Using them means the LED is gone.
  * That is intended — they are the only pins left.
@@ -68,7 +68,7 @@
  * Stock CYD default is SS 25, which is the XPT2046 touch clock. Moved to 17. */
 #define PN532_SS 17
 
-/* ── GPS GT-U7 ──────────────────────────────────────────────────────────────
+/* ── GPS ATGM336H ──────────────────────────────────────────────────────────────
  * The GPS TX line lands on GPIO 1, the ESP32's UART0 TX. That looks wrong and
  * is deliberate: GPIO 3 (UART0 RX) is driven by the USB-UART bridge's TX
  * output, so tying the GPS output there puts two push-pull drivers on one net.

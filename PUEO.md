@@ -3,7 +3,8 @@
 Open-source firmware for a handheld multi-radio field tool built on the
 ESP32-2432S028R "cheap yellow display" — a 2.8" touchscreen ESP32 carrying a
 CC1101 for sub-GHz, an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and a
-GT-U7 for GPS, in a printed enclosure zoned to keep the radios apart. It
+an ATGM336H for GPS, in a printed enclosure zoned to keep the radios
+apart. It
 covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
 clone, GPS wardriving and jam detection. It is a fork of CiferTech's
 ESP32-DIV, MIT licensed and staying that way, diverging mainly in the parts
