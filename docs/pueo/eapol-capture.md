@@ -1,10 +1,9 @@
 # EAPOL capture
 
 Scope for recognising WPA handshakes in frames this firmware can already
-record. Steps 1 to 4 of the phasing are built: the filter hazard below, the
-locator, the classifier, the per-AP tracking, and Packet Monitor showing
-what it has. Nothing transmits, and step 5 -- forcing a reassociation -- is
-deliberately not built.
+record. Steps 1 to 4 are built. Step 5, forcing a reassociation, is built as
+far as the decision and stops there: **nothing transmits**, and the reason is
+a blocker rather than a choice -- see the end.
 
 Split deliberately into a passive half and an active one, because they are
 different decisions and only the first is in the spirit of what Spotter
@@ -172,6 +171,46 @@ Recommendation: build the passive recogniser first, and keep any deauth
 pairing behind an explicit mode with its own confirmation, rather than a
 setting that quietly changes what the feature does.
 
+### What was built, and what stopped it
+
+The decision is built and tested; the transmitting is not wired, because it
+cannot work where it would have gone.
+
+`assistDue()` answers "should a burst go out now, and at which network".
+Its constraints are in the code rather than in a warning:
+
+- disarmed on every entry to the feature, with no setting that remembers it
+- it can only target a network whose handshake is **already in progress and
+  incomplete**, because the table it picks from gets a row only once an
+  EAPOL frame from that network has been received. It cannot be aimed at an
+  arbitrary access point
+- it stops the moment that network has M2 and M3
+- it stops after six bursts regardless, so a handshake that never completes
+  cannot leave it transmitting
+- two frames per burst, so an arming costs at most twelve frames
+
+For comparison, Marauder sends five frames every time it sees a beacon of
+the target, which on a normal network is tens per second for as long as it
+is running.
+
+**The blocker: Packet Monitor runs in `WIFI_MODE_NULL`.** Every path through
+`ptmStartRadioAndPcapOnce` sets it, and `esp_wifi_80211_tx(WIFI_IF_AP, ...)`
+needs an interface that is up. From this mode it returns `ESP_ERR_WIFI_IF`
+and sends nothing.
+
+So wiring a button to it would have produced a control that looks like it is
+doing something and is not, which is worse than not having it. The three ways
+out, none of them takeable without hardware to check against:
+
+- **Put Packet Monitor in `WIFI_MODE_AP`.** This is what Marauder does: it
+  keeps an AP interface up and sniffs at the same time. It also changes the
+  radio state of a capture feature, which is the sort of change that needs
+  measuring rather than reasoning about.
+- **A separate feature** that brings up both an AP interface and promiscuous
+  mode for itself, leaving Packet Monitor alone.
+- **Leave it.** The logic is there, tested, and costs nothing until something
+  calls it.
+
 ## Testing it without hardware
 
 The same approach as `tools/fuzz_ie_walk.py`, and for the same reason: none
@@ -227,4 +266,8 @@ say so in a way that is easy to fix and hard to guess.
    with the counting done under it and the drawing outside.
 3. Key Information classification and the per-AP flags.
 4. Show the flags, and record to the existing pcap writer.
-5. Only then, and separately, the question of forcing a reassociation.
+5. **Decision built, transmit not wired.** `assistArm`/`assistDue` with the
+   stop conditions above, and 4,000 randomised runs asserting the burst cap
+   is never exceeded and that it never fires while disarmed. Nothing calls
+   it: Packet Monitor is in `WIFI_MODE_NULL` and cannot transmit, and
+   changing that is a radio-state change wanting hardware. See above.

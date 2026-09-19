@@ -104,4 +104,54 @@ void             resetHandshakes();
 /** True when M2 and M3 are both present, which is the pair worth having. */
 bool usable(const Handshake& h);
 
+/* ── the deauthentication assist ─────────────────────────────────────────
+ *
+ * A handshake happens when a station associates, so waiting for one means
+ * waiting for somebody to connect. The way every tool in this space forces
+ * the issue is to deauthenticate a client so that it reconnects.
+ *
+ * That is transmitting at other people's equipment to make it fall off its
+ * network. It is a different act from listening, legally and otherwise, and
+ * this project's own pages say to use it only on networks you are allowed
+ * to touch. So it is built narrow, and the narrowness is in the code rather
+ * than in the instructions:
+ *
+ *   - Off on every entry to the feature. There is no setting that
+ *     remembers it.
+ *   - It will only nudge a network where a handshake has **already been
+ *     seen in progress** and is incomplete. It cannot be pointed at an
+ *     arbitrary access point, because the table it targets from only gets a
+ *     row when an EAPOL frame from that network has already been received.
+ *   - It stops the moment that network has M2 and M3. The point is the
+ *     handshake; once it is captured there is no reason to keep sending.
+ *   - It stops after kAssistMaxBursts regardless, so a handshake that never
+ *     completes cannot leave it transmitting indefinitely.
+ *
+ * Two frames per burst, one burst per interval: at most
+ * kAssistMaxBursts * 2 frames for each time it is armed. Marauder sends
+ * five per beacon it sees, which on a normal network is tens per second.
+ *
+ * The decision is here, where it can be tested on a host. The transmitting
+ * is in wifi.cpp, where the radio is.
+ */
+constexpr uint32_t kAssistIntervalMs = 3000;
+constexpr int      kAssistMaxBursts  = 6;
+
+/** Arm or disarm. Disarming resets the burst count; arming is an operator
+ *  action and nothing else calls it. */
+void assistArm(bool on);
+bool assistArmed();
+int  assistBursts();
+
+/**
+ * Index of the handshake to nudge, or -1 for "send nothing now".
+ *
+ * Returns -1 when disarmed, when the interval has not elapsed, when the
+ * burst cap is reached, and when no tracked network has an incomplete
+ * handshake. Disarms itself in the two cases that are permanent. Advances
+ * the burst count when it returns an index, so calling it is what consumes
+ * a burst.
+ */
+int assistDue(uint32_t nowMs);
+
 }  // namespace Eapol

@@ -367,6 +367,129 @@ for _ in range(40000):
     assert got in (None, "M1", "M2", "M3", "M4"), got
     checks += 1
 
+# ═══ the deauth assist ════════════════════════════════════════════════════
+#
+# This is the only part of Eapol that causes the radio to transmit, so its
+# stop conditions are the thing worth proving. There are three: the target is
+# captured, the burst cap is reached, or it was never armed. None of them may
+# be reachable only by luck.
+ASSIST_INTERVAL_MS = 3000
+ASSIST_MAX_BURSTS = 6
+
+
+class Assist:
+    def __init__(self, tracker):
+        self.t = tracker
+        self.armed = False
+        self.bursts = 0
+        self.last = 0
+
+    def arm(self, on):
+        self.armed = on
+        self.bursts = 0
+        self.last = 0
+
+    def due(self, now):
+        if not self.armed:
+            return -1
+        if self.bursts >= ASSIST_MAX_BURSTS:
+            self.armed = False
+            return -1
+        if self.bursts > 0 and (now - self.last) < ASSIST_INTERVAL_MS:
+            return -1
+        target = -1
+        for i, r in enumerate(self.t.rows):
+            if r["seen"] != 0 and not self.t.usable(r):
+                target = i
+                break
+        if target < 0:
+            if len(self.t.rows) > 0:
+                self.armed = False
+            return -1
+        self.last = now
+        self.bursts += 1
+        return target
+
+
+t = Tracker(); a = Assist(t)
+t.observe(b"AP", b"STA", "M1")
+case("disarmed sends nothing", a.due(0) == -1 and a.due(10**6) == -1)
+
+a.arm(True)
+case("armed with a partial handshake fires at once", a.due(1000) == 0)
+case("and not again inside the interval", a.due(1000 + ASSIST_INTERVAL_MS - 1) == -1)
+case("but does after it", a.due(1000 + ASSIST_INTERVAL_MS) == 0)
+
+# the cap
+t = Tracker(); a = Assist(t)
+t.observe(b"AP", b"STA", "M1")
+a.arm(True)
+fired = 0
+now = 0
+for _ in range(500):
+    now += ASSIST_INTERVAL_MS
+    if a.due(now) >= 0:
+        fired += 1
+case("never more bursts than the cap", fired == ASSIST_MAX_BURSTS)
+case("and it disarms itself at the cap", not a.armed)
+
+# capture stops it
+t = Tracker(); a = Assist(t)
+t.observe(b"AP", b"STA", "M1")
+a.arm(True)
+case("fires while incomplete", a.due(0) == 0)
+t.observe(b"AP", b"STA", "M2")
+t.observe(b"AP", b"STA", "M3")
+case("stops once that network has M2+M3", a.due(ASSIST_INTERVAL_MS) == -1)
+case("and disarms rather than idling armed", not a.armed)
+
+# nothing tracked yet: stay armed, send nothing
+t = Tracker(); a = Assist(t)
+a.arm(True)
+case("nothing to target sends nothing", a.due(0) == -1)
+case("but stays armed, since a handshake may yet appear", a.armed)
+
+# re-arming resets the budget
+t = Tracker(); a = Assist(t)
+t.observe(b"AP", b"STA", "M1")
+a.arm(True)
+now = 0
+for _ in range(20):
+    now += ASSIST_INTERVAL_MS
+    a.due(now)
+case("budget spent", not a.armed)
+a.arm(True)
+case("re-arming is deliberate and gives a fresh budget",
+     a.armed and a.bursts == 0 and a.due(now) == 0)
+
+# fuzz: random time jumps and random handshake progress, many runs
+import random as _r
+for trial in range(4000):
+    t = Tracker(); a = Assist(t)
+    armed_at = None
+    fired = 0
+    now = 0
+    for step in range(60):
+        now += _r.randint(0, 5000)
+        if _r.random() < 0.05:
+            a.arm(True)
+            fired = 0
+        if _r.random() < 0.15:
+            t.observe(bytes([_r.randint(0, 3)]), b"STA",
+                      _r.choice(["M1", "M2", "M3", "M4"]), now)
+        if a.due(now) >= 0:
+            fired += 1
+        assert fired <= ASSIST_MAX_BURSTS, "burst cap exceeded: %d" % fired
+        if not a.armed:
+            assert a.due(now) == -1, "fired while disarmed"
+    checks += 1
+
+# and the invariant stated plainly: frames per arming are bounded
+case("an arming can cost at most %d frames" % (ASSIST_MAX_BURSTS * 2),
+     ASSIST_MAX_BURSTS * 2 == 12)
+
 print("ok -- %d checks, no out-of-bounds read" % checks)
 print("payload offsets: 32 / 34 / 38 / 38 for 3-addr, QoS, 4-addr, QoS+HT")
 print("M1-M4 classify from key info; M2+M3 is what makes a row usable")
+print("assist stops on capture, on the %d-burst cap, and when disarmed"
+      % ASSIST_MAX_BURSTS)

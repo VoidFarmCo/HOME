@@ -64,6 +64,10 @@ constexpr int kAddrBytes = 6;
 Handshake s_handshakes[kMaxHandshakes];
 int       s_handshakeCount = 0;
 
+bool     s_assistArmed  = false;
+int      s_assistBursts = 0;
+uint32_t s_assistLastMs = 0;
+
 }  // namespace
 
 int headerLength(const uint8_t* frame, uint16_t len) {
@@ -277,6 +281,67 @@ const Handshake* handshakeAt(int i) {
 void resetHandshakes() {
   s_handshakeCount = 0;
   memset(s_handshakes, 0, sizeof(s_handshakes));
+  s_assistArmed = false;
+  s_assistBursts = 0;
+  s_assistLastMs = 0;
+}
+
+void assistArm(bool on) {
+  s_assistArmed = on;
+  s_assistBursts = 0;
+  s_assistLastMs = 0;
+}
+
+bool assistArmed() {
+  return s_assistArmed;
+}
+
+int assistBursts() {
+  return s_assistBursts;
+}
+
+int assistDue(uint32_t nowMs) {
+  if (!s_assistArmed) {
+    return -1;
+  }
+
+  /* Permanent stop: the cap is reached. Disarm rather than keep saying no,
+   * so the UI shows it is finished and re-arming is deliberate. */
+  if (s_assistBursts >= kAssistMaxBursts) {
+    s_assistArmed = false;
+    return -1;
+  }
+
+  /* First burst goes immediately; after that, one per interval. */
+  if (s_assistBursts > 0 &&
+      (uint32_t)(nowMs - s_assistLastMs) < kAssistIntervalMs) {
+    return -1;
+  }
+
+  /* Only a network that has shown part of a handshake and not the rest. A
+   * row exists only once an EAPOL frame from it has been received, so this
+   * cannot be aimed somewhere nothing was happening. */
+  int target = -1;
+  for (int i = 0; i < s_handshakeCount; i++) {
+    if (s_handshakes[i].seen != 0 && !usable(s_handshakes[i])) {
+      target = i;
+      break;
+    }
+  }
+
+  if (target < 0) {
+    /* Nothing incomplete. If nothing is tracked at all there is nothing to
+     * do yet; if everything tracked is complete, the job is done and it
+     * disarms. */
+    if (s_handshakeCount > 0) {
+      s_assistArmed = false;
+    }
+    return -1;
+  }
+
+  s_assistLastMs = nowMs;
+  s_assistBursts++;
+  return target;
 }
 
 }  // namespace Eapol
