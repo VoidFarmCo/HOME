@@ -4,14 +4,15 @@
 #   tools/make_release.sh            -> dist/pueo-<version>-src.zip
 #   tools/make_release.sh --with-bin -> also dist/pueo-<version>-merged.bin
 #
-# The repo tracks 55 MB, down from 254, and most of what is left is still
-# inherited: GLB models and doc images, a flash tool with its bootloader and
-# partition bins, and library zips for board variants Pueo does not target.
+# The repo tracks 36 MB, down from 254. Most of the remainder is still
+# inherited: upstream's GitHub Pages site under docs/ with its web flasher
+# and firmware bins, and the flash tool under tools/.
 #
 # Removed along the way, all of it upstream's and none of it applicable to a
-# CYD carrier design: PCB and schematic exports for ESP32-DIV's own boards,
-# nine pre-compiled builds of their firmware, and the .elf and .map debug
-# artifacts for three variants. Everything is still in the upstream remote,
+# CYD carrier design: PCB and schematic exports for their own boards, nine
+# pre-compiled builds of their firmware, .elf and .map debug artifacts for
+# three variants, the GLB board models, and the library zips for board
+# variants Pueo does not target. Everything is still in the upstream remote,
 # recoverable with git show upstream/main:<path>.
 # None of that is needed to build the firmware and none of it is ours, so the
 # archive is an explicit include list rather than "everything except".
