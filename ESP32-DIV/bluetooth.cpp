@@ -8895,6 +8895,15 @@ struct Config {
   static constexpr int serialBaud = 115200;
   static constexpr int bleScanDuration = 5;
   static constexpr int btScanDuration = 5;
+  /* These two decide "Jamming Suspected", and between them they fire on
+   * almost anything. packetCount is never reset -- it is set to 1 when a
+   * device is first seen and incremented on every advertisement after --
+   * so a beacon at the usual 100 ms interval passes 20 in about two
+   * seconds and is reported as jamming for the rest of the session. And
+   * -20 dBm is not a jammer, it is a phone on the desk next to you.
+   *
+   * Left as they are because choosing better numbers is guesswork without
+   * a radio to watch. See docs/pueo/ble-sniffer.md. */
   static constexpr int maxPacketCount = 20;
   static constexpr int minRssiThreshold = -20;
   static constexpr int maxNewDevices = 20;
@@ -9096,6 +9105,17 @@ private:
     }
   }
 
+  /* This asks whether the top two bits of the address are 11, which in BLE
+   * means a *static random* address: random, and then fixed for the life of
+   * the device. It is the one random class that does not rotate.
+   *
+   * The addresses that do rotate are resolvable private addresses, top bits
+   * 01, which is what phones and tags use precisely so they cannot be
+   * followed. Those are exactly what this misses. So the test is the wrong
+   * way round for what its caller is named after.
+   *
+   * Not corrected here because the caller is broken in a larger way -- see
+   * the comment on macChangeCount below, and docs/pueo/ble-sniffer.md. */
   bool isRandomizedMac(const String& mac) {
     String firstByte = mac.substring(0, 2);
     char* end;
@@ -9443,6 +9463,15 @@ public:
         sniffer.devices[idx].rssi = rssi;
         sniffer.devices[idx].packetCount++;
         sniffer.devices[idx].lastSeen = timestamp;
+        /* This does not count MAC changes. The row was found by matching
+         * this very address, so the address has not changed; what is being
+         * counted is advertisements from a device that happens to have a
+         * random address. A device that genuinely rotates its address fails
+         * the lookup above and gets a fresh row with the counter at zero,
+         * so the one thing this is named for is the one thing it cannot
+         * see. "MAC Spoofing Suspected" therefore means "six
+         * advertisements from a static random address", which is under a
+         * second of normal traffic. */
         if (sniffer.isRandomizedMac(mac)) {
           sniffer.devices[idx].macChangeCount++;
         }
@@ -9453,6 +9482,17 @@ public:
     }
   };
 
+  /* Dead code, and dead for two independent reasons. Nothing calls
+   * esp_bt_gap_register_callback or esp_bt_gap_start_discovery anywhere in
+   * this firmware, and nothing could: NimBLE has no Bluetooth Classic
+   * support, and ensureBleStackReady() hands the Classic controller RAM
+   * back with esp_bt_controller_mem_release before the stack comes up.
+   *
+   * It is kept rather than deleted because DeviceInfo::isBLE, the btDevice
+   * argument to processNewDevice and this function are one design, and
+   * pulling one thread unravels a structure somebody may want when the
+   * stack question is answered. It is marked so nobody reads the menu entry
+   * and believes this device scans Classic. */
   static void btCallback(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param) {
     if (!snifferInstance) return;
     if (event == ESP_BT_GAP_DISC_RES_EVT) {
