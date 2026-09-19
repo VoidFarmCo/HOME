@@ -1,3 +1,4 @@
+#include "Eapol.h"
 #include "KeyboardUI.h"
 #include "SettingsStore.h"
 #include "Touchscreen.h"
@@ -394,6 +395,13 @@ uint32_t lastButtonTime;
 uint32_t tmpPacketCounter;
 uint32_t pkts[MAX_X];
 uint32_t deauths = 0;
+
+/* Eapol's tracker is plain C++ with no locking of its own, on purpose: that
+ * is what lets tools/check_eapol.py run it on a host. The promiscuous
+ * callback and the UI are different tasks, so the lock lives here instead. */
+portMUX_TYPE s_eapolMux = portMUX_INITIALIZER_UNLOCKED;
+uint32_t s_eapolFrames = 0;
+int      s_eapolUsable = 0;
 unsigned int ch = 1;
 int rssiSum;
 
@@ -528,6 +536,40 @@ void do_sampling_FFT() {
   tft.print("Packet:");
   tft.print(tmpPacketCounter);
 
+  /* Handshakes, right of the packet counter. Counted under the lock and
+   * drawn outside it -- a TFT write is far too long to hold a critical
+   * section for. */
+  int hsTotal = 0;
+  int hsUsable = 0;
+  portENTER_CRITICAL(&s_eapolMux);
+  hsTotal = Eapol::handshakeCount();
+  for (int i = 0; i < hsTotal; i++) {
+    const Eapol::Handshake* h = Eapol::handshakeAt(i);
+    if (h != nullptr && Eapol::usable(*h)) {
+      hsUsable++;
+    }
+  }
+  portEXIT_CRITICAL(&s_eapolMux);
+
+  tft.fillRect(162, 20, 76, 16, kPtmToolbarBg);
+  if (hsTotal > 0) {
+    tft.setCursor(165, 24);
+    tft.setTextColor(hsUsable > 0 ? TFT_GREEN : ORANGE);
+    tft.print("HS ");
+    tft.print(hsUsable);
+    tft.print("/");
+    tft.print(hsTotal);
+    tft.setTextColor(TFT_WHITE);
+  }
+
+  /* Say so once, when a network first has the pair worth having. The frames
+   * are already in the pcap; this is the operator's cue that they are. */
+  if (hsUsable > s_eapolUsable) {
+    s_eapolUsable = hsUsable;
+    Serial.printf("[EAPOL] %d network(s) with M2+M3, %lu key frames seen\n",
+                  hsUsable, (unsigned long)s_eapolFrames);
+  }
+
   delay(10);
 }
 
@@ -551,6 +593,23 @@ void wifi_promiscuous(void* buf, wifi_promiscuous_pkt_type_t type) {
   if (type == WIFI_PKT_MGMT && (pkt->payload[0] == 0xA0 || pkt->payload[0] == 0xC0 )) deauths++;
 
   if (type == WIFI_PKT_MISC) return;
+
+  /* Offered every frame that gets this far, and deliberately before the
+   * size limit below: whether a handshake is recognised should not depend on
+   * whether the frame happens to fit the capture. EAPOL frames are a couple
+   * of hundred bytes, so in practice both see them, but coupling the two
+   * would be a trap for whoever changes SNAP_LEN. */
+  {
+    const uint32_t now = millis();
+    portENTER_CRITICAL_ISR(&s_eapolMux);
+    const Eapol::Msg em =
+        Eapol::observe(pkt->payload, (uint16_t)ctrl.sig_len, now);
+    portEXIT_CRITICAL_ISR(&s_eapolMux);
+    if (em != Eapol::Msg::None) {
+      s_eapolFrames++;
+    }
+  }
+
   if (ctrl.sig_len > SNAP_LEN) return;
 
   const uint16_t packetLength = (uint16_t)ctrl.sig_len;
@@ -832,6 +891,11 @@ void ptmSetup() {
 void ptmLoop() {
 
   if (!s_ptmHwReady) {
+    portENTER_CRITICAL(&s_eapolMux);
+    Eapol::resetHandshakes();
+    portEXIT_CRITICAL(&s_eapolMux);
+    s_eapolFrames = 0;
+    s_eapolUsable = 0;
     ptmStartRadioAndPcapOnce();
     s_ptmHwReady = true;
     constexpr int kPtmWaitBodyTop = 40;

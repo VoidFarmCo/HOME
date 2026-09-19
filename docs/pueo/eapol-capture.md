@@ -1,9 +1,10 @@
 # EAPOL capture
 
 Scope for recognising WPA handshakes in frames this firmware can already
-record. Steps 1 to 3 of the phasing are built: the promiscuous filter hazard
-below, the locator, the classifier and the per-AP tracking. Nothing records
-or transmits yet, and nothing calls any of it.
+record. Steps 1 to 4 of the phasing are built: the filter hazard below, the
+locator, the classifier, the per-AP tracking, and Packet Monitor showing
+what it has. Nothing transmits, and step 5 -- forcing a reassociation -- is
+deliberately not built.
 
 Split deliberately into a passive half and an active one, because they are
 different decisions and only the first is in the spirit of what Spotter
@@ -66,6 +67,14 @@ callback, so the filter does not reach them.
 comfortably enough for EAPOL -- the largest key message runs to roughly 200
 bytes including headers -- but it is a ceiling worth knowing about before
 someone concludes frames are being mangled.
+
+It is also not a snapshot length in the usual sense. `wifi_promiscuous` does
+`if (ctrl.sig_len > SNAP_LEN) return;`, so a frame longer than the limit is
+**dropped rather than truncated**. A pcap snaplen normally means "record this
+much of it"; here it means "record it only if it is this small". The capture
+is therefore missing every large frame, silently, which matters more for a
+packet monitor than it does for EAPOL. Left alone for now, and recognition
+is hooked in ahead of that check so the two are not coupled.
 
 ## Finding the EAPOL frame
 
@@ -205,6 +214,17 @@ say so in a way that is easy to fix and hard to guess.
 3. **Done.** `classify`, `addresses` and the per-AP tracker, in the same
    file. `tools/check_eapol_locate.py` became `tools/check_eapol.py` and
    covers all of it: 120,301 checks.
+4. **Done.** Packet Monitor offers every frame to the tracker and shows
+   `HS <usable>/<total>` beside the packet counter, amber until a network
+   has M2 and M3 and green once one does, with a line on the serial console
+   when that first happens. The frames were already going to the pcap; this
+   is the part that says so. 1,224 bytes of flash and 392 of RAM, the latter
+   being sixteen rows of twenty-four bytes.
+
+   The tracker has no locking of its own, deliberately -- that is what lets
+   the checker run it on a host. The promiscuous callback and the UI are
+   different tasks, so the critical section lives in `wifi.cpp` around both,
+   with the counting done under it and the drawing outside.
 3. Key Information classification and the per-AP flags.
 4. Show the flags, and record to the existing pcap writer.
 5. Only then, and separately, the question of forcing a reassociation.
