@@ -1,9 +1,9 @@
 # EAPOL capture
 
 Scope for recognising WPA handshakes in frames this firmware can already
-record. Steps 1 and 2 of the phasing are built: the promiscuous filter
-hazard below, and the locator that finds the 802.1X payload. Nothing
-classifies, records or transmits yet.
+record. Steps 1 to 3 of the phasing are built: the promiscuous filter hazard
+below, the locator, the classifier and the per-AP tracking. Nothing records
+or transmits yet, and nothing calls any of it.
 
 Split deliberately into a passive half and an active one, because they are
 different decisions and only the first is in the spirit of what Spotter
@@ -119,6 +119,12 @@ endian, and three of its bits separate the messages:
 Marauder does bounds-check this one (`key_info_offset + 1 < len`). Credit
 where it is due, and attribution where it is required.
 
+One thing that table needs which Marauder does not do: **check the Key Type
+bit**. A group rekey carries Key Ack, Key MIC and Secure together, which is
+precisely the M3 pattern, so without that check a rekey on an idle network
+reads as two thirds of a handshake. Key Type set means pairwise; clear means
+group, and group is not what any of this is for.
+
 ## What to keep, and where
 
 Per access point rather than per frame, because the useful question is "do I
@@ -196,6 +202,9 @@ say so in a way that is easy to fix and hard to guess.
    Payload offsets come out 32, 34, 38 and 38 for 3-address, QoS,
    4-address and QoS-with-HT-Control; the fixed-offset version knows the
    first two. Nothing calls it yet.
+3. **Done.** `classify`, `addresses` and the per-AP tracker, in the same
+   file. `tools/check_eapol_locate.py` became `tools/check_eapol.py` and
+   covers all of it: 120,301 checks.
 3. Key Information classification and the per-AP flags.
 4. Show the flags, and record to the existing pcap writer.
 5. Only then, and separately, the question of forcing a reassociation.

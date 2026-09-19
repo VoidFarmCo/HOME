@@ -47,4 +47,61 @@ int headerLength(const uint8_t* frame, uint16_t len);
  */
 int findPayload(const uint8_t* frame, uint16_t len);
 
+/** Which message of the 4-way handshake a frame carries. */
+enum class Msg : uint8_t { None = 0, M1, M2, M3, M4 };
+
+/**
+ * Classify the EAPOL-Key frame whose 802.1X payload begins at `eapolOffset`,
+ * which comes from findPayload().
+ *
+ * Only EAPOL-Key packets are considered; EAP, Start and Logoff share the
+ * ethertype and carry no Key Information field. Three bits of that field
+ * separate the four messages -- see the table in Eapol.cpp.
+ */
+Msg classify(const uint8_t* frame, uint16_t len, int eapolOffset);
+
+/**
+ * Point `bssid` and `station` at the right addresses for this frame.
+ *
+ * Which of the three addresses is which depends on the DS bits, so it is
+ * read off them rather than guessed. Returns false for a WDS frame, where
+ * neither question has a single answer, and for a frame too short to hold
+ * three addresses.
+ */
+bool addresses(const uint8_t* frame, uint16_t len,
+               const uint8_t** bssid, const uint8_t** station);
+
+/* ── what has been seen, per access point ────────────────────────────────
+ *
+ * Kept per AP rather than per frame, because the useful question is whether
+ * there is a usable handshake for a network, not how many EAPOL frames went
+ * past. Nothing here writes to a card or draws anything; that is step 4.
+ */
+constexpr int kMaxHandshakes = 16;
+
+struct Handshake {
+  uint8_t  bssid[6];
+  uint8_t  station[6];
+  uint8_t  seen;      // bit 0 = M1, bit 1 = M2, bit 2 = M3, bit 3 = M4
+  uint32_t firstMs;
+  uint32_t lastMs;
+};
+
+/** Mask for `Handshake::seen`. Msg::None maps to 0. */
+uint8_t maskOf(Msg m);
+
+/**
+ * Offer a frame to the tracker. Does nothing unless it is an EAPOL-Key
+ * frame that classifies. Returns the message it was, so a caller can react
+ * without parsing again.
+ */
+Msg observe(const uint8_t* frame, uint16_t len, uint32_t nowMs);
+
+int              handshakeCount();
+const Handshake* handshakeAt(int i);
+void             resetHandshakes();
+
+/** True when M2 and M3 are both present, which is the pair worth having. */
+bool usable(const Handshake& h);
+
 }  // namespace Eapol
