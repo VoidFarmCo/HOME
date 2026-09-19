@@ -577,21 +577,98 @@ module can still be replaced, and solder the power modules directly since
 they will not be swapped. That splits the difference on height and keeps the
 part that actually fails serviceable.
 
-### Enclosure changes this implies
+### Enclosure changes: applied
 
-Not yet applied to `halehound_v3.scad`:
+Done in `docs/pueo/pueo-enclosure.scad`. Both parts still render manifold.
+
+The enclosure now lives in this repo. It was a loose file in the parent
+directory, tracked by nothing, while being the thing every dimension in this
+document is measured against. The copy here is authoritative; the old
+`halehound_v3.scad` alongside it is a duplicate that will drift.
 
 ```
-MODULES[1]   26 x 19  ->  27 x 17        TP4056 pocket
-MODULES[4]   28 x 27 at (24,-21)          GPS pocket: shrink and move to
+MODULES[1]   26 x 19  ->  27 x 17         TP4056 pocket
+MODULES[4]   28 x 27 at (24,-21)          GPS pocket shrunk and moved to
              ->  16 x 13 at (0, 52)       the corridor between the radios
-GPS_D 5      ->  7                        the antenna board is 6 mm deep
-                                          and will not fit a 5 mm recess
-USBC_W 20, USBC_HT 7  ->  micro-USB      ~8 x 3 mm jack, so the cutout is
-                                         oversized and mis-shaped
-per-module pockets    ->  flat PCB shelf  see the height section above
-SMA_Z 5.0             ->  recompute       once socket height is chosen
+GPS_D        5  ->  7                     the antenna board is 6 mm deep
+                                          and would not fit a 5 mm recess
+USBC_W/HT    20 x 7  ->  USB_W/HT 11 x 6  micro-USB, not Type-C; clears the
+                                          plug shell, not the overmould
+SMA_Z        5.0  ->  derived             now a formula, see below
+NFC_INDEX    5  ->  looked up by name     reordering MODULES can no longer
+                                          point the thin floor at the wrong part
 ```
+
+Housekeeping picked up along the way: the header said `85 x 140 x 20` while
+`L = 170`, and it still said HALEHOUND. Both fixed. Part names in MODULES
+now match the netlist (`ATGM336H GPS`, `MP2307 buck`).
+
+Pockets left deliberately oversized, with a comment saying so: MT3608 36 x 17
+for a part that may be 30 mm, CC1101 15 x 40 for a 15 x 38, NRF24 16 x 41 for
+a 15.5 x 41, buck 20 x 12 for a 17.9 x 12. `pockets()` adds a further 0.6 mm
+to each dimension, which is worth knowing -- the NRF24's length clearance is
+0.6 mm rather than the zero the nominal numbers imply. Still tight for FDM,
+so still worth a test print, but not the interference it looked like.
+
+### SMA_Z is now derived, and it is not 5.0
+
+The old value was asserted. It cannot be: both radios carry their own
+edge-mounted SMA, so the bulkhead height is wherever the module's connector
+ends up once the module is stacked on a carrier board.
+
+```
+SMA_Z = STANDOFF_H + PCB_T + SOCKET_H + MOD_PCB_T + SMA_AXIS_H
+```
+
+`MOD_PCB_T` (1.0) and `SMA_AXIS_H` (2.5) are marked `[VERIFY]` -- they need
+the radio modules in hand. With the current values and the radios soldered
+down, OpenSCAD echoes **SMA_Z = 7.6 mm**, against the 5.0 the case was cut
+for. The bulkheads move up 2.6 mm.
+
+### Still open: the carrier cannot be a flat plane
+
+The remaining delta was "per-module pockets -> flat PCB shelf". It did not
+get applied, because working through it surfaced a problem that a shelf
+parameter does not solve.
+
+The interior is 80 x 165, which is exactly the carrier outline. So a
+full-span board covers the battery pocket at (-16, -23) completely. The
+battery is a physical object with a thickness nobody has measured yet -- a
+2000 mAh 1S pouch is typically 6 to 10 mm -- and it has to be either under
+the board, on top of it, or through it.
+
+Under it means the standoff grows to the battery's thickness, and everything
+above rises with it:
+
+```
+  standoff   socket   SMA_Z    hole spans      18 mm cavity
+     2.5       0       7.6     4.35 .. 10.85   ok     through-hole leads only
+     2.5       5.0    12.6     9.35 .. 15.85   ok
+     7.0       0      12.1     8.85 .. 15.35   ok     6 mm battery underneath
+     7.0       5.0    17.1    13.85 .. 20.35   over
+    11.0       0      16.1    12.85 .. 19.35   over   10 mm battery underneath
+```
+
+A 6 mm cell under the board works only with the radios soldered down. A
+10 mm cell does not work at all -- the SMA holes run out through the top of
+the base.
+
+Which is the same shape of problem as the PN532: two things want to be at
+floor level and the board is in the way. One answer covers both. **The
+carrier wants to be a frame, not a plane** -- cut out the battery footprint
+and the PN532 footprint, let both sit on the floor where the case already
+has pockets and a thinned NFC window for them, and keep the standoff at the
+2.5 mm that through-hole leads need. That holds SMA_Z at 7.6 and keeps NFC
+range.
+
+The cost is structural: two large holes, 45 x 34 and 43 x 41, in an 80 mm
+wide board. Whether what is left is stiff enough to carry a screwed-down
+lid is a question for the layout, not for the enclosure.
+
+This needs a decision and a measured battery before the base geometry
+changes. Until then the per-module pockets stay, which is the conservative
+state -- they are correct if the modules sit on the floor, and harmless
+extra clearance if they do not.
 
 MT3608 keeps its 36 x 17 pocket: if the board is really 30 mm the pocket is
 6 mm oversized, which is slack rather than interference, and oversizing is
