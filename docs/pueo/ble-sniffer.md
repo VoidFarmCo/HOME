@@ -99,8 +99,38 @@ Sniffer, where it bought nothing and has been turned off.
 
 A live list of nearby BLE devices with addresses, names, service UUIDs,
 iBeacon UUIDs, RSSI and how often each is heard. That part works and is
-useful. It overlaps heavily with **BLE Scanner**, and neither name says how
-they differ.
+useful.
 
 The two alerts are the part to distrust. On current thresholds they are not
 detections; they are a count of how long you have been standing there.
+
+## How it differs from BLE Scanner
+
+Neither name says, so:
+
+| | Sniffer | BLE Scanner |
+|---|---|---|
+| scan | continuous | one shot, 5 s, rescan on demand |
+| output | scrolling event log | paged list, then a per-device detail view |
+| detail | none | name, MAC, RSSI, TX power, service UUID, manufacturer and service data |
+| alerts | two, both unreliable | none |
+| Classic | dead code for it | none attempted |
+
+Scanner is the one to reach for when the question is "what is that device".
+Sniffer is for watching arrivals and departures over time, provided the two
+alerts are read as noise.
+
+Scanner had two rendering bugs of its own, now fixed:
+
+**Manufacturer and service data were drawn as text.**
+`String((char*)device.getManufacturerData().c_str())` stops at the first
+zero byte. Apple's company identifier is `4C 00`, so **every Apple device
+displayed as the single letter `L`** and nothing else -- and Apple devices
+are most of what is interesting in a BLE scan. Microsoft's `06 00` fared no
+better. Both fields are hex now, capped at eleven bytes with a `..` marker,
+which is what the row holds.
+
+**TX power was printed unguarded.** The three fields below it check
+`have…()` first; this one did not, so with no advertised value it printed
+whatever the library had left in the field, which reads as a measurement and
+is not one. It now says `not advertised`.

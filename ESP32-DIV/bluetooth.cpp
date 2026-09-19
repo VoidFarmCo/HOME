@@ -3504,6 +3504,40 @@ static int bleDevicesPerPage() {
   return (bleListBottomY() - LIST_FIRST_ROW_Y) / LIST_ROW_H;
 }
 
+
+/* Manufacturer data and service data are arbitrary bytes, and they were
+ * being drawn as if they were text:
+ *
+ *     String((char*)device.getManufacturerData().c_str())
+ *
+ * which stops at the first zero byte and sends whatever else is in there
+ * to the screen as characters. Apple's company identifier is 4C 00, so
+ * every Apple device in range rendered as the single letter "L" and
+ * nothing after it -- and that is most of the interesting devices.
+ *
+ * Hex, truncated to what the line holds, with a marker when there is more.
+ * The row starts at x=10 on a 240 px screen at 6 px a character, so it holds
+ * thirty-eight; the caption takes fourteen, leaving twenty-four for eleven
+ * bytes and the two-character marker. */
+static String hexPreview(const std::string& raw, size_t maxBytes) {
+  const size_t n = raw.size();
+  if (n == 0) {
+    return String("-");
+  }
+  const size_t shown = (n > maxBytes) ? maxBytes : n;
+  String out;
+  out.reserve(shown * 2 + 2);
+  char pair[3];
+  for (size_t i = 0; i < shown; i++) {
+    snprintf(pair, sizeof(pair), "%02X", (uint8_t)raw[i]);
+    out += pair;
+  }
+  if (n > shown) {
+    out += "..";
+  }
+  return out;
+}
+
 static void bleScanClearBody() {
   const int h = bleContentBottom() - 37;
   if (h > 0) {
@@ -3817,7 +3851,6 @@ void displayBLEDetails() {
   String deviceName = device.getName().length() > 0 ? device.getName().c_str() : "Unknown Device";
   String address = device.getAddress().toString().c_str();
   int rssi = device.getRSSI();
-  int txPower = device.getTXPower();
 
   tft.setTextColor(WHITE, TFT_BLACK);
   tft.setTextSize(1);
@@ -3833,7 +3866,14 @@ void displayBLEDetails() {
   tft.print("RSSI: " + String(rssi) + " dBm");
   y += 20;
   tft.setCursor(10, y);
-  tft.print("Tx Power: " + String(txPower) + " dBm");
+  /* Guarded like the three fields below it, which it was not. Without an
+   * advertised value this printed whatever the library leaves in the
+   * field, which reads as a measurement and is not one. */
+  if (device.haveTXPower()) {
+    tft.print("Tx Power: " + String((int)device.getTXPower()) + " dBm");
+  } else {
+    tft.print("Tx Power: not advertised");
+  }
 
   if (device.haveServiceUUID()) {
     y += 20;
@@ -3845,20 +3885,18 @@ void displayBLEDetails() {
     tft.print("No Service UUID");
   }
   if (device.haveManufacturerData()) {
-    String manufacturerData = String((char*)device.getManufacturerData().c_str());
     y += 20;
     tft.setCursor(10, y);
-    tft.print("Manufacturer: " + manufacturerData);
+    tft.print("Manufacturer: " + hexPreview(device.getManufacturerData(), 11));
   } else {
     y += 20;
     tft.setCursor(10, y);
     tft.print("No Manufacturer Data");
   }
   if (device.haveServiceData()) {
-    String serviceData = String((char*)device.getServiceData().c_str());
     y += 30;
     tft.setCursor(10, y);
-    tft.print("Service Data: " + serviceData);
+    tft.print("Service Data: " + hexPreview(device.getServiceData(), 11));
   } else {
     y += 30;
     tft.setCursor(10, y);
