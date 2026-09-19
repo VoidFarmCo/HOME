@@ -163,6 +163,15 @@ Initial targets: SubGHz capture/replay, NFC read/clone, GPS wardriving, jam
 detection. Everything else upstream ships stays compiled but untested on this
 hardware.
 
+Two deliberate calls on what to carry:
+
+**IR is gone.** There is no IR LED and no receiver on this board, so it was
+140 KB that could never run. See the size note under Building.
+
+**Ducky/BadUSB stays.** It is 1476 lines and outside the initial targets, but
+BLE HID needs no hardware Pueo does not already have, so unlike IR it
+actually works here. Kept on purpose, not by neglect.
+
 ## Changes so far
 
 - `board_pueo.h` — board profile, resolving all pin conflicts
