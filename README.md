@@ -22,8 +22,8 @@ and clone, GPS wardriving, and jam detection.
 ## Lineage
 
 Pueo is a fork of **[ESP32-DIV](https://github.com/cifertech/ESP32-DIV) by
-CiferTech**, MIT licensed and staying that way. Nearly every feature here is
-theirs; go star the original.
+CiferTech**, which is MIT. This fork is GPL-3.0-or-later. Nearly every
+feature here is theirs; go star the original.
 
 Forked at `90f7967c4dc7bcd8c09ebdcf421886737516ddc2` (upstream main,
 2026-09-01, eleven commits past `v1.7.2`). Upstream is kept as a read-only
@@ -130,8 +130,19 @@ Mostly the parts that decide whether the hardware works at all:
 
 ## License
 
-MIT. Copyright (c) 2023 CiferTech — see [LICENSE](LICENSE), which is
-unchanged. The MIT notice stays with any redistribution.
+**GPL-3.0-or-later** for this fork's own code — see [LICENSE](LICENSE).
+
+Upstream is MIT, Copyright (c) 2023 CiferTech, kept verbatim in
+[LICENSE.MIT](LICENSE.MIT). Those portions stay available under MIT from
+upstream, and the notice travels with any redistribution of this tree.
+
+> **Before you redistribute a compiled image, read
+> [docs/pueo/licensing.md](docs/pueo/licensing.md).** The firmware links
+> RF24 (GPL-2.0-*only*) alongside arduinoFFT (GPL-3.0-or-later) and
+> NimBLE-Arduino (Apache-2.0), and those cannot lawfully be combined in one
+> binary. The source is fine; the merged image is not, and has not been
+> since 0.1.0. It is inherited from upstream's dependency set, and
+> relicensing does not fix it.
 
 ## Credits
 

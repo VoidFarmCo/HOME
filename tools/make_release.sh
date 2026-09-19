@@ -42,6 +42,7 @@ INCLUDE=(
   "art"
   "PUEO.md"
   "LICENSE"
+  "LICENSE.MIT"
   ".gitignore"
   "tools/build.sh"
   "tools/make_release.sh"

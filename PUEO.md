@@ -7,7 +7,8 @@ an ATGM336H for GPS, in a printed enclosure zoned to keep the radios
 apart. It
 covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
 clone, GPS wardriving and jam detection. It is a fork of CiferTech's
-ESP32-DIV, MIT licensed and staying that way, diverging mainly in the parts
+ESP32-DIV, which is MIT; this fork is GPL-3.0-or-later. It diverges mainly
+in the parts
 that decide whether the hardware works at all: a board profile that resolves
 the pin conflicts in the stock CYD map, a single owner for the SPI bus that
 the display, SD card and all three radios share, and a build that compiles
@@ -25,10 +26,23 @@ remote for cherry-picking, but Pueo no longer tracks it.
 
 ## Licensing
 
-Upstream is **MIT**, not GPL. Copyright (c) 2023 CiferTech; see `LICENSE`,
-which stays as-is. Publishing binaries carries no source-disclosure obligation,
-and the fork can be licensed however you like as long as the MIT notice is
-retained.
+This fork's own code is **GPL-3.0-or-later**; see `LICENSE`. Upstream is
+**MIT**, Copyright (c) 2023 CiferTech, and that notice is kept verbatim in
+`LICENSE.MIT`. Those portions remain available under MIT from upstream, and
+the notice travels with any redistribution of this tree.
+
+An earlier version of this section said that publishing binaries carries no
+source-disclosure obligation. **That was wrong.** It was true of upstream's
+own code and false of the thing that actually gets published: the merged
+image links RF24, which is GPL-2.0-*only*, and arduinoFFT, which is
+GPL-3.0-or-later, and those two cannot lawfully be combined in one binary at
+all. Apache-2.0 NimBLE-Arduino conflicts with RF24 for a second reason.
+
+The source archive is unaffected. The merged binary is not distributable
+under any single licence and has not been since 0.1.0. It is a problem
+inherited from upstream's dependency set rather than created here, and it is
+not fixed by relicensing — read `docs/pueo/licensing.md` before publishing
+another image, which sets out what the options cost.
 
 ## Layout
 
