@@ -9,6 +9,26 @@
 
 
 namespace {
+  /* One list, because there were two.
+   *
+   * replayat and subjammer each carried an identical copy of this array.
+   * Nothing kept them in step: adding a frequency to one left the other
+   * quietly disagreeing, and the two features would then be tuning to
+   * different things from the same index. Same class of drift that
+   * gen_netlist.py exists to stop on the pin map.
+   *
+   * What is deliberately NOT shared is the index into it. replayat and
+   * subjammer keep their own currentFrequencyIndex, of different types and
+   * with different defaults -- the jammer starts at 315 MHz, the replay at
+   * 300 -- because each feature remembers where the operator left it. */
+  const uint32_t subghz_frequency_list[] = {
+      300000000, 303875000, 304250000, 310000000, 314000000, 315000000,
+      318000000, 390000000, 418000000, 433075000, 433420000, 433920000,
+      434420000, 434775000, 438900000, 868350000, 915000000, 925000000
+  };
+  constexpr size_t kSubghzFreqCount =
+      sizeof(subghz_frequency_list) / sizeof(subghz_frequency_list[0]);
+
   static constexpr const char* SUBGHZ_DIR = "/subghz";
   static constexpr const char* SUBGHZ_EXPORT_PREFIX = "/subghz/profiles_";
   static constexpr const char* SUBGHZ_CURRENT_PATH = "/subghz/profiles_current.bin";
@@ -528,12 +548,6 @@ uint32_t receivedValue = 0;
 uint16_t receivedBitLength = 0;
 uint16_t receivedProtocol = 0;
 const int rssi_threshold = -75;
-
-static const uint32_t subghz_frequency_list[] = {
-    300000000, 303875000, 304250000, 310000000, 314000000, 315000000,
-    318000000, 390000000, 418000000, 433075000, 433420000, 433920000,
-    434420000, 434775000, 438900000, 868350000, 915000000, 925000000
-};
 
 uint16_t currentFrequencyIndex = 0;
 int yshift = 20;
@@ -2314,12 +2328,7 @@ bool autoMode = false;
 unsigned long lastSweepTime = 0;
 const unsigned long sweepInterval = 1000;
 
-static const uint32_t subghz_frequency_list[] = {
-    300000000, 303875000, 304250000, 310000000, 314000000, 315000000,
-    318000000, 390000000, 418000000, 433075000, 433420000, 433920000,
-    434420000, 434775000, 438900000, 868350000, 915000000, 925000000
-};
-const int numFrequencies = sizeof(subghz_frequency_list) / sizeof(subghz_frequency_list[0]);
+const int numFrequencies = (int)kSubghzFreqCount;
 int currentFrequencyIndex = 5;
 float targetFrequency = subghz_frequency_list[currentFrequencyIndex] / 1000000.0;
 
