@@ -739,6 +739,36 @@ Both radio pockets stand as cut. CC1101 15 x 40 against a 15 x 38 module,
 NRF24 16 x 41 against 15.5 x 41 -- tight on the NRF24's length with no
 slack at all, so that one is worth a test print before committing.
 
+### The NRF24 fit test
+
+`docs/pueo/nrf24-fit-test.scad` is that test print. It renders two parts.
+
+`PART="ladder"` is a 100.5 x 55 x 4 plate carrying five pockets at 0.2,
+0.4, 0.6, 0.8 and 1.0 mm of total clearance over a 15.5 x 41 module, each
+labelled and each with a window through the floor to push the module back
+out. The smallest pocket the module seats into flat, without forcing, is
+what this printer needs. Print this one first; it is flat and quick and it
+answers the question on its own.
+
+For reference, the pocket as currently cut is 16.6 x 41.6 -- `pockets()`
+adds 0.6 to the 16 x 41 in `MODULES`. Against a 15.5 x 41 module that is
+1.1 mm of clearance across the width and 0.6 along the length, so the
+ladder's 0.6 rung is the closest thing to the shipping geometry. If even
+the 1.0 rung is tight, the `MODULES` entry has to grow rather than the
+kerf.
+
+`PART="insitu"` is a 36.5 x 51 x 15 slice of the base around the pocket,
+taken as an `intersection()` with `base()` itself rather than redrawn, so
+it cannot drift from the real part. It carries the top wall with the SMA
+bulkhead bore at its derived height, the corner boss at (36.5, 70), and
+slivers of the GPS and PN532 pockets where they cross the cut. Print it
+second, to check that the module's edge-mounted SMA actually lines up with
+the bulkhead hole -- which is the half of "does the NRF24 fit" that the
+ladder cannot answer.
+
+Neither coupon changes the enclosure. Whatever the ladder says still has
+to be applied to `pockets()` by hand.
+
 ## Before laying anything out
 
 **Build it by hand first and bring it up.** A PCB freezes the pin map, and

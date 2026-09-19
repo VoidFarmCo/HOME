@@ -19,6 +19,8 @@
 //
 //  In the GUI: edit PART below, or open the Customizer
 //  (Window > Customizer) and pick it there.
+//
+//  magikh0e.pl
 // =====================================================
 
 /* ---------- envelope ---------- */
