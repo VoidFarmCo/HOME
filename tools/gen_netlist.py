@@ -47,7 +47,10 @@ def to_kicad(x, y):
 # From halehound_v3.scad MODULES[]: (name, refdes, x, y, w, h)
 MODULES = [
     ("MT3608 boost",   "U1",  -19.0, -65.0, 36, 17),
-    ("TP4056 charger", "U2",   26.6, -62.0, 26, 19),
+    # 27 x 17 measured off the module, not the 26 x 19 the enclosure
+    # assumes. Mounted rotated 180 deg from the usual photo so the USB
+    # jack faces +X, out through the right wall.
+    ("TP4056 charger", "U2",   26.6, -62.0, 27, 17),
     ("3.3V buck",      "U3",  -29.0, -48.0, 20, 12),
     ("LiPo pack",      "BT1", -16.0, -23.0, 45, 34),
     ("GT-U7 GPS",      "J5",   24.0, -21.0, 28, 27),
@@ -67,14 +70,24 @@ USBC_Y = -62.0              # scad USBC_Y, right wall
 NETS = [
     ("GND", [("J1", "1"), ("J1", "2"), ("J1", "14"),
              ("J2", "GND"), ("J3", "GND"), ("J4", "GND"), ("J5", "GND"),
-             ("U1", "GND"), ("U2", "GND"), ("U3", "GND"), ("BT1", "-"),
+             ("U1", "GND"), ("U2", "OUT-"), ("U3", "GND"),
              ("R1", "-"), ("C1", "2"), ("C2", "2"), ("C3", "2"),
              ("C4", "2"), ("C5", "2"), ("C6", "2"), ("C7", "2"),
              ("TP5", "1")],
-     "ground pour both layers, except under the PN532 coil"),
+     "system ground is the PROTECTED side, U2.OUT-. Pour both layers except under the PN532 coil"),
 
-    ("VBAT", [("BT1", "+"), ("U2", "BAT"), ("U1", "VIN"), ("U3", "VIN")],
-     "1S LiPo, 1.0 mm trace"),
+    # The protection MOSFETs on this module sit in the NEGATIVE line, between
+    # B- and OUT-. So the battery hangs off B+/B- and the whole system takes
+    # its supply and its ground from OUT+/OUT-. Wiring the load to B+ and
+    # putting BT1's negative on the common ground -- which is what this
+    # netlist did first -- runs the load around the protection entirely, and
+    # over-discharge cutoff silently stops existing.
+    ("VBAT",     [("BT1", "+"), ("U2", "B+")],
+     "battery positive into the protection, 1.0 mm trace"),
+    ("BATT_NEG", [("BT1", "-"), ("U2", "B-")],
+     "battery negative. ONLY these two nodes: it is not system ground"),
+    ("+VSYS",    [("U2", "OUT+"), ("U1", "VIN"), ("U3", "VIN")],
+     "protected battery rail feeding both converters, 1.0 mm trace"),
 
     ("+5V_SW", [("U1", "VOUT"), ("J1", "3"), ("J4", "VCC"),
                 ("C6", "1"), ("TP1", "1")],
@@ -136,7 +149,10 @@ BOM = [
     ("J4",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
     ("J5",  1, "Header 1x5 2.54mm", "GT-U7 GPS [verify pinout]"),
     ("U1",  1, "MT3608 boost module", "VBAT -> 5V, size for 1 A continuous"),
-    ("U2",  1, "TP4056 + protection", "USB-C, 1 A charge"),
+    ("U2",  1, "TP4056 + DW01/FS8205 protection, 27x17mm",
+     "micro-USB, 1 A charge (module R3, typically 1.2k). Load on OUT+/OUT-, "
+     "not B+. Protection trips ~3 A, above the 1.6 A peak. IN+/IN- pads are "
+     "an alternate supply if USB is ever dropped"),
     ("U3",  1, "3.3V buck module", "separate RF rail, 500 mA"),
     ("BT1", 1, "1S LiPo, 2000 mAh", "~2 h at 600 mA average"),
     ("R1",  1, "1k 0805", "GPS TX series, contention limit on GPIO 1"),

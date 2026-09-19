@@ -241,6 +241,50 @@ there is little room to move anything without revisiting the enclosure.
 on the machine that generated it. `netlist.txt` is the deliverable; the
 `.net` is a convenience that may need hand-fixing.
 
+## What the first datasheet changed
+
+The TP4056 module, photographed and measured, disagreed with three
+assumptions. Two were paperwork. One was an electrical fault.
+
+**It is micro-USB, not USB-C.** Both the BOM and the enclosure said Type-C.
+
+**It is 27 x 17 mm, not 26 x 19.** The enclosure pocket is wrong in both
+axes, and it mounts rotated 180 degrees from how it is usually photographed
+so the jack faces +X and reaches the right wall.
+
+**The load was wired around the protection circuit.** This is the one that
+mattered. On these boards the DW01/FS8205 protection MOSFETs sit in the
+*negative* line, between `B-` and `OUT-`:
+
+```
+  BT1 + ────────────► B+            OUT+ ────► U1.VIN, U3.VIN
+  BT1 - ────────────► B-   [FETs]   OUT- ────► system ground
+```
+
+`B-` and `OUT-` are not the same node. The first netlist put the battery
+negative on the common ground net and took the converters off `B+`, which
+runs the entire load around the protection. Charging would have worked,
+over-current would have worked, and **over-discharge cutoff would silently
+not exist** — the failure mode being a flat lithium cell taken below 2.5 V
+because nothing was watching.
+
+Now `VBAT`/`BATT_NEG` reach only the battery and the module, and everything
+else hangs off `+VSYS` and a ground that is `OUT-`.
+
+Worth generalising: the enclosure was laid out from module outlines, and an
+outline tells you nothing about which terminal is which. Expect the other
+datasheets to move things too.
+
+### Enclosure changes this implies
+
+Not yet applied to `halehound_v3.scad`:
+
+```
+MODULES[1]   26 x 19  ->  27 x 17        TP4056 pocket
+USBC_W 20, USBC_HT 7  ->  micro-USB      ~8 x 3 mm jack, so the cutout is
+                                         oversized and mis-shaped
+```
+
 ## Before laying anything out
 
 **Build it by hand first and bring it up.** A PCB freezes the pin map, and
