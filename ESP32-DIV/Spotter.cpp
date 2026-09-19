@@ -42,6 +42,16 @@ bool     s_dirty    = true;
  * drawing from the callback. */
 portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 
+/* FNV-1a. Cheap, well distributed, and deliberately not cryptographic:
+ * nothing here depends on it being hard to collide on purpose, only on it
+ * separating the element sets that occur in practice. */
+constexpr uint32_t kFnvBasis = 2166136261u;
+constexpr uint32_t kFnvPrime = 16777619u;
+
+inline uint32_t fnv1a(uint32_t h, uint8_t b) {
+  return (h ^ b) * kFnvPrime;
+}
+
 bool prefixMatch(const char* s, const char* prefix) {
   if (!s || !prefix) {
     return false;
@@ -71,6 +81,26 @@ Hit* findOrAdd(const uint8_t* mac, bool viaBle) {
   h.label = "?";
   h.rssiBest = -127;
   return &h;
+}
+
+/* Attach a fingerprint to a row that already exists.
+ *
+ * Deliberately does not create one. Every device in the air has an element
+ * set, so creating rows here would fill all 48 with passing handsets before
+ * anything interesting arrived. Rows are still created only by a signature
+ * matching; this annotates them with something that outlives their address. */
+void noteFingerprint(const uint8_t* mac, uint32_t fp) {
+  portENTER_CRITICAL(&s_mux);
+  for (int i = 0; i < s_hitCount; i++) {
+    if (memcmp(s_hits[i].mac, mac, 6) == 0) {
+      if (s_hits[i].fingerprint != fp) {
+        s_hits[i].fingerprint = fp;
+        s_dirty = true;
+      }
+      break;
+    }
+  }
+  portEXIT_CRITICAL(&s_mux);
 }
 
 /* Record a match. A second, different signature on the same device promotes
@@ -150,45 +180,102 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
    * a zero-length SSID is a wildcard probe, and those carry the full element
    * set that fingerprinting will want. See docs/pueo/ie-fingerprinting.md.
    *
-   * Detections are unchanged by this: the SSID table is still matched
-   * against a non-empty SSID and nothing else consumes the walk yet. */
+   * The same pass builds the fingerprint. Which bytes go into it is the
+   * whole question, and the answer is in docs/pueo/ie-fingerprinting.md:
+   * every element's id, because presence and order are decided by the
+   * chipset and driver; contents only where they are a property of the
+   * device rather than of this particular probe. */
   const uint16_t ieStart = (subtype == 0x40) ? 24 : 36;
 
   const uint8_t* ssidVal = nullptr;
   uint8_t        ssidLen = 0;
+
+  uint32_t fp     = kFnvBasis;
+  int      hashed = 0;
 
   uint32_t off = ieStart;
   for (int seen = 0; seen < kMaxIes; seen++) {
     if (off + 2u > len) {
       break;                            // no room for an id and a length
     }
-    const uint8_t id   = p[off];
-    const uint8_t ilen = p[off + 1];
+    const uint8_t  id   = p[off];
+    const uint8_t  ilen = p[off + 1];
     if (off + 2u + ilen > len) {
       break;                            // claims more than the frame holds
     }
+    const uint8_t* val = p + off + 2;
 
     if (id == 0x00 && ssidVal == nullptr) {
-      ssidVal = p + off + 2;
+      ssidVal = val;
       ssidLen = ilen;
+    }
+
+    /* The id always goes in: that an element is present, and where in the
+     * order it sits, is signal on its own. */
+    fp = fnv1a(fp, id);
+    hashed++;
+
+    switch (id) {
+      case 0x00:   // SSID -- the one field that varies between probes from
+      case 0x03:   // one device, and DS Param, which is the current channel
+        break;     // and Spotter hops channels every 260 ms
+
+      case 0xDD: { // vendor specific: whose element it is, not what it says.
+        const uint8_t n = (ilen < 4) ? ilen : 4;   // OUI plus vendor type
+        for (uint8_t k = 0; k < n; k++) {
+          fp = fnv1a(fp, val[k]);
+        }
+        break;
+      }
+
+      case 0xFF:   // element extension: the extension id identifies it
+        if (ilen >= 1) {
+          fp = fnv1a(fp, val[0]);
+        }
+        break;
+
+      case 0x01:   // supported rates
+      case 0x2D:   // HT capabilities
+      case 0x32:   // extended supported rates
+      case 0x7F:   // extended capabilities
+      case 0xBF:   // VHT capabilities
+        for (uint8_t k = 0; k < ilen; k++) {
+          fp = fnv1a(fp, val[k]);
+        }
+        break;
+
+      default:
+        break;     // id alone
     }
 
     off += 2u + ilen;
   }
 
-  if (ssidVal == nullptr || ssidLen == 0 || ssidLen > 32) {
-    return;                             // wildcard probe, or no SSID element
+  /* 0 means "no fingerprint", so a real hash that lands on it is nudged.
+   * One value in four billion, and cheaper than carrying a valid flag. */
+  if (hashed == 0) {
+    fp = 0;
+  } else if (fp == 0) {
+    fp = 1;
   }
 
-  char ssid[33];
-  memcpy(ssid, ssidVal, ssidLen);
-  ssid[ssidLen] = '\0';
+  if (ssidVal != nullptr && ssidLen > 0 && ssidLen <= 32) {
+    char ssid[33];
+    memcpy(ssid, ssidVal, ssidLen);
+    ssid[ssidLen] = '\0';
 
-  for (size_t i = 0; i < kSsidSigCount; i++) {
-    if (prefixMatch(ssid, kSsidSigs[i].prefix)) {
-      record(src, rssi, kSsidSigs[i].kind, kSsidSigs[i].conf, kSsidSigs[i].label, false);
-      break;
+    for (size_t i = 0; i < kSsidSigCount; i++) {
+      if (prefixMatch(ssid, kSsidSigs[i].prefix)) {
+        record(src, rssi, kSsidSigs[i].kind, kSsidSigs[i].conf, kSsidSigs[i].label, false);
+        break;
+      }
     }
+  }
+
+  /* Last, so that a row created by either the OUI or the SSID match above
+   * gets annotated in the same frame that created it. */
+  if (fp != 0) {
+    noteFingerprint(src, fp);
   }
 }
 
@@ -338,6 +425,15 @@ void drawList() {
              h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
              h.viaBle ? "BLE" : "WiFi", (int)h.rssiBest, (unsigned)h.hits);
     tft.drawString(line, 8, y + 11);
+
+    /* The fingerprint is here to be written down: it is what a signature
+     * table gets built out of, and there is nothing to match it against
+     * yet. BLE rows never have one. */
+    if (h.fingerprint != 0) {
+      tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+      snprintf(line, sizeof(line), "fp %08lX", (unsigned long)h.fingerprint);
+      tft.drawString(line, 8, y + 21);
+    }
 
     if (h.corroborated) {
       tft.setTextColor(TFT_RED, TFT_BLACK);

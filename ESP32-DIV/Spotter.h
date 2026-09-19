@@ -43,6 +43,10 @@ struct Hit {
   uint16_t hits;
   bool     viaBle;      // false = seen on WiFi
   bool     corroborated; // matched on more than one signature
+  /* Hash of the device's probe-request element set, or 0 if none has been
+   * seen. Survives the MAC changing, which the address above does not.
+   * WiFi only; a BLE row never has one. See docs/pueo/ie-fingerprinting.md. */
+  uint32_t fingerprint;
 };
 
 /* Feature entry points, following the shape every other module here uses. */

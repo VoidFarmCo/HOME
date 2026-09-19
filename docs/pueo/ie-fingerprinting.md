@@ -1,8 +1,11 @@
 # Probe-request IE fingerprinting
 
-Scope for a Spotter detection path that survives MAC randomisation. Nothing
-here is built yet. This is the design and, more importantly, the reason the
-signature table has to start empty.
+Scope for a Spotter detection path that survives MAC randomisation, and the
+reason its signature table has to start empty.
+
+Steps 1 and 2 of the phasing at the end are built: the walk, the hash, and
+the fingerprint on screen. Nothing matches against it yet, and nothing can
+until there are captures to match against.
 
 ## Why
 
@@ -35,28 +38,41 @@ A probe request is a fixed 24-byte header followed by tagged elements, each
 
 | id | element | in the hash |
 |---|---|---|
-| `0x00` | SSID | **no** |
-| `0x01` | Supported Rates | yes, with contents |
-| `0x03` | DS Parameter Set | **no** |
-| `0x2D` | HT Capabilities | yes, with contents |
-| `0x32` | Extended Supported Rates | yes, with contents |
-| `0x7F` | Extended Capabilities | yes, with contents |
-| `0xBF` | VHT Capabilities | yes, with contents |
-| `0xDD` | Vendor Specific | yes, OUI and type only |
-| `0xFF` | Element Extension | yes, ext id only |
+| `0x00` | SSID | id only |
+| `0x01` | Supported Rates | id and contents |
+| `0x03` | DS Parameter Set | id only |
+| `0x2D` | HT Capabilities | id and contents |
+| `0x32` | Extended Supported Rates | id and contents |
+| `0x7F` | Extended Capabilities | id and contents |
+| `0xBF` | VHT Capabilities | id and contents |
+| `0xDD` | Vendor Specific | id, OUI and vendor type |
+| `0xFF` | Element Extension | id and extension id |
+| anything else | | id only |
 
 The fingerprint is a hash over that sequence, in the order the elements
 actually appear, because order is itself part of the signature.
 
-Two exclusions matter more than any of the inclusions.
+Every element contributes its id, including the two below: that an element
+is present at all, and where it sits in the order, is decided by the driver
+and is signal on its own. What the two below do not contribute is contents,
+and those two exclusions matter more than any of the inclusions.
 
-**SSID must not be in the hash.** It is the thing that varies between two
-probes from the same device, and it is already matched separately. Including
-it would produce a fingerprint per network name rather than per device.
+**The SSID's contents must not be in the hash.** It is the one field that
+varies between two probes from the same device, and it is already matched
+separately. Including it would produce a fingerprint per network name rather
+than per device -- and a wildcard probe would not match a directed one from
+the same radio.
 
-**DS Parameter Set must not be in the hash.** It carries the current
-channel, and Spotter hops channels every 260 ms. Including it would give the
-same camera up to thirteen different fingerprints.
+**The DS Parameter Set's contents must not be in the hash.** It carries the
+current channel, and Spotter hops channels every 260 ms. Including it would
+give the same camera up to thirteen different fingerprints.
+
+(The first draft of this document excluded both elements outright, ids and
+all. That is worse: whether a device emits a DS Parameter Set in a probe at
+all is stable per driver, and throwing the id away throws that away with the
+channel. `tools/fuzz_ie_walk.py` holds the distinction to account -- it
+asserts that changing the SSID or the channel leaves the fingerprint alone
+while changing the supported rates moves it.)
 
 For vendor-specific elements only the 3-byte OUI and the vendor type go in,
 not the payload. The payload of a WPS or Apple element carries device state
@@ -69,11 +85,10 @@ cryptographic.
 
 ## Where it lands
 
-`onPacket` in `Spotter.cpp`, and it needs that function restructured before
-it can go in.
+`onPacket` in `Spotter.cpp`, which had to be restructured first.
 
-Today the flow is: match the OUI, then find the SSID element, then match the
-SSID. The SSID step bails on a zero-length SSID:
+It used to read the SSID straight off the front of the tagged region and
+return if the first element was not one, or if it was zero length:
 
 ```c
 if (ssidLen == 0 || ssidLen > 32 || len < (uint16_t)(ieStart + 2 + ssidLen)) {
@@ -81,21 +96,23 @@ if (ssidLen == 0 || ssidLen > 32 || len < (uint16_t)(ieStart + 2 + ssidLen)) {
 }
 ```
 
-That is correct for what it does. It is also fatal for fingerprinting,
+That was correct for what it did. It was also fatal for fingerprinting,
 because a zero-length SSID is a **wildcard probe request** -- a device asking
 "is anyone there" rather than "is *my* network there" -- and those are a
 large fraction of the probes in the air. They carry the full element set.
-Dropping them throws away most of the evidence.
+Dropping them threw away most of the evidence.
 
-So the walk has to happen first and the SSID match becomes one case inside
-it:
+So the walk comes first and the SSID match is one case inside it:
 
 1. Walk the elements once, bounds-checked.
 2. Accumulate the hash as described.
-3. If element `0x00` is present and non-empty, run the existing SSID match.
-4. After the walk, match the hash against the fingerprint table.
+3. If element `0x00` is present and non-empty, run the SSID match.
+4. Annotate the row, if a signature created one, with the hash.
+5. (Step 5 of the phasing) match the hash against the fingerprint table.
 
-One pass, no second traversal.
+One pass, no second traversal. The annotation is last so that a row created
+by either the OUI or the SSID match gets its fingerprint in the same frame
+that created it.
 
 ## Cost
 
@@ -121,12 +138,21 @@ Nothing here is close to a constraint.
 
 ## The parsing is hostile input
 
-This walks an attacker-shaped buffer. Every step needs `id`, `len` and
-`value` checked against `sig_len` before it is read, and the loop needs a
-hard iteration cap so a malformed frame cannot spin it. The existing SSID
-code gets this right and the walk has to be held to the same standard --
-`len` is a single byte from the air and `ieStart + 2 + len` can run past the
-end of a truncated frame.
+This walks an attacker-shaped buffer. Every step checks `id`, `len` and
+`value` against `sig_len` before reading, the arithmetic is `uint32_t` so a
+large offset plus a large claimed length cannot wrap back into range, and
+there is a hard iteration cap on top of the bound. `len` is a single byte
+from the air and `ieStart + 2 + len` can run past the end of a truncated
+frame.
+
+Step 2 widened the reach considerably: the walk no longer reads only ids and
+lengths but element contents, up to every byte of a capabilities element.
+`tools/fuzz_ie_walk.py` transcribes the walk into Python behind a buffer
+that refuses any read outside the frame and runs 65,543 frames through it,
+including an element of every contents-reading id claiming more than the
+frame holds, and elements ending exactly on the last byte. It says nothing
+about the compiled C -- there is no host compiler here -- but the bounds
+reasoning is the part worth checking.
 
 Worth stating plainly because the rest of this document is about detection
 quality, and this is the part where a bug is a remote read of adjacent
@@ -200,9 +226,13 @@ hardware it is meant to detect.
 
 ## Phasing
 
-1. Restructure `onPacket` to walk elements once; keep behaviour identical.
-   Fix the wildcard-probe drop. No new features.
-2. Hash, `Hit.fingerprint`, and the hash on the UI row.
+1. **Done.** Restructure `onPacket` to walk elements once; keep behaviour
+   identical. Fix the wildcard-probe drop. No new features.
+2. **Done.** Hash, `Hit.fingerprint`, and the hash on the UI row. 308 bytes
+   of flash, 192 of RAM, which is the 48 rows times the four bytes. The
+   fingerprint annotates rows that a signature already created; it does not
+   create rows of its own, or 48 passing handsets would fill the table
+   before anything interesting arrived.
 3. Grouping by fingerprint, randomised-address flagging, persistence.
 4. SD capture mode.
 5. `kIeSigs[]`, populated from captures, once there are any.
