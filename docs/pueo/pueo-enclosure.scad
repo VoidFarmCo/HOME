@@ -36,6 +36,11 @@ SMA_AXIS_H  = 2.5;  // SMA axis above the module's own board   [VERIFY]
 SMA_Z = STANDOFF_H + PCB_T + SOCKET_H + MOD_PCB_T + SMA_AXIS_H;
 echo(str("SMA_Z = ", SMA_Z, " mm above the pocket floor"));
 
+// Room a soldered-down module has above the carrier. Every module has to
+// fit inside this; the MT3608 at its disputed 14 mm does not.
+CARRIER_HEADROOM = (H - (FLOOR - POCKET)) - STANDOFF_H - PCB_T;
+echo(str("room above the carrier = ", CARRIER_HEADROOM, " mm"));
+
 // The TP4056 in hand has a micro-USB jack, not Type-C. The receptacle is
 // about 8 x 3; the cutout has to clear the plug's metal shell with slack for
 // print tolerance, not the overmoulded boot, which stays outside the wall.

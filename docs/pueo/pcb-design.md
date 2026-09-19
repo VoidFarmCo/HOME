@@ -361,23 +361,32 @@ Collected as datasheets and listings turn up. Footprints are mostly settled;
 heights are the gap, and heights are what the enclosure budget runs on.
 
 ```
-module           footprint mm    height mm   source
---------------   -------------   ---------   ------------------------------
-MT3608 boost     36 x 17  (?)    6.25 (?)    CONFLICT, see below
-                 30 x 17  (?)    14.0 (?)
-TP4056 charger   27 x 17         ?           measured off the module photo
-HW-863 CC1101    28 x 15         ?           listing drawing; 38 mm overall
-                                             with the board-mounted SMA
-NRF24 PA+LNA     41 x 15.5       ?           listing text; 41 appears to
-                                             include the SMA body
-MP2307 buck      17.9 x 12       ?           confirmed, 2.1 mm under
-                                             the assumed 20 mm
-ATGM336H GPS     16 x 13         ?           confirmed; NOT the GT-U7
-                                             that was assumed
-PN532 V3         43 x 41         ?           confirmed, matches the
-                                             footprint already assumed
-LiPo pack        45 x 34         ?           assumed
+module           footprint mm    height mm    basis
+--------------   -------------   ----------   -----------------------------
+MT3608 boost     36 x 17  (?)    6.25 or 14   CONFLICT, and it now decides
+                 30 x 17  (?)                 whether the module fits at all
+TP4056 charger   27 x 17         ~4  (est)    micro-USB jack is the tallest
+                                              thing on it, ~2.7 over ~1.0
+MP2307 buck      17.9 x 12       ~6  (est)    inductor and trimmer stand
+                                              proud of a ~1.0 board
+PN532 V3         43 x 41         ~3.5 (est)   flat board, no tall parts
+ATGM336H GPS     16 x 13         ~3.5 (est)   shield can over a ~1.0 board
+HW-863 CC1101    28 x 15         ~7  (est)    set by the SMA barrel, 6.35
+                                              OD, axis near the board top
+NRF24 PA+LNA     41 x 15.5       ~8  (est)    SMA barrel plus the shield can
+LiPo pack        45 x 34         ?            depends on the cell; 6-10 for
+                                              a 2000 mAh pouch
 ```
+
+**The five marked `(est)` are reasoned from the tallest visible component,
+not measured.** Listings for these parts publish footprint and almost never
+publish height -- I went looking and it is simply not there. They are good
+enough to answer the question below, and not good enough to cut plastic to.
+
+One number got confirmed rather than estimated: an SMA coupling barrel is
+6.35 mm outside diameter, fixed by the connector standard rather than by a
+vendor. `SMA_D = 6.5` in the enclosure is a 0.15 mm clearance hole on that,
+so the bulkhead holes have been right all along.
 
 Both radios land within a millimetre of what the enclosure already guessed:
 CC1101 at 15 wide against a 15 mm pocket, NRF24 at 15.5 against 16. Their
@@ -419,27 +428,34 @@ Vertical space in the base:
   pocket floor to base top       18.00 mm    everything lives in here
 ```
 
-Stack-up with a carrier board underneath, both heights carried:
+### How much room is there, really
+
+The carrier does not sit on the pocket floor. It sits on standoffs, because
+through-hole leads have to go somewhere. That was missing from the earlier
+arithmetic, and it changes the answer:
 
 ```
-                                    h=6.25    h=14.0
-  PCB 1.6 + soldered direct          7.85      15.60
-  PCB 1.6 + low-profile socket 5.0  12.85      20.60   over
-  PCB 1.6 + standard socket 8.5     16.35      24.10   over
+  cavity above the pocket floor        18.00 mm
+  standoff 2.5 + carrier 1.6            4.10 mm
+  room above the carrier               13.90 mm
 ```
 
-At 6.25 mm every option fits. At 14 mm **only soldering directly to the
-carrier fits**, with 2.4 mm to spare, and sockets are off the table for this
-module entirely.
+**13.90 mm is the budget every soldered-down module lives inside.** Which
+makes the MT3608 conflict decisive rather than academic:
 
-The recommendation already on record -- sockets for the radios, power
-modules soldered direct -- survives either answer, which is the one piece of
-luck here. Had the plan been to socket the MT3608, 14 mm would have killed
-it. So the conflict does not block layout; it does mean the 2.4 mm worst
-case is the real margin under the boost converter, not the 10 mm the
-earlier figure implied.
+```
+  MT3608 at  6.25 mm   ->  +7.65 mm spare
+  MT3608 at 14.00 mm   ->  -0.10 mm
+```
 
-And the MT3608 is not the tallest thing here anyway.
+At 14 mm it does not fit. Not "fits tightly" -- over by a tenth of a
+millimetre, before any tolerance on the standoff or the print.
+
+This corrects what this document said one revision ago, which was that at
+14 mm the module "fits, 1.65 mm spare" soldered direct. That was carrier
+plus module with the standoff left out. With the standoff counted the two
+candidate dimensions give opposite answers to "does this design work", so
+the MT3608 measurement is no longer one detail among several.
 
 ### The PN532 pays for height twice
 
@@ -624,6 +640,50 @@ SMA_Z = STANDOFF_H + PCB_T + SOCKET_H + MOD_PCB_T + SMA_AXIS_H
 the radio modules in hand. With the current values and the radios soldered
 down, OpenSCAD echoes **SMA_Z = 7.6 mm**, against the 5.0 the case was cut
 for. The bulkheads move up 2.6 mm.
+
+### Only two unknown heights can change anything
+
+Seven heights were open. Sorting them against the 13.90 mm budget collapses
+the list:
+
+```
+  MT3608 boost     6.25 or 14      DECIDES IT -- 14 does not fit
+  LiPo pack        6-10            structural, not a fit question
+  NRF24 PA+LNA     ~8   est        ~6 mm clear at the estimate
+  HW-863 CC1101    ~7   est        ~7 mm clear
+  MP2307 buck      ~6   est        ~8 mm clear
+  TP4056 charger   ~4   est        ~10 mm clear
+  ATGM336H GPS     ~3.5 est        ~10 mm clear
+  PN532 V3         ~3.5 est        sits on the floor, not on the board
+```
+
+Every estimate would have to be wrong by 6 mm or more to matter, and these
+are flat modules whose tallest part is visible in a photograph. Not worth
+chasing further.
+
+The radios deserve one extra note, because their SMA has to line up with a
+hole in a wall. The axis must land between 3.25 and 14.75 mm above the
+pocket floor for the 6.5 mm hole to stay inside the cavity, and with the
+carrier top at 4.10 mm that means:
+
+```
+  radios soldered down      SMA axis 0.00 .. 10.65 mm above their own board
+  radios on a 5 mm socket   SMA axis 0.00 ..  5.65 mm
+```
+
+Any real SMA mounting is 1 to 4 mm above the board it sits on. So SMA height
+is not a fit risk in either configuration. It only sets where the hole goes,
+and that is already a formula in the enclosure rather than a constant.
+
+**So two measurements are blocking, and neither can be looked up:**
+
+1.  **MT3608 overall height**, trimmer and inductor included. Over 13.90 mm
+    and it cannot be soldered to the carrier at all -- which means a shorter
+    boost module, a thinner standoff, or a taller base.
+2.  **Battery thickness.** Not a fit question but a structural one; see
+    below.
+
+Everything else is decided.
 
 ### Still open: the carrier cannot be a flat plane
 
