@@ -157,11 +157,33 @@ read from its source and can be checked by anyone; the claim about touch
 actually dying is a prediction derived from those, and it is the first thing
 to test when a CYD exists.
 
-It does not add transactions to the CC1101 driver. The right fix is
-`beginTransaction`/`endTransaction` around its transfers so the bus settings
-cannot be disturbed mid-exchange by an interrupt handler, but that means
-patching a vendored library, and the ownership layer removes the practical
-problem without it.
+## The CC1101 driver was the other half of it
+
+Vendored into `libs/` and fixed at source now that the fork is standalone.
+Two things it was doing:
+
+```c
+void ELECHOUSE_CC1101::SpiEnd(void) {
+  SPI.endTransaction();
+  SPI.end();          // after every single register access
+}
+```
+
+`SPI.end()` calls `spiStopBus()`, which resets the peripheral. The touch
+controller and the SD card are on that same peripheral and hold the same
+`spi_t*`, so **every CC1101 register read tore the bus down for both of
+them**. That is the cause behind upstream's symptom comments -- "leaves the
+SD card dead until something else re-inits the bus", "Mounting SD here is
+what broke SubGHz". It now ends the transaction and nothing more.
+
+And `SpiStart()` called `SPI.begin(SCK, MISO, MOSI, SS)`, which is a no-op
+once the bus is running, so the pins it looked like it was claiming were
+never claimed. It now opens a transaction instead, which holds the SPI mutex
+so a WiFi or BLE task cannot interleave a transfer midway through ours, and
+applies `CC1101_SPI_HZ` (4 MHz, under the 6.5 MHz burst ceiling) explicitly
+rather than inheriting the last device's clock.
+
+See `libs/SmartRC-CC1101-Driver-Lib/VENDORED.md`.
 
 It does not touch `sdTryBeginOrder()`, which still configures the bus inline.
 Its comments describe carefully tuned mount-retry ordering ("Do not

@@ -57,35 +57,6 @@ LIBS=(
   "PCF8574@0.4.5"
 )
 
-# ── Two fixes to the vendored CC1101 driver ─────────────────────────────────
-# Both were being absorbed silently by -zmuldefs in upstream's platform.txt.
-# See docs/pueo/zmuldefs.md for how they were found.
-patch_cc1101() {
-  local lib="$1"
-
-  # 1. ELECHOUSE_CC1101_SRC_JT_DRV.{cpp,h} is a copy-paste clone of the whole
-  #    driver: same `class ELECHOUSE_CC1101`, its own `ELECHOUSE_cc1101` object,
-  #    and 29 duplicate globals. Nothing in the firmware includes its header.
-  #    Two different classes sharing one name in a single program is an ODR
-  #    violation; the linker was picking whichever came first.
-  rm -f "$lib/ELECHOUSE_CC1101_SRC_JT_DRV.cpp" "$lib/ELECHOUSE_CC1101_SRC_JT_DRV.h"
-
-  # 2. The driver declares its hardware-SPI flag as a *global* named `spi`:
-  #       bool spi = 0;
-  #    TFT_eSPI declares its bus object with the same name and linkage:
-  #       SPIClass spi = SPIClass(HSPI);
-  #    The linker folded them onto one address, so the 1-byte flag landed on
-  #    SPIClass::_spi_num (int8_t, offset 0). setSpiPin() does `spi = 1`, which
-  #    wrote 1 = FSPI into the display's bus number, and `if (spi == 0)` read
-  #    that field back instead of the flag. File-local linkage separates them.
-  if grep -q '^bool spi = 0;$' "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp"; then
-    sed -i 's|^bool spi = 0;$|static bool spi = 0;   // pueo: was global, collided with TFT_eSPI|' \
-      "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp"
-  fi
-  grep -q '^static bool spi = 0;' "$lib/ELECHOUSE_CC1101_SRC_DRV.cpp" \
-    || { echo "patch_cc1101: 'spi' patch did not apply" >&2; exit 1; }
-}
-
 # ── Why -zmuldefs is no longer needed ───────────────────────────────────────
 # wifi.cpp defines ieee80211_raw_frame_sanity_check to return 0, overriding
 # the IDF's copy so esp_wifi_80211_tx accepts hand-built frames. Without that
@@ -164,11 +135,11 @@ setup() {
   rm -rf "$LIB/TFT_eSPI" "$LIB/SmartRC-CC1101-Driver-Lib"
   unzip -q -o "$REPO/Libraries/TFT_eSPI-master.zip" -d "$LIB"
   mv "$LIB/TFT_eSPI-master" "$LIB/TFT_eSPI"
-  unzip -q -o "$REPO/Libraries/SmartRC-CC1101-Driver-Lib-master.zip" -d "$LIB"
-  mv "$LIB/SmartRC-CC1101-Driver-Lib-master" "$LIB/SmartRC-CC1101-Driver-Lib"
   cp "$REPO/Libraries/User_Setup cyd.h" "$LIB/TFT_eSPI/User_Setup.h"
 
-  patch_cc1101 "$LIB/SmartRC-CC1101-Driver-Lib"
+  # The CC1101 driver is vendored rather than unzipped and sed'd. Its changes
+  # are real source edits now -- see libs/SmartRC-CC1101-Driver-Lib/VENDORED.md.
+  cp -r "$REPO/libs/SmartRC-CC1101-Driver-Lib" "$LIB/"
 
   weaken_ieee80211_symbol
 
