@@ -13,6 +13,7 @@
  *
  * Sources, so a future reader can re-check rather than trust:
  *   B4:1E:52     Flock Safety's own IEEE MA-L assignment
+ *   00:25:DF     Axon Enterprise's own IEEE MA-L assignment
  *   00:03:7F     Qualcomm Atheros (QCA9377), the radio in several units
  *   0x0D53       Luxottica, BLE company ID in Meta Ray-Ban advertisements
  *   0xFD5F       Meta, BLE service UUID in the same advertisements
@@ -59,7 +60,7 @@
 
 namespace Spotter {
 
-enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Accessory };
+enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Bodycam, Accessory };
 
 /* How much a single match is worth. Corroboration -- a second, differently
  * labelled signature on the same MAC -- promotes Likely to Strong. It does
@@ -98,6 +99,15 @@ static const OuiSig kOuiSigs[] = {
 
   /* The radio in several units. Qualcomm builds for everyone. */
   {{0x00, 0x03, 0x7F}, Kind::Alpr, Conf::Weak,    "Atheros QCA9377"},
+
+  /* Axon Enterprise's own IEEE block, and the only body-camera signature
+   * here. Strong on the vendor, not on the product: Axon also builds the
+   * docks, the in-car Fleet systems and the TASERs, so this says Axon
+   * hardware is in range rather than specifically a camera on a shoulder.
+   * Axon Body units carry WiFi for dock upload and Axon View, which is what
+   * makes them audible at all. Unlike the block below it, this one is the
+   * vendor's own assignment rather than a contract manufacturer's. */
+  {{0x00, 0x25, 0xDF}, Kind::Bodycam, Conf::Strong, "Axon Enterprise"},
 
   /* Liteon Technology Corporation -- 23 blocks across the two lists. */
   {{0x00, 0xF4, 0x8D}, Kind::Alpr, Conf::Weak,    "Liteon (ALPR?)"},

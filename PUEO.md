@@ -178,7 +178,11 @@ actually works here. Kept on purpose, not by neglect.
 New in 0.2.1, the first release since 0.1.0 whose compiled image actually
 differs in something other than the version string:
 
-- `SpotterSignatures.h` — the community Flock OUI collections, checked
+- `SpotterSignatures.h` — Axon body cameras, and the community Flock OUI
+  collections. `00:25:DF` is Axon Enterprise's own IEEE block, so it lands
+  on `Strong` under a new `Bodycam` kind; it means Axon hardware in range
+  rather than a camera specifically, since the same block covers their
+  docks and Fleet systems. The Flock side is the collections, checked
   before being trusted. `flock-you` carries 32 WiFi prefixes and
   `flock-finder` 31, 30 of them shared, for a union of 33; all are in,
   along with the `Flock Camera net.` and bare `Flock` SSIDs, the
@@ -194,6 +198,20 @@ differs in something other than the version string:
   pocket with no nominal slack: a clearance ladder, and a slice of the base
   taken as an `intersection()` with `base()` so it cannot drift from the
   real part
+- `tools/build.sh` — stopped shipping the build machine's home directory
+  inside the firmware. NimBLE's assert macros bake `__FILE__` in, so the
+  absolute path of every asserting source file was in the image: seventeen
+  strings of `C:\Users\<name>\...` in the published 0.1.0 and 0.2.0
+  binaries, still naming the folder the project used to be called.
+  `-ffile-prefix-map` now rewrites those to `pueo\...` and `arduino\...`
+  while compiling. The flags are passed per build rather than patched into
+  `platform.txt`, which lives in the shared core directory and would
+  otherwise leak one checkout's path into another's build. Side effect
+  worth having: the merged image no longer depends on where it was built,
+  so a rebuild at any path matches the published digest byte for byte. The
+  macro form of the flag is not enough for that -- it cleans `__FILE__` but
+  leaves the paths in the ELF's debug info, and the app descriptor carries
+  a SHA-256 of that ELF
 
 New in 0.2.0, all of it design work rather than firmware — the compiled
 image was unchanged from 0.1.0 apart from the version string:

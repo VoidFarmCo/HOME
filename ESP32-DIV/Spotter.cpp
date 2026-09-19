@@ -237,6 +237,7 @@ const char* kindText(Kind k) {
   switch (k) {
     case Kind::Alpr:      return "ALPR";
     case Kind::Glasses:   return "GLASSES";
+    case Kind::Bodycam:   return "BODYCAM";
     case Kind::Accessory: return "ACCESSORY";
     default:              return "?";
   }

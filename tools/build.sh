@@ -149,6 +149,41 @@ setup() {
   echo "setup complete. core: $CORE_DIR"
 }
 
+# __FILE__ ends up in the firmware. NimBLE's assert macros put the absolute
+# path of every asserting source file into the image, which is how the build
+# machine's home directory came to be inside the published 0.1.0 and 0.2.0
+# binaries -- seventeen strings of it, including the old name of the
+# workspace folder. -fmacro-prefix-map rewrites the prefix while
+# preprocessing, so __FILE__ comes out under pueo/ and arduino/ instead.
+#
+# -ffile-prefix-map rather than -fmacro-prefix-map: the macro form rewrites
+# __FILE__ only, which cleans the firmware but leaves the absolute paths in
+# the ELF's debug info. The app descriptor carries a SHA-256 of that ELF, so
+# two builds of identical code at different paths still produced different
+# images. The file form covers debug info too, and with it the merged image
+# is identical wherever it was built.
+#
+# Passed per build rather than patched into platform.txt on purpose:
+# platform.txt lives in the shared core directory, while these two paths
+# belong to this checkout. Baking them in there would leak one checkout's
+# path into another checkout's build.
+#
+# Each root is mapped in all three spellings it can arrive in. The toolchain
+# is a MinGW build and __FILE__ preserves whatever arduino-cli handed the
+# compiler, which today is the backslashed C: form.
+prefix_maps() {
+  local flags="" root tag win mixed
+  for root in "$REPO" "$PUEO_ARDUINO_ROOT"; do
+    if [ "$root" = "$REPO" ]; then tag="pueo"; else tag="arduino"; fi
+    win="$(cygpath -w "$root" 2>/dev/null || echo "$root")"
+    mixed="$(cygpath -m "$root" 2>/dev/null || echo "$root")"
+    flags="$flags -ffile-prefix-map=$win=$tag"
+    flags="$flags -ffile-prefix-map=$mixed=$tag"
+    flags="$flags -ffile-prefix-map=$root=$tag"
+  done
+  echo "$flags"
+}
+
 # -Wall -Wextra, and the sketch is expected to stay clean under both. If this
 # prints a warning, that is the whole point -- fix it rather than lowering the
 # level again.
@@ -163,7 +198,10 @@ compile() {
   local log="$PUEO_ARDUINO_ROOT/compile.log"
   mkdir -p "$PUEO_ARDUINO_ROOT"
   local rc=0
+  local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
+    --build-property "compiler.c.extra_flags=$maps" \
+    --build-property "compiler.cpp.extra_flags=$maps" \
     --build-path "$BUILD_PATH" "$REPO/ESP32-DIV" >"$log" 2>&1 || rc=$?
 
   grep -E "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*(warning|error):" "$log" || true
@@ -189,7 +227,10 @@ compile() {
 # library rather than the sketch.
 warnings() {
   rm -rf "$BUILD_PATH-warnings"
+  local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
+    --build-property "compiler.c.extra_flags=$maps" \
+    --build-property "compiler.cpp.extra_flags=$maps" \
     --build-path "$BUILD_PATH-warnings" "$REPO/ESP32-DIV" 2>&1 \
     | grep -E "warning:|Sketch uses|Global variables"
 }

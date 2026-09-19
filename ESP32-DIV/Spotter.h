@@ -13,6 +13,9 @@
  *   Smart glasses  advertise over BLE, and Meta's put both a Luxottica
  *                  company ID and a Meta service UUID in the same packet.
  *
+ *   Body cameras   carry WiFi so they can offload to a dock, which makes an
+ *                  Axon unit audible the same way an ALPR camera is.
+ *
  * Receive only. Spotter never transmits, never associates, never deauths.
  * It puts the radio in promiscuous mode and runs a passive BLE scan, which
  * is the same thing any WiFi analyser does. That matters legally as well as
