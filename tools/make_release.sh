@@ -4,8 +4,10 @@
 #   tools/make_release.sh            -> dist/pueo-<version>-src.zip
 #   tools/make_release.sh --with-bin -> also dist/pueo-<version>-merged.bin
 #
-# The repo tracks 254 MB, almost all of it inherited: upstream's prebuilt ELF
-# and .map files, a flash tool, PCB and schematic exports, and a GLB model.
+# The repo tracks 236 MB, almost all of it inherited: upstream's prebuilt ELF
+# and .map files, a flash tool, and a GLB model. The PCB and schematic
+# exports are gone -- they were for ESP32-DIV's own boards, which Pueo does
+# not use.
 # None of that is needed to build the firmware and none of it is ours, so the
 # archive is an explicit include list rather than "everything except".
 set -euo pipefail
