@@ -55,9 +55,14 @@ MODULES = [
     # assumes. Mounted rotated 180 deg from the usual photo so the USB
     # jack faces +X, out through the right wall.
     ("TP4056 charger", "U2",   26.6, -62.0, 27, 17),
-    ("3.3V buck",      "U3",  -29.0, -48.0, 20, 12),
+    # MP2307 "Mini-360": 17.9 x 12, adjustable via a single-turn trimpot.
+    ("3.3V buck",      "U3",  -29.0, -48.0, 17.9, 12),
     ("LiPo pack",      "BT1", -16.0, -23.0, 45, 34),
-    ("GT-U7 GPS",      "J5",   24.0, -21.0, 28, 27),
+    # ATGM336H, not the GT-U7 that was assumed: 16 x 13 with the antenna on
+    # a 90 mm u.FL pigtail rather than a patch on the module. Frees roughly
+    # 550 mm2 of floor, but the pigtail will not reach the top wall from
+    # here -- see pcb-design.md.
+    ("ATGM336H GPS",   "J5",   24.0, -21.0, 16, 13),
     ("PN532 V3",       "J4",    0.0,  18.0, 43, 41),
     # 28 x 15 PCB, 38 x 15 overall -- the SMA jack is soldered to the module
     # edge, so the antenna position is fixed by where the module sits.
@@ -94,12 +99,15 @@ NETS = [
      "battery positive into the protection, 1.0 mm trace"),
     ("BATT_NEG", [("BT1", "-"), ("U2", "B-")],
      "battery negative. ONLY these two nodes: it is not system ground"),
-    ("+VSYS",    [("U2", "OUT+"), ("U1", "VIN+"), ("U3", "VIN")],
-     "protected battery rail feeding both converters, 1.0 mm trace"),
+    ("+VSYS",    [("U2", "OUT+"), ("U1", "VIN+")],
+     "protected battery rail feeding the boost, 1.0 mm trace"),
 
-    ("+5V_SW", [("U1", "OUT+"), ("J1", "3"), ("J4", "VCC"),
+    # U3 is an MP2307 buck: it cannot step 3.0-4.2 V up to 3.3 V, and the
+    # module wants 4.75 V minimum anyway. It has to sit downstream of the
+    # boost, which puts the whole RF rail on the MT3608's back.
+    ("+5V_SW", [("U1", "OUT+"), ("J1", "3"), ("J4", "VCC"), ("U3", "VIN"),
                 ("C6", "1"), ("TP1", "1")],
-     "boost output, feeds the CYD and the PN532, 1.0 mm trace"),
+     "boost output, feeds the CYD, the PN532 and the 3V3 buck, 1.0 mm"),
 
     ("+3V3_RF", [("U3", "VOUT"), ("J2", "VCC"), ("J3", "VCC"), ("J5", "VCC"),
                  ("C1", "1"), ("C2", "1"), ("C3", "1"), ("C7", "1"),
@@ -155,7 +163,7 @@ BOM = [
     ("J2",  1, "Header 2x4 2.54mm", "HW-863 CC1101 module [verify pinout]"),
     ("J3",  1, "Header 2x4 2.54mm", "NRF24L01+PA+LNA module [verify pinout]"),
     ("J4",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
-    ("J5",  1, "Header 1x5 2.54mm", "GT-U7 GPS [verify pinout]"),
+    ("J5",  1, "Header 1x5 2.54mm", "ATGM336H GPS, VCC GND TX RX PPS"),
     ("U1",  1, "MT3608 boost module, ~36x17mm",
      "+VSYS -> 5V, 1 A continuous. OUTPUT IS A MULTI-TURN TRIMPOT: set to "
      "5.00 V on the bench BEFORE connecting J1. Ships at an arbitrary "

@@ -97,36 +97,65 @@ degrades a pin slowly rather than failing loudly.
 ## Power tree
 
 ```
-  USB-C ──► TP4056 ──► 1S LiPo ──┬──► MT3608 boost ──► +5V_SW ──► CYD (J1.3)
-           (1 A chg)             │                          └──► PN532 VCC
-                                 └──► 3.3V buck ──► +3V3_RF ──┬─► NRF24
-                                      (separate rail)          └─► CC1101
-                                                               └─► GT-U7
+  USB-C ──► TP4056 ──► 1S LiPo ──► MT3608 ──► +5V_SW ─┬─► CYD (J1.3)
+           (1 A chg)   3.0-4.2 V     boost             ├─► PN532 VCC
+                                                       │
+                                                       └─► MP2307 ──► +3V3_RF ─┬─► NRF24
+                                                           buck                ├─► CC1101
+                                                                               └─► ATGM336H
 ```
 
-The separate 3.3 V rail is not optional. The PA/LNA modules brown out if
-they share the CYD's regulator, which is why the enclosure already allocates
-a third power module at (-29, -48).
+**The buck has to hang off the boost, not off the battery.** An earlier
+draft of this tree fed it from +VSYS directly, which cannot work: a buck
+only steps down, and 1S LiPo swings 3.0-4.2 V against a 3.3 V target. Below
+about 3.6 V the rail would sag with the battery and the PA modules would
+brown out exactly when the pack is low. The MP2307 module is spec'd from
+4.75 V input in any case, so it is out of range across the whole discharge
+curve. Boost to 5 V, then buck to 3.3 V.
+
+That costs a conversion: two switchers in series at roughly 90% each is
+about 81% end to end on the RF rail, against the ~90% a single buck-boost
+would manage. A proper buck-boost is a real option if efficiency matters
+more than using the part already on hand.
+
+The separate 3.3 V rail itself is not optional. The PA/LNA modules brown out
+if they share the CYD's regulator, which is why the enclosure already
+allocates a third power module at (-29, -48).
 
 ### Budget
 
 | load | typical | peak | source |
 |---|---|---|---|
-| CYD (ESP32 + ILI9341 + backlight) | ~200 mA | ~500 mA on WiFi TX | **[verify]** |
-| NRF24L01+PA+LNA | 45 mA RX | ~115 mA TX @ +20 dBm | **[verify]** |
-| CC1101 | 16 mA RX | ~34 mA TX @ +10 dBm | **[verify]** |
-| PN532 | ~10 mA idle | ~100 mA field on | **[verify]** |
-| GT-U7 | 30 mA tracking | ~45 mA acquiring | **[verify]** |
+| load | rail | typical | peak | source |
+|---|---|---|---|---|
+| CYD (ESP32 + ILI9341 + backlight) | +5V_SW | ~200 mA | ~500 mA on WiFi TX | **[verify]** |
+| PN532 | +5V_SW | ~10 mA idle | ~100 mA field on | **[verify]** |
+| NRF24L01+PA+LNA | +3V3_RF | 45 mA RX | ~115 mA TX @ +20 dBm | **[verify]** |
+| CC1101 | +3V3_RF | 16 mA RX | ~34 mA TX @ +10 dBm | **[verify]** |
+| ATGM336H | +3V3_RF | ~25 mA tracking | ~40 mA acquiring | **[verify]** |
 
-Worst case if everything transmits at once is roughly 800 mA, but the SPI
-bus is shared and `SpiBus` enforces one owner at a time, so the radios cannot
-all be mid-transaction together. A realistic simultaneous peak is **CYD on
-WiFi + one radio + GPS ≈ 660 mA**.
+With the buck downstream of the boost, the 3.3 V loads no longer draw from
+the battery in parallel with the CYD — they are reflected onto +5V_SW,
+scaled by 3.3/5 and divided by the buck's efficiency:
 
-Size the boost for 1 A continuous at 5 V. From a 3.7 V cell at ~85%
-efficiency that is about 1.6 A drawn from the battery at peak, so the cell
-and its protection circuit must tolerate that — many small protection boards
-cut out around 2 A, which is closer than it sounds.
+```
+                  CYD   PN532   +3V3_RF        +5V_SW    battery @ 3.7 V
+  worst case      500     100   189 -> 139     739 mA         1174 mA
+  realistic       500      10   155 -> 114     624 mA          992 mA
+```
+
+Worst case assumes everything transmits at once, which the SPI bus makes
+impossible: it is shared and `SpiBus` enforces one owner at a time, so the
+radios cannot all be mid-transaction together. Realistic is CYD on WiFi plus
+one radio plus GPS.
+
+**Size the boost for 800 mA continuous at 5 V**, which is about **1.2 A from
+the cell** at peak. That is up from the earlier figure, and the increase is
+the direct cost of moving the buck downstream — the RF rail used to bypass
+the boost entirely. The cell and its protection circuit must tolerate 1.2 A;
+many small protection boards cut out around 2 A, which is closer than it
+sounds. The MT3608 is rated 2 A switch current, so it is inside spec but
+will run warm in a sealed enclosure.
 
 **Runtime**, 2000 mAh cell, 600 mA average at 5 V: roughly **2 hours**.
 If that is short, the lever is the backlight, not the radios.
@@ -176,9 +205,9 @@ Module positions are already fixed by the enclosure (origin = case centre):
 |---|---|---|
 | MT3608 boost | -19, -65 | 36 × 17 |
 | TP4056 charger | 26.6, -62 | 26 × 19 |
-| 3.3 V buck | -29, -48 | 20 × 12 |
+| MP2307 buck | -29, -48 | 17.9 × 12 |
 | LiPo pack | -16, -23 | 45 × 34 |
-| GT-U7 GPS | 24, -21 | 28 × 27 |
+| ATGM336H GPS | 24, -21 | 16 × 13 |
 | PN532 V3 | 0, 18 | 43 × 41 |
 | CC1101 HW-863 | -23, 61.5 | 15 × 40 |
 | NRF24 PA+LNA | 22, 61 | 16 × 41 |
@@ -194,7 +223,11 @@ Constraints that follow:
   43 x 41 extent, so the keepout and the floor window are both correctly
   sized -- the module is exactly as large as the design assumed.
 - **USB-C on the right wall** at y = −62, 20 × 7 cutout.
-- **GPS antenna slot** top centre, 21 mm wide, 1.6 mm floor.
+- **GPS antenna** is a separate 20 x 6 mm board on a 90 mm u.FL pigtail, not
+  a patch on the module. It needs a flat spot with sky view and a thinned
+  wall, but it is no longer tied to where the module sits -- and the 90 mm
+  is a hard limit. See the GPS section below; the top-centre slot the
+  enclosure cuts today is out of reach from the module's current position.
 - Battery pocket at (−16, -23) is 45 × 34 and must stay clear of copper.
 
 ### Recommendation: keep the radios as modules
@@ -285,6 +318,14 @@ both land on ground.
 
 Two things about this module are worth more than a pin correction.
 
+**Both switchers ship adjustable, and neither ships at the voltage you
+want.** The MT3608's is a 25-turn pot; the MP2307's is a single-turn SMD
+trimmer, which is worse to set precisely because the whole range is in one
+rotation. Set *both* against a meter, into no load, before either one is
+connected to anything. The buck is the dangerous one: +3V3_RF feeds the
+NRF24, the CC1101 and the GPS directly, with no regulator downstream to
+absorb a mistake.
+
 **The output is a multi-turn trimpot, not a fixed 5 V.** These ship at an
 arbitrary setting and the MT3608 will happily produce about 28 V. Connecting
 J1 to an unadjusted module destroys the CYD, and the ESP32 behind it,
@@ -329,8 +370,10 @@ HW-863 CC1101    28 x 15         ?           listing drawing; 38 mm overall
                                              with the board-mounted SMA
 NRF24 PA+LNA     41 x 15.5       ?           listing text; 41 appears to
                                              include the SMA body
-3.3V buck        20 x 12         ?           assumed
-GT-U7 GPS        28 x 27         ?           assumed
+MP2307 buck      17.9 x 12       ?           confirmed, 2.1 mm under
+                                             the assumed 20 mm
+ATGM336H GPS     16 x 13         ?           confirmed; NOT the GT-U7
+                                             that was assumed
 PN532 V3         43 x 41         ?           confirmed, matches the
                                              footprint already assumed
 LiPo pack        45 x 34         ?           assumed
@@ -417,6 +460,52 @@ plus whatever holds it:
 Read range on a PN532 is a couple of centimetres to begin with. Ten
 millimetres of added standoff is a large fraction of it, and it is spent on
 nothing the user gets back.
+
+## The GPS is a different module than assumed
+
+The part in hand is an **ATGM336H** on a GOOUUU breakout, 16 x 13 mm, with a
+1x5 header silkscreened VCC / GND / TX / RX / PPS. Two things follow.
+
+**The footprint collapses.** 28 x 27 was budgeted; 16 x 13 is what turned
+up. That is roughly 550 mm2 of floor handed back, in the middle of the
+board, next to the battery. It also resolves the `[verify pinout]` note on
+J5 -- the silkscreen matches the assumed order exactly, so the netlist
+stands.
+
+Firmware is unaffected: `GPS_UART_BAUD` is 9600 and the ATGM336H defaults to
+9600 NMEA, same as the GT-U7 would have.
+
+**The antenna moves off the module**, onto a 20 x 6 mm board on a 90 mm u.FL
+pigtail. This is mostly good -- a patch soldered to the module has to sit
+wherever the module sits, and this one does not. But 90 mm is short, and it
+is measured through whatever path the cable can actually take:
+
+```
+  from J5 at (24, -21) to ...          straight line
+  top centre, the slot cut today          94.1 mm    over
+  top left, clear of the NRF24           105.8 mm    over
+  upper right wall                        61.5 mm    ok
+```
+
+Straight-line is the optimistic case; the cable has to route around modules,
+so treat anything past about 75 mm as doubtful.
+
+So the enclosure's existing top-centre antenna slot cannot be fed from where
+the GPS module currently sits. Two ways to fix it, and the shrink makes the
+first one cheap:
+
+1.  **Move the module up.** It is now 16 x 13 and has no antenna on top, so
+    it can tuck almost anywhere. Put it within reach of wherever the antenna
+    wants to be.
+2.  **Move the antenna.** With a pigtail it can lie flat against a wall or
+    the inside of the lid, which is a better GPS position than the floor
+    anyway.
+
+There is an argument for not putting it top-centre regardless: that is
+directly between the two SMA bulkheads, so the GPS antenna would sit between
+a 433 MHz transmitter and a 2.4 GHz PA. GPS L1 is at 1575 MHz and receives
+at around -130 dBm. The pigtail is what makes moving it away possible, which
+is a freedom the patch-antenna assumption did not have.
 
 So the PN532 is the one module with a reason not to be socketed, which cuts
 against the swappability argument that applies to the radios. Three ways
