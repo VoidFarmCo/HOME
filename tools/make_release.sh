@@ -54,6 +54,7 @@ INCLUDE=(
   "docs/pueo"
   "art"
   "PUEO.md"
+  "CHANGELOG.txt"
   "LICENSE"
   "LICENSE.MIT"
   ".gitignore"

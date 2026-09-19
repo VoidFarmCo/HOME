@@ -1,0 +1,134 @@
+Pueo - changelog
+================
+
+Firmware for a handheld multi-radio field tool on the ESP32-2432S028R.
+Forked from CiferTech's ESP32-DIV at 90f7967, 2026-09-01.
+
+Nothing here has run on hardware. Every release below compiles clean and
+several fixes are verified at the symbol level, but no version has been
+flashed to a board. Treat inherited feature claims as inherited.
+
+Digests for each release are in dist/pueo-<version>.sha256.
+
+
+0.2.2 - 2026-09-19
+------------------
+
+Licensing:
+
+  * Relicensed to GPL-3.0-or-later. Upstream's MIT notice is kept verbatim
+    in LICENSE.MIT and those portions remain available under MIT.
+  * RF24 removed. It is GPL-2.0-only and could not lawfully share a binary
+    with arduinoFFT (GPL-3.0-or-later) or NimBLE-Arduino (Apache-2.0) - a
+    conflict inherited from upstream's dependency set and carried since
+    0.1.0. It was the only GPLv2-only library in the tree, so the merged
+    image is distributable again.
+  * ESP32-DIV/Nrf24Raw.{h,cpp} replaces it: the nRF24L01+ register
+    interface, scoped to power, channel and an unmodulated carrier.
+    MouseJack, the ESB paths and the skimmer detector never used RF24 -
+    they already drove the registers directly - so only the jammers had to
+    change. 3,476 bytes smaller.
+  * docs/pueo/licensing.md records the dependency table, the grants it is
+    read from, and why "version 2" and "version 2 or later" was the whole
+    question.
+
+Spotter:
+
+  * Fingerprints the probe-request information-element set, so a camera
+    that randomises its MAC can still be followed. FNV-1a over the elements
+    a device emits; ids always, contents only where they belong to the
+    device rather than to that probe, which leaves the SSID and the channel
+    out deliberately.
+  * One device is one row when it changes address. A new address folds into
+    an existing row on a fingerprint match, but only when both addresses
+    are locally administered: two cameras of one model share an element
+    set, and merging on the fingerprint alone would report one where there
+    are two.
+  * Rows show whether the address is made up, how many times it has
+    changed, and how long the device has been in range.
+  * Capture to SD on the Log button, off until switched on. One row per
+    device, and every device rather than only the matched ones.
+  * No fingerprint signature table ships. The values need captures off real
+    hardware. See docs/pueo/ie-fingerprinting.md.
+
+Fixes:
+
+  * The jammers hop on purpose now. They configured three RF24 objects over
+    three channel groups, which reads as twelve channels across three
+    radios and was neither: the board profile maps all three chip selects
+    onto one module, and the setup loop called startConstCarrier once per
+    channel with each call replacing the last. The hopping that did work
+    was in the feature loops, picking a random channel every iteration and
+    writing it three times. Now round-robin on a 4 ms dwell, written once.
+  * onPacket no longer discards wildcard probe requests. A zero-length SSID
+    ended processing of the frame, which threw away the full element set
+    those frames carry.
+
+Tooling:
+
+  * tools/fuzz_ie_walk.py, tools/check_spotter_merge.py and
+    tools/check_spotter_capture.py model the parts that cannot be tried on
+    hardware that does not exist: 65,543 frames through the element walk
+    with no out-of-bounds read, sixteen merge rules, sixteen capture rules.
+
+
+0.2.1 - 2026-09-19
+------------------
+
+  * SpotterSignatures.h: Axon body cameras under a new Bodycam kind
+    (00:25:DF is Axon Enterprise's own IEEE block, so Strong), and the
+    union of the flock-you and flock-finder community OUI collections - 33
+    prefixes, plus the Flock SSID variants, the Penguin battery pack's BLE
+    name and XUNTONG company ID, and the Raven GATT UUIDs.
+  * Every prefix was resolved against the IEEE MA-L registry first, which
+    is why nearly all land on Weak: 23 belong to Liteon and 2 to Espressif,
+    blocks that appear in a great deal of unrelated consumer hardware. Each
+    carries the assignee the registry names rather than the word "Flock".
+  * The build stopped writing the build machine's home directory into the
+    firmware. NimBLE's assert macros bake __FILE__ in, so the absolute path
+    of every asserting source file was in the published 0.1.0 and 0.2.0
+    images - seventeen strings of it. -ffile-prefix-map rewrites them.
+    Side effect: the merged image no longer depends on where it was built,
+    so a rebuild at any path matches the published digest.
+  * docs/pueo/nrf24-fit-test.scad: a test print for the one enclosure
+    pocket with no nominal slack.
+
+
+0.2.0 - 2026-09-18
+------------------
+
+Design work rather than firmware. The compiled image is unchanged from
+0.1.0 apart from the version string.
+
+  * docs/pueo/pcb-design.md grew into the carrier-board design: netlist,
+    power tree, load budget, placement, module dimensions.
+  * docs/pueo/pueo-enclosure.scad brought into the repo.
+  * tools/gen_netlist.py generates the netlist, placement and BOM, and
+    checks every signal GPIO against board_pueo.h so the two cannot drift.
+
+
+0.1.0 - 2026-09-18
+------------------
+
+First release of the fork.
+
+  * board_pueo.h: a board profile resolving the pin conflicts in the stock
+    CYD map, as an overlay rather than a fourth board branch.
+  * SpiBus.{h,cpp}: one owner for the SPI bus the display, SD card and all
+    three radios share, and the fix for touch losing it to the radios. The
+    resource that conflicts is the GPIO matrix rather than the clock - MISO
+    is an input and exactly one GPIO can drive it.
+  * Spotter: passive detection of ALPR cameras and smart glasses. Receive
+    only; it never transmits, associates or deauthenticates.
+  * gps.cpp: gpsPortOpen/gpsPortClose bracket every UART open and close and
+    hand GPIO 1 between the console and the GPS.
+  * wifi.cpp: removed an out-of-bounds write in both deauth frame builders.
+  * A brightness step that wrapped: stepping up from 248-254 dropped the
+    backlight to almost off.
+  * -w and -zmuldefs removed from the build, and the underlying issues
+    fixed rather than silenced. The one load-bearing duplicate symbol is
+    handled by weakening the SDK symbol instead.
+  * IR support dropped: 140 KB that could never run on a board with no IR
+    hardware.
+  * tools/check_pinmap.py resolves the pin macros the way the compiler will
+    and fails the build on a collision.

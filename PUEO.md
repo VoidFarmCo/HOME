@@ -190,6 +190,9 @@ actually works here. Kept on purpose, not by neglect.
 
 ## Changes so far
 
+Per-release notes, in the form that ships in the archive, are in
+`CHANGELOG.txt`. What follows is the same ground with more of the reasoning.
+
 New in 0.2.2. Two threads: a detection path that survives a camera changing
 its address, and the end of a licence conflict the project inherited.
 
