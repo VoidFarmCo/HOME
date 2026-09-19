@@ -4,3 +4,6 @@
 # Python bytecode from the tools/
 __pycache__/
 *.pyc
+
+# Source artwork is kept; intermediate renders are not
+art/*_render_*.png

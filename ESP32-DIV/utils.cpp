@@ -1246,9 +1246,14 @@ void displayLogo(uint16_t color, int displayTime) {
 
   const int16_t cx = screenWidth / 2;
 
+#if !defined(PUEO_LOGO_HAS_WORDMARK) || !PUEO_LOGO_HAS_WORDMARK
+  // Artwork without a wordmark: draw the name. Font-rendered text is sharper
+  // than a wordmark scaled into a 1-bit bitmap, so this is the better option
+  // whenever the logo does not already carry the name.
   tft.setTextSize(3);
   tft.drawString(PUEO_NAME, cx, textY);
   textY += 26;
+#endif
 
   tft.setTextSize(1);
   tft.drawString(PUEO_TAGLINE, cx, textY);

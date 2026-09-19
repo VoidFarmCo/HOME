@@ -23,6 +23,8 @@ already use.
   --threshold N  0-255 luminance cut, default 128
   --invert       flip black and white
   --alpha N      pixels with alpha below N count as background, default 128
+  --crop         trim to the drawn content and pad to square before scaling
+  --margin N     percent margin to leave after --crop, default 4
   --preview      also print an ASCII rendering, to check before pasting
 """
 
@@ -37,9 +39,46 @@ except ImportError:
     sys.exit("needs Pillow:  py -3 -m pip install Pillow")
 
 
-def to_mono(path, size, fit, threshold, invert, alpha_cut):
+def crop_to_ink(img, threshold, invert, margin_pct):
+    """Trim to the drawn content, then pad back out to a square.
+
+    Generated artwork almost always arrives with slack: letterbox bars, an
+    uneven margin, or a canvas that is not square. Scaling that straight to
+    150x150 wastes pixels on whitespace, which is exactly what this format
+    cannot afford.
+
+    The bounding box is taken after thresholding rather than from getbbox(),
+    because "white" out of an image generator is usually 253-255 rather than
+    255, and getbbox() on a near-white background returns the whole canvas.
+    """
+    # "Ink" means the pixels that will end up set, which is exactly the test
+    # to_mono applies below: on = (v >= threshold) XOR invert. Getting this
+    # backwards finds the bounding box of the *background* -- which on a
+    # full-bleed canvas is the whole image, so the crop silently does nothing.
+    grey = img.convert("L")
+    mask = grey.point(lambda v: 255 if ((v < threshold) if invert else (v >= threshold)) else 0)
+    bbox = mask.getbbox()
+    if not bbox:
+        return img  # nothing drawn; leave it alone
+
+    img = img.crop(bbox)
+    side = max(img.width, img.height)
+    side = int(side * (1.0 + 2.0 * margin_pct / 100.0))
+    bg = (0, 0, 0, 255) if not invert else (255, 255, 255, 255)
+    canvas = Image.new("RGBA", (side, side), bg)
+    canvas.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+    return canvas
+
+
+def to_mono(path, size, fit, threshold, invert, alpha_cut, crop=False, margin=4):
     img = Image.open(path)
     img = img.convert("RGBA")
+
+    if crop:
+        # Flatten first so transparency does not confuse the ink detection.
+        flat = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        flat.paste(img, (0, 0), img.split()[3])
+        img = crop_to_ink(flat, threshold, invert, margin)
 
     # Flatten transparency onto the background colour, so a transparent PNG
     # does not come out as a solid block.
@@ -116,6 +155,10 @@ def main():
     ap.add_argument("--invert", action="store_true")
     ap.add_argument("--alpha", type=int, default=128)
     ap.add_argument("--preview", action="store_true")
+    ap.add_argument("--crop", action="store_true",
+                    help="trim to drawn content and pad to square first")
+    ap.add_argument("--margin", type=float, default=4,
+                    help="percent margin to leave after --crop (default 4)")
     args = ap.parse_args()
 
     m = re.fullmatch(r"(\d+)x(\d+)", args.size)
@@ -129,7 +172,8 @@ def main():
     for i, path in enumerate(sorted(args.images), 1):
         if not path.exists():
             sys.exit("no such file: %s" % path)
-        bits = to_mono(path, size, args.fit, args.threshold, args.invert, args.alpha)
+        bits = to_mono(path, size, args.fit, args.threshold, args.invert,
+                       args.alpha, args.crop, args.margin)
         data = pack(bits, w)
         name = "%s_%d" % (args.name, i) if multi else args.name
         if args.preview:
