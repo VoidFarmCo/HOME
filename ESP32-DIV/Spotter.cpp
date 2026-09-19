@@ -62,12 +62,40 @@ bool prefixMatch(const char* s, const char* prefix) {
 /* Find or create the row for this MAC. Returns null when the table is full,
  * which is deliberate: dropping new devices is better than evicting one the
  * operator is currently looking at. */
-Hit* findOrAdd(const uint8_t* mac, bool viaBle) {
+Hit* findOrAdd(const uint8_t* mac, bool viaBle, uint32_t fp) {
   for (int i = 0; i < s_hitCount; i++) {
     if (memcmp(s_hits[i].mac, mac, 6) == 0) {
       return &s_hits[i];
     }
   }
+
+  /* No row for this address. Before making one: it may be a row already
+   * here, wearing a new address.
+   *
+   * Only when both addresses are locally administered. A globally unique MAC
+   * is a real, stable identifier and keeps its own row even if something in
+   * range shares its element set -- two cameras of one model have the same
+   * fingerprint, and folding those together would report one where there are
+   * two. Two randomised addresses with the same element set are the
+   * defensible case: that is what one radio rotating looks like.
+   *
+   * It is not proof. Two handsets of the same model, both randomising, are
+   * indistinguishable from here, and this will merge them. The merge is
+   * deliberately limited to the case where the alternative -- a row per
+   * address -- is certainly wrong. */
+  if (fp != 0 && !viaBle && (mac[0] & 0x02)) {
+    for (int i = 0; i < s_hitCount; i++) {
+      Hit& h = s_hits[i];
+      if (!h.viaBle && h.fingerprint == fp && (h.mac[0] & 0x02)) {
+        memcpy(h.mac, mac, 6);
+        if (h.addrChanges < 255) {
+          h.addrChanges++;
+        }
+        return &h;
+      }
+    }
+  }
+
   if (s_hitCount >= kMaxHits) {
     return nullptr;
   }
@@ -80,42 +108,26 @@ Hit* findOrAdd(const uint8_t* mac, bool viaBle) {
   h.conf = Conf::Weak;
   h.label = "?";
   h.rssiBest = -127;
+  h.fingerprint = fp;
   return &h;
-}
-
-/* Attach a fingerprint to a row that already exists.
- *
- * Deliberately does not create one. Every device in the air has an element
- * set, so creating rows here would fill all 48 with passing handsets before
- * anything interesting arrived. Rows are still created only by a signature
- * matching; this annotates them with something that outlives their address. */
-void noteFingerprint(const uint8_t* mac, uint32_t fp) {
-  portENTER_CRITICAL(&s_mux);
-  for (int i = 0; i < s_hitCount; i++) {
-    if (memcmp(s_hits[i].mac, mac, 6) == 0) {
-      if (s_hits[i].fingerprint != fp) {
-        s_hits[i].fingerprint = fp;
-        s_dirty = true;
-      }
-      break;
-    }
-  }
-  portEXIT_CRITICAL(&s_mux);
 }
 
 /* Record a match. A second, different signature on the same device promotes
  * it: two weak hints agreeing is worth more than either alone, which is the
  * whole reason confidence is tracked rather than just a boolean. */
 void record(const uint8_t* mac, int8_t rssi, Kind kind, Conf conf,
-            const char* label, bool viaBle) {
+            const char* label, bool viaBle, uint32_t fp = 0) {
   portENTER_CRITICAL(&s_mux);
-  Hit* h = findOrAdd(mac, viaBle);
+  Hit* h = findOrAdd(mac, viaBle, fp);
   if (h) {
     h->hits++;
     h->lastMs = millis();
     h->rssiLast = rssi;
     if (rssi > h->rssiBest) {
       h->rssiBest = rssi;
+    }
+    if (fp != 0) {
+      h->fingerprint = fp;
     }
     if (h->kind != Kind::Unknown && h->label != label) {
       h->corroborated = true;
@@ -156,14 +168,11 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
   const uint8_t* src = p + 10;          // addr2, the transmitter
   const int8_t rssi = pkt->rx_ctrl.rssi;
 
-  for (size_t i = 0; i < kOuiSigCount; i++) {
-    if (memcmp(src, kOuiSigs[i].oui, 3) == 0) {
-      record(src, rssi, kOuiSigs[i].kind, kOuiSigs[i].conf, kOuiSigs[i].label, false);
-      break;
-    }
-  }
-
-  /* Tagged parameters start after the fixed header: probe requests have none,
+  /* The walk runs before either signature table, so that a row created by
+   * one of them carries its fingerprint from the moment it exists -- which
+   * is what lets findOrAdd recognise the same radio under a new address.
+   *
+   * Tagged parameters start after the fixed header: probe requests have none,
    * beacons and probe responses carry 12 bytes of them first.
    *
    * Everything past here is attacker-shaped. `ilen` is one byte off the air
@@ -259,6 +268,14 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
     fp = 1;
   }
 
+  for (size_t i = 0; i < kOuiSigCount; i++) {
+    if (memcmp(src, kOuiSigs[i].oui, 3) == 0) {
+      record(src, rssi, kOuiSigs[i].kind, kOuiSigs[i].conf, kOuiSigs[i].label,
+             false, fp);
+      break;
+    }
+  }
+
   if (ssidVal != nullptr && ssidLen > 0 && ssidLen <= 32) {
     char ssid[33];
     memcpy(ssid, ssidVal, ssidLen);
@@ -266,16 +283,11 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
 
     for (size_t i = 0; i < kSsidSigCount; i++) {
       if (prefixMatch(ssid, kSsidSigs[i].prefix)) {
-        record(src, rssi, kSsidSigs[i].kind, kSsidSigs[i].conf, kSsidSigs[i].label, false);
+        record(src, rssi, kSsidSigs[i].kind, kSsidSigs[i].conf, kSsidSigs[i].label,
+               false, fp);
         break;
       }
     }
-  }
-
-  /* Last, so that a row created by either the OUI or the SSID match above
-   * gets annotated in the same frame that created it. */
-  if (fp != 0) {
-    noteFingerprint(src, fp);
   }
 }
 
@@ -426,12 +438,39 @@ void drawList() {
              h.viaBle ? "BLE" : "WiFi", (int)h.rssiBest, (unsigned)h.hits);
     tft.drawString(line, 8, y + 11);
 
-    /* The fingerprint is here to be written down: it is what a signature
-     * table gets built out of, and there is nothing to match it against
-     * yet. BLE rows never have one. */
-    if (h.fingerprint != 0) {
+    /* Third line: what is true of the device rather than of its address.
+     *
+     * The fingerprint is here to be written down -- it is what a signature
+     * table gets built out of, and there is nothing to match it against yet.
+     * "rnd" means the address is locally administered, which is to say made
+     * up, which is to say the OUI on the line above means nothing. "+N" is
+     * how many times this row has changed address underneath us. The last
+     * field is how long it has been in range, because a handset walks past
+     * and a camera is bolted to a pole. */
+    {
+      const uint32_t secs = (h.lastMs - h.firstMs) / 1000u;
+      char age[10];
+      if (secs < 60u) {
+        snprintf(age, sizeof(age), "%lus", (unsigned long)secs);
+      } else if (secs < 3600u) {
+        snprintf(age, sizeof(age), "%lum", (unsigned long)(secs / 60u));
+      } else {
+        snprintf(age, sizeof(age), "%luh", (unsigned long)(secs / 3600u));
+      }
+
+      char fpTxt[14] = "";
+      if (h.fingerprint != 0) {
+        snprintf(fpTxt, sizeof(fpTxt), "fp %08lX ", (unsigned long)h.fingerprint);
+      }
+
+      char rot[10] = "";
+      if (h.addrChanges > 0) {
+        snprintf(rot, sizeof(rot), "+%u ", (unsigned)h.addrChanges);
+      }
+
       tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-      snprintf(line, sizeof(line), "fp %08lX", (unsigned long)h.fingerprint);
+      snprintf(line, sizeof(line), "%s%s%s%s", fpTxt,
+               (!h.viaBle && (h.mac[0] & 0x02)) ? "rnd " : "", rot, age);
       tft.drawString(line, 8, y + 21);
     }
 

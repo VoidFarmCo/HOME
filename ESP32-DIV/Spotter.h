@@ -47,6 +47,9 @@ struct Hit {
    * seen. Survives the MAC changing, which the address above does not.
    * WiFi only; a BLE row never has one. See docs/pueo/ie-fingerprinting.md. */
   uint32_t fingerprint;
+  /* How many times this row has been seen wearing a different address. Only
+   * ever non-zero for randomised addresses; see findOrAdd. */
+  uint8_t  addrChanges;
 };
 
 /* Feature entry points, following the shape every other module here uses. */

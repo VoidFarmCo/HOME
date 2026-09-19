@@ -3,9 +3,10 @@
 Scope for a Spotter detection path that survives MAC randomisation, and the
 reason its signature table has to start empty.
 
-Steps 1 and 2 of the phasing at the end are built: the walk, the hash, and
-the fingerprint on screen. Nothing matches against it yet, and nothing can
-until there are captures to match against.
+Steps 1 to 3 of the phasing at the end are built: the walk, the hash, the
+fingerprint on screen, and the three things that work without any signature
+table at all. Nothing matches against a signature yet, and nothing can until
+there are captures to match against.
 
 ## Why
 
@@ -190,9 +191,24 @@ surfacing -- not as a detection, but as a note on the row, because it is
 exactly the case where the OUI beneath it means nothing.
 
 **Grouping by fingerprint** fixes the table-exhaustion problem whether or not
-any signature matches. Several MACs sharing one fingerprint, appearing and
-disappearing together, is one device rotating its address. Collapsing those
-into a single row is a straight improvement to a 48-row table.
+any signature matches. Several MACs sharing one fingerprint is one device
+rotating its address. Collapsing those into a single row is a straight
+improvement to a 48-row table: 500 rotations of one radio now leave 47 rows
+free, where before they would have filled it eight times over.
+
+The fold is narrow on purpose, because getting it wrong under-reports
+surveillance hardware, and that is the failure that matters here. Two
+cameras of the same model have the same element set, so merging on
+fingerprint alone would show one device where there are two. The rule
+therefore requires that **both** addresses are locally administered: a
+globally unique MAC is a real identifier, and a device using one is not
+hiding, so it keeps its own row whatever it shares with its neighbours.
+
+It is still not proof. Two handsets of the same model, both randomising,
+are indistinguishable from here and will be merged. The fold is limited to
+the case where the alternative -- a row per address -- is certainly wrong.
+`tools/check_spotter_merge.py` pins all of that down: sixteen rules, one of
+which is that two real cameras of a model stay two rows.
 
 **Persistence** is the cheap behavioural signal. A phone walks past. A
 camera is bolted to a pole and is still there on the next pass. Spotter
@@ -233,7 +249,13 @@ hardware it is meant to detect.
    fingerprint annotates rows that a signature already created; it does not
    create rows of its own, or 48 passing handsets would fill the table
    before anything interesting arrived.
-3. Grouping by fingerprint, randomised-address flagging, persistence.
+3. **Done.** Grouping by fingerprint, randomised-address flagging,
+   persistence. Another 308 bytes of flash and 192 of RAM. The row's third
+   line now reads `fp 25567F65 rnd +3 12m`: the hash, whether the address is
+   made up, how many times it has changed underneath us, and how long the
+   device has been in range. None of it scores into the confidence -- a
+   device being persistent is displayed, not believed, because what
+   persistence is worth is a question for hardware to answer.
 4. SD capture mode.
 5. `kIeSigs[]`, populated from captures, once there are any.
 

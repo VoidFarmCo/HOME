@@ -47,6 +47,7 @@ INCLUDE=(
   "tools/make_release.sh"
   "tools/check_pinmap.py"
   "tools/fuzz_ie_walk.py"
+  "tools/check_spotter_merge.py"
   "tools/gen_netlist.py"
   "tools/make_bitmap.py"
   "tools/make_placeholder_logo.py"
