@@ -18,6 +18,13 @@ understanding before anything is drawn.
 
 ## Why it cannot plug in
 
+**This board is drawn for the 2.8" ESP32-2432S028R.** The 3.5"
+ESP32-3248S035R is a supported panel for the firmware but not for this
+carrier: it is a different outline, and two of the signals below land
+elsewhere on it -- `CC1101_CS` is GPIO 21 rather than 27, and the touch
+controller is not on VSPI. Adapting J1 is a second-spin question, not an
+edit to this table.
+
 Of the ten signals the firmware needs, only four reach a CYD header:
 
 | signal | GPIO | where it is |

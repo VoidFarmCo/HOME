@@ -70,7 +70,7 @@ build.
 
 | Signal | GPIO | Where it lands | |
 |---|---|---|---|
-| CC1101 CS | 27 | CN1 header | header |
+| CC1101 CS | 21 / 27 | P3 header (3.5") or CN1 (2.8") | header |
 | CC1101 GDO0 (TX) | 22 | P3 header | header |
 | CC1101 GDO2 (RX) | 35 | P3 header | header |
 | GPS TX → ESP32 | 1 | P1 JST | header |

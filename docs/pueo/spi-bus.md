@@ -12,11 +12,16 @@ clock.
 The ESP32 has two general-purpose SPI peripherals. TFT_eSPI takes HSPI for the
 display. Everything else shares VSPI:
 
+This table is the 2.8" ESP32-2432S028R. Two rows move on the 3.5"
+ESP32-3248S035R: the XPT2046 is on the display's bus rather than this one, so
+it is not a contender for MISO at all, and `CC1101_CS` is 21 rather than 27
+because 27 is that panel's backlight. Everything else is identical.
+
 | device | CS | SCK | MISO | MOSI | driver behaviour |
 |---|---|---|---|---|---|
 | XPT2046 touch | 33 | 25 | **39** | 32 | own `beginTransaction`, 2 MHz |
 | SD card | 5 | 18 | **19** | 23 | own frequency via `SD.begin` |
-| CC1101 | 27 | 18 | **19** | 23 | **bare `SPI.transfer()`, no transaction** |
+| CC1101 | 27 * | 18 | **19** | 23 | **bare `SPI.transfer()`, no transaction** |
 | NRF24 | 4 | 18 | **19** | 23 | own `beginTransaction`, 16 MHz |
 | PN532 | 17 | 18 | 19 | 23 | **bit-bangs the pads**, LSB-first |
 

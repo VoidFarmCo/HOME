@@ -17,7 +17,7 @@ the compiler will and cross-references them against the CYD's own wiring.
 | VSPI MOSI | 23 | shared bus |
 | VSPI MISO | 19 | shared bus |
 | SD CS | 5 | onboard slot |
-| CC1101 CS | 27 | CN1 header |
+| CC1101 CS | **21 / 27** | panel-dependent, see below |
 | CC1101 GDO0 (TX) | 22 | P3 header |
 | CC1101 GDO2 (RX) | 35 | P3 header, input-only pin |
 | NRF24 CSN | 4 | was RGB LED red |
@@ -29,6 +29,22 @@ the compiler will and cross-references them against the CYD's own wiring.
 
 The onboard RGB LED is gone. GPIO 4/16/17 are the only contiguous spare pins on
 this board, and three radios need six lines.
+
+## CC1101 CS is the one pin the two panels cannot share
+
+The backlight moves between them: GPIO 21 on the 2.8" ESP32-2432S028R, GPIO 27
+on the 3.5" ESP32-3248S035R. Whichever one the display is not using is the one
+free for a chip select, so `CC1101_CS` is 27 on the 2.8" and 21 on the 3.5",
+selected by `PUEO_PANEL_35` in `board_pueo.h`.
+
+On the 3.5" that is a small bonus: 21 is on the Expand IO header (P3: GND,
+IO35, IO22, IO21) beside GDO0 and GDO2, so all three CC1101 control lines reach
+a connector instead of a pad. On the 2.8" board 27 is on CN1, which is also a
+header, so the count of soldered joints is the same either way.
+
+`tools/check_pinmap.py` reads the backlight pin out of `User_Setup cyd.h`
+rather than assuming it, so putting the select on the wrong one fails the
+build.
 
 ## Why GPIO 1 for GPS
 
