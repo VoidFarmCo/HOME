@@ -78,17 +78,73 @@ static bool bleSetFreshRandomAddress() {
   return true;
 }
 
-/* Stop, rotate, start. Returns false if the address did not change, in
- * which case advertising is restarted anyway on the old one. */
+/* Rotation gives up after this many consecutive failures and says why.
+ *
+ * Without it a board that dislikes the stop/start would fail silently once a
+ * second, and the visible symptom would be a spoofer that mysteriously stops
+ * transmitting -- which looks like a dead feature rather than a refused HCI
+ * command. Three in a row is a pattern rather than a hiccup. */
+static constexpr uint8_t kBleAddrRotateMaxFails = 3;
+
+static uint8_t     s_addrRotateFails = 0;
+static bool        s_addrRotateOff = false;
+static bool        s_addrRotateReported = false;
+static const char* s_addrRotateWhy = "";
+
+/* Stop, rotate, start.
+ *
+ * Advertising is restarted whatever happened in the middle: a spoofer that
+ * silently goes dark is worse than one transmitting from a stale address,
+ * and the stale address is exactly the behaviour every release before this
+ * one had. */
 static bool bleRotateAddressNow(BLEAdvertising* adv) {
-  if (adv != nullptr) {
-    adv->stop();
+  if (s_addrRotateOff) {
+    return false;
   }
-  const bool ok = bleSetFreshRandomAddress();
-  if (adv != nullptr) {
-    adv->start();
+
+  const char* why = nullptr;
+  if (adv != nullptr && !adv->stop()) {
+    why = "stop refused";
   }
-  return ok;
+  if (why == nullptr && !bleSetFreshRandomAddress()) {
+    why = "set addr refused";
+  }
+  if (adv != nullptr && !adv->start() && why == nullptr) {
+    why = "restart refused";
+  }
+
+  if (why == nullptr) {
+    s_addrRotateFails = 0;
+    return true;
+  }
+  if (++s_addrRotateFails >= kBleAddrRotateMaxFails) {
+    s_addrRotateOff = true;
+    s_addrRotateWhy = why;
+  }
+  return false;
+}
+
+/* Give rotation another go when a feature is entered. A transient refusal
+ * should not disable it for the rest of the session. */
+static void bleAddrRotateReset() {
+  s_addrRotateFails = 0;
+  s_addrRotateOff = false;
+  s_addrRotateReported = false;
+  s_addrRotateWhy = "";
+}
+
+/* True exactly once, the first time rotation gives up, so a feature can put
+ * one line on screen without polling a flag every pass. */
+static bool bleAddrRotateJustDisabled() {
+  if (s_addrRotateOff && !s_addrRotateReported) {
+    s_addrRotateReported = true;
+    return true;
+  }
+  return false;
+}
+
+static const char* bleAddrRotateWhy() {
+  return s_addrRotateWhy;
 }
 
 /* True once per kBleAddrRotateMs. `lastMs` starts at 0, so the first call
@@ -1106,6 +1162,7 @@ void runUI() {
 }
 
 void spooferSetup() {
+  bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   setTouchButtonInputEnabled(true);
   bleSetSpooferNavLabels();
@@ -1188,6 +1245,10 @@ void spooferLoop() {
    * not on whether the screen happened to redraw. */
   if (isAdvertising && pAdvertising && bleAddrRotateDue(&s_addrRotateMs)) {
     bleRotateAddressNow(pAdvertising);
+  }
+  if (bleAddrRotateJustDisabled()) {
+    Printspoofer("[!] addr rotation off: " + String(bleAddrRotateWhy()),
+                 ORANGE, false);
   }
 }
 
@@ -1376,6 +1437,7 @@ BLEAdvertisementData getOAdvertisementData() {
 }
 
 void sourappleSetup() {
+  bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   setTouchButtonInputEnabled(true);
   bleSetExitOnlyNavLabels();
@@ -1417,6 +1479,10 @@ void sourappleLoop() {
    * pattern AirTagSpoofer found was resetting the board. */
   if (bleAddrRotateDue(&s_addrRotateMs)) {
     bleRotateAddressNow(Advertising);
+  }
+  if (bleAddrRotateJustDisabled()) {
+    addLineToDisplay("[!] addr rotation off: " +
+                     String(bleAddrRotateWhy()));
   }
   BLEAdvertisementData oAdvertisementData = getOAdvertisementData();
 
@@ -1792,6 +1858,12 @@ static void burstOnce(bool forceLog) {
   if (bleAddrRotateDue(&s_addrRotateMs)) {
     bleRotateAddressNow(s_advertising);
   }
+  if (bleAddrRotateJustDisabled()) {
+    char line[48];
+    snprintf(line, sizeof(line), "[!] addr rotation off: %s",
+             bleAddrRotateWhy());
+    logLine(line, ORANGE);
+  }
 
   s_txCount++;
   s_lastBurstMs = millis();
@@ -1905,6 +1977,7 @@ static void teardown() {
 }
 
 void airTagSetup() {
+  bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);

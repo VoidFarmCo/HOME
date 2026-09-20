@@ -87,6 +87,16 @@ resetting the board, so rotating on every 40 ms burst is the exact pattern to
 avoid. A second is far below anything that makes a device followable and is
 about twenty-five times less churn.
 
+**It gives up rather than going dark.** Rotation is stop, set, start, and
+if the board turns out to dislike that the failure has to be visible. Three
+consecutive failures latch it off and put one line on screen saying which
+step was refused &mdash; `stop refused`, `set addr refused`, `restart refused`.
+Advertising is restarted whatever happened in between, because a spoofer
+that silently stops transmitting is worse than one transmitting from a stale
+address, and a stale address is exactly what every release before this did.
+Entering a spoofer resets the latch, so a transient refusal does not disable
+rotation for the session.
+
 **The screen reads the address back from the stack.**
 `NimBLEDevice::getAddress()` is no use here: it prefers the *public* address
 and only falls back to random when there is no public one, which on an ESP32
