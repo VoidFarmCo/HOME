@@ -79,6 +79,7 @@ INCLUDE=(
   "tools/check_airtag_parse.py"
   "tools/check_sub_parse.py"
   "tools/check_fastpair.py"
+  "tools/check_fastpair_probe.py"
   "tools/gen_netlist.py"
   "tools/make_bitmap.py"
   "tools/make_placeholder_logo.py"

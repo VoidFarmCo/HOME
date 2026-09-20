@@ -101,4 +101,10 @@ namespace BleSniffer {
   void blesnifferSetup();
 }
 
+namespace FastPairScan {
+  void fastPairSetup();
+  void fastPairLoop();
+  void exit();
+}
+
 #endif

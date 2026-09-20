@@ -5,6 +5,7 @@
 #include "SettingsStore.h"
 #include "Touchscreen.h"
 #include "config.h"
+#include "FastPairScan.h"
 #include "Spotter.h"
 #include "ducky.h"
 #include "icon.h"
@@ -90,7 +91,7 @@ const char *wifi_page1_items[WIFI_PAGE1_FEATURES] = {
 
 // Bluetooth submenu uses the same paged footer layout as WiFi.
 static constexpr int BT_PAGE0_FEATURES = 8;
-static constexpr int BT_PAGE1_FEATURES = 2;
+static constexpr int BT_PAGE1_FEATURES = 3;
 static int bluetooth_submenu_page = 0;
 
 const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
@@ -105,7 +106,8 @@ const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
 
 const char *bluetooth_page1_items[BT_PAGE1_FEATURES] = {
     "Skimmer Detect",
-    "Spotter"};
+    "Spotter",
+    "Fast Pair"};
 
 static FeatureUI::Button s_pagedFooterBtns[2];
 static int s_pagedFooterFocus = -1;  // 0=back, 1=page btn, -1=none
@@ -2313,6 +2315,41 @@ void handleBluetoothSubmenuButtons() {
                 }
             }
             Spotter::exit();
+            if (feature_exit_requested) {
+                in_sub_menu = true;
+                is_main_menu = false;
+                submenu_initialized = false;
+                feature_active = false;
+                feature_exit_requested = false;
+                displaySubmenu();
+                delay(200);
+            }
+        }
+
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
+            current_submenu_index = 2;
+            in_sub_menu = true;
+            feature_active = true;
+            feature_exit_requested = false;
+            FastPairScan::fastPairSetup();
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+                current_submenu_index = 2;
+                in_sub_menu = true;
+                FastPairScan::fastPairLoop();
+                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                    in_sub_menu = true;
+                    is_main_menu = false;
+                    submenu_initialized = false;
+                    feature_active = false;
+                    feature_exit_requested = false;
+                    displaySubmenu();
+                    delay(200);
+                    while (isButtonPressed(BTN_SELECT)) {
+                    }
+                    break;
+                }
+            }
+            FastPairScan::exit();
             if (feature_exit_requested) {
                 in_sub_menu = true;
                 is_main_menu = false;
