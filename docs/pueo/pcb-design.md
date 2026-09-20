@@ -181,8 +181,8 @@ If that is short, the lever is the backlight, not the radios.
 
 ## SPI signal integrity
 
-Four devices on one bus, reached through a cable, is the part of this design
-most likely to disappoint.
+Five devices on one bus, three of them through a cable, is the part of this
+design most likely to disappoint.
 
 - Keep module stubs off the SCK/MOSI spine as short as the placement allows.
   Daisy-chain along the spine rather than star-wiring from J1.
