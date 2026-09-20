@@ -11,6 +11,54 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.7 - 2026-09-19
+------------------
+
+The BLE spoofers stop transmitting from one fixed address.
+
+Bluetooth:
+
+  * BLE Spoofer, Sour Apple and AirTag Spoofer now rotate their BLE address
+    once a second. All three built a random address and then dropped it on
+    the floor - nothing called esp_ble_gap_set_rand_addr, setOwnAddrType or
+    ble_hs_id_set_rnd - so every packet went out from the ESP32's one fixed
+    address. A stream of a dozen different Apple products sharing an address
+    is not a disguise, and it made the transmitting device attributable for
+    as long as it ran.
+
+    This was documented rather than fixed in 0.2.4, because making the
+    spoofers harder to attribute is an increase in what they do rather than
+    a correction to what they claim. That is the owner's call and it has now
+    been made.
+
+  * Non-resolvable private, not static random. ble_hs_id_gen_rnd(1, ...)
+    asks the stack for an NRPA, which is the address type the specification
+    defines for exactly this; a static random address is meant to hold still
+    for a power cycle, so rotating one is out of spec even though the
+    controller allows it. Letting the stack generate it also sidesteps the
+    top-two-bits rule, which the old dead code got right once (0xC0) and
+    wrong twice - 0xF0, and on the wrong end of the array for NimBLE, which
+    takes the address little-endian.
+
+  * Once a second rather than once a burst, because the controller refuses
+    HCI_LE_Set_Random_Address while advertising is enabled, so a rotation is
+    stop, set, start. AirTagSpoofer carries a note that repeated stop/start
+    was resetting the board, so rotating every 40 ms burst is the exact
+    pattern to avoid. kBleAddrRotateMs is the dial if the board turns out to
+    tolerate more. On a failure advertising restarts on the old address
+    rather than staying dark.
+
+  * AirTag Spoofer's address display reads the stack instead of a kept copy.
+    NimBLEDevice::getAddress() prefers the PUBLIC address and only falls back
+    to random when there is no public one, which on an ESP32 never happens,
+    so it would have gone back to confidently showing the one address the
+    radio is not transmitting from. ble_hs_id_copy_addr(BLE_ADDR_RANDOM, ...)
+    gets the real one.
+
++504 bytes. The four NimBLE symbols are in the linked image, checked with nm
+rather than assumed - including ble_hs_hci_util_set_random_addr, which is
+what actually issues the HCI command.
+
 0.2.6 - 2026-09-19
 ------------------
 
