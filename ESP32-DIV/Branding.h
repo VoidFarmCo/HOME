@@ -22,6 +22,7 @@
 
 #define PUEO_NAME        "Pueo"
 #define PUEO_TAGLINE     "multi-radio field tool"
+#define PUEO_AUTHOR      "magikh0e"
 
 /* Shown under the name on the splash, and in the serial banner. */
 #define PUEO_UPSTREAM    "based on ESP32-DIV by CiferTech"
@@ -44,9 +45,15 @@
  *
  * The size ceiling comes from the layout, not from taste. displayLogo() puts
  * the logo at y = 140 - H/2, so the text below it has to fit in what is left
- * of a 320px panel. With the name line that text block is 82px and H caps at
- * 196; with PUEO_LOGO_HAS_WORDMARK it is 46px and H caps at about 240, where
- * the 240px panel width becomes the real limit. 200 leaves 24px of slack.
+ * of a 320px panel.
+ *
+ * Four lines sit under the artwork now -- byline, tagline, version, upstream
+ * -- which is a 62px block, and H caps at 217. It was three lines and 46px,
+ * capping at 249, before the byline was added. With the name line drawn as
+ * well (PUEO_LOGO_HAS_WORDMARK 0) the block is 88px and H caps at 164.
+ *
+ * 200 leaves 8px of slack at the bottom of the panel. That is the number to
+ * recompute before adding a fifth line, not the logo size.
  *
  * The ten-frame loading animation (bitmap_icon_skull_loading_1..10, 100x120)
  * is also upstream artwork and is still in use. Replace it the same way when

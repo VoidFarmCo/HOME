@@ -1255,7 +1255,13 @@ void displayLogo(uint16_t color, int displayTime) {
   textY += 26;
 #endif
 
+  /* Byline first, directly under the artwork. Everything below it moved
+   * down 16px when this was added; see the ceiling note in Branding.h,
+   * which is the thing that stops the logo and the text colliding. */
   tft.setTextSize(1);
+  tft.drawString("by: " PUEO_AUTHOR, cx, textY);
+  textY += 16;
+
   tft.drawString(PUEO_TAGLINE, cx, textY);
   textY += 16;
 
@@ -1268,6 +1274,7 @@ void displayLogo(uint16_t color, int displayTime) {
 
   Serial.println("==================================");
   Serial.println(PUEO_NAME " - " PUEO_TAGLINE);
+  Serial.println("by: " PUEO_AUTHOR);
   Serial.print("Version:      "); Serial.println(PUEO_VERSION);
   Serial.print("Forked from:  ESP32-DIV "); Serial.println(ESP32DIV_VERSION);
   Serial.println(PUEO_UPSTREAM);
