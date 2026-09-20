@@ -3,6 +3,9 @@
 CYD ESP32-2432S028R with four external peripherals, in a custom 85 x 170 x 20
 enclosure. The pin map below is fixed; the case is already printed around it.
 
+For the order to wire it in, and which six of the ten signals need soldering
+rather than a header, see [build-guide.md](build-guide.md).
+
 ## Pin map
 
 Machine-checked by `tools/check_pinmap.py`, which resolves the macros the way
