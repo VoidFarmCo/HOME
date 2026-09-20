@@ -180,7 +180,7 @@ And `SpiStart()` called `SPI.begin(SCK, MISO, MOSI, SS)`, which is a no-op
 once the bus is running, so the pins it looked like it was claiming were
 never claimed. It now opens a transaction instead, which holds the SPI mutex
 so a WiFi or BLE task cannot interleave a transfer midway through ours, and
-applies `CC1101_SPI_HZ` (4 MHz, under the 6.5 MHz burst ceiling) explicitly
+applies the CC1101's 4 MHz from `kProfiles` (under the 6.5 MHz burst ceiling)
 rather than inheriting the last device's clock.
 
 See `libs/SmartRC-CC1101-Driver-Lib/VENDORED.md`.

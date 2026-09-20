@@ -188,8 +188,9 @@ most likely to disappoint.
   Daisy-chain along the spine rather than star-wiring from J1.
 - Footprints for **22 Ω series resistors on SCK and MOSI** at the J1 end.
   Fit 0 Ω initially; they are there so ringing is a part swap, not a respin.
-- The CC1101 runs at 4 MHz and the NRF24 at up to 10 MHz (`CC1101_SPI_HZ`,
-  and the `RF24` constructor). At 10 MHz through a cable, edge rates matter.
+- The CC1101 runs at 4 MHz and the NRF24 at up to 10 MHz, both set in the
+  `kProfiles` table in `ESP32-DIV/SpiBus.cpp`. At 10 MHz through a cable, edge
+  rates matter.
 - Chip selects are the safe nets to route awkwardly. They are static during a
   transaction, so a long CS trace costs nothing.
 

@@ -52,13 +52,14 @@ this wiring, not a bug. It comes back when you leave the feature.
 The handoff listed NRF24 IRQ and PN532 SS both on GPIO 17. Resolved in favour
 of the PN532: upstream never reads the NRF24 interrupt line. There is no IRQ
 pin macro anywhere in the tree and no `whatHappened()` or `maskIRQ()` call; the
-RF24 driver is polled throughout. Leave the pin off the board.
+NRF24 path is polled throughout. Leave the pin off the board.
 
 ## One NRF24, three radio objects
 
-`bluetooth.cpp` instantiates `radio1`/`radio2`/`radio3` for the multi-channel
-BLE jammer modes. Pueo has one module, so `CE_PIN_2`/`_3` and
-`CSN_PIN_2`/`_3` are aliased onto the same pads as `_1`. Those modes will run
+The multi-channel BLE jammer modes were written around three radio objects;
+since 0.2.2 they go through `Nrf24Raw`'s free functions instead. Pueo has one
+module, so `CE_PIN_2`/`_3` and `CSN_PIN_2`/`_3` are aliased onto the same pads
+as `_1`. Those modes will run
 degraded on a single radio rather than failing to build. They are outside the
 initial feature set anyway.
 
