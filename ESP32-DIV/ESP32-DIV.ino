@@ -1018,12 +1018,14 @@ void displayOtherMenuGrid() {
         int x_position = (column == 0) ? X_OFFSET_LEFT : X_OFFSET_RIGHT;
         int y_position = Y_START + row * Y_SPACING;
 
-        tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_FG);
+        /* Filled, to match the main menu -- same tile, same size, and it
+         * had the same problem. See the note in displayMenu(). */
+        tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
         tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
 
-        tft.setTextColor(UI_ICON, UI_FG);
+        tft.setTextColor(UI_BG, UI_ICON);
         tft.drawBitmap(x_position + 42, y_position + 10, other_submenu_icons[current_submenu_index],
-                       16, 16, SELECTED_ICON_COLOR);
+                       16, 16, UI_BG);
         int textWidth = tft.textWidth(other_submenu_items[current_submenu_index]);
         int textX = x_position + (100 - textWidth) / 2;
         int textY = y_position + 30;
@@ -1128,14 +1130,26 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
         int x_position = (column == 0) ? X_OFFSET_LEFT : X_OFFSET_RIGHT;
         int y_position = Y_START + row * Y_SPACING;
 
-        tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_FG);
+        /* A selected tile is FILLED with the accent and its contents drop to
+         * the background colour, rather than only swapping a hairline border.
+         *
+         * It had nowhere else to go. Every entry in the icon tables is
+         * already UI_ICON and SELECTED_ICON_COLOR was defined as UI_ICON
+         * again, so the icon was identical selected or not; the whole cue was
+         * a 1 px outline and the label going white to accent, on a 100x60
+         * tile. Filling flips about half the tile's area instead, which is
+         * what carries at arm's length and in sunlight.
+         *
+         * The label goes dark rather than white because dark on accent is
+         * about 6.4:1 and white on accent is 2.6:1. */
+        tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
         tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
 
-        tft.setTextColor(UI_ICON, UI_FG);
+        tft.setTextColor(UI_BG, UI_ICON);
         if (current_menu_index == MAIN_MENU_OTHER_IDX) {
-            drawMainMenuOtherTripleIcons(x_position, y_position, SELECTED_ICON_COLOR);
+            drawMainMenuOtherTripleIcons(x_position, y_position, UI_BG);
         } else {
-            tft.drawBitmap(x_position + 42, y_position + 10, bitmap_icons[current_menu_index], 16, 16, SELECTED_ICON_COLOR);
+            tft.drawBitmap(x_position + 42, y_position + 10, bitmap_icons[current_menu_index], 16, 16, UI_BG);
         }
         int textWidth = tft.textWidth(menu_items[current_menu_index]);
         int textX = x_position + (100 - textWidth) / 2;

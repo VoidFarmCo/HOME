@@ -46,8 +46,6 @@ uint16_t uiUniversalColor();
 #define FEATURE_BG BLACK
 #endif
 
-#define SELECTED_ICON_COLOR UI_ICON
-
 /*──────────────────── UI Defaults ────────────────────*/
 #ifndef UI_BG
 #define UI_BG UI.bg
