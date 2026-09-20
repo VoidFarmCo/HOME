@@ -398,6 +398,15 @@ SPOTTER_HITS = [
          mac="00:25:DF:4A:19:E2", via="BLE", rssi=-49, hits=18,
          fp=0, rnd=False, rot=0, age="2m", corrob=False),
 
+    # 0.3.3: a KARR module, matched on its advertised name -- "QT " plus
+    # exactly eight characters. Likely, not Strong: the name says a module is
+    # there, and nothing in the advertisement says whether it still carries
+    # the shared key. Also the only orange row here, which is the point of
+    # including it -- the grading has three levels and the render showed two.
+    dict(kind="VEHICLE", label="KARR BT module", conf="Likely",
+         mac="D8:3A:DD:41:0C:96", via="BLE", rssi=-63, hits=27,
+         fp=0, rnd=False, rot=0, age="6m", corrob=False),
+
     # What the same table looks like when it is guessing. A contract
     # manufacturer's block, seen three times in eight seconds, walking past.
     dict(kind="ALPR", label="Liteon (ALPR?)", conf="Weak",

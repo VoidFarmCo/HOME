@@ -10,6 +10,74 @@ been read closely it is said so in the entry that did it.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.3.3 - 2026-09-20
+------------------
+
+Spotter learns to name KARR modules, and the wardriver learns not to upload
+them.
+
+  * UC San Diego's "BLE Theft Auto" (USENIX Security 2026) wardrove San
+    Diego's highways and found KARR second only to Tesla among BLE devices on
+    the road - 608 of 4,314 unique devices - because dealerships fit one to
+    every car on the lot. It is a dealer-installed immobiliser and remote
+    control whose modules share one hard-coded key across every unit. Two
+    models, both advertising a prefix plus exactly eight characters: QT is
+    BLE-only, DR adds cellular.
+
+        {"QT ", 11, Kind::Vehicle, Conf::Likely, "KARR BT module"},
+        {"DR ", 11, Kind::Vehicle, Conf::Likely, "KARR Cell module"},
+
+    Likely, not Strong, and a module rather than a finding. The shared-key
+    vulnerability was patched by the vendor on 2026-07-20, but the fix is
+    applied by hand and nothing in the advertisement says whether it has
+    been. Presence is what a passive scan can support.
+
+    No OUI rows. The paper reports KARR allocating MACs sequentially inside a
+    small set of blocks - 221 outliers in 1,141,798 sampled QT addresses - so
+    the addresses are public and corroboration would work, but it plots the
+    blocks without printing them.
+
+  * NameSig gains exactLen. It matched on prefix alone, case-insensitively,
+    which is fine for "Spectacles" and useless for "DR " - that claims every
+    device whose name starts that way, and a match is what puts a row on the
+    screen. prefixMatch becomes nameMatch so something reads the field. The
+    nine existing rows carry an explicit 0 rather than relying on zero-fill:
+    in a signature table, "no constraint" should be visible, not inferred.
+
+  * The WiGLE upload withholds Kind::Vehicle rows. The same paper describes
+    the attack beginning with a name-pattern query against a public
+    wardriving database - 1,141,798 QT addresses were pulled from WiGLE that
+    way - so uploading fresh sightings with coordinates would be adding to
+    that index.
+
+    Filtered at the conversion, not at the log. The ward CSV on the card
+    keeps every device the radio heard; only what leaves for a public
+    database is trimmed, and the conversion reports how many rows it dropped.
+    Withholding from WiGLE and lying to the operator about what their own
+    radio heard are different things.
+
+    Spotter never fed the WiGLE export in the first place - it writes its own
+    /spotter_<ms>.csv with no coordinates in it, and gps.cpp had no reference
+    to Spotter before this. The exposure was the wardriver logging every BLE
+    device it hears by name, MAC and position, which it does for a KARR
+    module the same as for a doorbell.
+
+  * check_spotter_oui.py: 151 checks to 197. A short prefix must declare a
+    length or be listed with the reason it does not need one; an exemption
+    fails once the row it was written for is gone; isVehicleName has to exist,
+    select on Kind::Vehicle, and be called from gps.cpp.
+
+    Two of those checks were wrong when first written and were fixed rather
+    than kept. A bare length threshold failed on {"Flock", 0}, which is a
+    false positive - a distinctive word is not a two-letter prefix - so an
+    exemption list replaced the threshold instead of the threshold being
+    tuned until it passed. And the gps.cpp check read `"Spotter::isVehicleName"
+    in gps`, which the comment beside the call satisfied on its own; it now
+    requires the name followed by an open paren.
+
+  * The Spotter screen render gains a KARR row. It is also the first orange
+    row in it: the grading has three levels and the render showed two.
+
 0.3.2 - 2026-09-20
 ------------------
 
