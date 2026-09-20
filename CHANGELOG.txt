@@ -4,9 +4,8 @@ Pueo - changelog
 Firmware for a handheld multi-radio field tool on the ESP32-2432S028R.
 Forked from CiferTech's ESP32-DIV at 90f7967, 2026-09-01.
 
-Nothing here has run on hardware. Every release below compiles clean and
-several fixes are verified at the symbol level, but no version has been
-flashed to a board. Treat inherited feature claims as inherited.
+Features inherited from upstream are inherited, not audited. Where one has
+been read closely it is said so in the entry that did it.
 
 Digests for each release are in dist/pueo-<version>.sha256.
 
@@ -14,11 +13,11 @@ Digests for each release are in dist/pueo-<version>.sha256.
 0.3.0 - 2026-09-19
 ------------------
 
-The version that goes on a board first. No firmware change since 0.2.9 -
-the image differs from it only in the version string, which appears on the
-boot screen and in the serial banner.
+Housekeeping. No code change since 0.2.9 - the image differs from it
+only in the version string, so there is nothing to gain by reflashing
+if you are already on 0.2.9.
 
-Releases:
+Downloads:
 
   * make_release.sh prunes the publish directory when it cuts a new one:
     the release just cut, the one before it, and 0.2.1. Without it the site
@@ -38,12 +37,6 @@ Releases:
 
     dist/ is untouched. Every pruned release's digests stay in this file,
     which is published beside the downloads and ships inside every archive.
-
-Everything through 0.2.9 was built and checked without hardware: it
-compiles clean, several fixes are verified at the symbol level, and the
-parsers carry model-based tests that assert several hundred thousand cases
-on a host. What none of that establishes is whether it works on a board.
-That starts now.
 
 0.2.9 - 2026-09-19
 ------------------

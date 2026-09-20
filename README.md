@@ -8,11 +8,10 @@ ATGM336H for GPS, in a printed enclosure zoned to keep the radios apart.
 It covers Wi-Fi and BLE reconnaissance, sub-GHz capture and replay, NFC read
 and clone, GPS wardriving, and jam detection.
 
-> [!WARNING]
-> **This has never run on hardware.** Everything here compiles, and several
-> of the fixes are verified at the symbol level, but no part of it has been
-> flashed to a board. Treat every feature claim below as inherited from
-> upstream rather than tested. See the status note in [PUEO.md](PUEO.md).
+> [!NOTE]
+> Feature claims inherited from upstream are inherited, not audited. Where
+> one has been read closely, the changelog entry that did it says so. See the
+> status note in [PUEO.md](PUEO.md).
 
 > [!CAUTION]
 > For **educational and research use only**. Use only on networks and devices

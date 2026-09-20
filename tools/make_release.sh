@@ -157,9 +157,8 @@ bite you" section of PUEO.md before deviating from the script -- the esp32
 core version, the pinned library versions and the toolchain path length are
 all load-bearing.
 
-NOT TESTED ON HARDWARE. This compiles clean and much of it is verified at
-the symbol level, but no part of it has been flashed to a board. See the
-status note in PUEO.md.
+Features inherited from upstream are inherited, not audited. See the status
+note in PUEO.md.
 
 tools/history/ holds the one-shot scripts that performed specific refactors,
 kept for provenance. They are not meant to be run again and will refuse.

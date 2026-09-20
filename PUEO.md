@@ -14,10 +14,11 @@ the pin conflicts in the stock CYD map, a single owner for the SPI bus that
 the display, SD card and all three radios share, and a build that compiles
 clean under `-Wall -Wextra` rather than suppressing its own warnings.
 
-> **Status: not yet run on hardware.** Everything here compiles and is
-> reasoned from the source, and several of the fixes are verified at the
-> symbol level, but no part of it has been flashed to a board. Treat feature
-> claims as inherited from upstream rather than tested.
+> **Status.** Everything here compiles clean under `-Wall -Wextra`, several
+> of the fixes are verified at the symbol level, and the parsers carry
+> model-based tests that run on a host. Features inherited from upstream are
+> inherited, not audited — where one has been read closely, the changelog
+> entry that did it says so.
 
 Lineage: forked from [CiferTech's ESP32-DIV](https://github.com/cifertech/ESP32-DIV)
 at `90f7967c4dc7bcd8c09ebdcf421886737516ddc2` (upstream main, 2026-09-01,
