@@ -259,6 +259,149 @@ bool generateGoogleAdvPacket(BLEAdvertisementData& advData) {
   return true;
 }
 
+/* ── Microsoft Swift Pair ──────────────────────────────────────────────────
+ *
+ * Windows raises a "New <name> found" notification for any LE advertisement
+ * carrying Microsoft's vendor section. The layout is Microsoft's own, from
+ * the Swift Pair component guidelines:
+ *
+ *     02 01 06                     flags
+ *     LL FF 06 00 03 SS 80 <name>
+ *        |  |     |  |  +--------- reserved RSSI byte, spec says set to 0x80
+ *        |  |     |  +------------ beacon sub scenario, see below
+ *        |  |     +--------------- Microsoft Beacon ID
+ *        |  +--------------------- Microsoft vendor ID 0x0006, little endian
+ *        +------------------------ vendor-specific AD type
+ *
+ * Sourcing, because the two halves are not equally well attested. The
+ * vendor ID, the 0x80 reserved byte and the sub-scenario table are stated
+ * in the text of Microsoft's documentation. The Beacon ID 0x03 appears only
+ * in that page's figures, which are images -- it is what implementations
+ * use and what Windows answers, but it was read off a picture rather than a
+ * table, and that is worth knowing if it ever stops working.
+ *
+ * Sub scenario, from the spec's own table:
+ *     0x00  pairing over Bluetooth LE only
+ *     0x01  pairing over BR/EDR only, using LE for discovery
+ *     0x02  pairing over LE and BR/EDR with Secure Connections
+ *
+ * Only 0x00 is sent. The other two describe a dual-mode peripheral, and
+ * 0x01 additionally requires the BR/EDR address to be in the same
+ * advertisement. This transmits LE and has no BR/EDR address to offer, so
+ * sending either would be advertising a capability that is not there. Note
+ * that several spam tools send 0x03, which is not in the table at all.
+ *
+ * On the name: it is deliberately this device's own rather than a real
+ * product's. Windows prints it verbatim, so a neutral name means the person
+ * running the test can tell their own notification from a stranger's, and
+ * nothing here ends up impersonating a brand it has no business wearing.
+ * The four random characters are what make repeated bursts show up as
+ * separate notifications -- see the note in docs/pueo/spoofers.md about the
+ * BLE address never rotating, which is why the name has to do that work. */
+constexpr uint8_t SWIFT_PAIR_BEACON_ID     = 0x03;
+constexpr uint8_t SWIFT_PAIR_SUB_LE_ONLY   = 0x00;
+constexpr uint8_t SWIFT_PAIR_RESERVED_RSSI = 0x80;
+
+bool generateSwiftPairAdvPacket(BLEAdvertisementData& advData) {
+  char name[14];
+  static const char kAlpha[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  snprintf(name, sizeof(name), "Pueo-%c%c%c%c",
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)]);
+  const uint8_t nameLen = (uint8_t)strlen(name);
+
+  uint8_t raw[31];
+  uint8_t i = 0;
+  raw[i++] = 0x02;                      // flags section
+  raw[i++] = 0x01;
+  raw[i++] = 0x06;                      // LE general discoverable, no BR/EDR
+
+  /* Length counts the type byte and everything after it: 2 vendor ID, 1
+   * beacon ID, 1 sub scenario, 1 reserved, then the name. */
+  raw[i++] = (uint8_t)(1 + 2 + 1 + 1 + 1 + nameLen);
+  raw[i++] = 0xFF;
+  raw[i++] = 0x06;                      // 0x0006 little endian
+  raw[i++] = 0x00;
+  raw[i++] = SWIFT_PAIR_BEACON_ID;
+  raw[i++] = SWIFT_PAIR_SUB_LE_ONLY;
+  raw[i++] = SWIFT_PAIR_RESERVED_RSSI;
+  memcpy(&raw[i], name, nameLen);
+  i = (uint8_t)(i + nameLen);
+
+  advData.addData(std::string((char*)raw, i));
+  return true;
+}
+
+/* ── Flipper Zero ──────────────────────────────────────────────────────────
+ *
+ *     02 01 06                     flags
+ *     LL 09 <name>                 complete local name
+ *     03 02 <lo> 30                incomplete list of 16-bit service UUIDs
+ *     02 0A 00                     TX power
+ *
+ * The service UUID is 0x3080 with the hardware colour OR'd into the low
+ * bits. That is not inferred from captures: Flipper's own firmware does
+ *
+ *     .Service_UUID_16 = 0x3080
+ *     config->adv_service.Service_UUID_16 |= furi_hal_version_get_hw_color();
+ *
+ * in its serial profile, so 0x3081, 0x3082 and 0x3083 are one service on
+ * differently coloured hardware rather than three services. 0x3082 already
+ * appears in this file as devices_uuid, which is where it came from.
+ *
+ * Worth knowing about that devices_uuid: it is handed to addServiceUUID()
+ * immediately before setAdvertisementData(), and a custom advertisement
+ * payload replaces what addServiceUUID built, so it never reaches the air.
+ * It also carries 9000 where the Bluetooth base UUID has 8000. Left alone
+ * here because this change is about adding two templates, not rewriting the
+ * advertising path, but it is why the UUID below is written out rather than
+ * reusing that string. */
+constexpr uint16_t FLIPPER_SERVICE_BASE = 0x3080;
+
+bool generateFlipperAdvPacket(BLEAdvertisementData& advData) {
+  /* Flipper names are "Flipper " and the unit's own name. Six letters is
+   * the usual length and keeps the whole packet inside 31 bytes. */
+  static const char kAlpha[] = "abcdefghijklmnopqrstuvwxyz";
+  char name[16];
+  snprintf(name, sizeof(name), "Flipper %c%c%c%c%c%c",
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)],
+           kAlpha[random(sizeof(kAlpha) - 1)]);
+  const uint8_t nameLen = (uint8_t)strlen(name);
+
+  /* Colour 1..3. Zero is the uncoloured value and is not something a unit
+   * in the wild advertises. */
+  const uint16_t uuid = (uint16_t)(FLIPPER_SERVICE_BASE | (random(3) + 1));
+
+  uint8_t raw[31];
+  uint8_t i = 0;
+  raw[i++] = 0x02;
+  raw[i++] = 0x01;
+  raw[i++] = 0x06;
+
+  raw[i++] = (uint8_t)(1 + nameLen);
+  raw[i++] = 0x09;                      // complete local name
+  memcpy(&raw[i], name, nameLen);
+  i = (uint8_t)(i + nameLen);
+
+  raw[i++] = 0x03;
+  raw[i++] = 0x02;                      // incomplete list of 16-bit UUIDs
+  raw[i++] = (uint8_t)(uuid & 0xFF);    // little endian on the wire
+  raw[i++] = (uint8_t)(uuid >> 8);
+
+  raw[i++] = 0x02;
+  raw[i++] = 0x0A;                      // TX power
+  raw[i++] = 0x00;
+
+  advData.addData(std::string((char*)raw, i));
+  return true;
+}
+
 BLEAdvertisementData getAdvertismentData() {
   BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
 
@@ -269,6 +412,10 @@ BLEAdvertisementData getAdvertismentData() {
     generateSamsungAdvPacket(samsungIndex, oAdvertisementData);
   } else if (device_choice == 2) { // Google
     generateGoogleAdvPacket(oAdvertisementData);
+  } else if (device_choice == 3) { // Microsoft Swift Pair
+    generateSwiftPairAdvPacket(oAdvertisementData);
+  } else if (device_choice == 4) { // Flipper Zero
+    generateFlipperAdvPacket(oAdvertisementData);
   }
 
   return oAdvertisementData;
@@ -385,6 +532,8 @@ static const char* spooferDeviceLabel(int type) {
     case 19: return "Galaxy Watch 5";
     case 20: return "Galaxy Watch 6";
     case 21: return "Google Smart Ctrl";
+    case 22: return "Swift Pair (Win)";
+    case 23: return "Flipper Zero";
     default: return "Airpods";
   }
 }
@@ -619,6 +768,18 @@ void Google_Smart_Ctrl() {
   attack_state = 1;
 }
 
+void Swift_Pair() {
+  device_choice = 3; // Microsoft
+  device_index = 0;
+  attack_state = 1;
+}
+
+void Flipper_Zero() {
+  device_choice = 4; // Flipper
+  device_index = 0;
+  attack_state = 1;
+}
+
 void setAdvertisingData() {
 
   switch (deviceType) {
@@ -685,6 +846,12 @@ void setAdvertisingData() {
     case 21:
       Google_Smart_Ctrl();
       break;
+    case 22:
+      Swift_Pair();
+      break;
+    case 23:
+      Flipper_Zero();
+      break;
     default:
       Airpods();
       break;
@@ -712,7 +879,7 @@ void handleButtonPress(int pin, void (*callback)()) {
 
 void changeDeviceTypeNext() {
   deviceType++;
-  if (deviceType > 21) deviceType = 1;
+  if (deviceType > 23) deviceType = 1;
   Serial.println("Device Type Next: " + String(deviceType));
   setAdvertisingData();
   updateSpoofer();
@@ -720,7 +887,7 @@ void changeDeviceTypeNext() {
 
 void changeDeviceTypePrev() {
   deviceType--;
-  if (deviceType < 1) deviceType = 21;
+  if (deviceType < 1) deviceType = 23;
   Serial.println("Device Type Prev: " + String(deviceType));
   setAdvertisingData();
   updateSpoofer();

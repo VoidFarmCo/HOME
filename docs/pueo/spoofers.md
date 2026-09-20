@@ -81,3 +81,100 @@ the floor. That is deliberate for this kind of thing and is also what makes
 them conspicuous to anything watching the band.
 
 None of this has run on hardware, like everything else here.
+
+## Two templates added: Swift Pair and Flipper Zero
+
+`BLE Spoofer` had Apple, Samsung and Google. It now also has Microsoft
+Swift Pair and Flipper Zero, as device types 22 and 23.
+
+Both were built from primary sources rather than from another tool's byte
+arrays, which matters because in both cases the primary source said
+something the copies do not.
+
+### Swift Pair
+
+Windows raises a "New *name* found" notification for any LE advertisement
+carrying Microsoft's vendor section:
+
+```
+02 01 06                     flags
+LL FF 06 00 03 SS 80 <name>  vendor-specific
+```
+
+From Microsoft's Swift Pair component guidelines. The vendor ID `0x0006`,
+the `0x80` reserved RSSI byte, and the sub-scenario table are stated in the
+text. **The Beacon ID `0x03` is not** — it appears only in that page's
+figures, which are images. It is what implementations use and what Windows
+answers, but it was read off a picture, and that is worth knowing if it ever
+stops working.
+
+The sub-scenario values the spec defines:
+
+| value | meaning |
+|---|---|
+| `0x00` | pairing over Bluetooth LE only |
+| `0x01` | pairing over BR/EDR only, using LE for discovery |
+| `0x02` | pairing over LE and BR/EDR with Secure Connections |
+
+Only `0x00` is sent. The other two describe a dual-mode peripheral, and
+`0x01` additionally requires the BR/EDR address in the same advertisement.
+This device transmits LE and has no BR/EDR address to offer, so sending
+either would advertise a capability that is not there. Several spam tools
+send `0x03`, which is not in the table at all.
+
+**The name is `Pueo-XXXX`, deliberately not a real product's.** Windows
+prints it verbatim. A neutral name means whoever is running the test can
+tell their own notification from a stranger's, and nothing here impersonates
+a brand it has no business wearing. The four random characters exist because
+the BLE address never rotates — see above — so the name is the only thing
+that makes a second burst appear as a second notification.
+
+### Flipper Zero
+
+```
+02 01 06                     flags
+LL 09 <name>                 complete local name
+03 02 <lo> 30                incomplete list of 16-bit service UUIDs
+02 0A 00                     TX power
+```
+
+The service UUID is `0x3080` with the hardware colour OR'd into the low
+bits. That is not inferred from captures — Flipper's own firmware does it,
+in its serial profile:
+
+```c
+.Service_UUID_16 = 0x3080
+config->adv_service.Service_UUID_16 |= furi_hal_version_get_hw_color();
+```
+
+So `0x3081`, `0x3082` and `0x3083` are one service on differently coloured
+hardware, not three services. The colour is randomised per burst, skipping
+0, which is the uncoloured value no unit in the wild advertises.
+
+### A dead line found next door
+
+`devices_uuid` in `bluetooth.cpp` is `00003082-0000-1000-9000-00805f9b34fb`
+— the Flipper UUID, which is where the number above was first noticed. It is
+passed to `addServiceUUID()` immediately before `setAdvertisementData()`, and
+a custom advertisement payload replaces whatever `addServiceUUID` built, so
+it never reaches the air. It also carries `9000` where the Bluetooth base
+UUID has `8000`.
+
+Left alone. Removing it should change nothing, but "should change nothing"
+is analysis rather than a measurement, and this change was about adding two
+templates. It is written down here so the next person does not spend the
+same half hour on it.
+
+### What is checked
+
+`tools/check_ble_adv.py` builds both packets and walks them the way a
+receiver does, insisting the walk lands exactly on the end of the packet.
+That is the check worth having: a wrong length byte still transmits, still
+looks right in the log, and is silently dropped by everything that hears it.
+1095 checks, covering every name and colour either builder can produce.
+
+It also walks the three older templates, which are fixed arrays and had
+never been checked. They are all well formed. The Google one decodes as
+three bytes of Fast Pair service data, which by the rule in `FastPair.cpp`
+is a discoverable frame advertising Model ID `00B727` — one fixed model,
+never varied.
