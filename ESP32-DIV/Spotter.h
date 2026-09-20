@@ -55,6 +55,14 @@ struct Hit {
   uint8_t  addrChanges;
 };
 
+/* True when this BLE advertised name matches a Kind::Vehicle signature.
+ *
+ * Exposed for the wardriver, which has no other way to ask: it does not carry
+ * the signature tables and has no Spotter state. A function rather than the
+ * header's tables so there is one copy of them in flash and one place a
+ * vehicle signature has to be added. */
+bool isVehicleName(const char* name);
+
 /* Feature entry points, following the shape every other module here uses. */
 void spotterSetup();
 void spotterLoop();

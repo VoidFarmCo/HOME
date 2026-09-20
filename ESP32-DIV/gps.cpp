@@ -22,6 +22,7 @@
 #include "icon.h"
 #include "KeyboardUI.h"
 #include "shared.h"
+#include "Spotter.h"
 #include "Touchscreen.h"
 #include "utils.h"
 
@@ -2907,6 +2908,7 @@ static bool wardConvertWardCsvToWigle(const char* srcPath, File& out) {
             "AccuracyMeters,RCOIs,MfgrId,Type\r\n");
 
   char line[400];
+  uint32_t withheld = 0;
   while (in.available()) {
     size_t n = in.readBytesUntil('\n', line, sizeof(line) - 1u);
     line[n] = '\0';
@@ -2972,6 +2974,14 @@ static bool wardConvertWardCsvToWigle(const char* srcPath, File& out) {
       wardAppendCsvString(out, caps);
       out.printf(",%s,%d,%d,%s,%s,%s,%d,%.2f,,,WIFI\r\n", firstSeen, ch, mhz, rssi, latS, lonS, altM, acc);
     } else if (!strcmp(radio, "BLE")) {
+      /* Not uploaded: vehicle modules with a published weakness. See
+       * Spotter::isVehicleName. The row stays in the ward log on the card --
+       * this withholds it from a public database, it does not hide it from
+       * the operator. */
+      if (Spotter::isVehicleName(fld[10])) {
+        withheld++;
+        continue;
+      }
       char mac[24];
       snprintf(mac, sizeof(mac), "%s", bssid);
       wardMacToLowerColons(mac);
@@ -2984,6 +2994,11 @@ static bool wardConvertWardCsvToWigle(const char* srcPath, File& out) {
     }
   }
   in.close();
+  if (withheld) {
+    char msg[40];
+    snprintf(msg, sizeof(msg), "WiGLE: %lu withheld", (unsigned long)withheld);
+    wardLogPush(msg);
+  }
   return true;
 }
 

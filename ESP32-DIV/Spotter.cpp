@@ -270,6 +270,31 @@ void captureFlush() {
   s_logFile.flush();
 }
 
+}  // namespace
+
+/* A KARR module is a parked car with a known-weak immobiliser, and the paper
+ * that documented it describes the attack starting with a name-pattern query
+ * against a public wardriving database. Uploading these sightings would be
+ * contributing to exactly that index, so the WiGLE conversion drops them.
+ *
+ * The local log keeps them. Withholding from a public database and lying to
+ * the operator about what their own radio heard are different things, and
+ * only the first is wanted. */
+bool isVehicleName(const char* name) {
+  if (!name || !name[0]) {
+    return false;
+  }
+  for (size_t i = 0; i < kBleNameSigCount; i++) {
+    if (kBleNameSigs[i].kind == Kind::Vehicle
+        && nameMatch(name, kBleNameSigs[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+namespace {
+
 bool captureStart() {
   s_logFailed = false;
 

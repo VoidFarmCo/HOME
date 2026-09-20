@@ -28,6 +28,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SIGS = os.path.join(os.path.dirname(HERE), "ESP32-DIV", "SpotterSignatures.h")
 SRC = os.path.join(os.path.dirname(HERE), "ESP32-DIV", "Spotter.cpp")
+GPS = os.path.join(os.path.dirname(HERE), "ESP32-DIV", "gps.cpp")
 
 # {{0xB4, 0x1E, 0x52}, Kind::Alpr, Conf::Strong,  "Flock Safety"},
 ENTRY = re.compile(
@@ -64,6 +65,7 @@ def check(cond, msg):
 
 text = io.open(SIGS, encoding="utf-8", newline="").read()
 code = io.open(SRC, encoding="utf-8", newline="").read()
+gps = io.open(GPS, encoding="utf-8", newline="").read()
 
 # ── the enum has to mean what the BLE filter assumes ────────────────────────
 #
@@ -220,6 +222,27 @@ for table, prefix, exact, kind, conf, label in karr:
           "evidence it is unpatched: the fix is applied by hand and the "
           "advertisement does not say either way" % (table, prefix))
 
+# ── vehicle rows stay out of the WiGLE upload ─────────────────────
+#
+# The paper that documented KARR describes the attack beginning with a
+# name-pattern query against a public wardriving database. Pueo not adding to
+# that index is a decision, and a decision in one .cpp that another .cpp has
+# to keep honouring is the kind that quietly stops being true.
+check("isVehicleName" in code,
+      "Spotter.cpp no longer defines isVehicleName")
+check(re.search(r"kind\s*==\s*Kind::Vehicle", code) is not None,
+      "Spotter::isVehicleName no longer selects on Kind::Vehicle, so it does "
+      "not track what the signature table says is a vehicle")
+# A call, not a mention: the comment beside it names the function too, and
+# the first version of this check was satisfied by that comment while the
+# call itself had been replaced with `if (false)`.
+check(re.search(r"Spotter::isVehicleName\s*\(", gps) is not None,
+      "gps.cpp no longer calls Spotter::isVehicleName; the WiGLE upload is "
+      "back to exporting vehicle modules with their coordinates")
+check(any(e[3] == "Vehicle" for e in name_entries),
+      "no Kind::Vehicle name signatures left, so the WiGLE filter matches "
+      "nothing and is doing no work")
+
 # ── the matcher actually reads the field ────────────────────────────────────
 #
 # Without this the length is decoration: every row above could declare one and
@@ -239,7 +262,7 @@ check(re.search(r"conf\s*!=\s*Conf::Strong", code) is not None,
 
 checks = (len(entries) * 4 + len(VENDOR_OWN) + 5
           + len(name_entries) * 3 + len(karr) * 2
-          + len(SHORT_BUT_DELIBERATE) + 4)
+          + len(SHORT_BUT_DELIBERATE) + 8)
 if fail:
     for f in fail:
         sys.stderr.write("FAIL: %s\n" % f)
