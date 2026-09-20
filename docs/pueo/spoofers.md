@@ -121,7 +121,9 @@ All three advertise at a 20 ms interval (`setMinInterval(0x20)`), which is
 the floor. That is deliberate for this kind of thing and is also what makes
 them conspicuous to anything watching the band.
 
-None of this has run on hardware, like everything else here.
+What none of these have been checked against is a phone. The packets are
+built from the byte layouts each platform documents, so what is verified is
+that the bytes go out in the right order — not that the popup appears.
 
 ## Two templates added: Swift Pair and Flipper Zero
 

@@ -265,8 +265,8 @@ point still see the header's 0, exactly as before.
 
 ### Proving it changed nothing
 
-A refactor that can silently resize an array, with no hardware to test on,
-needs more than "it compiles". Three gates:
+A refactor that can silently resize an array needs more than "it compiles".
+Three gates:
 
 `tools/macro_value_check.py` recomputes every derived-macro use twice -- with
 the operand values in effect at the use, and with those in effect at the

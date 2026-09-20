@@ -200,7 +200,7 @@ and sends nothing.
 
 So wiring a button to it would have produced a control that looks like it is
 doing something and is not, which is worse than not having it. The three ways
-out, none of them takeable without hardware to check against:
+out, each of which needs a board to measure against rather than reason about:
 
 - **Put Packet Monitor in `WIFI_MODE_AP`.** This is what Marauder does: it
   keeps an AP interface up and sniffs at the same time. It also changes the
@@ -211,10 +211,11 @@ out, none of them takeable without hardware to check against:
 - **Leave it.** The logic is there, tested, and costs nothing until something
   calls it.
 
-## Testing it without hardware
+## Testing it on a host
 
-The same approach as `tools/fuzz_ie_walk.py`, and for the same reason: none
-of this can be tried on a board that does not exist yet.
+The same approach as `tools/fuzz_ie_walk.py`, and for the same reason: the
+malformed frames that matter here are far easier to synthesise than to
+capture.
 
 - synthesise frames for each header layout -- 3-address, 4-address, QoS,
   QoS with HT Control -- and assert the ethertype is found at the right

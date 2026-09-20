@@ -772,8 +772,7 @@ to be applied to `pockets()` by hand.
 ## Before laying anything out
 
 **Build it by hand first and bring it up.** A PCB freezes the pin map, and
-nothing in this firmware has run on hardware. Three things could still move
-it:
+three things could still move it:
 
 1. The **GPIO 1 GPS handover** is reasoned from the core source and the
    datasheet, with nothing measured. If it does not work, the GPS moves to a

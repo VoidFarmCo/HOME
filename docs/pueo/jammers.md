@@ -113,8 +113,7 @@ anything was affected.
 
 ## Not verified
 
-None of this has run on hardware — no version of Pueo has been flashed to a
-board. For these three specifically that means:
+None of the three has been observed transmitting. Specifically:
 
 - the NRF24 carrier is verified at the **register level only**: the
   constant-wave bit is set and the power bits are at maximum, which is what

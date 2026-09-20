@@ -105,6 +105,6 @@ a response, and 50,000 random blocks that must never be mistaken for a
 matched response.
 
 The probe itself cannot be checked here. It needs a radio and a second
-device, and none of this has run on hardware — like everything else in this
-project. The crypto path in particular has never derived a key against a
-real Provider. Treat the first run on real hardware as the first test of it.
+device. The crypto path in particular has never derived a key against a real
+Provider, so if every device reports "no response", suspect the probe before
+concluding the devices are sound.
