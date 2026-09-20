@@ -10,6 +10,56 @@ been read closely it is said so in the entry that did it.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.3.2 - 2026-09-20
+------------------
+
+Documentation, and where releases get published. No code change since
+0.3.1 - the image differs only in the version string.
+
+Corrected, all three found by checking every backticked name in docs/pueo
+against the source rather than by reading:
+
+  * pcb-design.md sourced the SPI clocks from CC1101_SPI_HZ and "the RF24
+    constructor". Neither exists. The identifier is nowhere in the tree and
+    RF24 itself went in 0.2.2 over the GPL-2.0-only clash. Both clocks come
+    from the kProfiles table in SpiBus.cpp, which is where it points now.
+    The figures were right: 4 MHz and 10 MHz are what that table sets.
+
+  * spi-bus.md named the same dead identifier.
+
+  * hardware.md said bluetooth.cpp "instantiates radio1/radio2/radio3". It
+    calls Nrf24Raw's free functions; the objects went with RF24. The point
+    that sentence supports is unaffected and was re-verified: CE_PIN_2/_3
+    and CSN_PIN_2/_3 really are aliased onto _1 in board_pueo.h.
+
+  * pcb-design.md opened its SPI section with "Four devices on one bus".
+    hardware.md already says five, "not the four you would count from the
+    wiring", because the touch controller is on VSPI too and on a CYD it is
+    the only input device. Five, three of them through the cable.
+
+Carrier board:
+
+  * An Ebyte E07-433M20S gives the CC1101 about +20 dBm against the stock
+    +12, and HaleHound-CYD fits one on the same board family. Recorded as a
+    decision rather than adopted: TX_EN and RX_EN land on GPIO 4, which is
+    the NRF24's CSN here, and GPIO 0, a strapping pin. Nothing is spare
+    after the RGB LED gave up three pins and UART0 a fourth. The RF rail was
+    not sized for that peak, and transmit testing happens in a cage where
+    8 dB buys nothing.
+
+Releases:
+
+  * make_release.sh reads the publish directory from .publish.local beside
+    the repo when PUEO_PUBLISH_DIR is not set. The variable exists because
+    this script ships inside the archive and a path written into it would be
+    published to everyone who downloads the source; that reasoning is
+    unchanged. What it left behind was a variable to retype on every cut,
+    which is how a release eventually lands in the wrong directory.
+
+    Parsed, not sourced - sourcing a file to get one string is how a stray
+    command in it gets run. Gitignored, and absent from the archive's
+    include list.
+
 0.3.1 - 2026-09-19
 ------------------
 
