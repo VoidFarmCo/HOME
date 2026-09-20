@@ -47,6 +47,19 @@
  * agreeing is strong. The detector scores accordingly and the UI shows it,
  * because a detector that cries wolf is one you stop believing.
  *
+ * Strong carries a second consequence, so mark an entry Strong deliberately.
+ * The whole OUI table is matched against WiFi source addresses; only the
+ * Strong entries are also matched against BLE addresses, and then only when
+ * the address is public. The reason for the split is that an OUI is a claim
+ * about who made the radio, and on BLE that claim is worth something only
+ * from a block the vendor itself holds. Espressif's block against every
+ * public BLE address in range would report a room full of dev boards, and
+ * this device is one of them. The reason for the public-address gate is that
+ * a random address's top two bits encode the address type rather than a
+ * vendor -- and 00:25:DF has top two bits 00, which is the shape of a
+ * non-resolvable private address, so the strongest entry in the table is
+ * also the one a randomised address could wear by chance.
+ *
  * Not expressible here, and so deliberately left out rather than fudged:
  * the Flock accessory GATT service e8ccbb38-9532-46a8-9fe5-1814df172e6f and
  * the Nordic DFU service, both 128-bit, against a BleSig.service that is

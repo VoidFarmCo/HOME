@@ -509,6 +509,38 @@ class SpotterAdvCallbacks : public BLEAdvertisedDeviceCallbacks {
     }
     const int8_t rssi = (int8_t)dev->getRSSI();
 
+    /* An OUI is only meaningful on a public address. A random address's top
+     * two bits encode the address type, not a vendor block, so matching one
+     * against the OUI table reads noise as a name. That is not a theoretical
+     * worry: 00:25:DF has top two bits 00, which is exactly the shape of a
+     * non-resolvable private address, so the table's strongest entry is also
+     * the one a randomised address could wear. The odds are 1 in 16.7M per
+     * rotation and the gate costs one comparison.
+     *
+     * Strong only. The Strong OUIs are the blocks IEEE assigned to the
+     * vendors themselves; the rest of the table is contract manufacturers
+     * and module vendors, and Espressif's block against a public BLE address
+     * would flag every dev board in range, including -- given a scan that
+     * heard its own radio -- this one. Filtering on Conf rather than keeping
+     * a second table means a vendor-own block added to SpotterSignatures.h
+     * applies here too, which is what that file's header promises.
+     *
+     * The WiFi path passes an element fingerprint to record(); there is no
+     * BLE equivalent, and findOrAdd's viaBle flag already keeps a hit found
+     * this way apart from a WiFi hit for the same vendor. */
+    if (dev->getAddress().getType() == BLE_ADDR_PUBLIC) {
+      for (size_t i = 0; i < kOuiSigCount; i++) {
+        if (kOuiSigs[i].conf != Conf::Strong) {
+          continue;
+        }
+        if (memcmp(mac, kOuiSigs[i].oui, 3) == 0) {
+          record(mac, rssi, kOuiSigs[i].kind, kOuiSigs[i].conf,
+                 kOuiSigs[i].label, true);
+          break;
+        }
+      }
+    }
+
     uint16_t company = 0;
     if (dev->haveManufacturerData()) {
       const std::string md = dev->getManufacturerData();

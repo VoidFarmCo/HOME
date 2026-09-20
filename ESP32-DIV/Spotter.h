@@ -14,7 +14,10 @@
  *                  company ID and a Meta service UUID in the same packet.
  *
  *   Body cameras   carry WiFi so they can offload to a dock, which makes an
- *                  Axon unit audible the same way an ALPR camera is.
+ *                  Axon unit audible the same way an ALPR camera is. Axon
+ *                  hardware also advertises over BLE, so the vendor's OUI
+ *                  is matched against public BLE addresses as well -- see
+ *                  the note on Strong in SpotterSignatures.h.
  *
  * Receive only. Spotter never transmits, never associates, never deauths.
  * It puts the radio in promiscuous mode and runs a passive BLE scan, which

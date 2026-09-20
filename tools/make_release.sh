@@ -84,6 +84,7 @@ INCLUDE=(
   "tools/check_logo_scale.py"
   "tools/check_menu_tables.py"
   "tools/check_tracker_follow.py"
+  "tools/check_spotter_oui.py"
   "tools/render_screens.py"
   "tools/gen_netlist.py"
   "tools/make_bitmap.py"

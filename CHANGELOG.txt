@@ -10,6 +10,55 @@ been read closely it is said so in the entry that did it.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.3.1 - 2026-09-19
+------------------
+
+Spotter hears Axon hardware on Bluetooth as well as WiFi.
+
+  * The OUI table was matched against WiFi source addresses only. The BLE
+    side matched on company ID, service UUID and name prefix and never
+    looked at the address, so a unit advertising over BLE and not WiFi went
+    past unnamed. github.com/PoliceDetector/PoliceDetector is a 60-line
+    script that does nothing but that one match - Axon's block, 00:25:DF,
+    against BLE addresses - and it was the thing this had missed. The
+    signature itself was already here and already graded Strong.
+
+  * Strong entries only, and only on a public address.
+
+    Strong is the two blocks IEEE assigned to the vendors themselves, Flock
+    Safety and Axon. The other 34 are contract manufacturers and module
+    vendors - 23 Liteon, 2 Espressif, Qualcomm Atheros - and on WiFi they
+    are graded Weak and read as corroboration for an SSID or a beacon. On
+    BLE a scan hears every advertiser in the room rather than only the ones
+    probing for a network, so Espressif's block would report a shelf of dev
+    boards as surveillance hardware, and the board running the scan is one.
+
+    The public-address gate is not caution for its own sake. A random
+    address's top two bits encode the address type, not a vendor, and
+    00:25:DF has top two bits 00 - the shape of a non-resolvable private
+    address. The strongest entry in the table is also the one a randomised
+    address could wear by chance. One in 16.7 million per rotation, and the
+    gate costs a comparison.
+
+  * tools/check_spotter_oui.py, 151 checks. Conf::Strong now does two jobs:
+    it grades the finding and it decides what is allowed on BLE, and nothing
+    in C++ connects the second to the first. Promoting a Liteon block while
+    thinking only about how a WiFi hit is labelled would put it on the BLE
+    path silently. The check fails on that, on either gate being removed
+    from Spotter.cpp, and on a new Conf level added above Strong - each
+    verified by making the change and watching it fail.
+
+  * Not copied from the same script: its threshold counts sightings rather
+    than devices and the counter does not reset, so one camera seen five
+    times in 35 seconds reads as a raid. That is the failure the
+    tracker-follow maturity gate exists to avoid.
+
+Verified in the built image rather than the source: the BLE callback now
+makes two getAddress calls, one memcmp and three record calls, against one,
+none and two before, and the entry filter is visible as a branch on the conf
+byte. -28 bytes of flash, which is layout noise rather than a claim that
+code was removed; RAM unchanged.
+
 0.3.0 - 2026-09-19
 ------------------
 
