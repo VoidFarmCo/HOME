@@ -16,3 +16,8 @@ dist/
 # otherwise go stale on every UI change. The copies that are published
 # live in the website repo.
 render/
+
+# Where this machine publishes releases. Read by tools/make_release.sh and
+# deliberately never in the archive's include list: a path from one machine
+# would otherwise be published to everyone who downloads the source.
+.publish.local

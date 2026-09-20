@@ -205,6 +205,24 @@ cat "$OUT/pueo-${VERSION}.sha256"
 #
 #   PUEO_PUBLISH_DIR=/path/to/site tools/make_release.sh --with-bin
 #
+# Typing that every time is how a release eventually gets published to the
+# wrong directory, so .publish.local beside this repo is read first when it
+# exists. That file is gitignored and is not in the include list above, so it
+# never reaches the archive -- the path stays on the machine that owns it,
+# which is the whole point of not writing one in here.
+#
+#   echo 'PUEO_PUBLISH_DIR=/path/to/site' > .publish.local
+#
+# An explicit PUEO_PUBLISH_DIR in the environment still wins.
+if [ -z "${PUEO_PUBLISH_DIR:-}" ] && [ -f "$REPO/.publish.local" ]; then
+  # Only KEY=value lines, and only the one key. Sourcing a file to get a
+  # string is how a stray command in it gets run.
+  PUEO_PUBLISH_DIR=$(
+    sed -n 's/^[[:space:]]*PUEO_PUBLISH_DIR[[:space:]]*=[[:space:]]*//p'         "$REPO/.publish.local" | tail -1 | sed 's/^["'"'"']//; s/["'"'"']$//'
+  )
+  [ -n "$PUEO_PUBLISH_DIR" ] && echo "publish dir from .publish.local: $PUEO_PUBLISH_DIR"
+fi
+
 if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
   DEST="$PUEO_PUBLISH_DIR"
   if [ ! -d "$DEST" ]; then
