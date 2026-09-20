@@ -799,3 +799,22 @@ lunch. Fit:
 
 Leave off anything not needed to prove the above. The second spin is for
 what bring-up teaches you.
+
+### Deliberately not fitted: a sub-GHz PA
+
+The stock CC1101 transmits at +12 dBm. An Ebyte E07-433M20S reaches roughly
++20 dBm, and HaleHound-CYD (MIT, same CYD family) wires one alongside the
+CC1101 for exactly that. Not taken here, for three reasons:
+
+- It needs two control lines, TX_EN and RX_EN. HaleHound puts them on GPIO 4
+  and GPIO 0. GPIO 4 is the NRF24's CSN here, and GPIO 0 is a strapping pin
+  that decides boot mode. There is no third pair of spare pins on this board
+  -- the RGB LED already gave up its three and UART0 gave up a fourth -- so
+  fitting it means J1 grows and something else moves.
+- It moves the power budget. +20 dBm on the RF rail is a different peak draw
+  from the one the buck and the 0.5 mm +3V3_RF pour were sized for, and that
+  sizing is still marked [verify].
+- Transmit testing happens in a shielded enclosure, where 8 dB buys nothing.
+
+Worth revisiting only if the sub-GHz work ever moves outside a cage, and
+then as a second-spin change with the pin budget reopened.
