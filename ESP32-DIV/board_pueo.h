@@ -14,7 +14,8 @@
  *
  *   VSPI (shared bus)   SCK 18   MOSI 23   MISO 19
  *     SD (onboard)      CS  5
- *     CC1101            CS  27      GDO0 22 (TX)   GDO2 35 (RX)
+ *     CC1101            CS  21 *    GDO0 22 (TX)   GDO2 35 (RX)
+ *                       * 27 on the 2.8" panel; see CC1101_CS below
  *     NRF24L01+PA+LNA   CSN 4       CE   16        IRQ unconnected
  *     PN532 V3 (SPI)    SS  17
  *   GPS ATGM336H        ESP32 RX on GPIO 1, GPS RX not connected
@@ -22,6 +23,18 @@
  * GPIO 4/16/17 are the CYD's onboard RGB LED. Using them means the LED is gone.
  * That is intended — they are the only pins left.
  * ──────────────────────────────────────────────────────────────────────────── */
+
+/* Which CYD panel. shared.h guards its own definition with #ifndef, so
+ * setting it here wins -- and it has to be here, because this overlay is
+ * included before shared.h evaluates its defaults, and CC1101_CS below
+ * depends on it.
+ *
+ *   0  2.8" ESP32-2432S028R   ILI9341  240x320   backlight GPIO 21
+ *   1  3.5" ESP32-3248S035R   ST7796   320x480   backlight GPIO 27
+ */
+#ifndef PUEO_PANEL_35
+#define PUEO_PANEL_35 1
+#endif
 
 #define BOARD_CYD
 
@@ -37,7 +50,24 @@
  * ELECHOUSE setGDO(gdo0, gdo2) is called as setGDO(TX, RX) in subghz.cpp,
  * which is correct. GPIO 35 is input-only, which suits GDO2 and makes the
  * assignment impossible to get backwards. */
+/* CS is 21 rather than the stock CYD's 27, and that is panel-driven.
+ * On the 3.5" ESP32-3248S035R the backlight is on GPIO 27, so the stock
+ * assignment fights it: driving the chip select would dim the screen.
+ * The two boards swap the pair -- 21 is the backlight on the 2.8" and 27
+ * on the 3.5" -- so 21 is free here and 27 is not.
+ *
+ * It also lands CS on the Expand IO header (P3: GND, IO35, IO22, IO21)
+ * alongside GDO0 and GDO2, which puts all three CC1101 control lines on a
+ * connector instead of a solder pad.
+ *
+ * [VERIFY] on the 2.8" board 21 IS the backlight, so this has to move back
+ * to 27 there. It is the one pin the two panels cannot share.
+ */
+#if PUEO_PANEL_35
+#define CC1101_CS     21   /* 27 is the backlight on this panel */
+#else
 #define CC1101_CS     27
+#endif
 #define SUBGHZ_TX_PIN 22   /* -> CC1101 GDO0 */
 #define SUBGHZ_RX_PIN 35   /* <- CC1101 GDO2, input-only pin */
 

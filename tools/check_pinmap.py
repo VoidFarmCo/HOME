@@ -21,20 +21,57 @@ from pathlib import Path
 
 SKETCH = Path(__file__).resolve().parent.parent / "ESP32-DIV"
 
-# CYD ESP32-2432S028R fixed hardware. Not in shared.h; TFT and touch come from
-# TFT_eSPI's User_Setup and the LED/LDR/speaker are simply soldered down.
-CYD_RESERVED = {
-    15: "TFT CS",        2: "TFT DC",        13: "TFT MOSI",
-    14: "TFT SCK",      12: "TFT MISO",      21: "TFT backlight",
-    33: "touch CS",     32: "touch MOSI",    39: "touch MISO",
-    25: "touch CLK",    36: "touch IRQ",
+# The display pins are READ from TFT_eSPI's User_Setup rather than copied here.
+#
+# They used to be copied, and that was the bug this table exists to prevent. The
+# transcription described the 2.8" ESP32-2432S028R, where the backlight is GPIO
+# 21. On the 3.5" ESP32-3248S035R it is GPIO 27 -- so a chip select on 27 would
+# fight the backlight, and the copied table had no entry for 27 at all and said
+# nothing. That collision was found by eye on real hardware, which is precisely
+# the job this script claims in its own docstring.
+USER_SETUP = SKETCH.parent / "Libraries" / "User_Setup cyd.h"
+
+TFT_ROLES = {
+    "TFT_CS": "TFT CS",     "TFT_DC": "TFT DC",       "TFT_MOSI": "TFT MOSI",
+    "TFT_SCLK": "TFT SCK",  "TFT_MISO": "TFT MISO",   "TFT_BL": "TFT backlight",
+    "TOUCH_CS": "touch CS",
+}
+
+
+def read_user_setup():
+    """Active (uncommented) `#define NAME <int>` pins from User_Setup."""
+    out = {}
+    if not USER_SETUP.exists():
+        return out
+    for line in USER_SETUP.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if line.startswith("//") or not line.startswith("#define"):
+            continue
+        m = re.match(r"#define\s+(\w+)\s+(-?\d+)", line)
+        if m and m.group(1) in TFT_ROLES:
+            pin = int(m.group(2))
+            if pin >= 0:
+                out[pin] = TFT_ROLES[m.group(1)]
+    return out
+
+
+# Soldered-down parts of the board that no config file describes.
+BOARD_FIXED = {
      4: "RGB LED red",  16: "RGB LED green", 17: "RGB LED blue",
     34: "LDR",          26: "speaker",
 }
 
+CYD_RESERVED = dict(BOARD_FIXED)
+CYD_RESERVED.update(read_user_setup())
+
 # Pins we knowingly repurpose. The RGB LED is the only block of spare GPIO left
-# on this board; giving it up is what makes room for three radios.
-REPURPOSABLE = {4, 16, 17, 21, 26, 34}
+# on this board; giving it up is what makes room for three radios. The backlight
+# pin is whatever User_Setup says it is, so take it from there rather than
+# naming a number that is right on one panel and wrong on the other.
+# The backlight is deliberately absent: it is a pin the display needs, on
+# whichever panel this build targets, and taking it is the collision that
+# started this.
+REPURPOSABLE = {4, 16, 17, 26, 34}
 
 # Macros that actually drive a pad.
 SIGNALS = {
