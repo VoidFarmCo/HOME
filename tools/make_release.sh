@@ -230,6 +230,45 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
     exit 1
   fi
 
+  # ── retention ────────────────────────────────────────────────────────────
+  #
+  # Keep the release just cut, the one before it, and 0.2.1. Everything else
+  # goes, so the download list stays short and the directory does not fill
+  # with images nobody will flash.
+  #
+  # 0.2.1 is the exception because of the licence rather than the code: it is
+  # the last release that still contained RF24, which is GPL-2.0-only and
+  # could not share a binary with arduinoFFT or NimBLE. 0.2.2 is where that
+  # ended. Anyone holding a 0.2.1 digest is holding the last of a distinct
+  # licence state, so it stays reachable. See docs/pueo/licensing.md.
+  #
+  # Nothing is lost by pruning the rest: every release's digests are in
+  # CHANGELOG.txt, which is published beside the downloads and ships inside
+  # every archive.
+  #
+  # Only ever three exact filenames per version. No globbing over the
+  # directory, because this runs against somebody's website tree.
+  PUBLISH_KEEP_ALWAYS="0.2.1"
+
+  published=$(ls "$DEST" 2>/dev/null \
+    | sed -n 's/^pueo-\([0-9][0-9.]*\)\.sha256$/\1/p' | sort -V)
+  keep=$(printf '%s\n' $published | tail -2)
+  keep=$(printf '%s\n%s\n' "$keep" "$PUBLISH_KEEP_ALWAYS" | sort -V -u)
+
+  pruned=0
+  for v in $published; do
+    if printf '%s\n' $keep | grep -qx -- "$v"; then
+      continue
+    fi
+    rm -f "$DEST/pueo-$v-src.zip" \
+          "$DEST/pueo-$v-merged.bin" \
+          "$DEST/pueo-$v.sha256"
+    echo "pruned $v"
+    pruned=$((pruned + 1))
+  done
+  echo "keeping: $(printf '%s ' $keep)"
+  [ "$pruned" -gt 0 ] && echo "($pruned older release(s) removed; their digests stay in CHANGELOG.txt)"
+
   echo
   echo "published to $DEST"
 fi
