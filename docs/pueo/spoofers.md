@@ -14,12 +14,23 @@ one defect.
 |---|---|---|
 | **BLE Spoofer** | Continuity `0x07`, proximity pairing | a table of Apple model bytes, plus Samsung (`0x0075`) and Google Fast Pair (`0xFE2C`) templates |
 | **Sour Apple** | Continuity `0x0F`, nearby action | a 17-byte packet built per burst |
-| **AirTag Spoofer** | offline finding | a 31-byte packet with a random key, plus a model byte |
+| **AirTag Spoofer** | Continuity `0x07`, proximity pairing, prefix `0x05` | a 31-byte packet with a model byte and 16 random bytes |
 
 So BLE Spoofer is the "a device wants to pair" prompt, Sour Apple is the
-"action" prompt that gave the technique its name, and AirTag Spoofer
-pretends to be a separated tracker. They overlap only in that all three
-impersonate Apple.
+"action" prompt that gave the technique its name, and AirTag Spoofer is the
+"a new AirTag is nearby, set it up?" prompt.
+
+**AirTag Spoofer does not pretend to be a separated tracker**, which is the
+easy assumption to make from the name and which this document got wrong
+until it was checked against `buildProximityPacket()`. A separated AirTag
+broadcasts Continuity `0x12`, offline finding, carrying a rotating public
+key that the Find My network relays. This sends `0x07` proximity pairing
+with prefix `0x05`, which is the setup popup for an *unpaired* tag. The
+sixteen random bytes are payload padding, not a Find My key.
+
+Nothing here transmits `0x12` at all. The only code in this firmware that
+touches offline finding is `AirTagSniffer`, which **receives** it &mdash; that
+is what lets it tell a separated tag from a passing phone.
 
 ## The defect, and the fix
 
