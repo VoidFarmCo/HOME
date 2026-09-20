@@ -218,9 +218,28 @@ module base() {
    Opening sized for the existing CYD bezel (55.5 x 92)
    ===================================================== */
 LID_H     = 12;
-BEZEL_W   = 56.0;    // 55.5 bezel + 0.5 clearance
-BEZEL_L   = 92.5;
-BEZEL_Y   = 0;       // shift the screen up/down the face
+
+/* Which CYD the lid is cut for. Both run the same firmware a define
+ * apart, and both are 55 mm across the board -- the 3.5" is simply 9 mm
+ * longer, so only the window length and what sits under it change.
+ *
+ *   2.8"  ESP32-2432S028R  ILI9341  240x320  board 55.5 x 92
+ *   3.5"  ESP32-3248S035R  ST7796   320x480  board 55.0 x 101   [VERIFY]
+ *
+ * The 3.5" figures come from the vendor's dimensioned drawing (55 x 101
+ * stated) with the glass measured against it at 54.8 x 84.4, sitting
+ * 8.6 mm below the top edge and 8.0 mm above the bottom. Confirm with
+ * calipers before printing a lid you intend to keep.
+ *
+ * Render with:  openscad -D PART=\"lid\" -D PANEL=\"3.5\" ...
+ */
+PANEL     = "2.8";
+
+BEZEL_W   = (PANEL == "3.5") ? 55.5 : 56.0;   // board + 0.5 clearance
+BEZEL_L   = (PANEL == "3.5") ? 101.5 : 92.5;
+/* The longer window eats into the chin. Nudging it 2 mm toward the top,
+ * where nothing lives, keeps a printable margin around the owl. */
+BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the face
 
 /* ---------- owl, debossed into the lid face ----------
  *
@@ -250,7 +269,7 @@ BEZEL_Y   = 0;       // shift the screen up/down the face
 LOGO       = true;   // false leaves the face blank
 LOGO_H     = 30;     // artwork height in mm; see the note above before shrinking
 LOGO_DEPTH = 0.6;    // cut into a 2.5 mm skin, so 1.9 mm is left under it
-LOGO_Y     = -64;    // centre of the chin band
+LOGO_Y     = (PANEL == "3.5") ? -65.5 : -64;   // centre of the chin band
 LOGO_SVG   = "pueo-owl.svg";
 LOGO_PX_W  = 462;    // the SVG's own viewBox, so scaling stays honest
 LOGO_PX_H  = 474;
