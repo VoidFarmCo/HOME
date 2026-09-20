@@ -9,6 +9,7 @@
 #include "Nrf24Raw.h"
 #include "SpiBus.h"
 
+
 #ifdef TFT_BLACK
 #undef TFT_BLACK
 #endif
@@ -35,6 +36,87 @@
 #undef DARK_GRAY
 #endif
 #define DARK_GRAY UI_FG
+
+/* ── BLE address rotation, shared by the three spoofers ────────────────────
+ *
+ * All three used to build a random address and then drop it on the floor:
+ * nothing called esp_ble_gap_set_rand_addr, setOwnAddrType or
+ * ble_hs_id_set_rnd, so every advertisement went out from the ESP32's one
+ * fixed address. A stream of a dozen different Apple products that all
+ * share an address is not a disguise, and it made the transmitting device
+ * trivially attributable for as long as it ran.
+ *
+ * NON-RESOLVABLE PRIVATE, not static random. ble_hs_id_gen_rnd(1, ...)
+ * produces an NRPA, which is the type the spec defines for exactly this.
+ * A static random address is meant to hold still for a power cycle, so
+ * rotating one is out of spec even though the controller allows it; an NRPA
+ * is meant to be thrown away. Letting the stack generate it also avoids
+ * hand-rolling the top-two-bits rule, which the old dead code got right in
+ * one place (0xC0) and wrong in two (0xF0 on the wrong end for NimBLE).
+ *
+ * ON A TIMER, NOT PER BURST. The controller refuses
+ * HCI_LE_Set_Random_Address while advertising is enabled, so changing the
+ * address means stop, set, start. AirTagSpoofer carries a note that
+ * repeated stop/start was resetting the ESP32, so this keeps that churn to
+ * once a second rather than once per 40 ms burst. A second is far below
+ * anything that makes a device followable and about 25x less stop/start
+ * than the alternative.
+ * ───────────────────────────────────────────────────────────────────────── */
+static constexpr uint32_t kBleAddrRotateMs = 1000;
+
+/* Install a fresh non-resolvable private address. Caller must not be
+ * advertising. False means the stack refused and the old address stands. */
+static bool bleSetFreshRandomAddress() {
+  ble_addr_t addr;
+  if (ble_hs_id_gen_rnd(1, &addr) != 0) {   // 1 = non-resolvable private
+    return false;
+  }
+  if (ble_hs_id_set_rnd(addr.val) != 0) {
+    return false;
+  }
+  NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_RANDOM);
+  return true;
+}
+
+/* Stop, rotate, start. Returns false if the address did not change, in
+ * which case advertising is restarted anyway on the old one. */
+static bool bleRotateAddressNow(BLEAdvertising* adv) {
+  if (adv != nullptr) {
+    adv->stop();
+  }
+  const bool ok = bleSetFreshRandomAddress();
+  if (adv != nullptr) {
+    adv->start();
+  }
+  return ok;
+}
+
+/* True once per kBleAddrRotateMs. `lastMs` starts at 0, so the first call
+ * always rotates -- which is what gives a feature a fresh address before
+ * its first advertisement rather than one burst in. */
+static bool bleAddrRotateDue(uint32_t* lastMs) {
+  const uint32_t now = millis();
+  if (*lastMs != 0 && (uint32_t)(now - *lastMs) < kBleAddrRotateMs) {
+    return false;
+  }
+  *lastMs = now;
+  return true;
+}
+
+/* The random address actually in use, written most significant byte first.
+ * NimBLEDevice::getAddress() is no good for this: it prefers the PUBLIC
+ * address and only falls back to random when there is no public one, and
+ * the ESP32 always has one -- so it would report the address we are
+ * deliberately not transmitting from. */
+static void bleCurrentAddrText(char* out, size_t outSz) {
+  uint8_t a[6];
+  if (ble_hs_id_copy_addr(BLE_ADDR_RANDOM, a, nullptr) != 0) {
+    snprintf(out, outSz, "(no random addr)");
+    return;
+  }
+  snprintf(out, outSz, "%02X:%02X:%02X:%02X:%02X:%02X",
+           a[5], a[4], a[3], a[2], a[1], a[0]);
+}
 
 static constexpr int kBleScreenH = 320;
 
@@ -189,6 +271,7 @@ unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 500;
 
 bool isAdvertising = false;
+static uint32_t s_addrRotateMs = 0;
 
 int scanTime = 5;
 int deviceType = 1;
@@ -919,24 +1002,11 @@ void toggleAdvertising() {
     updateSpoofer();
   } else {
     if (attack_state == 1) {
-      /* Built, and then not used. Nothing here nor anywhere else in this file
-       * calls esp_ble_gap_set_rand_addr, NimBLEDevice::setOwnAddrType or
-       * ble_hs_id_set_rnd, so every advertisement below goes out from the
-       * ESP32's own fixed BLE address. A stream of different devices that
-       * all share one address is not a disguise.
-       *
-       * Left as it is rather than wired up: making the address rotate would
-       * make this harder to attribute, which is an increase in what the
-       * feature does rather than a correction. That is the owner's call, not
-       * a tidy-up. See docs/pueo/spoofers.md. */
-      esp_bd_addr_t dummy_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-      for (int i = 0; i < 6; i++) {
-        dummy_addr[i] = random(256);
-        if (i == 0) {
-          dummy_addr[i] |= 0xF0;
-        }
-      }
-      (void)dummy_addr;
+      /* Fresh address before the first advertisement. Not advertising yet,
+       * so this does not need the stop/start dance. */
+      s_addrRotateMs = 0;
+      bleAddrRotateDue(&s_addrRotateMs);
+      bleSetFreshRandomAddress();
 
       BLEAdvertisementData oAdvertisementData = getAdvertismentData();
       pAdvertising->addServiceUUID(devices_uuid);
@@ -1113,6 +1183,12 @@ void spooferLoop() {
     handleButtonPress(BTN_DOWN, changeAdvTypeNext);
     handleButtonPress(BTN_UP, toggleAdvertising);
   }
+
+  /* Outside the 50 ms UI gate: the address should rotate on its own clock,
+   * not on whether the screen happened to redraw. */
+  if (isAdvertising && pAdvertising && bleAddrRotateDue(&s_addrRotateMs)) {
+    bleRotateAddressNow(pAdvertising);
+  }
 }
 
 void exit() {
@@ -1142,6 +1218,7 @@ static int iconY = STATUS_BAR_Y_OFFSET;
 std::string device_uuid = "00003082-0000-1000-9000-00805f9b34fb";
 
 BLEAdvertising *Advertising;
+static uint32_t s_addrRotateMs = 0;
 
 uint8_t packet[17];
 
@@ -1335,16 +1412,12 @@ void sourappleLoop() {
   tft.drawFastHLine(0, 19, 240, UI_LINE);
   runUI();
 
-  /* Same unused address as BleSpoofer::toggleAdvertising -- see the note
-   * there, and docs/pueo/spoofers.md. */
-  esp_bd_addr_t dummy_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  for (int i = 0; i < 6; i++) {
-    dummy_addr[i] = random(256);
-    if (i == 0) {
-      dummy_addr[i] |= 0xF0;
-    }
+  /* The payload changes every burst; the address changes once a second.
+   * Rotating it per burst would mean a stop/start every 40 ms, which is the
+   * pattern AirTagSpoofer found was resetting the board. */
+  if (bleAddrRotateDue(&s_addrRotateMs)) {
+    bleRotateAddressNow(Advertising);
   }
-  (void)dummy_addr;
   BLEAdvertisementData oAdvertisementData = getOAdvertisementData();
 
   Advertising->addServiceUUID(device_uuid);
@@ -1413,7 +1486,7 @@ static unsigned long s_lastLogMs = 0;
 static uint32_t s_txCount = 0;
 static int s_modelIndex = 0;
 
-static uint8_t s_mac[6];
+static uint32_t s_addrRotateMs = 0;
 static uint8_t s_packet[31];
 
 static BLEAdvertising* s_advertising = nullptr;
@@ -1496,22 +1569,12 @@ static void buildProximityPacket() {
     s_packet[i++] = 0x00;
   }
 
-  /* s_mac is generated here and never applied to the radio -- nothing in
-   * this file sets a random address. It used to be printed on screen and in
-   * the log as though it were the address being transmitted from, which was
-   * the screen telling the operator something untrue. It is kept because
-   * it is what would be used if the address were ever set, and both
-   * displays now show the address actually in use instead. */
-  for (int b = 0; b < 6; b++) {
-    s_mac[b] = (uint8_t)random(256);
-  }
-  s_mac[0] |= 0xC0;
 }
 
-/* The address this radio is really advertising from. */
+/* The address this radio is really advertising from: the rotating NRPA,
+ * read back out of the stack rather than from a copy we kept. */
 static void realAddrText(char* out, size_t outSz) {
-  const std::string a = BLEDevice::getAddress().toString();
-  snprintf(out, outSz, "%s", a.c_str());
+  bleCurrentAddrText(out, outSz);
 }
 
 static void paintField(int x, int y, int w, char* cache, size_t cacheSz,
@@ -1723,6 +1786,12 @@ static void burstOnce(bool forceLog) {
   }
   s_advertising->setAdvertisementData(advData);
   s_advertising->start();
+
+  /* Same once-a-second cadence as the other two. This runs after start()
+   * so the first burst goes out on the address the setup call installed. */
+  if (bleAddrRotateDue(&s_addrRotateMs)) {
+    bleRotateAddressNow(s_advertising);
+  }
 
   s_txCount++;
   s_lastBurstMs = millis();

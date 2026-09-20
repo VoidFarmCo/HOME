@@ -21,9 +21,9 @@ So BLE Spoofer is the "a device wants to pair" prompt, Sour Apple is the
 pretends to be a separated tracker. They overlap only in that all three
 impersonate Apple.
 
-## The defect: the address is generated and never used
+## The defect, and the fix
 
-All three build a random BLE address and then do nothing with it.
+All three used to build a random BLE address and then do nothing with it.
 
 ```c
 esp_bd_addr_t dummy_addr = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -36,15 +36,15 @@ for (int i = 0; i < 6; i++) {
 That is `BleSpoofer::toggleAdvertising` and, word for word, `SourApple`.
 `AirTagSpoofer` has its own version writing `s_mac`, with `|= 0xC0` — the
 correct top bits for a static random address, so somebody knew what they
-were doing — and then also never applies it.
+were doing — and then also never applied it.
 
-Nothing in the file calls `esp_ble_gap_set_rand_addr`,
-`NimBLEDevice::setOwnAddrType` or `ble_hs_id_set_rnd`. **Every packet all
-three send goes out from the ESP32's one fixed BLE address.**
+Nothing in the file called `esp_ble_gap_set_rand_addr`,
+`NimBLEDevice::setOwnAddrType` or `ble_hs_id_set_rnd`, so **every packet all
+three sent went out from the ESP32's one fixed BLE address.**
 
 A stream of a dozen different Apple products that all share a single address
-is not a disguise. It also makes the transmitting device trivially
-attributable for as long as it runs, which matters to whoever is holding it.
+is not a disguise. It also made the transmitting device trivially
+attributable for as long as it ran, which matters to whoever is holding it.
 
 **Why the compiler did not say so.** `dummy_addr` is an array written
 through subscripts, and GCC's `-Wunused-but-set-variable` does not fire on
@@ -64,15 +64,35 @@ about what it is transmitting is worse than one that says nothing.
 **Changed: the two dead constants are gone**, and the three unused-address
 sites are commented so the next reader does not assume rotation happens.
 
-**Not changed: the address still does not rotate.** Wiring it up would make
-these harder to attribute and more convincing, which is an increase in what
-the features do rather than a correction to what they claim. That is the
-owner's decision, not a tidy-up, so it is written down here instead of made.
+**Changed: the address now rotates.** This was left alone at first and
+written up here instead, because making the spoofers harder to attribute is
+an increase in what they do rather than a correction to what they claim, and
+that is the owner's call. It was made.
 
-If it is wanted, the call is `NimBLEDevice::setOwnAddrType()` with a
-non-resolvable private address, or `ble_hs_id_set_rnd()` with the bytes
-already being generated. It would also need doing per burst rather than
-once, or it is one new fixed address instead of one old one.
+Three decisions worth recording.
+
+**Non-resolvable private, not static random.** `ble_hs_id_gen_rnd(1, ...)`
+asks the stack for an NRPA, which is the address type the specification
+defines for exactly this. A static random address is meant to hold still for
+a power cycle, so rotating one is out of spec even though the controller
+allows it. Letting the stack generate it also sidesteps the top-two-bits
+rule, which the old dead code got right once (`0xC0`) and wrong twice
+(`0xF0`, and on the wrong end of the array for NimBLE, which takes the
+address little-endian).
+
+**Once a second, not once a burst.** The controller refuses
+`HCI_LE_Set_Random_Address` while advertising is enabled, so a rotation is
+stop, set, start. `AirTagSpoofer` carries a note that repeated stop/start was
+resetting the board, so rotating on every 40 ms burst is the exact pattern to
+avoid. A second is far below anything that makes a device followable and is
+about twenty-five times less churn.
+
+**The screen reads the address back from the stack.**
+`NimBLEDevice::getAddress()` is no use here: it prefers the *public* address
+and only falls back to random when there is no public one, which on an ESP32
+never happens. It would confidently display the one address the radio is not
+transmitting from. `ble_hs_id_copy_addr(BLE_ADDR_RANDOM, ...)` gets the real
+one.
 
 ## Also worth knowing
 
