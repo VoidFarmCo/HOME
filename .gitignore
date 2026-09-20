@@ -10,3 +10,9 @@ art/*_render_*.png
 
 # Release artefacts
 dist/
+
+# Screenshots from tools/render_screens.py. Generated from icon.h and
+# TFT_eSPI's font data, so they are reproducible in seconds and would
+# otherwise go stale on every UI change. The copies that are published
+# live in the website repo.
+render/
