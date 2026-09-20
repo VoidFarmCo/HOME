@@ -3,7 +3,10 @@
 Wiring a CYD and four modules into a working unit, in the order that makes a
 fault easy to find.
 
-**Nothing in this guide has been built yet.** It is derived from the pin map
+**Nothing in this guide has been wired yet.** Step 2 has been done -- a board
+was flashed and booted on 2026-09-20, and display, menu and touch work -- but
+no module has been soldered to anything, so steps 3 onward remain untested.
+The rest is derived from the pin map
 in [hardware.md](hardware.md), which `tools/check_pinmap.py` verifies against
 the CYD's own wiring, from the CYD schematic, and from module datasheets. The
 first unit goes together on 2026-09-20; whatever that gets wrong is a

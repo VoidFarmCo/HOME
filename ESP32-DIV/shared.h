@@ -170,6 +170,36 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define ESP32DIV_RFID_SRC_PAGES    128
 #endif
 
+/* Bring-up 2026-09-20: the board in hand is a 3.5" ESP32-3248S035R
+ * (ST7796, 320x480, XPT2046 on the display's own SPI bus), not the 2.8"
+ * ESP32-2432S028R this profile was written for. Everything the two boards
+ * disagree about is gathered here.
+ * TODO: make this a real board profile rather than a hand-set define. */
+#ifndef PUEO_PANEL_35
+#define PUEO_PANEL_35 1
+#endif
+
+#if PUEO_PANEL_35
+/* From the on-device calibrator, four crosshairs at the 20 px inset,
+ * extrapolated out to the screen edges. Both axes run backwards on this
+ * panel -- raw falls as the screen coordinate rises -- and that is carried
+ * in the numbers rather than in a separate invert flag: the pair is
+ * (raw at 0, raw at max), and map() handles a descending range natively.
+ * Measured: x 3591/3259 at screen 20 against 514/406 at 300;
+ *           y 3675/3673 at screen 20 against 372/457 at 460. */
+#define TOUCH_PROFILE_ID "CYD35"
+#define TOUCH_X_MIN 3637   /* raw at screen x = 0   */
+#define TOUCH_X_MAX 259    /* raw at screen x = 319 */
+#define TOUCH_Y_MIN 3822   /* raw at screen y = 0   */
+#define TOUCH_Y_MAX 274    /* raw at screen y = 479 */
+#define TOUCH_INVERT_Y 0   /* direction lives in the values above */
+#define TOUCH_ROTATION 1   /* measured: rotation 0 transposed the axes */
+#endif
+
+#ifndef TOUCH_INVERT_Y
+#define TOUCH_INVERT_Y 0
+#endif
+
 /*──────────────────── Touch calibration profiles ────────────────────*/
 /* Factory defaults per board (raw XPT2046 range). Override in BoardConfig.h.
  * User-saved calibration in settings.json overrides when board id matches. */
@@ -248,8 +278,13 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #endif
 
 #ifndef TOUCH_SHARES_TFT_SPI
-/* CYD uses a dedicated VSPI touch bus (T_CLK/T_DIN/T_OUT on 25/32/39); TFT stays on HSPI. */
-#define TOUCH_SHARES_TFT_SPI 0
+/* The 2.8" CYD uses a dedicated VSPI touch bus (T_CLK/T_DIN/T_OUT on
+ * 25/32/39) with the TFT on HSPI. The 3.5" ESP32-3248S035R does not: its
+ * XPT2046 sits on the display's own SPI bus behind TOUCH_CS. Bring-up on
+ * 2026-09-20 read rails (x=4095 y=0 z=4095, unchanging under a press) on the
+ * 25/32/39 trio, which is what an absent device looks like.
+ * TODO: make this follow the board profile rather than being set by hand. */
+#define TOUCH_SHARES_TFT_SPI 1
 #endif
 
 #if defined(BOARD_CYD)

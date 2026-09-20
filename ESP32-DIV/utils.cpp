@@ -1476,8 +1476,18 @@ void runUI() {
     }
 }
 
+/* Vertical scroll is a MIPI DCS command rather than a vendor extension:
+ * 0x33 and 0x37 are identical on ILI9341, ST7789 and ST7796. TFT_eSPI only
+ * publishes them under whichever driver the build selected, so naming them
+ * here keeps the terminal scrolling independent of which panel this board
+ * happens to carry. */
+#ifndef PUEO_VSCRDEF
+#define PUEO_VSCRDEF  0x33   // vertical scrolling definition
+#define PUEO_VSCRSADD 0x37   // vertical scroll start address
+#endif
+
 void scrollAddress(uint16_t vsp) {
-  tft.writecommand(ILI9341_VSCRSADD);
+  tft.writecommand(PUEO_VSCRSADD);
   tft.writedata(vsp >> 8);
   tft.writedata(vsp);
 }
@@ -1497,7 +1507,7 @@ int scroll_line() {
 }
 
 void setupScrollArea(uint16_t tfa, uint16_t bfa) {
-  tft.writecommand(ILI9341_VSCRDEF);
+  tft.writecommand(PUEO_VSCRDEF);
   tft.writedata(tfa >> 8);
   tft.writedata(tfa);
   tft.writedata((DISPLAY_HEIGHT - tfa - bfa) >> 8);
@@ -3118,19 +3128,38 @@ void setup(){
 
 void loop(){
   if (stepIdx>=4){
-    uint16_t xMin = min(xs[0], xs[3]);
-    uint16_t xMax = max(xs[1], xs[2]);
-    uint16_t yMin = min(ys[0], ys[1]);
-    uint16_t yMax = max(ys[2], ys[3]);
+    /* Average the pair at each edge, then extrapolate from the 20 px
+     * target inset out to the screen edges, so the stored pair is
+     * (raw at 0, raw at max) rather than (raw at 20, raw at max-20).
+     *
+     * The old min/max form assumed raw counts rise with the screen
+     * coordinate. On a panel where they fall -- both axes do on the 3.5"
+     * board -- min() and max() pick one reading from each edge pair
+     * rather than the correct end, and the result is skewed. Averaging
+     * and extrapolating has no opinion about direction. */
+    const float xLowRaw  = (xs[0] + xs[3]) * 0.5f;   // screen x = 20
+    const float xHighRaw = (xs[1] + xs[2]) * 0.5f;   // screen x = W-20
+    const float yLowRaw  = (ys[0] + ys[1]) * 0.5f;   // screen y = 20
+    const float yHighRaw = (ys[2] + ys[3]) * 0.5f;   // screen y = H-20
+    const float xPerPx = (xHighRaw - xLowRaw) / (float)(TFT_WIDTH  - 40);
+    const float yPerPx = (yHighRaw - yLowRaw) / (float)(TFT_HEIGHT - 40);
+    uint16_t xMin = (uint16_t)constrain(lroundf(xLowRaw  - 20.0f * xPerPx), 0L, 4095L);
+    uint16_t xMax = (uint16_t)constrain(lroundf(xHighRaw + 19.0f * xPerPx), 0L, 4095L);
+    uint16_t yMin = (uint16_t)constrain(lroundf(yLowRaw  - 20.0f * yPerPx), 0L, 4095L);
+    uint16_t yMax = (uint16_t)constrain(lroundf(yHighRaw + 19.0f * yPerPx), 0L, 4095L);
     auto& s = settings();
     s.touchXMin = xMin; s.touchXMax = xMax;
-#if defined(BOARD_CYD)
     s.touchYMin = yMin; s.touchYMax = yMax;
-#else
-    s.touchYMin = yMax; s.touchYMax = yMin;
-#endif
+
+    /* Echoed regardless of whether the card takes the write, so a failed
+     * save still leaves usable numbers on the wire. */
+    Serial.printf("[calib] pts (%u,%u) (%u,%u) (%u,%u) (%u,%u)\n",
+                  xs[0],ys[0], xs[1],ys[1], xs[2],ys[2], xs[3],ys[3]);
+    Serial.printf("[calib] stored X:[%u..%u] Y:[%u..%u]\n",
+                  s.touchXMin,s.touchXMax,s.touchYMin,s.touchYMax);
 
     bool ok = settingsSave();
+    Serial.printf("[calib] settingsSave -> %s\n", ok ? "ok" : "FAILED");
 
     tft.fillScreen(UI_BG);
     tft.setTextColor(ok ? UI.ok : UI.warn, UI_BG);
@@ -3148,11 +3177,40 @@ void loop(){
 
   int16_t rx = 0, ry = 0;
   if (readTouchRawXY(rx, ry)) {
-    xs[stepIdx] = (uint16_t)rx;
-    ys[stepIdx] = (uint16_t)ry;
+    /* Let the press settle, then take the median of a burst. A single
+     * sample taken the instant the panel closes is the noisiest one
+     * available, and these four numbers set every tap afterwards. */
+    delay(60);
+    int16_t bx[9], by[9];
+    int n = 0;
+    for (int i = 0; i < 9; i++) {
+      int16_t sx = 0, sy = 0;
+      if (readTouchRawXY(sx, sy)) { bx[n] = sx; by[n] = sy; n++; }
+      delay(12);
+    }
+    if (n < 3) { delay(50); return; }   // a brush, not a press
+    for (int i = 1; i < n; i++) {
+      int16_t kx = bx[i], ky = by[i];
+      int j = i - 1;
+      while (j >= 0 && bx[j] > kx) { bx[j+1] = bx[j]; j--; }
+      bx[j+1] = kx;
+      j = i - 1;
+      while (j >= 0 && by[j] > ky) { by[j+1] = by[j]; j--; }
+      by[j+1] = ky;
+    }
+    xs[stepIdx] = (uint16_t)bx[n/2];
+    ys[stepIdx] = (uint16_t)by[n/2];
     stepIdx++;
+
+    /* Wait for the finger to leave. Without this one press satisfies
+     * every remaining target in a few milliseconds, and all four points
+     * come back identical. */
+    uint32_t guard = millis();
+    while (isTouchDown(200) && millis() - guard < 4000) { delay(10); }
+    delay(200);
+
     if (stepIdx<4) drawTarget(pts[stepIdx][0], pts[stepIdx][1]);
   }
-  delay(100);
+  delay(30);
 }
 }

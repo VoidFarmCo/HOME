@@ -812,11 +812,32 @@ unsigned long last_interaction_time = 0;
 int last_menu_index = -1;
 bool menu_initialized = false;
 
+/* Menu grid geometry. The 2.8" values are the originals and are kept
+ * exactly, because the screen renders in render/ were drawn against them.
+ * The 3.5" panel is 320x480 rather than 240x320, so its tiles are sized to
+ * fill it instead of leaving a border of unused pixels: same 2x4 grid, same
+ * 10 px margins and gaps, just bigger. */
+#if TFT_WIDTH >= 320
+const int TILE_W = 145;
+const int TILE_H = 92;
+const int COLUMN_WIDTH = 155;
+const int X_OFFSET_LEFT = 10;
+const int X_OFFSET_RIGHT = X_OFFSET_LEFT + COLUMN_WIDTH;
+const int Y_START = 44;
+const int Y_SPACING = 106;
+const int TILE_ICON_DY = 27;   // icon+label block centred in a taller tile
+const int TILE_TEXT_DY = 49;
+#else
+const int TILE_W = 100;
+const int TILE_H = 60;
 const int COLUMN_WIDTH = 120;
 const int X_OFFSET_LEFT = 10;
 const int X_OFFSET_RIGHT = X_OFFSET_LEFT + COLUMN_WIDTH;
 const int Y_START = 30;
 const int Y_SPACING = 75;
+const int TILE_ICON_DY = 10;
+const int TILE_TEXT_DY = 30;
+#endif
 
 void displayOtherMenuGrid();
 void displayPagedSubmenu();
@@ -977,14 +998,14 @@ void displayOtherMenuGrid() {
             int x_position = (column == 0) ? X_OFFSET_LEFT : X_OFFSET_RIGHT;
             int y_position = Y_START + row * Y_SPACING;
 
-            tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_FG);
-            tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_LINE);
-            tft.drawBitmap(x_position + 42, y_position + 10, other_submenu_icons[i], 16, 16, UI_ICON);
+            tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
+            tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
+            tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, other_submenu_icons[i], 16, 16, UI_ICON);
 
             tft.setTextColor(UI_TEXT, UI_FG);
             int textWidth = tft.textWidth(other_submenu_items[i]);
-            int textX = x_position + (100 - textWidth) / 2;
-            int textY = y_position + 30;
+            int textX = x_position + (TILE_W - textWidth) / 2;
+            int textY = y_position + TILE_TEXT_DY;
             tft.setCursor(textX, textY);
             tft.print(other_submenu_items[i]);
         }
@@ -1001,14 +1022,14 @@ void displayOtherMenuGrid() {
             int y_position = Y_START + row * Y_SPACING;
 
             if (i == last_other_menu_index) {
-                tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_FG);
-                tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_LINE);
+                tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
+                tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
                 tft.setTextColor(UI_TEXT, UI_FG);
-                tft.drawBitmap(x_position + 42, y_position + 10,
+                tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY,
                                other_submenu_icons[last_other_menu_index], 16, 16, UI_ICON);
                 int textWidth = tft.textWidth(other_submenu_items[last_other_menu_index]);
-                int textX = x_position + (100 - textWidth) / 2;
-                int textY = y_position + 30;
+                int textX = x_position + (TILE_W - textWidth) / 2;
+                int textY = y_position + TILE_TEXT_DY;
                 tft.setCursor(textX, textY);
                 tft.print(other_submenu_items[last_other_menu_index]);
             }
@@ -1021,15 +1042,15 @@ void displayOtherMenuGrid() {
 
         /* Filled, to match the main menu -- same tile, same size, and it
          * had the same problem. See the note in displayMenu(). */
-        tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
-        tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
+        tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_ICON);
+        tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_ICON);
 
         tft.setTextColor(UI_BG, UI_ICON);
-        tft.drawBitmap(x_position + 42, y_position + 10, other_submenu_icons[current_submenu_index],
+        tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, other_submenu_icons[current_submenu_index],
                        16, 16, UI_BG);
         int textWidth = tft.textWidth(other_submenu_items[current_submenu_index]);
-        int textX = x_position + (100 - textWidth) / 2;
-        int textY = y_position + 30;
+        int textX = x_position + (TILE_W - textWidth) / 2;
+        int textY = y_position + TILE_TEXT_DY;
         tft.setCursor(textX, textY);
         tft.print(other_submenu_items[current_submenu_index]);
 
@@ -1045,8 +1066,8 @@ static constexpr int MAIN_MENU_OTHER_ICON_GAP = 4;
 
 static void drawMainMenuOtherTripleIcons(int x_position, int y_position, uint16_t iconColor) {
     const int tripleW = 16 * 3 + MAIN_MENU_OTHER_ICON_GAP * 2;
-    int ix = x_position + (100 - tripleW) / 2;
-    const int iy = y_position + 10;
+    int ix = x_position + (TILE_W - tripleW) / 2;
+    const int iy = y_position + TILE_ICON_DY;
     tft.drawBitmap(ix, iy, bitmap_icon_led, 16, 16, iconColor);
     tft.drawBitmap(ix + 16 + MAIN_MENU_OTHER_ICON_GAP, iy, bitmap_icon_satellite, 16, 16, iconColor);
     tft.drawBitmap(ix + 32 + MAIN_MENU_OTHER_ICON_GAP * 2, iy, bitmap_icon_down_dots, 16, 16, iconColor);
@@ -1083,18 +1104,18 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
             int x_position = (column == 0) ? X_OFFSET_LEFT : X_OFFSET_RIGHT;
             int y_position = Y_START + row * Y_SPACING;
 
-            tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_FG);
-            tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_LINE);
+            tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
+            tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
             if (i == MAIN_MENU_OTHER_IDX) {
                 drawMainMenuOtherTripleIcons(x_position, y_position, icon_colors[i]);
             } else {
-                tft.drawBitmap(x_position + 42, y_position + 10, bitmap_icons[i], 16, 16, icon_colors[i]);
+                tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, bitmap_icons[i], 16, 16, icon_colors[i]);
             }
 
             tft.setTextColor(UI_TEXT, UI_FG);
             int textWidth = tft.textWidth(menu_items[i]);
-            int textX = x_position + (100 - textWidth) / 2;
-            int textY = y_position + 30;
+            int textX = x_position + (TILE_W - textWidth) / 2;
+            int textY = y_position + TILE_TEXT_DY;
             tft.setCursor(textX, textY);
             tft.print(menu_items[i]);
         }
@@ -1110,17 +1131,17 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
             int y_position = Y_START + row * Y_SPACING;
 
             if (i == last_menu_index) {
-                tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_FG);
-                tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_LINE);
+                tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
+                tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
                 tft.setTextColor(UI_TEXT, UI_FG);
                 if (last_menu_index == MAIN_MENU_OTHER_IDX) {
                     drawMainMenuOtherTripleIcons(x_position, y_position, icon_colors[last_menu_index]);
                 } else {
-                    tft.drawBitmap(x_position + 42, y_position + 10, bitmap_icons[last_menu_index], 16, 16, icon_colors[last_menu_index]);
+                    tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, bitmap_icons[last_menu_index], 16, 16, icon_colors[last_menu_index]);
                 }
                 int textWidth = tft.textWidth(menu_items[last_menu_index]);
-                int textX = x_position + (100 - textWidth) / 2;
-                int textY = y_position + 30;
+                int textX = x_position + (TILE_W - textWidth) / 2;
+                int textY = y_position + TILE_TEXT_DY;
                 tft.setCursor(textX, textY);
                 tft.print(menu_items[last_menu_index]);
             }
@@ -1143,18 +1164,18 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
          *
          * The label goes dark rather than white because dark on accent is
          * about 6.4:1 and white on accent is 2.6:1. */
-        tft.fillRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
-        tft.drawRoundRect(x_position, y_position, 100, 60, 5, UI_ICON);
+        tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_ICON);
+        tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_ICON);
 
         tft.setTextColor(UI_BG, UI_ICON);
         if (current_menu_index == MAIN_MENU_OTHER_IDX) {
             drawMainMenuOtherTripleIcons(x_position, y_position, UI_BG);
         } else {
-            tft.drawBitmap(x_position + 42, y_position + 10, bitmap_icons[current_menu_index], 16, 16, UI_BG);
+            tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, bitmap_icons[current_menu_index], 16, 16, UI_BG);
         }
         int textWidth = tft.textWidth(menu_items[current_menu_index]);
-        int textX = x_position + (100 - textWidth) / 2;
-        int textY = y_position + 30;
+        int textX = x_position + (TILE_W - textWidth) / 2;
+        int textY = y_position + TILE_TEXT_DY;
         tft.setCursor(textX, textY);
         tft.print(menu_items[current_menu_index]);
 
@@ -4415,6 +4436,32 @@ void setup() {
 }
 
 void loop() {
+  /* TEMPORARY bring-up aid -- remove before committing. Runs the touch
+   * calibrator once at startup, because a panel whose touch is wrong
+   * enough to need calibrating is also too wrong to navigate to the menu
+   * entry that starts it. */
+#ifndef PUEO_FORCE_TOUCH_CALIB
+#define PUEO_FORCE_TOUCH_CALIB 0
+#endif
+#if PUEO_FORCE_TOUCH_CALIB
+  {
+    static bool s_forcedCalibDone = false;
+    if (!s_forcedCalibDone) {
+      s_forcedCalibDone = true;
+      feature_active = true;
+      feature_exit_requested = false;
+      TouchCalib::setup();
+      while (!feature_exit_requested) {
+        TouchCalib::loop();
+        delay(10);
+      }
+      feature_active = false;
+      feature_exit_requested = false;
+      menu_initialized = false;
+      displayMenu();
+    }
+  }
+#endif
   applyThemeToPalette(settings().theme);
   handleButtons();
   updateStatusBar();

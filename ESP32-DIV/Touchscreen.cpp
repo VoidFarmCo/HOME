@@ -76,8 +76,47 @@ static void ensureTouchSpiReady() {
 #endif
 }
 
+/* TEMPORARY bring-up diagnostic -- remove before committing. Reports what
+ * the controller is actually doing, so a dead panel can be told apart from
+ * a wrong IRQ pin and from a wrong SPI bus. */
+#ifndef PUEO_TOUCH_DEBUG
+#define PUEO_TOUCH_DEBUG 0
+#endif
+
 static bool touchSampleOk(uint16_t zThresh, int16_t& rawX, int16_t& rawY) {
+#if PUEO_TOUCH_DEBUG && !TOUCH_SHARES_TFT_SPI
+  {
+    static uint32_t s_lastDump = 0;
+    if (millis() - s_lastDump > 400) {
+      s_lastDump = millis();
+      ensureTouchSpiReady();
+      TS_Point dp = ts.getPoint();
+      int irq = -1;
+#if defined(XPT2046_IRQ) && (XPT2046_IRQ < 255)
+      pinMode(XPT2046_IRQ, INPUT);
+      irq = digitalRead(XPT2046_IRQ);
+#endif
+      Serial.printf("[touch] irq(%d)=%d tirq=%d touched=%d raw x=%d y=%d z=%d\n",
+                    (int)XPT2046_IRQ, irq, (int)ts.tirqTouched(), (int)ts.touched(),
+                    (int)dp.x, (int)dp.y, (int)dp.z);
+    }
+  }
+#endif
 #if TOUCH_SHARES_TFT_SPI
+#if PUEO_TOUCH_DEBUG
+  {
+    static uint32_t s_lastDump2 = 0;
+    if (millis() - s_lastDump2 > 70) {
+      s_lastDump2 = millis();
+      tft.endWrite();
+      uint16_t dx = 0, dy = 0;
+      int16_t dz = (int16_t)tft.getTouchRawZ();
+      tft.getTouchRaw(&dx, &dy);
+      Serial.printf("[touch] shared raw x=%d y=%d z=%d\n",
+                    (int)dx, (int)dy, (int)dz);
+    }
+  }
+#endif
   int16_t z = 0;
   return readSharedTouchSample(rawX, rawY, z, zThresh);
 #else
@@ -135,13 +174,14 @@ bool readTouchRawXY(int16_t& x, int16_t& y, uint16_t zThresh) {
 
 static void mapTouchToScreen(int16_t rawX, int16_t rawY, int& x, int& y) {
   auto& s = settings();
-#if defined(BOARD_CYD)
-  // Same axis order as the RNT CYD touch test (no inverted Y).
   x = ::map(rawX, s.touchXMin, s.touchXMax, 0, TFT_WIDTH - 1);
-  y = ::map(rawY, s.touchYMin, s.touchYMax, 0, TFT_HEIGHT - 1);
-#else
-  x = ::map(rawX, s.touchXMin, s.touchXMax, 0, TFT_WIDTH - 1);
+#if TOUCH_INVERT_Y
+  /* Y runs the other way on this panel: raw falls as the screen
+   * coordinate rises, measured at -0.96 correlation. */
   y = ::map(rawY, s.touchYMax, s.touchYMin, 0, TFT_HEIGHT - 1);
+#else
+  // Same axis order as the RNT CYD touch test (no inverted Y).
+  y = ::map(rawY, s.touchYMin, s.touchYMax, 0, TFT_HEIGHT - 1);
 #endif
 }
 
