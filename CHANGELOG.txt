@@ -11,6 +11,92 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.6 - 2026-09-19
+------------------
+
+A crash fix, the enclosure carrying the logo, and a way to see the screens
+without a board.
+
+Fixed:
+
+  * Opening the second Bluetooth page would have faulted the device. Adding
+    Fast Pair in 0.2.5 raised BT_PAGE1_FEATURES from 2 to 3 but left
+    bluetooth_page1_icons with two initialisers, so the third was null and
+    displayPagedSubmenu() handed it straight to drawBitmap. It compiled
+    clean: an array with fewer initialisers than its size is legal C++ and
+    neither -Wall nor -Wextra warns.
+  * tools/check_menu_tables.py now walks every label and icon table in the
+    sketch and asserts each has as many initialisers as its declared bound,
+    and that a menu's labels and icons share a size constant. 28 tables, 12
+    pairs. Run against the bug first to confirm it fails on it.
+
+UI:
+
+  * A selected menu tile is FILLED with the accent, with its icon and label
+    dropped to the background colour. It used to move a 1 px border and the
+    label from white to accent - and the icon did not change at all, since
+    every icon table is already UI_ICON and SELECTED_ICON_COLOR was defined
+    as UI_ICON again. On a 100x60 tile that was the whole cue. Both grids,
+    the main menu and "More". Flash is byte-identical: a constant swap.
+  * SELECTED_ICON_COLOR is deleted, having no users left. It would not have
+    tripped -Wunused; it was a #define.
+  * "by: magikh0e" on the boot screen, under the artwork. The logo height
+    ceiling in Branding.h moved with it: four lines under the logo is a
+    62 px block and caps the logo at 217 px, where three lines and 46 px
+    capped it at 249. At the shipped 200 px there are now 8 px of slack
+    rather than 24.
+
+Enclosure:
+
+  * The owl is debossed into the chin of the lid, 30 mm at 0.6 mm deep.
+    LOGO = false turns it off and produces an STL identical to the pre-logo
+    one, triangle for triangle.
+  * Debossed rather than embossed because the artwork is line art: the
+    thinnest 5% of strokes are 8 px of a 474 px height, so at 30 mm they
+    land at 0.51 mm - one extrusion wide on a 0.4 nozzle. A raised rib that
+    thin shears off; the same feature cut in is a channel that cannot.
+  * tools/trace_logo.py turns the PNG into outlines with marching squares
+    and Douglas-Peucker, since OpenSCAD cannot usefully extrude a bitmap
+    and there is no potrace here. It rasterises what it wrote and refuses
+    to write when more than 3% disagrees with the source; at the shipped
+    tolerance it is 0.02%.
+  * docs/pueo/logo-fit-test.scad is a 76 x 56 x 3 tile to print first. The
+    lid is a tray, so it must print face-down or its ceiling is an 80 x 165
+    bridge - which puts the logo against the bed. The tile carries the same
+    owl on both faces to show which side does it better, plus a ladder of
+    eight grooves 0.3 to 1.6 mm wide at the shipped depth.
+  * tools/check_logo_scale.py asserts the artwork's height, width, centring
+    and area at three sizes, and the lid's removed volume. It exists
+    because the first version rendered the owl at 7.9 mm instead of 30 and
+    11 mm off centre, and two renders were inspected without noticing.
+    OpenSCAD converts SVG px to mm at a fixed 96 dpi; resize() measures the
+    box that turned up instead of assuming one.
+
+Documented:
+
+  * docs/pueo/jammers.md, to the same standard as the Fast Pair probe. The
+    two radios are not the same story. BLE Jammer and Proto Kill set
+    RF_CONT_WAVE with the power bits at maximum, so they are an unmodulated
+    carrier - certain. SubGHz Jammer sets 2-FSK at +12 dBm and calls
+    SetTx(), and nothing is ever fed to it: no FIFO payload, and TX_PIN is
+    only ever driven LOW. What radiates is NOT established, and no
+    constant-wave bit is set, so nothing in the code states the intent.
+  * Also recorded there: none of the three can report whether they worked,
+    and none ever will, because knowing you had suppressed a link means
+    receiving it.
+
+Tooling:
+
+  * tools/render_screens.py draws the boot screen, main menu and Bluetooth
+    submenu to PNG from the firmware's own bitmaps and TFT_eSPI's own font
+    data, at the coordinates the source gives. Not a mockup - the text is
+    the panel's 5x7 GLCD font and its 16 px proportional font. Version and
+    byline come from Branding.h so the images cannot go stale.
+  * art/ is out of the source archive: 7389 KB -> 6166 KB. It was a 1.3 MB
+    photograph whose only job is regenerating a bitmap already committed in
+    icon.h. The merged image's digest does not move, because the firmware
+    never depended on it.
+
 0.2.5 - 2026-09-19
 ------------------
 

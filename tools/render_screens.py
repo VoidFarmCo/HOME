@@ -97,6 +97,25 @@ def _preprocess(src):
     return "\n".join(out)
 
 
+def load_branding():
+    """The boot strings, from Branding.h rather than retyped here.
+
+    The version is on the boot screen, so a hardcoded copy means the
+    screenshots quietly disagree with the firmware one release after anyone
+    stops checking."""
+    src = _strip_comments(
+        open(os.path.join(REPO, "ESP32-DIV", "Branding.h"),
+             encoding="utf-8", newline="").read())
+    out = {}
+    for name in ("PUEO_VERSION", "PUEO_AUTHOR", "PUEO_TAGLINE",
+                 "PUEO_UPSTREAM"):
+        m = re.search(r"#define\s+" + name + r'\s+"([^"]*)"', src)
+        if not m:
+            raise SystemExit("Branding.h has no %s" % name)
+        out[name] = m.group(1)
+    return out
+
+
 # ── the firmware's bitmaps ─────────────────────────────────────────────────
 def load_bitmaps():
     src = _strip_comments(open(ICON_H, encoding="utf-8", newline="").read())
@@ -264,7 +283,7 @@ def status_bar(t):
     t.draw_bitmap(sd_icon_x + 10, y - 2, "bitmap_icon_sdcard", 16, 16, GREEN)
 
 
-def render_boot(t):
+def render_boot(t, brand):
     """displayLogo(TFT_WHITE, 500) in utils.cpp."""
     t.fill_screen(BLACK)
     lw = lh = 200
@@ -273,13 +292,13 @@ def render_boot(t):
     ty = ly + lh + 10
     cx = W // 2
     # PUEO_LOGO_HAS_WORDMARK is 1, so no separate name line
-    t.draw_string_tc("by: magikh0e", cx, ty, WHITE)
+    t.draw_string_tc("by: " + brand["PUEO_AUTHOR"], cx, ty, WHITE)
     ty += 16
-    t.draw_string_tc("multi-radio field tool", cx, ty, WHITE)
+    t.draw_string_tc(brand["PUEO_TAGLINE"], cx, ty, WHITE)
     ty += 16
-    t.draw_string_tc("0.2.5", cx, ty, WHITE)
+    t.draw_string_tc(brand["PUEO_VERSION"], cx, ty, WHITE)
     ty += 22
-    t.draw_string_tc("based on ESP32-DIV by CiferTech", cx, ty, WHITE)
+    t.draw_string_tc(brand["PUEO_UPSTREAM"], cx, ty, WHITE)
 
 
 MENU = [
@@ -364,11 +383,15 @@ def main():
     bitmaps = load_bitmaps()
     glcd = load_glcd()
     fw, fg = load_font16()
+    brand = load_branding()
     print("loaded %d bitmaps, %d glcd chars, %d font-2 glyphs"
           % (len(bitmaps), len(glcd), len(fg)))
+    print("branding: %s %s, by %s"
+          % ("Pueo", brand["PUEO_VERSION"], brand["PUEO_AUTHOR"]))
 
     os.makedirs(args.out, exist_ok=True)
-    for name, fn in (("boot", render_boot), ("menu", render_menu),
+    for name, fn in (("boot", lambda t: render_boot(t, brand)),
+                     ("menu", render_menu),
                      ("bluetooth", render_bluetooth)):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
