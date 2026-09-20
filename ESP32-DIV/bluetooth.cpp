@@ -7,6 +7,7 @@
 #include "shared.h"
 #include "utils.h"
 #include "Nrf24Raw.h"
+#include "TrackerFollow.h"
 #include "SpiBus.h"
 
 
@@ -2067,9 +2068,20 @@ constexpr int STATUS_BAR_HEIGHT = 16;
 constexpr int ICON_SIZE = 16;
 constexpr int ICON_NUM = 1;
 
-static constexpr int HDR_Y = 42;
-static constexpr int COL_Y = 58;
-static constexpr int LIST_Y = 74;
+static constexpr int HDR_Y  = 42;
+/* The tail line sits between the header and the column titles, and costs
+ * the list one row. Worth it: "is something following me" is the question
+ * this feature exists to answer, and an answer that only appears when it is
+ * bad teaches you nothing the rest of the time. */
+static constexpr int TAIL_Y = 56;
+static constexpr int COL_Y  = 72;
+static constexpr int LIST_Y = 88;
+
+/* Above this many new identities a minute the surroundings are busy enough
+ * that every signal here degrades together -- a crowd, or you moving through
+ * one. The verdict is still shown, in a colour that says "with a pinch of
+ * salt" rather than being silently suppressed. */
+static constexpr uint16_t kTailBusyChurn = 20;
 static constexpr int ROW_H = 18;
 static constexpr int MAX_HITS = 32;
 static constexpr unsigned long BTN_DEBOUNCE_MS = 220;
@@ -2122,7 +2134,32 @@ static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static volatile bool s_hasUpdates = false;
 
 static char s_cacheFound[12] = {0};
+static char s_cacheTail[44] = {0};
+static TrackerFollow::State s_follow;
 static char s_cacheState[10] = {0};
+
+/* FNV-1a over the address. Hashed rather than kept so that nothing in this
+ * feature holds a list of who was near you. */
+static uint32_t macHash(const uint8_t mac[6]) {
+  uint32_t h = 2166136261u;
+  for (int i = 0; i < 6; i++) {
+    h ^= mac[i];
+    h *= 16777619u;
+  }
+  return h;
+}
+
+/* RSSI of the lane driving the current verdict. Rows sitting in it are the
+ * ones implicated, which is as specific as this can honestly get -- there is
+ * no identity to point at, that being the whole problem. */
+static bool tailLaneRssi(int8_t* out) {
+  const TrackerFollow::Lane* L = TrackerFollow::leadLane(&s_follow, millis());
+  if (L == nullptr) {
+    return false;
+  }
+  *out = L->centre;
+  return true;
+}
 
 static int listBottomY() {
   return bleContentBottom() - 2;
@@ -2229,6 +2266,7 @@ static void updateHeader(bool force) {
   if (force) {
     s_cacheFound[0] = '\0';
     s_cacheState[0] = '\0';
+    s_cacheTail[0] = '\0';
   }
   char found[12];
   snprintf(found, sizeof(found), "FOUND %d", s_hitCount);
@@ -2236,6 +2274,27 @@ static void updateHeader(bool force) {
   paintField(200, HDR_Y, 40, s_cacheState, sizeof(s_cacheState),
              s_scanning ? "LIVE" : "IDLE",
              s_scanning ? ORANGE : UI_DIM_TEXT);
+
+  const uint32_t now = millis();
+  const TrackerFollow::Verdict v = TrackerFollow::verdict(&s_follow, now);
+  const uint16_t ch = TrackerFollow::churn(&s_follow, now);
+  const bool busy = (ch >= kTailBusyChurn);
+
+  char tail[44];
+  if (v == TrackerFollow::Verdict::None) {
+    snprintf(tail, sizeof(tail), "No tail  %u new/min%s", (unsigned)ch,
+             busy ? "  busy" : "");
+  } else {
+    const TrackerFollow::Lane* L = TrackerFollow::leadLane(&s_follow, now);
+    const unsigned mins =
+        L ? (unsigned)((L->lastMs - L->firstMs) / 60000u) : 0u;
+    snprintf(tail, sizeof(tail), "%s  %ddBm  %umin%s",
+             TrackerFollow::verdictText(v), L ? (int)L->centre : 0, mins,
+             busy ? "  busy" : "");
+  }
+  paintField(10, TAIL_Y, 220, s_cacheTail, sizeof(s_cacheTail), tail,
+             (v == TrackerFollow::Verdict::None) ? UI_DIM_TEXT
+                                                 : (busy ? ORANGE : TFT_RED));
 }
 
 static void formatRow(const Hit& h, char* out, size_t outSz) {
@@ -2274,6 +2333,16 @@ static void paintRow(int listIndex, bool selected) {
   tft.print(line);
   if (selected) {
     tft.fillRect(2, y + 2, 3, ROW_H - 4, ORANGE);
+  }
+  /* Right edge, so it cannot be confused with the selection bar on the left.
+   * These are the rows sitting in the lane that raised the verdict. */
+  int8_t tailRssi = 0;
+  if (s_hits[absIndex].kind == HIT_FIND_MY && tailLaneRssi(&tailRssi)) {
+    const int8_t r = s_hits[absIndex].rssi;
+    const int d = (r > tailRssi) ? (r - tailRssi) : (tailRssi - r);
+    if (d <= TrackerFollow::kLaneWidthDb) {
+      tft.fillRect(SCREEN_WIDTH - 5, y + 2, 3, ROW_H - 4, TFT_RED);
+    }
   }
 }
 
@@ -2441,8 +2510,15 @@ class AdvCallbacks : public BLEAdvertisedDeviceCallbacks {
 
     const int8_t rssi = (int8_t)device->getRSSI();
 
+    const uint32_t nowMs = millis();
     portENTER_CRITICAL(&s_mux);
     upsertHit(mac, rssi, kind, status);
+    /* Only the long form of 0x12 -- a separated tag carrying a key, which is
+     * what a clone emits. The short form is every passing iPhone reporting
+     * itself and would bury the signal. */
+    if (kind == HIT_FIND_MY) {
+      TrackerFollow::sighting(&s_follow, nowMs, rssi, macHash(mac));
+    }
     s_hasUpdates = true;
     portEXIT_CRITICAL(&s_mux);
   }
@@ -2609,6 +2685,7 @@ static void teardown() {
 }
 
 void airTagSnifferSetup() {
+  TrackerFollow::reset(&s_follow);
   if (!bleRequireStackOrExit()) return;
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
@@ -2669,6 +2746,7 @@ void airTagSnifferLoop() {
   maintainTouchNavBar();
 
   const unsigned long now = millis();
+  TrackerFollow::tick(&s_follow, (uint32_t)now);
   if (s_hasUpdates || (now - s_lastUiMs >= UI_MS)) {
     s_lastUiMs = now;
     bool updates = false;
