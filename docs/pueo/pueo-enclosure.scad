@@ -222,6 +222,47 @@ BEZEL_W   = 56.0;    // 55.5 bezel + 0.5 clearance
 BEZEL_L   = 92.5;
 BEZEL_Y   = 0;       // shift the screen up/down the face
 
+/* ---------- owl, debossed into the lid face ----------
+ *
+ * pueo-owl.svg is traced from the logo by tools/trace_logo.py, which checks
+ * its own output by rasterising it back and comparing: 0.02% of the artwork
+ * differs at the tolerance it ships with. Re-run the tracer rather than
+ * editing the SVG.
+ *
+ * Debossed rather than embossed, and that is about the artwork. This is line
+ * art, not a silhouette: measured across the bitmap, the thinnest 5% of
+ * strokes are 8 px of a 474 px height, so at LOGO_H they come out at
+ * LOGO_H * 8/474 mm -- 0.51 mm at 30, 0.34 mm at 20. A raised 0.5 mm rib
+ * 0.6 mm tall is a fragile single extrusion that can shear off the face. The
+ * same feature as a groove is a narrow channel in otherwise solid top
+ * layers, which is the forgiving direction to fail in: it may close up a
+ * little, but it cannot break off.
+ *
+ * Going below about 25 mm puts the fine strokes under a 0.4 mm nozzle
+ * entirely, at which point the wifi arcs and the eye rings stop existing.
+ * If a smaller mark is wanted, the answer is different artwork, not a
+ * smaller copy of this one.
+ *
+ * LOGO_Y sits it in the chin, between the screen window and the bottom
+ * wall. That band runs -82.5 to -46.25, and the screw pillars either side
+ * are at x +/-36.5, which a ~29 mm wide logo on the centreline never reaches.
+ */
+LOGO       = true;   // false leaves the face blank
+LOGO_H     = 30;     // artwork height in mm; see the note above before shrinking
+LOGO_DEPTH = 0.6;    // cut into a 2.5 mm skin, so 1.9 mm is left under it
+LOGO_Y     = -64;    // centre of the chin band
+LOGO_SVG   = "pueo-owl.svg";
+LOGO_PX_W  = 462;    // the SVG's own viewBox, so scaling stays honest
+LOGO_PX_H  = 474;
+
+// The artwork, centred on the origin, as a 2D shape.
+module owl2d(height) {
+    s = height / LOGO_PX_H;
+    scale([s, s])
+        translate([-LOGO_PX_W/2, -LOGO_PX_H/2])
+            import(LOGO_SVG);
+}
+
 module lid() {
     difference() {
         union() {
@@ -245,6 +286,11 @@ module lid() {
                 translate([0,0,-1]) cylinder(h=LID_H+2, r=1.7);
                 translate([0,0,LID_H-2.2]) cylinder(h=2.4, r1=1.7, r2=3.2);
             }
+        // owl, cut into the outer face
+        if (LOGO)
+            translate([0, LOGO_Y, LID_H - LOGO_DEPTH])
+                linear_extrude(LOGO_DEPTH + 1)
+                    owl2d(LOGO_H);
     }
 }
 
