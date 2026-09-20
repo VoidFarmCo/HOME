@@ -11,6 +11,83 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.9 - 2026-09-19
+------------------
+
+A detector for trackers that rotate their identity to avoid being detected.
+
+Bluetooth:
+
+  * New: AirTag Sniffer reports a rotating tail. It keyed its rows on the
+    BLE address, which is fine against a real AirTag and useless against a
+    clone - the published ESP32 one cycles a couple of thousand public keys,
+    so every rotation made a fresh row, the hit count reset, and after 32
+    identities the list started evicting. The harder something worked to
+    avoid detection, the less it stood out.
+
+  * ESP32-DIV/TrackerFollow.{h,cpp} asks a different question: has something
+    been beside me, at the same distance, wearing a succession of names.
+    Sightings of the long form of Continuity 0x12 go into RSSI lanes; a lane
+    held without a long gap while collecting persistent identities fast
+    enough is the finding. No BLE, no display, no clock of its own, so it is
+    tested on a host.
+
+  * Two gates, both added because a scripted scenario failed rather than
+    because they sounded sensible:
+
+      A shopping centre read as a tail. A lane is not "one device holding
+      station", it is "anything at roughly this distance", and in a crowd
+      every lane stays occupied by a parade of strangers. Fixed by counting
+      only identities seen at least three times - a follower's keys persist,
+      a passer-by is seen once.
+
+      Sitting still crept into an alert. Half an hour beside your own AirTag
+      reaches two identities and forty-five minutes reaches three, which was
+      the Weak threshold. Fixed with a rate gate: a qualifying lane averages
+      a new persistent identity at least every four minutes. Apple rotates
+      at about 0.07 a minute, the clone at 2.0.
+
+  * Measured margins, not estimates: desk at 45 min 0.07/min and silent;
+    concourse nothing matured at all; clone following 2.00/min and reported
+    within two minutes. There is a check that three hours at a desk is as
+    quiet as thirty. 315 checks in tools/check_tracker_follow.py.
+
+  * On screen: a tail line between the header and the columns, always shown,
+    because "no tail" is the answer the feature exists to give. Rows in the
+    implicated lane get a red bar on the RIGHT edge - the left edge is the
+    selection bar. Churn is on the line and above 20 new identities a minute
+    the verdict draws orange rather than red, because a crowd degrades every
+    signal here at once. Costs the list one row, 10 down to 9. Addresses are
+    hashed before the detector sees them.
+
+  * docs/pueo/tracker-follow.md records what it cannot do, including the
+    weakness named by arXiv:2602.07656 (AirCatch): RSSI is a function of
+    transmit power and transmit power is the adversary's to choose. A clone
+    that randomises its output level alongside its keys never holds a lane
+    and this reports nothing. Their answer - fingerprinting the transmitter
+    by carrier frequency offset - is better and is not implementable here: a
+    NimBLE advertisement report carries no phase, no I/Q and no frequency
+    offset, which is why their work ships a separate micro-SDR.
+
+Corrected:
+
+  * docs/pueo/spoofers.md said AirTag Spoofer sends offline finding. It does
+    not. buildProximityPacket() emits Continuity 0x07 proximity pairing with
+    prefix 0x05 - the setup popup for an unpaired tag. Offline finding is
+    0x12, which nothing in this firmware transmits; the only code that
+    touches it is AirTagSniffer, which receives it. My error in the 0.2.4
+    write-up.
+
+Wardriving:
+
+  * WiGLE uploads identify as Pueo. The CSV header said model=ESP32-DIV,
+    brand=ESP32-DIV and the User-Agent said ESP32-DIV-Wardrive/1, so every
+    upload from this build was filed against the wrong firmware. appRelease
+    and release now come from PUEO_VERSION rather than a hardcoded 1.0.
+    Verified against the built image rather than the source.
+
++1364 bytes of flash, +1168 of RAM.
+
 0.2.8 - 2026-09-19
 ------------------
 
