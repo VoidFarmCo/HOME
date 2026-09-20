@@ -11,6 +11,30 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.8 - 2026-09-19
+------------------
+
+Address rotation fails loudly instead of silently.
+
+  * bleRotateAddressNow() restarted advertising when the address change
+    failed, but never checked whether the restart itself succeeded. If a
+    board dislikes the stop/set/start the symptom would have been a spoofer
+    that mysteriously stops transmitting, once a second, with nothing said
+    on screen and nothing in the log.
+
+  * Each step is now checked and named: "stop refused", "set addr refused",
+    "restart refused". Three consecutive failures latch rotation off and put
+    one line on screen saying which step it was.
+
+  * Advertising is restarted whatever happened in between. Silently going
+    dark is worse than a stale address, and a stale address is what every
+    release before 0.2.7 did anyway.
+
+  * Entering a spoofer resets the latch, so a transient refusal does not
+    disable rotation for the rest of the session.
+
++760 bytes.
+
 0.2.7 - 2026-09-19
 ------------------
 
