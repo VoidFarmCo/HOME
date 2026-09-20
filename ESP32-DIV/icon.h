@@ -1855,6 +1855,8 @@ const unsigned char bitmap_icon_skull_loading_9 [] PROGMEM = {
 
 // ── Pueo logo ──────────────────────────────────────────────────────────────
 // art/pueo_owl_src.jpg -> tools/make_bitmap.py --size 200x200 --crop --invert
+// The jpg is in the repository but not in the source archive;
+// Branding.h says where to get the artwork if you work from it.
 // Artwork carries the wordmark; see PUEO_LOGO_HAS_WORDMARK in Branding.h.
 // 'pueo_logo', 200x200px
 const unsigned char bitmap_pueo_logo [] PROGMEM = {

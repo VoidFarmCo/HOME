@@ -35,6 +35,13 @@
  *
  * and paste the output into icon.h.
  *
+ * art/pueo_owl_src.jpg is in the repository but NOT in the source archive.
+ * It is a 1.3 MB photograph -- sixteen times the size of every document in
+ * docs/pueo put together -- and all it buys is the ability to regenerate a
+ * bitmap that is already sitting in icon.h. Working from the archive, take
+ * the logo from magikh0e.pl, or use docs/pueo/pueo-owl.svg, which is the
+ * same artwork traced and ships with it.
+ *
  * The size ceiling comes from the layout, not from taste. displayLogo() puts
  * the logo at y = 140 - H/2, so the text below it has to fit in what is left
  * of a 320px panel. With the name line that text block is 82px and H caps at

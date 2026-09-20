@@ -63,7 +63,6 @@ INCLUDE=(
   "ESP32-DIV"
   "libs"
   "docs/pueo"
-  "art"
   "PUEO.md"
   "CHANGELOG.txt"
   "LICENSE"
@@ -136,8 +135,8 @@ for path in "${HISTORY[@]}"; do
   [ -e "$path" ] && cp "$path" "$STAGE/tools/history/"
 done
 
-# Dropped by cp -r from art/, and not wanted in a source archive.
-rm -rf "$STAGE/.arduino" "$STAGE/art"/*_render_*.png
+# Dragged in by cp -r, and not wanted in a source archive.
+rm -rf "$STAGE/.arduino"
 
 cat > "$STAGE/BUILDING.txt" <<TXT
 Pueo ${VERSION} - source archive
