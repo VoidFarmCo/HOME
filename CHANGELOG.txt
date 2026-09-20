@@ -11,6 +11,40 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.3.0 - 2026-09-19
+------------------
+
+The version that goes on a board first. No firmware change since 0.2.9 -
+the image differs from it only in the version string, which appears on the
+boot screen and in the serial banner.
+
+Releases:
+
+  * make_release.sh prunes the publish directory when it cuts a new one:
+    the release just cut, the one before it, and 0.2.1. Without it the site
+    accumulated images nobody will flash and a download list that grew every
+    release.
+
+    0.2.1 is held by name because of the licence rather than the code. It is
+    the last release containing RF24, which is GPL-2.0-only and could not
+    share a binary with arduinoFFT or NimBLE; 0.2.2 ended that, so 0.2.1 is
+    the last of a distinct licence state.
+
+    Only ever three exact filenames per version, never a glob over the
+    directory, because it runs against a website tree. Ordering is sort -V,
+    so 0.2.10 sorts after 0.2.9 rather than before it - checked against a
+    scratch directory holding both, since a lexical sort would have silently
+    deleted the newest release at the first double digit.
+
+    dist/ is untouched. Every pruned release's digests stay in this file,
+    which is published beside the downloads and ships inside every archive.
+
+Everything through 0.2.9 was built and checked without hardware: it
+compiles clean, several fixes are verified at the symbol level, and the
+parsers carry model-based tests that assert several hundred thousand cases
+on a host. What none of that establishes is whether it works on a board.
+That starts now.
+
 0.2.9 - 2026-09-19
 ------------------
 
