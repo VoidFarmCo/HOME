@@ -124,6 +124,42 @@ It is a heuristic. Apple does the equivalent server-side with the whole
 network in view. Scored like Spotter: compute it, show it, claim nothing the
 signal does not support.
 
+## Prior art, and the weakness it names
+
+**AirCatch: Effectively tracing advanced tag-based trackers** — Mishra
+(Inria), Swadeep and Noubir (Northeastern), Cunche (Lyon/Inria),
+[arXiv:2602.07656](https://arxiv.org/abs/2602.07656) — attacks the same
+problem and states the premise more sharply than this document does:
+identifier-based defences *fundamentally* break down against a tracker that
+rotates every transmission.
+
+Their answer is better than this one, and it is worth saying so plainly.
+They fingerprint the **transmitter**, not the transmission. A radio's
+carrier frequency offset comes from its crystal, so while the logical
+identifiers change arbitrarily fast, the analog imprint does not. They
+detect a "persistently occupied, abnormally compact CFO core" — structurally
+the same idea as a persistently occupied RSSI lane here, but in a space the
+adversary does not control.
+
+**That difference is the weakness in this detector, and it is a real one.**
+RSSI is a function of transmit power, and transmit power is the adversary's
+to choose. A clone that randomises its output level alongside its keys
+smears itself across lanes, never holds one, and this reports nothing at
+all. Nothing here can see through that. Carrier frequency offset cannot be
+varied the same way — it is a property of the part.
+
+It cannot be implemented on this hardware. A NimBLE advertisement report
+carries `event_type`, the address, `rssi`, and the payload; there is no
+phase, no I/Q, no frequency offset anywhere in the stack, because the ESP32's
+BLE controller does not surface one. That is precisely why the paper comes
+with **BlePhasyr**, a roughly $10 BLE micro-SDR. Doing this properly on Pueo
+would mean adding that radio, not writing better code.
+
+So what is here is the weaker, cheaper version: it works on hardware the
+device already has, against a clone that rotates identifiers but not power.
+Against the adversary the paper describes, it does not work, and neither
+does anything else built on an identifier or on RSSI.
+
 ## The assumption most likely to be wrong
 
 **That a passer-by is seen fewer than three times.**
