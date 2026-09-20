@@ -16,6 +16,7 @@
 #include "freertos/task.h"
 
 #include "BleCompat.h"
+#include "Branding.h"
 
 #include "gps.h"
 #include "icon.h"
@@ -2895,8 +2896,13 @@ static bool wardConvertWardCsvToWigle(const char* srcPath, File& out) {
   if (!in) {
     return false;
   }
-  out.print("WigleWifi-1.6,appRelease=1.0,model=ESP32-DIV,release=1.0,device=wardrive,display=,board=ESP32,"
-             "brand=ESP32-DIV,star=Sol,body=3,subBody=0\r\n");
+  /* Identify as this firmware. It said ESP32-DIV, which was true when
+   * upstream wrote it and means every upload from this build is filed
+   * against the wrong firmware. The version comes from Branding.h so it
+   * cannot drift from the release the way a hardcoded 1.0 did. */
+  out.print("WigleWifi-1.6,appRelease=" PUEO_VERSION ",model=" PUEO_NAME
+            ",release=" PUEO_VERSION ",device=wardrive,display=,board=ESP32,"
+            "brand=" PUEO_NAME ",star=Sol,body=3,subBody=0\r\n");
   out.print("MAC,SSID,AuthMode,FirstSeen,Channel,Frequency,RSSI,CurrentLatitude,CurrentLongitude,AltitudeMeters,"
             "AccuracyMeters,RCOIs,MfgrId,Type\r\n");
 
@@ -3096,7 +3102,7 @@ static bool wardWigleStreamUpload(File& csv, const char* uploadName, const char*
   const size_t contentLen = part1Len + head2Len + fileLen + tailLen;
 
   cli.printf("POST /api/v2/file/upload HTTP/1.1\r\nHost: api.wigle.net\r\n");
-  cli.printf("User-Agent: ESP32-DIV-Wardrive/1\r\n");
+  cli.printf("User-Agent: " PUEO_NAME "-Wardrive/" PUEO_VERSION "\r\n");
   cli.printf("Authorization: Basic %s\r\n", b64Auth);
   cli.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary);
   cli.printf("Content-Length: %u\r\n\r\n", (unsigned)contentLen);
