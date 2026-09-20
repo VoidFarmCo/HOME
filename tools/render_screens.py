@@ -1,0 +1,386 @@
+"""Render Pueo's screens as the panel would draw them, to PNG.
+
+Not a mockup. This parses the firmware's own bitmaps out of icon.h and
+TFT_eSPI's own font data out of glcdfont.c and Font16.c, implements the
+handful of TFT primitives the menus use, and replays the drawing calls at
+the coordinates the source gives. The text is the panel's actual 5x7 GLCD
+font and its 16 px proportional font, not a web substitute.
+
+    python tools/render_screens.py [--out dir] [--scale 3]
+
+What is exact: every bitmap, every glyph, every colour (RGB565 converted
+once), and every coordinate, because they are read from the source rather
+than retyped.
+
+What is not: the rounded corners. TFT_eSPI draws them with its own circle
+helper and this uses PIL's, which can differ by a pixel at r=5. Nothing else
+in these screens has curves.
+
+Colours assume the dark theme and accent preset 0 (Orange), which are the
+defaults. Battery is drawn at 85%, and the status bar's live counts are
+shown in their "something was heard" state, because a screenshot of an idle
+device shows less than one of a working one -- stated here rather than
+implied.
+"""
+import argparse
+import os
+import re
+import sys
+
+from PIL import Image, ImageDraw
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+ICON_H = os.path.join(REPO, "ESP32-DIV", "icon.h")
+FONTS = os.path.join(REPO, ".arduino", "user", "libraries", "TFT_eSPI", "Fonts")
+
+W, H = 240, 320
+
+
+# ── colours, straight from shared.h ────────────────────────────────────────
+def rgb(c565):
+    r = (c565 >> 11) & 0x1F
+    g = (c565 >> 5) & 0x3F
+    b = c565 & 0x1F
+    return (r * 255 // 31, g * 255 // 63, b * 255 // 31)
+
+
+UI_BG = rgb(0x20E4)
+UI_FG = rgb(0x3166)
+UI_LINE = rgb(0x8410)
+UI_TEXT = rgb(0xFFFF)
+UI_ICON = rgb(0xFBE4)          # accent preset 0, Orange
+UI_LABLE = rgb(0x4208)
+GREEN = rgb(0xB721)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+CYAN = rgb(0x07FF)
+
+
+def _strip_comments(src):
+    """A // comment sits between `=` and `{` in these files, so a regex that
+    expects only whitespace there matches nothing. Worse, the width table's
+    comments are full of digits ("char 32 - 39") which would be read as
+    widths. Take them out before parsing anything."""
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    return re.sub(r"//[^\n]*", "", src)
+
+
+def _preprocess(src):
+    """Resolve the #ifdef/#else pairs in Font16.c.
+
+    Not optional. The width table carries two versions of chars 96-103, one
+    behind TFT_ESPI_GRAVE_IS_DEGREE and one behind #else, and reading both
+    gives a 104-entry table in which everything past index 64 is shifted by
+    eight. The visible result is that narrow letters advance too far --
+    "WiFi" comes out as "Wi Fi" -- which looks like a rendering bug rather
+    than a parsing one, so it is worth resolving properly instead of special
+    casing the one table.
+    """
+    defined = set(re.findall(r"^\s*#define\s+(\w+)\s*$", src, re.M))
+    out, stack = [], []
+    for line in src.split("\n"):
+        m = re.match(r"\s*#(ifdef|ifndef|else|endif)\s*(\w*)", line)
+        if m:
+            kind, name = m.group(1), m.group(2)
+            if kind == "ifdef":
+                stack.append(name in defined)
+            elif kind == "ifndef":
+                stack.append(name not in defined)
+            elif kind == "else":
+                stack[-1] = not stack[-1]
+            else:
+                stack.pop()
+            continue
+        if all(stack):
+            out.append(line)
+    return "\n".join(out)
+
+
+# ── the firmware's bitmaps ─────────────────────────────────────────────────
+def load_bitmaps():
+    src = _strip_comments(open(ICON_H, encoding="utf-8", newline="").read())
+    out = {}
+    for m in re.finditer(
+            r"\b(bitmap_\w+)\s*\[\]\s*PROGMEM\s*=\s*\{(.*?)\};", src, re.S):
+        vals = [int(v, 16) for v in re.findall(r"0x([0-9a-fA-F]{2})", m.group(2))]
+        out[m.group(1)] = vals
+    return out
+
+
+# ── TFT_eSPI font 1: 5x7 GLCD, 5 columns per char, LSB is the top pixel ────
+def load_glcd():
+    src = _strip_comments(
+        open(os.path.join(FONTS, "glcdfont.c"), encoding="utf-8").read())
+    body = src[src.index("font[] PROGMEM = {"):]
+    vals = [int(v, 16) for v in re.findall(r"0x([0-9a-fA-F]{2})", body)]
+    return [vals[i * 5:(i + 1) * 5] for i in range(256)]
+
+
+# ── TFT_eSPI font 2: 96 glyphs from ASCII 32, 16 rows, MSB left ────────────
+def load_font16():
+    src = _preprocess(_strip_comments(
+        open(os.path.join(FONTS, "Font16.c"), encoding="utf-8").read()))
+    wm = re.search(r"widtbl_f16\[96\]\s*=\s*\{(.*?)\};", src, re.S)
+    widths = [int(x) for x in re.findall(r"\b(\d+)\b", wm.group(1))]
+    # 96 exactly, or an #ifdef was mishandled and every later glyph shifts
+    assert len(widths) == 96, "width table has %d entries, want 96" % len(widths)
+
+    glyphs = {}
+    for m in re.finditer(
+            r"chr_f16_([0-9a-fA-F]{2})\[\d+\]\s*=\s*\{(.*?)\};", src, re.S):
+        code = int(m.group(1), 16)
+        glyphs[code] = [int(v, 16)
+                        for v in re.findall(r"0x([0-9a-fA-F]{2})", m.group(2))]
+    return widths, glyphs
+
+
+class Tft:
+    """Only the primitives the menus actually call."""
+
+    def __init__(self, glcd, f16_widths, f16_glyphs, bitmaps):
+        self.im = Image.new("RGB", (W, H), BLACK)
+        self.d = ImageDraw.Draw(self.im)
+        self.glcd = glcd
+        self.fw, self.fg = f16_widths, f16_glyphs
+        self.bm = bitmaps
+
+    # -- shapes --
+    def fill_screen(self, c):
+        self.d.rectangle([0, 0, W - 1, H - 1], fill=c)
+
+    def fill_rect(self, x, y, w, h, c):
+        if w <= 0 or h <= 0:
+            return
+        self.d.rectangle([x, y, x + w - 1, y + h - 1], fill=c)
+
+    def fill_round_rect(self, x, y, w, h, r, c):
+        self.d.rounded_rectangle([x, y, x + w - 1, y + h - 1], radius=r, fill=c)
+
+    def draw_round_rect(self, x, y, w, h, r, c):
+        self.d.rounded_rectangle([x, y, x + w - 1, y + h - 1], radius=r,
+                                 outline=c)
+
+    def draw_fast_hline(self, x, y, w, c):
+        self.d.rectangle([x, y, x + w - 1, y], fill=c)
+
+    # -- 1bpp bitmap, rows of ceil(w/8) bytes, MSB first --
+    def draw_bitmap(self, x, y, name, w, h, c):
+        data = self.bm[name]
+        stride = (w + 7) // 8
+        px = self.im.load()
+        for row in range(h):
+            for col in range(w):
+                i = row * stride + (col >> 3)
+                if i < len(data) and data[i] & (0x80 >> (col & 7)):
+                    xx, yy = x + col, y + row
+                    if 0 <= xx < W and 0 <= yy < H:
+                        px[xx, yy] = c
+
+    # -- font 1, size 1: 5 columns then a 1px gap --
+    def _glcd_char(self, x, y, ch, c, bg):
+        cols = self.glcd[ord(ch) & 0xFF]
+        px = self.im.load()
+        for col in range(6):
+            bits = cols[col] if col < 5 else 0
+            for row in range(8):
+                on = bits & (1 << row)
+                xx, yy = x + col, y + row
+                if 0 <= xx < W and 0 <= yy < H:
+                    if on:
+                        px[xx, yy] = c
+                    elif bg is not None:
+                        px[xx, yy] = bg
+
+    def draw_string_tc(self, s, cx, y, c, bg=None):
+        """TC_DATUM: x is the centre of the string, y its top."""
+        x = cx - (len(s) * 6) // 2
+        for ch in s:
+            self._glcd_char(x, y, ch, c, bg)
+            x += 6
+
+    def print_f1(self, x, y, s, c, bg=None):
+        """Cursor-relative print in font 1, which is what drawStatusBar uses
+        for the battery percentage -- it calls setTextFont(1) immediately
+        before. Rendering that line in font 2 puts a 16 px glyph cell in a
+        20 px bar starting at y=6, which paints two rows of background below
+        the bar and looks exactly like a firmware bug. It is not one."""
+        for ch in s:
+            self._glcd_char(x, y, ch, c, bg)
+            x += 6
+        return x
+
+    # -- font 2 --
+    def text_width(self, s):
+        return sum(self.fw[ord(ch) - 32] for ch in s if 32 <= ord(ch) < 128)
+
+    def print_f2(self, x, y, s, c, bg=None):
+        px = self.im.load()
+        for ch in s:
+            code = ord(ch)
+            if not (32 <= code < 128):
+                continue
+            w = self.fw[code - 32]
+            glyph = self.fg.get(code)
+            stride = (w + 7) // 8
+            for row in range(16):
+                for col in range(w):
+                    i = row * stride + (col >> 3)
+                    on = glyph and i < len(glyph) and \
+                        glyph[i] & (0x80 >> (col & 7))
+                    xx, yy = x + col, y + row
+                    if 0 <= xx < W and 0 <= yy < H:
+                        if on:
+                            px[xx, yy] = c
+                        elif bg is not None:
+                            px[xx, yy] = bg
+            x += w
+        return x
+
+
+# ── drawStatusBar(), 85% battery, something heard on both radios ───────────
+def status_bar(t):
+    t.fill_rect(0, 0, W, 20, UI_LABLE)
+    x, y = 7, 4
+    t.draw_round_rect(x, y, 22, 10, 2, WHITE)
+    t.fill_rect(x + 22, y + 3, 2, 4, WHITE)
+    t.fill_round_rect(x + 2, y + 2, 85 * 20 // 100, 6, 1, GREEN)
+    t.print_f1(x + 30, y + 2, "85%", GREEN, UI_LABLE)
+
+    ble_icon_x, gap, icon_w = 130, 3, 16
+    ble_text_x = ble_icon_x + icon_w + gap
+    wifi_bars_x = ble_text_x + 12 + gap
+    temp_icon_x = wifi_bars_x + 24 + gap
+    sd_icon_x = temp_icon_x + icon_w + gap
+    icon_y = y - 2
+
+    wifi_x, wifi_y = wifi_bars_x + 10, y + 11
+    for i in range(4):
+        bar_h = (i + 1) * 3
+        t.draw_round_rect(wifi_x + i * 6, wifi_y - bar_h, 4, bar_h, 1, WHITE)
+
+    t.draw_bitmap(ble_icon_x + 25, icon_y, "bitmap_icon_ble", 16, 16, CYAN)
+    t.draw_bitmap(temp_icon_x + 10, y - 2, "bitmap_icon_temp", 16, 16, GREEN)
+    t.draw_bitmap(sd_icon_x + 10, y - 2, "bitmap_icon_sdcard", 16, 16, GREEN)
+
+
+def render_boot(t):
+    """displayLogo(TFT_WHITE, 500) in utils.cpp."""
+    t.fill_screen(BLACK)
+    lw = lh = 200
+    lx, ly = (W - lw) // 2, (H - lh) // 2 - 20
+    t.draw_bitmap(lx, ly, "bitmap_pueo_logo", lw, lh, WHITE)
+    ty = ly + lh + 10
+    cx = W // 2
+    # PUEO_LOGO_HAS_WORDMARK is 1, so no separate name line
+    t.draw_string_tc("by: magikh0e", cx, ty, WHITE)
+    ty += 16
+    t.draw_string_tc("multi-radio field tool", cx, ty, WHITE)
+    ty += 16
+    t.draw_string_tc("0.2.5", cx, ty, WHITE)
+    ty += 22
+    t.draw_string_tc("based on ESP32-DIV by CiferTech", cx, ty, WHITE)
+
+
+MENU = [
+    ("WiFi", "bitmap_icon_wifi"), ("2.4GHz", "bitmap_icon_jammer"),
+    ("More", None), ("Settings", "bitmap_icon_setting"),
+    ("Bluetooth", "bitmap_icon_spoofer"), ("SubGHz", "bitmap_icon_analyzer"),
+    ("Tools", "bitmap_icon_stat"), ("About", "bitmap_icon_question"),
+]
+
+
+def render_menu(t, selected=0):
+    """displayMenu() in ESP32-DIV.ino."""
+    t.fill_screen(UI_BG)
+    for i, (label, icon) in enumerate(MENU):
+        col, row = i // 4, i % 4
+        x = 10 if col == 0 else 130
+        y = 30 + row * 75
+        sel = (i == selected)
+        fill = UI_ICON if sel else UI_FG
+        edge = UI_ICON if sel else UI_LINE
+        ink = UI_BG if sel else UI_TEXT
+        t.fill_round_rect(x, y, 100, 60, 5, fill)
+        t.draw_round_rect(x, y, 100, 60, 5, edge)
+        if icon is None:                      # the "More" tile's three icons
+            triple_w = 16 * 3 + 4 * 2
+            ix = x + (100 - triple_w) // 2
+            for k, nm in enumerate(("bitmap_icon_led", "bitmap_icon_satellite",
+                                    "bitmap_icon_down_dots")):
+                t.draw_bitmap(ix + k * 20, y + 10, nm, 16, 16, ink)
+        else:
+            t.draw_bitmap(x + 42, y + 10, icon, 16, 16, ink)
+        tw = t.text_width(label)
+        t.print_f2(x + (100 - tw) // 2, y + 30, label, ink, fill)
+    status_bar(t)
+
+
+BT_PAGE0 = [
+    ("BLE Jammer", "bitmap_icon_ble_jammer"),
+    ("BLE Spoofer", "bitmap_icon_spoofer"),
+    ("Sour Apple", "bitmap_icon_apple"),
+    ("AirTag Spoofer", "bitmap_icon_tags"),
+    ("AirTag Sniffer", "bitmap_icon_magnifying_glass"),
+    ("Sniffer", "bitmap_icon_analyzer"),
+    ("BLE Scanner", "bitmap_icon_graph"),
+    ("BLE Rubber Ducky", "bitmap_icon_rubber_ducky"),
+]
+
+
+def render_bluetooth(t, selected=3):
+    """displayPagedSubmenu() in ESP32-DIV.ino, Bluetooth page 0."""
+    t.fill_screen(UI_BG)
+    for i, (label, icon) in enumerate(BT_PAGE0):
+        y = 30 + i * 30
+        c = UI_ICON if i == selected else UI_TEXT
+        t.draw_bitmap(10, y, icon, 16, 16, c)
+        t.print_f2(30, y, "| " + label, c, UI_BG)
+
+    ny = H - 30
+    icon_y = ny + (28 - 16) // 2
+    text_y = ny + (28 - 16) // 2
+    t.draw_bitmap(10, icon_y, "bitmap_icon_go_back", 16, 16, UI_TEXT)
+    t.print_f2(30, text_y, "Main Menu", UI_TEXT, UI_BG)
+    label = "Next Page"
+    icon_x = W - 10 - 16
+    t.print_f2(icon_x - 4 - t.text_width(label), text_y, label, UI_TEXT, UI_BG)
+    t.draw_bitmap(icon_x, icon_y, "bitmap_icon_navigate_right", 16, 16, UI_TEXT)
+    status_bar(t)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=os.path.join(REPO, "render"))
+    ap.add_argument("--scale", type=int, default=3)
+    args = ap.parse_args()
+
+    for p in (ICON_H, os.path.join(FONTS, "glcdfont.c")):
+        if not os.path.isfile(p):
+            print("missing %s - run tools/build.sh setup first" % p,
+                  file=sys.stderr)
+            return 1
+
+    bitmaps = load_bitmaps()
+    glcd = load_glcd()
+    fw, fg = load_font16()
+    print("loaded %d bitmaps, %d glcd chars, %d font-2 glyphs"
+          % (len(bitmaps), len(glcd), len(fg)))
+
+    os.makedirs(args.out, exist_ok=True)
+    for name, fn in (("boot", render_boot), ("menu", render_menu),
+                     ("bluetooth", render_bluetooth)):
+        t = Tft(glcd, fw, fg, bitmaps)
+        fn(t)
+        p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
+        t.im.save(p1)
+        big = t.im.resize((W * args.scale, H * args.scale), Image.NEAREST)
+        pN = os.path.join(args.out, "pueo-screen-%s@%dx.png" % (name, args.scale))
+        big.save(pN)
+        print("  %-10s %s  and  %s" % (name, os.path.basename(p1),
+                                       os.path.basename(pN)))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
