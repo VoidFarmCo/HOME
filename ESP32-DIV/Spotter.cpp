@@ -103,11 +103,18 @@ inline uint32_t fnv1a(uint32_t h, uint8_t b) {
   return (h ^ b) * kFnvPrime;
 }
 
-bool prefixMatch(const char* s, const char* prefix) {
-  if (!s || !prefix) {
+/* A signature matches on its prefix, and on its length when it declares one.
+ * The length is what makes a short prefix usable: KARR advertises "QT " or
+ * "DR " followed by exactly eight characters, and a bare case-insensitive
+ * "dr " would otherwise claim every device whose name starts that way. */
+bool nameMatch(const char* s, const NameSig& sig) {
+  if (!s || !sig.prefix) {
     return false;
   }
-  return strncasecmp(s, prefix, strlen(prefix)) == 0;
+  if (strncasecmp(s, sig.prefix, strlen(sig.prefix)) != 0) {
+    return false;
+  }
+  return sig.exactLen == 0 || strlen(s) == sig.exactLen;
 }
 
 /* Find or create the row for this MAC. Returns null when the table is full,
@@ -480,7 +487,7 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
     ssid[ssidLen] = '\0';
 
     for (size_t i = 0; i < kSsidSigCount; i++) {
-      if (prefixMatch(ssid, kSsidSigs[i].prefix)) {
+      if (nameMatch(ssid, kSsidSigs[i])) {
         record(src, rssi, kSsidSigs[i].kind, kSsidSigs[i].conf, kSsidSigs[i].label,
                false, fp);
         break;
@@ -581,7 +588,7 @@ class SpotterAdvCallbacks : public BLEAdvertisedDeviceCallbacks {
     const std::string name = dev->getName();
     if (!name.empty()) {
       for (size_t i = 0; i < kBleNameSigCount; i++) {
-        if (prefixMatch(name.c_str(), kBleNameSigs[i].prefix)) {
+        if (nameMatch(name.c_str(), kBleNameSigs[i])) {
           record(mac, rssi, kBleNameSigs[i].kind, kBleNameSigs[i].conf,
                  kBleNameSigs[i].label, true);
           break;
@@ -606,6 +613,7 @@ const char* kindText(Kind k) {
     case Kind::Glasses:   return "GLASSES";
     case Kind::Bodycam:   return "BODYCAM";
     case Kind::Accessory: return "ACCESSORY";
+    case Kind::Vehicle:   return "VEHICLE";
     default:              return "?";
   }
 }

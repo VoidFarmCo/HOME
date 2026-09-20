@@ -73,7 +73,8 @@
 
 namespace Spotter {
 
-enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Bodycam, Accessory };
+enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Bodycam, Accessory,
+                            Vehicle };
 
 /* How much a single match is worth. Corroboration -- a second, differently
  * labelled signature on the same MAC -- promotes Likely to Strong. It does
@@ -90,6 +91,7 @@ struct OuiSig {
 
 struct NameSig {
   const char* prefix;   // matched case-insensitively against SSID or BLE name
+  uint8_t exactLen;     // 0 = any length, else the name must be exactly this long
   Kind kind;
   Conf conf;
   const char* label;
@@ -171,18 +173,18 @@ static const OuiSig kOuiSigs[] = {
 };
 
 /* ── WiFi: SSID patterns in probe requests and beacons ───────────────────── */
-/* Ordered most specific first: prefixMatch stops at the first hit, so a bare
+/* Ordered most specific first: nameMatch stops at the first hit, so a bare
  * "Flock" above "Flock-" would swallow the provisioning SSIDs and report them
  * at the lower confidence. */
 static const NameSig kSsidSigs[] = {
-  {"Flock Camera net", Kind::Alpr, Conf::Strong, "Flock camera SSID"},
-  {"Flock-",           Kind::Alpr, Conf::Strong, "Flock SSID"},
+  {"Flock Camera net", 0, Kind::Alpr, Conf::Strong, "Flock camera SSID"},
+  {"Flock-",           0, Kind::Alpr, Conf::Strong, "Flock SSID"},
 
   /* Provisioned units drop the suffix. Still specific, but a bare word is a
    * bare word and somebody's home network can be called this. */
-  {"Flock",            Kind::Alpr, Conf::Likely, "Flock (bare)"},
+  {"Flock",            0, Kind::Alpr, Conf::Likely, "Flock (bare)"},
 
-  {"Penguin-", Kind::Accessory, Conf::Likely, "Flock battery pack"},
+  {"Penguin-", 0, Kind::Accessory, Conf::Likely, "Flock battery pack"},
 };
 
 /* ── BLE: advertisement contents ─────────────────────────────────────────── */
@@ -211,17 +213,33 @@ static const BleSig kBleSigs[] = {
 
 /* ── BLE: advertised names ───────────────────────────────────────────────── */
 static const NameSig kBleNameSigs[] = {
-  {"Penguin-",       Kind::Accessory, Conf::Likely, "Flock battery pack"},
-  {"FS Ext Battery", Kind::Accessory, Conf::Strong, "Flock ext battery"},
-  {"Ray-Ban",        Kind::Glasses,   Conf::Strong, "Ray-Ban Meta"},
-  {"Spectacles",     Kind::Glasses,   Conf::Strong, "Snap Spectacles"},
+  {"Penguin-",       0, Kind::Accessory, Conf::Likely, "Flock battery pack"},
+  {"FS Ext Battery", 0, Kind::Accessory, Conf::Strong, "Flock ext battery"},
+  {"Ray-Ban",        0, Kind::Glasses,   Conf::Strong, "Ray-Ban Meta"},
+  {"Spectacles",     0, Kind::Glasses,   Conf::Strong, "Snap Spectacles"},
 
   /* The stock Nordic bootloader name. It is in the community lists because
    * the battery pack advertises it while updating, but so does every other
    * Nordic device in DFU mode, so on its own it means almost nothing. Kept
    * because it costs one row and it corroborates a Penguin sitting next to
    * it. */
-  {"DfuTarg",        Kind::Accessory, Conf::Weak,   "Nordic DFU (generic)"},
+  {"DfuTarg",        0, Kind::Accessory, Conf::Weak,   "Nordic DFU (generic)"},
+
+  /* KARR: a dealer-installed BLE immobiliser and remote control, found by
+   * UC San Diego's "BLE Theft Auto" (USENIX Security 2026). They wardrove San
+   * Diego's highways and KARR came second only to Tesla -- 608 of 4,314 unique
+   * devices -- because dealerships fit one to every car on the lot. Two models:
+   * QT is BLE-only, DR adds cellular. The paper gives both as a prefix plus
+   * exactly eight characters, which is where exactLen earns its place: "dr "
+   * matched case-insensitively against any name is a wide net.
+   *
+   * Likely, not Strong, and labelled as a module rather than as a finding. The
+   * paper's vulnerability is a fixed key shared across every unit, patched by
+   * the vendor on 2026-07-20 -- but the fix has to be applied by hand and
+   * nothing in the advertisement says whether it has been. So this says a KARR
+   * module is in range. It does not say the car is open. */
+  {"QT ", 11, Kind::Vehicle, Conf::Likely, "KARR BT module"},
+  {"DR ", 11, Kind::Vehicle, Conf::Likely, "KARR Cell module"},
 };
 
 constexpr size_t kOuiSigCount     = sizeof(kOuiSigs) / sizeof(kOuiSigs[0]);

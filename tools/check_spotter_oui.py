@@ -146,6 +146,88 @@ for oui, want in VENDOR_OWN.items():
     check(got, "%s (%s) is gone from the Strong set, so it no longer reaches "
                "the BLE path" % (oui, want))
 
+# ── name signatures: a short prefix has to declare its length ───────────────
+#
+# NameSig.exactLen exists because KARR advertises "QT " or "DR " followed by
+# exactly eight characters. Matched case-insensitively and on the prefix
+# alone, "dr " claims every device whose name starts that way -- and a match
+# is what puts a row on the operator's screen.
+#
+# Length is a proxy for distinctiveness and not a very good one, so it only
+# decides which rows have to be argued for. Below the threshold a prefix needs
+# either an exact length or a line in SHORT_BUT_DELIBERATE saying why it is
+# specific enough without one. At or above it ("Spectacles", "FS Ext Battery")
+# a prefix carries its own specificity.
+SHORT_PREFIX = 6
+
+# Short prefixes that have been looked at and kept. The value is the reason,
+# which is the point of the list: a bare word like "Flock" is distinctive in a
+# way "dr " is not, and that is a judgement someone should have to write down.
+SHORT_BUT_DELIBERATE = {
+    "Flock": "a distinctive word, and already graded Likely for this reason",
+}
+
+# {"QT ", 11, Kind::Vehicle, Conf::Likely, "KARR BT module"},
+NAME_ENTRY = re.compile(
+    r'\{\s*"([^"]*)"\s*,\s*(\d+)\s*,\s*Kind::(\w+)\s*,\s*Conf::(\w+)\s*,'
+    r'\s*"([^"]*)"\s*\}')
+
+name_entries = []
+for table in ("kSsidSigs", "kBleNameSigs"):
+    body = re.search(r"%s\[\]\s*=\s*\{(.*?)\n\};" % table, text, re.S)
+    check(body is not None, "could not find the %s table" % table)
+    rows = NAME_ENTRY.findall(body.group(1)) if body else []
+    check(rows, "%s parsed to nothing; the struct layout probably changed, so "
+                "this check is silently testing an empty list" % table)
+    for prefix, exact, kind, conf, label in rows:
+        name_entries.append((table, prefix, int(exact), kind, conf, label))
+
+for table, prefix, exact, kind, conf, label in name_entries:
+    check(exact == 0 or exact >= len(prefix),
+          '%s: "%s" declares length %d, shorter than the prefix itself, so it '
+          "can never match" % (table, prefix, exact))
+
+    check(len(prefix) >= SHORT_PREFIX
+          or exact != 0
+          or prefix in SHORT_BUT_DELIBERATE,
+          '%s: "%s" is %d characters and declares no exact length, so it '
+          "matches any name beginning that way. Give it a length, or add it "
+          "to SHORT_BUT_DELIBERATE with the reason it is specific enough "
+          "without one." % (table, prefix, len(prefix)))
+
+    check(not (exact != 0 and conf == "Strong"),
+          '%s: "%s" is graded Strong on a name and a length. A name is a '
+          "string a device chose to broadcast, and its length does not "
+          "corroborate it" % (table, prefix))
+
+for prefix in SHORT_BUT_DELIBERATE:
+    check(any(e[1] == prefix for e in name_entries),
+          '"%s" is listed in SHORT_BUT_DELIBERATE but is no longer a name '
+          "signature; the exemption outlived the row it was written for"
+          % prefix)
+
+# The two KARR rows specifically: they are why the field exists, and the
+# published pattern is a prefix plus exactly eight characters.
+karr = [e for e in name_entries if "KARR" in e[5]]
+check(len(karr) == 2, "expected 2 KARR name signatures, found %d" % len(karr))
+for table, prefix, exact, kind, conf, label in karr:
+    check(exact == len(prefix) + 8,
+          '%s: KARR row "%s" declares length %d; the published pattern is the '
+          "prefix plus exactly eight, so it should be %d"
+          % (table, prefix, exact, len(prefix) + 8))
+    check(conf != "Strong",
+          '%s: KARR row "%s" is graded Strong. A module being present is not '
+          "evidence it is unpatched: the fix is applied by hand and the "
+          "advertisement does not say either way" % (table, prefix))
+
+# ── the matcher actually reads the field ────────────────────────────────────
+#
+# Without this the length is decoration: every row above could declare one and
+# every one of them would still match on its prefix alone.
+check(re.search(r"exactLen\s*==\s*0\s*\|\|", code) is not None,
+      "Spotter.cpp no longer honours NameSig.exactLen, so every name "
+      "signature matches on its prefix alone again")
+
 # ── the filter is still in Spotter.cpp ──────────────────────────────────────
 #
 # Cheap, but the whole point of the table check is that something applies it.
@@ -155,12 +237,16 @@ check("BLE_ADDR_PUBLIC" in code,
 check(re.search(r"conf\s*!=\s*Conf::Strong", code) is not None,
       "Spotter.cpp no longer filters the BLE OUI match to Strong entries")
 
-checks = len(entries) * 4 + len(VENDOR_OWN) + 5
+checks = (len(entries) * 4 + len(VENDOR_OWN) + 5
+          + len(name_entries) * 3 + len(karr) * 2
+          + len(SHORT_BUT_DELIBERATE) + 4)
 if fail:
     for f in fail:
         sys.stderr.write("FAIL: %s\n" % f)
     sys.exit(1)
 
+print("%d name signatures, %d declaring an exact length"
+      % (len(name_entries), len([e for e in name_entries if e[2]])))
 print("%d OUI entries, %d reach the BLE path (%s)"
       % (len(entries), len(strong),
          ", ".join("%s %s" % (o, l) for o, l in strong)))
