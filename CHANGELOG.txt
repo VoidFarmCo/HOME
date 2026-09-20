@@ -11,6 +11,124 @@ flashed to a board. Treat inherited feature claims as inherited.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.2.5 - 2026-09-19
+------------------
+
+Google's side of the BLE world, which this device had never looked at, plus
+a Flipper .sub reader and two more advertisement templates.
+
+Bluetooth:
+
+  * New feature: Fast Pair, on page 1 of the Bluetooth menu. Two halves that
+    are deliberately not the same act.
+
+    Listening is passive - a BLE scan with active scanning off, reading the
+    0xFE2C service data every Fast Pair device broadcasts unasked.
+
+    Probing transmits. It opens a GATT connection to ONE device the operator
+    selected and writes 80 bytes to the key-based pairing characteristic, to
+    test for CVE-2025-36911. It sits behind a confirm screen that names the
+    target address and states what will be sent, it never runs on its own,
+    and it never touches more than the selected row. Point it at your own
+    devices or ones you have permission to test.
+
+  * ESP32-DIV/FastPair.{h,cpp} parses the advertisement. Fast Pair lives in
+    BLE service data, not manufacturer data, which is why the three
+    Apple-shaped parsers already here were structurally incapable of seeing
+    one.
+
+    A payload is a 24-bit Model ID only when it is exactly three bytes. Every
+    other length is a not-discoverable frame - flags, account key filter,
+    optional salt and battery - with no Model ID anywhere in it. Reading its
+    first three bytes as one produces a confident, plausible, meaningless
+    number, and since most earbuds already belong to somebody that is the
+    common case rather than the edge case.
+
+  * Nothing correlates devices across address rotation, because Fast Pair
+    deliberately offers nothing to correlate on. A Model ID names a model,
+    not a unit, so two strangers with the same earbuds share one. An account
+    key filter is a salted bloom filter whose salt rotates precisely so a
+    passive listener cannot follow the device. Two tests assert those
+    non-properties, so adding correlation later means deleting a test that
+    says why not.
+
+  * The model-name table is empty on purpose. Google's mapping needs an API
+    key, and the lists circulating for "fast pair spam" tools are IDs chosen
+    to provoke a popup, with names that are often wrong. An unknown ID prints
+    as six hex digits, which is true.
+
+  * BLE Spoofer gains Microsoft Swift Pair and Flipper Zero, device types 22
+    and 23. Both built from primary sources.
+
+    Swift Pair sends sub scenario 0x00, pairing over LE only. The other two
+    values the spec defines describe a dual-mode peripheral and 0x01 also
+    requires a BR/EDR address in the same advertisement; this has none, so
+    sending either would advertise a capability that is not there. Several
+    spam tools send 0x03, which the spec's table does not define at all. The
+    display name is Pueo-XXXX rather than a real product's, so the operator
+    can tell their own notification from a stranger's.
+
+    Flipper uses service UUID 0x3080 with the hardware colour in the low
+    bits - from Flipper's own serial profile, not from captures - so
+    0x3081-0x3083 are one service on differently coloured hardware.
+
+  * Found, not changed: devices_uuid is handed to addServiceUUID()
+    immediately before setAdvertisementData(), which replaces the whole
+    payload, so it never reaches the air. It also carries 9000 where the
+    Bluetooth base UUID has 8000. Removing it should change nothing, but
+    that is analysis rather than a measurement.
+
+Sub-GHz:
+
+  * ESP32-DIV/SubFile.{h,cpp} reads Flipper .sub captures. Pueo's own export
+    is a binary blob with a magic number that nothing else can read; .sub is
+    what the rest of the sub-GHz world trades in.
+
+    RAW files are refused by name, three ways - Filetype, Protocol: RAW, and
+    RAW_Data. They share the key file's header and carry microsecond timings
+    where the key would be, and a SubGhzProfile has nowhere to put timings,
+    so half-parsing one yields a profile that looks valid and transmits
+    nonsense.
+
+    Only Princeton claims an rc-switch protocol number, because Princeton is
+    PT2262/EV1527 and rc-switch protocol 1 is the same thing. CAME, NICE
+    FLO, Holtek and the rest parse and return protocol 0 with the name kept.
+    Their timings do not match an rc-switch number and a guess would
+    transmit something subtly wrong while presenting as correct.
+
+  * Nothing calls the .sub reader yet. Wiring it in is a UI change -
+    saveProfile() reads globals rather than taking a profile, and there are
+    only five EEPROM slots, so an import has to ask which to replace.
+
+Checked:
+
+  * tools/check_fastpair.py, 80,111 checks. Every fuzz input asserts
+    (frame == ModelId) == (len == 3), which is the whole rule in one line.
+  * tools/check_fastpair_probe.py, 50,293 checks, most of them on the
+    provider address at bytes 2..7. That field is the test: a probe broken
+    so subtly that every device reports "no response" is indistinguishable
+    from a room full of correctly-behaving devices.
+  * tools/check_sub_parse.py, 60,891 checks, including every single-byte
+    mutation of a valid file.
+  * tools/check_ble_adv.py, 1,095 checks. Walks each advertisement the way a
+    receiver does and insists the walk lands exactly on the packet's end - a
+    wrong AD length byte still transmits, still looks right in the log, and
+    is silently dropped by everything that hears it. It also walks the three
+    older fixed templates, which had never been checked; all are well
+    formed. The Google one decodes as a discoverable Fast Pair frame
+    advertising model ID 00B727, one fixed model, never varied.
+
+Fixed while writing the above:
+
+  * mbedtls here is 2.28, so the 3.x MBEDTLS_PRIVATE field accessor was
+    wrong.
+  * deriveKey() called mbedtls_ecp_point_init instead of _free in its
+    cleanup, leaking a point per probe.
+
+Still true: none of this has run on hardware. The Fast Pair probe's crypto
+path in particular has never derived a key against a real provider. Treat
+the first run on real hardware as the first test of it.
+
 0.2.4 - 2026-09-19
 ------------------
 
