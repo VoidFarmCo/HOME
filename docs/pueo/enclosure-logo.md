@@ -112,14 +112,70 @@ openscad -D 'PART="lid"' -o lid.stl docs/pueo/pueo-enclosure.scad
 Both report `Simple: yes` from CGAL, so both are manifold. The base is
 untouched either way. The extra 12 seconds of render time is the outline.
 
+## The scale bug, because a render did not catch it
+
+The first version of `owl2d()` scaled the import by `height / 474`, which
+would be right if OpenSCAD imported one SVG pixel as one unit. It does not.
+It converts px to mm at a fixed 96 dpi, so a 474 px tall file arrives
+125.4 mm tall, and scaling *that* by 30/474 gives **7.9 mm**. The centring
+translate, written in pixels, landed in millimetres too, so the owl also sat
+11 mm off centre.
+
+Rendered at lid scale it looked completely plausible. A small owl in the
+chin of a 170 mm lid is just a small owl — nothing in the picture says it is
+a quarter of its intended size. Two renders were inspected and both passed.
+
+What caught it was arithmetic: 108,773 ink px at 30 mm tall and 0.6 mm deep
+has to remove about **261 mm³**, and measuring the lid's volume with and
+without the logo showed **18**.
+
+The fix is `resize([0, height], auto=true)`, which measures the bounding box
+that actually turned up rather than assuming one. Passing `dpi=25.4` to
+`import()` does *not* work — the SVG's explicit `width="462px"` wins.
+
+`tools/check_logo_scale.py` now renders the artwork at three sizes and
+asserts height, width, centring and area against figures derived from the
+source bitmap, plus the lid's removed volume. 14 checks. It skips cleanly
+when OpenSCAD is absent, since the firmware build does not need it.
+
+## The test tile
+
+`docs/pueo/logo-fit-test.scad` — 76 × 56 × 3 mm, about 10 g.
+
+```bash
+openscad -o logo-fit-test.stl docs/pueo/logo-fit-test.scad
+```
+
+**Which way up decides the test.** The lid is a tray, so printed
+outer-face-up its ceiling is an 80 × 165 bridge. It has to print
+outer-face-**down**, which puts the logo against the bed. Bed-side grooves
+behave differently from top-side ones: glass-smooth floor, crisp walls, and
+the material above bridges a 0.5 mm gap without noticing.
+
+So the tile carries the same owl on **both faces**, back to back in the same
+place:
+
+| face | what it tells you |
+|---|---|
+| underside | the real case — what the lid will get |
+| top | the comparison, if top-side detail turns out better |
+
+Print it flat and as-is. Everything on the underside is already mirrored in
+the model, so it reads correctly when the tile is turned over.
+
+Alongside the underside owl is a **groove ladder** — eight slots at the
+shipped 0.6 mm depth and widths 0.3 to 1.6 mm, labelled. That is the part
+that generalises past this logo: the narrowest groove that still has a
+visible floor is this printer's limit for a debossed line, and anything
+thinner in the artwork is decoration that will not survive. 0.3 is below a
+0.4 mm nozzle and is meant to fail.
+
 ## Not verified
 
-Nothing here has been printed. The stroke widths are measured off the
-artwork and the geometry is confirmed manifold, but whether a 0.51 mm groove
-at 0.6 mm deep reads well in a given filament, nozzle and layer height is
-something only a test print answers.
+Nothing here has been printed. Stroke widths are measured off the artwork,
+the geometry is confirmed manifold, and the scale is now asserted rather
+than eyeballed — but whether a 0.51 mm groove at 0.6 mm deep reads well in a
+given filament and layer height is what the tile is for.
 
-`docs/pueo/nrf24-fit-test.scad` is the precedent for that: print the small
-thing that answers one question before committing to the big one. A 40 × 40
-tile carrying just the chin band would settle it for a few grams of
-filament.
+`docs/pueo/nrf24-fit-test.scad` is the precedent: print the small thing that
+answers one question before committing to the big one.

@@ -255,12 +255,30 @@ LOGO_SVG   = "pueo-owl.svg";
 LOGO_PX_W  = 462;    // the SVG's own viewBox, so scaling stays honest
 LOGO_PX_H  = 474;
 
-// The artwork, centred on the origin, as a 2D shape.
+/* The artwork, centred on the origin, scaled to `height` millimetres.
+ *
+ * resize() rather than a computed scale factor, because the size the SVG
+ * arrives at is not the size it says. The file is 462 x 474 px and carries
+ * width="462px", and OpenSCAD converts px to mm at a fixed 96 dpi, so the
+ * import is really 122.2 x 125.4 mm. Scaling by height/474 on top of that
+ * gives a logo 3.78x too small -- 7.9 mm where 30 was asked for. Passing
+ * dpi=25.4 to import() does not help: the explicit px dimensions win.
+ *
+ * resize([0, height], auto=true) sidesteps all of it by measuring the
+ * bounding box that actually turned up and scaling that to fit, with 0
+ * meaning "keep this axis proportional". Whatever units the SVG claims, the
+ * owl comes out `height` tall.
+ *
+ * Worth knowing how this was caught, because a picture did not do it. A
+ * 7.9 mm owl sitting in the chin looks much like a 30 mm one at lid scale,
+ * and the render looked right. What found it was arithmetic: 108,773 ink px
+ * at 30 mm tall and 0.6 mm deep has to remove about 261 mm^3, and measuring
+ * the lid's volume before and after showed 18. Measure it again if this is
+ * ever changed.
+ */
 module owl2d(height) {
-    s = height / LOGO_PX_H;
-    scale([s, s])
-        translate([-LOGO_PX_W/2, -LOGO_PX_H/2])
-            import(LOGO_SVG);
+    resize([0, height], auto = true)
+        import(LOGO_SVG, center = true);
 }
 
 module lid() {
