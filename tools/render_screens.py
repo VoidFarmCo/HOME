@@ -55,6 +55,9 @@ GREEN = rgb(0xB721)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 CYAN = rgb(0x07FF)
+RED = rgb(0xF800)              # TFT_RED, Conf::Strong
+LIGHTGREY = rgb(0xD69A)        # TFT_LIGHTGREY, the address line
+DARKGREY = rgb(0x7BEF)         # TFT_DARKGREY, Conf::Weak and the third line
 
 
 def _strip_comments(src):
@@ -368,6 +371,92 @@ def render_bluetooth(t, selected=3):
     status_bar(t)
 
 
+# Spotter rows, in the shape drawList() prints them. Each is what the
+# detector would hold after hearing the device described in the comment.
+#
+# conf drives the colour of the first line and nothing else: Strong red,
+# Likely orange, Weak dark grey. "**" in the right margin is corroborated --
+# two different signatures matched the same address, which is the only way a
+# Likely is promoted to Strong.
+SPOTTER_HITS = [
+    # Flock's own IEEE block, heard on WiFi. Bolted to a pole: 41 minutes in
+    # range and 312 probe requests, which is what separates it from a phone.
+    dict(kind="ALPR", label="Flock Safety", conf="Strong",
+         mac="B4:1E:52:0C:7A:31", via="WiFi", rssi=-58, hits=312,
+         fp=0x9E41C7A2, rnd=False, rot=0, age="41m", corrob=False),
+
+    # A Liteon OUI, which alone is worth nothing -- but the same address also
+    # beaconed "Flock-2291", and two independent fields agreeing is the whole
+    # point of the scoring. Promoted, and marked.
+    dict(kind="ALPR", label="Flock SSID", conf="Strong",
+         mac="00:F4:8D:11:B2:60", via="WiFi", rssi=-71, hits=96,
+         fp=0x2D7F0B54, rnd=False, rot=0, age="39m", corrob=True),
+
+    # 0.3.1: Axon's own block on a public BLE address. No fingerprint,
+    # because that is built out of WiFi information elements.
+    dict(kind="BODYCAM", label="Axon Enterprise", conf="Strong",
+         mac="00:25:DF:4A:19:E2", via="BLE", rssi=-49, hits=18,
+         fp=0, rnd=False, rot=0, age="2m", corrob=False),
+
+    # What the same table looks like when it is guessing. A contract
+    # manufacturer's block, seen three times in eight seconds, walking past.
+    dict(kind="ALPR", label="Liteon (ALPR?)", conf="Weak",
+         mac="14:5A:FC:83:D1:07", via="WiFi", rssi=-77, hits=3,
+         fp=0x33B1006E, rnd=False, rot=0, age="8s", corrob=False),
+
+    # A randomised address. "rnd" says the OUI on the line above is made up,
+    # so the Weak grading is being generous.
+    dict(kind="ALPR", label="LAA, not a vendor", conf="Weak",
+         mac="82:6B:F2:5E:40:98", via="WiFi", rssi=-69, hits=11,
+         fp=0x7C22A1D4, rnd=True, rot=2, age="4m", corrob=False),
+]
+
+CONF_COLOUR = {"Strong": RED, "Likely": UI_ICON, "Weak": DARKGREY}
+
+
+def render_spotter(t):
+    """drawHeader() and drawList() in Spotter.cpp.
+
+    Rendered without the touch nav bar, so contentBottom() is 320 and the
+    list gets (320-42)/30 = 9 rows. With touch buttons enabled the feature
+    reserves the bottom strip for Back/Down/Up/Log and the count drops.
+    """
+    t.fill_screen(BLACK)
+    status_bar(t)
+
+    # drawHeader()
+    t.fill_rect(0, 20, W, 18, BLACK)
+    t.print_f1(8, 24, "ch  6  frames 18244  hits %d" % len(SPOTTER_HITS),
+               WHITE, BLACK)
+    t.print_f1(180, 24, "REC 41", RED, BLACK)        # s_logging, rows written
+
+    # drawList()
+    top, row_h = 42, 30
+    t.fill_rect(0, top, W, 320 - top, BLACK)
+    for i, h in enumerate(SPOTTER_HITS):
+        y = top + i * row_h
+
+        t.print_f1(8, y, "%-9s %s" % (h["kind"], h["label"]),
+                   CONF_COLOUR[h["conf"]], BLACK)
+
+        t.print_f1(8, y + 11, "%s %s %ddBm x%u"
+                   % (h["mac"], h["via"], h["rssi"], h["hits"]),
+                   LIGHTGREY, BLACK)
+
+        third = ""
+        if h["fp"]:
+            third += "fp %08X " % h["fp"]
+        if h["rnd"]:
+            third += "rnd "
+        if h["rot"]:
+            third += "+%d " % h["rot"]
+        third += h["age"]
+        t.print_f1(8, y + 21, third, DARKGREY, BLACK)
+
+        if h["corrob"]:
+            t.print_f1(224, y, "**", RED, BLACK)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(REPO, "render"))
@@ -392,7 +481,8 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     for name, fn in (("boot", lambda t: render_boot(t, brand)),
                      ("menu", render_menu),
-                     ("bluetooth", render_bluetooth)):
+                     ("bluetooth", render_bluetooth),
+                     ("spotter", render_spotter)):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
