@@ -232,7 +232,8 @@ const unsigned char *bluetooth_page0_icons[BT_PAGE0_FEATURES] = {
 
 const unsigned char *bluetooth_page1_icons[BT_PAGE1_FEATURES] = {
     bitmap_icon_Wireless_4,
-    bitmap_icon_Wireless_4
+    bitmap_icon_Wireless_4,
+    bitmap_icon_ble
 };
 
 const unsigned char *nrf_submenu_icons[nrf_NUM_SUBMENU_ITEMS] = {
