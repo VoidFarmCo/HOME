@@ -44,7 +44,34 @@ case "$PUEO_PANEL" in
   28) PANEL_DEF="-DPUEO_PANEL_35=0" ;;
   *)  echo "PUEO_PANEL must be 28 or 35, not '$PUEO_PANEL'" >&2; exit 2 ;;
 esac
-BUILD_PATH="$PUEO_ARDUINO_ROOT/build-$PUEO_PANEL"
+# Which firmware. The detector is Pueo itself; the beacon is the bench
+# transmitter that emits the things the detector looks for, so a receive path
+# can be proved rather than assumed. They are separate images on purpose:
+# Spotter and DroneScan both say they transmit nothing, and an image that
+# also carried a surveillance-hardware imitator would make that untrue of the
+# binary even while it stayed true of the feature.
+PUEO_ROLE="${PUEO_ROLE:-detector}"
+case "$PUEO_ROLE" in
+  detector) SKETCH_DIR="ESP32-DIV";  SKETCH_NAME="ESP32-DIV.ino"  ;;
+  beacon)   SKETCH_DIR="PueoBeacon"; SKETCH_NAME="PueoBeacon.ino" ;;
+  *) echo "PUEO_ROLE must be detector or beacon, not '$PUEO_ROLE'" >&2; exit 2 ;;
+esac
+
+BUILD_PATH="$PUEO_ARDUINO_ROOT/build-$PUEO_ROLE-$PUEO_PANEL"
+
+# The beacon includes the detector's headers rather than copying the
+# constants it has to match. arduino-cli compiles a sketch from a staging
+# directory, so a relative ../ include does not resolve; the directory goes
+# on the include path instead. A decoy built from a second copy of the
+# numbers would test the copy, not the detector.
+ROLE_INC=""
+if [ "$PUEO_ROLE" = "beacon" ]; then
+  # cygpath, because this is embedded inside a longer --build-property
+  # string. MSYS rewrites a bare path-shaped argument on its way to a Windows
+  # binary but not one buried in the middle of one, so an -I/c/... reaches
+  # the compiler verbatim and finds nothing.
+  ROLE_INC="-I$(cygpath -m "$REPO/ESP32-DIV" 2>/dev/null || echo "$REPO/ESP32-DIV")"
+fi
 
 # arduino-cli's winget install does not land on the Git Bash PATH.
 if ! command -v arduino-cli >/dev/null 2>&1; then
@@ -245,9 +272,9 @@ compile() {
   local rc=0
   local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF" \
-    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF" \
-    --build-path "$BUILD_PATH" "$REPO/ESP32-DIV" >"$log" 2>&1 || rc=$?
+    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
+    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
+    --build-path "$BUILD_PATH" "$REPO/$SKETCH_DIR" >"$log" 2>&1 || rc=$?
 
   grep -E "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*(warning|error):" "$log" || true
   grep -E "^(Sketch uses|Global variables)" "$log" || true
@@ -274,9 +301,9 @@ warnings() {
   rm -rf "$BUILD_PATH-warnings"
   local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF" \
-    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF" \
-    --build-path "$BUILD_PATH-warnings" "$REPO/ESP32-DIV" 2>&1 \
+    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
+    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
+    --build-path "$BUILD_PATH-warnings" "$REPO/$SKETCH_DIR" 2>&1 \
     | grep -E "warning:|Sketch uses|Global variables"
 }
 
@@ -287,13 +314,13 @@ merge() {
   local esptool
   esptool=$(ls "$ARDUINO_DIRECTORIES_DATA"/packages/esp32/tools/esptool_py/*/esptool.exe 2>/dev/null | head -1)
   [ -n "$esptool" ] || { echo "esptool not found; run setup first" >&2; return 1; }
-  "$esptool" --chip esp32 merge_bin -o "$BUILD_PATH/pueo-merged.bin"     --flash_mode dio --flash_freq keep --flash_size 4MB     0x1000  "$BUILD_PATH/ESP32-DIV.ino.bootloader.bin"     0x8000  "$BUILD_PATH/ESP32-DIV.ino.partitions.bin"     0x10000 "$BUILD_PATH/ESP32-DIV.ino.bin"
+  "$esptool" --chip esp32 merge_bin -o "$BUILD_PATH/pueo-merged.bin"     --flash_mode dio --flash_freq keep --flash_size 4MB     0x1000  "$BUILD_PATH/$SKETCH_NAME.bootloader.bin"     0x8000  "$BUILD_PATH/$SKETCH_NAME.partitions.bin"     0x10000 "$BUILD_PATH/$SKETCH_NAME.bin"
   echo "merged image: $BUILD_PATH/pueo-merged.bin"
 }
 
 upload() {
   local port="${1:?usage: tools/build.sh upload <port>}"
-  arduino-cli upload -b "$FQBN" -p "$port" --input-dir "$BUILD_PATH" "$REPO/ESP32-DIV"
+  arduino-cli upload -b "$FQBN" -p "$port" --input-dir "$BUILD_PATH" "$REPO/$SKETCH_DIR"
 }
 
 case "${1:-compile}" in
