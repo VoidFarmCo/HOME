@@ -235,8 +235,26 @@ LID_H     = 12;
  */
 PANEL     = "2.8";
 
-BEZEL_W   = (PANEL == "3.5") ? 55.5 : 56.0;   // board + 0.5 clearance
-BEZEL_L   = (PANEL == "3.5") ? 101.5 : 92.5;
+/* 3.5" numbers are from QDtech's E32R35T outline drawing, V1.0 2024-08-14,
+ * not from calipers. The PCB is 55.50 x 101.50 x 5.80 mm, corners R3.50,
+ * four mounting holes on a 47.90 x 94.50 pattern at 3.20 mm, and 5.09 mm of
+ * SMD standing off the back. Unmarked tolerance on that drawing is +/-0.2.
+ *
+ * The window was 55.5 x 101.5 -- the board's exact outline, with the comment
+ * claiming half a millimetre of clearance that was not in the arithmetic. An
+ * FDM part printed to a board's exact size does not accept the board. 0.5 on
+ * each dimension is the clearance the comment always meant; if your printer
+ * runs tight, this is the number to open up rather than the one to scale.
+ *
+ * The 2.8" values are left alone: they came from measurement rather than a
+ * drawing, and there is no E32R35T-equivalent outline for that board here to
+ * check them against. */
+BEZEL_W   = (PANEL == "3.5") ? 56.0 : 56.0;   // board + 0.5 clearance
+BEZEL_L   = (PANEL == "3.5") ? 102.0 : 92.5;
+
+/* Corner radius of the window. The 3.5" board's own corners are R3.50, so a
+ * 2 mm window leaves four crescents of lid covering the PCB corners. */
+BEZEL_R   = (PANEL == "3.5") ? 3.5 : 2;
 /* The longer window eats into the chin. Nudging it 2 mm toward the top,
  * where nothing lives, keeps a printable margin around the owl. */
 BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the face
@@ -316,7 +334,7 @@ module lid() {
         }
         // CYD window
         translate([0, BEZEL_Y, -1])
-            linear_extrude(LID_H+2) rrect(BEZEL_W, BEZEL_L, 2);
+            linear_extrude(LID_H+2) rrect(BEZEL_W, BEZEL_L, BEZEL_R);
         // screw clearance holes, countersunk from outside
         for (p = BOSS_POS)
             translate([p[0], p[1], 0]) {
