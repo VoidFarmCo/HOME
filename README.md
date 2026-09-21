@@ -8,8 +8,11 @@ a printed enclosure zoned to keep the radios apart.
 Two panels, one image each. The **3.5" ESP32-3248S035R** is the reference
 board: it is the one this has run on, the one with a dimensioned enclosure,
 and the one that brings its SPI bus out on a connector instead of asking you
-to solder to the microSD slot's pins. The 2.8" **ESP32-2432S028R** is
-supported and built for every release.
+to solder to the microSD slot's pins.
+
+The 2.8" **ESP32-2432S028R** is built every release and **has never been
+booted**. It compiles clean and reproduces from its own archive; nobody has
+put it on a board.
 
 It covers Wi-Fi and BLE reconnaissance, sub-GHz capture and replay, NFC read
 and clone, GPS wardriving, and jam detection.

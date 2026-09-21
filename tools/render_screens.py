@@ -35,7 +35,40 @@ REPO = os.path.dirname(HERE)
 ICON_H = os.path.join(REPO, "ESP32-DIV", "icon.h")
 FONTS = os.path.join(REPO, ".arduino", "user", "libraries", "TFT_eSPI", "Fonts")
 
-W, H = 240, 320
+# The panel these are drawn for. main() sets it from --panel; the default
+# is the 3.5", which is the board this firmware runs on.
+#
+# Every layout constant below is the firmware's own, read out of
+# ESP32-DIV.ino and shared.h rather than chosen to look right. The menu grid
+# in particular is a different size per panel, not the same grid scaled:
+# 145x92 tiles on a 155 px column pitch against 100x60 on 120.
+PANEL = 35
+W, H = 320, 480
+
+
+def set_panel(panel):
+    """Resize the canvas and the layout to one of the two panels."""
+    global PANEL, W, H
+    global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
+    global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W
+    PANEL = panel
+    W, H = (320, 480) if panel == 35 else (240, 320)
+    if panel == 35:
+        TILE_W, TILE_H, COLUMN_WIDTH = 145, 92, 155
+        Y_START, Y_SPACING = 44, 106
+        TILE_ICON_DY, TILE_TEXT_DY = 27, 49
+    else:
+        TILE_W, TILE_H, COLUMN_WIDTH = 100, 60, 120
+        Y_START, Y_SPACING = 30, 75
+        TILE_ICON_DY, TILE_TEXT_DY = 10, 30
+    X_OFFSET_RIGHT = X_OFFSET_LEFT + COLUMN_WIDTH
+    # drawStatusBar()'s right-hand cluster: BLE icon, count, wifi bars, temp,
+    # SD, plus gaps and a 4 px margin. Anchored to the right edge.
+    STATUS_ICONS_W = 110
+
+
+X_OFFSET_LEFT = 10
+set_panel(PANEL)
 
 
 # ── colours, straight from shared.h ────────────────────────────────────────
@@ -322,7 +355,7 @@ def status_bar(t):
     t.fill_round_rect(x + 2, y + 2, 85 * 20 // 100, 6, 1, GREEN)
     t.print_f1(x + 30, y + 2, "85%", GREEN, UI_LABLE)
 
-    ble_icon_x, gap, icon_w = 130, 3, 16
+    ble_icon_x, gap, icon_w = W - STATUS_ICONS_W, 3, 16
     ble_text_x = ble_icon_x + icon_w + gap
     wifi_bars_x = ble_text_x + 12 + gap
     temp_icon_x = wifi_bars_x + 24 + gap
@@ -370,24 +403,25 @@ def render_menu(t, selected=0):
     t.fill_screen(UI_BG)
     for i, (label, icon) in enumerate(MENU):
         col, row = i // 4, i % 4
-        x = 10 if col == 0 else 130
-        y = 30 + row * 75
+        x = X_OFFSET_LEFT if col == 0 else X_OFFSET_RIGHT
+        y = Y_START + row * Y_SPACING
         sel = (i == selected)
         fill = UI_ICON if sel else UI_FG
         edge = UI_ICON if sel else UI_LINE
         ink = UI_BG if sel else UI_TEXT
-        t.fill_round_rect(x, y, 100, 60, 5, fill)
-        t.draw_round_rect(x, y, 100, 60, 5, edge)
+        t.fill_round_rect(x, y, TILE_W, TILE_H, 5, fill)
+        t.draw_round_rect(x, y, TILE_W, TILE_H, 5, edge)
         if icon is None:                      # the "More" tile's three icons
             triple_w = 16 * 3 + 4 * 2
-            ix = x + (100 - triple_w) // 2
+            ix = x + (TILE_W - triple_w) // 2
             for k, nm in enumerate(("bitmap_icon_led", "bitmap_icon_satellite",
                                     "bitmap_icon_down_dots")):
-                t.draw_bitmap(ix + k * 20, y + 10, nm, 16, 16, ink)
+                t.draw_bitmap(ix + k * 20, y + TILE_ICON_DY, nm, 16, 16, ink)
         else:
-            t.draw_bitmap(x + 42, y + 10, icon, 16, 16, ink)
+            t.draw_bitmap(x + (TILE_W - 16) // 2, y + TILE_ICON_DY,
+                          icon, 16, 16, ink)
         tw = t.text_width(label)
-        t.print_f2(x + (100 - tw) // 2, y + 30, label, ink, fill)
+        t.print_f2(x + (TILE_W - tw) // 2, y + TILE_TEXT_DY, label, ink, fill)
     status_bar(t)
 
 
@@ -479,9 +513,10 @@ CONF_COLOUR = {"Strong": RED, "Likely": UI_ICON, "Weak": DARKGREY}
 def render_spotter(t):
     """drawHeader() and drawList() in Spotter.cpp.
 
-    Rendered without the touch nav bar, so contentBottom() is 320 and the
-    list gets (320-42)/30 = 9 rows. With touch buttons enabled the feature
-    reserves the bottom strip for Back/Down/Up/Log and the count drops.
+    Rendered without the touch nav bar, so contentBottom() is the panel
+    height and the list gets (H-42)/30 rows -- 14 on the 3.5", 9 on the 2.8".
+    With touch buttons enabled the feature reserves the bottom strip for
+    Exit/Down/Up/Log and the count drops.
     """
     t.fill_screen(BLACK)
     status_bar(t)
@@ -494,7 +529,7 @@ def render_spotter(t):
 
     # drawList()
     top, row_h = 42, 30
-    t.fill_rect(0, top, W, 320 - top, BLACK)
+    t.fill_rect(0, top, W, H - top, BLACK)
     for i, h in enumerate(SPOTTER_HITS):
         y = top + i * row_h
 
@@ -734,7 +769,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(REPO, "render"))
     ap.add_argument("--scale", type=int, default=3)
+    ap.add_argument("--panel", type=int, choices=(28, 35), default=35,
+                    help="which CYD panel to draw for (default: 35)")
     args = ap.parse_args()
+    set_panel(args.panel)
 
     for p in (ICON_H, os.path.join(FONTS, "glcdfont.c")):
         if not os.path.isfile(p):
@@ -750,6 +788,8 @@ def main():
           % (len(bitmaps), len(glcd), len(fg)))
     print("branding: %s %s, by %s"
           % ("Pueo", brand["PUEO_VERSION"], brand["PUEO_AUTHOR"]))
+    print("panel: %.1f\" -- %dx%d, %dx%d tiles"
+          % (args.panel / 10, W, H, TILE_W, TILE_H))
 
     os.makedirs(args.out, exist_ok=True)
     for name, fn in (("boot", lambda t: render_boot(t, brand)),

@@ -8,8 +8,12 @@ a printed enclosure zoned to keep the radios apart.
 Two panels, one flash image each. The 3.5" ESP32-3248S035R is the reference
 board — the one this has run on, the one with a dimensioned enclosure, and
 the one that brings its SPI bus out on a connector rather than asking for
-three joints on a microSD slot. The 2.8" ESP32-2432S028R is supported and
-built for every release. It
+three joints on a microSD slot.
+
+The 2.8" ESP32-2432S028R is built every release and **has never been
+booted**. It compiles clean and reproduces from its own archive; nobody has
+put it on a board. Treat it the way this project treats its radio claims --
+written carefully, not witnessed. It
 covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
 clone, GPS wardriving and jam detection. It is a fork of CiferTech's
 ESP32-DIV, which is MIT; this fork is GPL-3.0-or-later. It diverges mainly
