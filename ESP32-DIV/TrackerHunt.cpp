@@ -143,6 +143,20 @@ bool identify(BLEAdvertisedDevice* dev, char* label, size_t labelSz) {
 void record(const uint8_t* mac, int8_t rssi, const char* label) {
   const uint32_t now = millis();
 
+  /* The picker repaints on this flag and nothing else set it.
+   *
+   * enterPicker() sets it once, at entry, while the list is empty; the gauge
+   * branch sets it every pass because the needle is live. Nothing set it when
+   * a tracker actually arrived, so the picker drew "no trackers" once and
+   * stayed that way however many were in range. Scrolling revealed them,
+   * because a button press sets the flag -- which is why this looked like an
+   * empty picker rather than a stuck one.
+   *
+   * Set for updates as well as additions: the rows show RSSI and age, and a
+   * list that never refreshes them is wrong in a quieter way. The redraw is
+   * already rate-limited by kRedrawMs, so this costs nothing. */
+  s_dirty = true;
+
   for (int i = 0; i < s_count; i++) {
     if (memcmp(s_targets[i].mac, mac, 6) != 0) {
       continue;

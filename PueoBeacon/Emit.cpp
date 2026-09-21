@@ -169,10 +169,28 @@ size_t buildPack(uint8_t* out) {
 /* ── BLE ──────────────────────────────────────────────────────────────────
  *
  * One advertisement at a time, because advertising is a state. The scheduler
- * in the sketch rotates which one is live. */
-void bleAdvertise(const std::string& payload) {
+ * in the sketch rotates which one is live.
+ *
+ * Each decoy advertises from its own address, and that is not cosmetic.
+ * Spotter keys a row on the MAC and keeps the strongest signature that row
+ * has matched: one address sending both the Meta glasses pair (Strong) and
+ * the KARR vehicle name (Likely) becomes a single row labelled Meta
+ * Ray-Ban, marked corroborated, with the vehicle match folded invisibly
+ * into it. The detector is right to do that -- one device is not credibly
+ * both -- so the bench has to stop pretending it is one device.
+ *
+ * Random static, which is what the top two bits of the most significant
+ * byte mean. The address goes to the controller least significant byte
+ * first, so that byte is addr[5]. */
+void setBleAddress(uint8_t tag) {
+  uint8_t addr[6] = {tag, 0xAD, 0xDE, 0x55, 0x50, 0xC0};
+  ble_hs_id_set_rnd(addr);
+}
+
+void bleAdvertise(const std::string& payload, uint8_t tag) {
   NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
   adv->stop();
+  setBleAddress(tag);
   NimBLEAdvertisementData d;
   d.addData(payload);
   adv->setAdvertisementData(d);
@@ -255,6 +273,7 @@ void begin() {
   memset(s_sent, 0, sizeof(s_sent));
   wifiUp();
   NimBLEDevice::init("");
+  NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_RANDOM);
   NimBLEDevice::setPower(ESP_PWR_LVL_N12);   // floor
 }
 
@@ -315,7 +334,7 @@ void send(Signal s) {
       else if (which == 1) buildLocation(body + 2);
       else                 buildOperatorId(body + 2);
       which = (uint8_t)((which + 1) % 3);
-      bleAdvertise(serviceData16(DroneId::kBleServiceUuid, body, sizeof(body)));
+      bleAdvertise(serviceData16(DroneId::kBleServiceUuid, body, sizeof(body)), s);
       s_bleLive = s;
       break;
     }
@@ -324,14 +343,14 @@ void send(Signal s) {
       /* Company and service from kBleSigs: Luxottica 0x0D53 with Meta's
        * 0xFD5F is the Strong pair Spotter calls "Meta Ray-Ban". */
       const uint8_t body[] = {0x01, 0x00};
-      bleAdvertise(uuid16(0xFD5F) + mfgData(0x0D53, body, sizeof(body)));
+      bleAdvertise(uuid16(0xFD5F) + mfgData(0x0D53, body, sizeof(body)), s);
       s_bleLive = s;
       break;
     }
 
     case VehicleBle: {
       /* kNameSigs wants the prefix "QT " at exactly 11 characters. */
-      bleAdvertise(completeName("QT 12345678"));
+      bleAdvertise(completeName("QT 12345678"), s);
       s_bleLive = s;
       break;
     }
@@ -344,7 +363,7 @@ void send(Signal s) {
       body[1] = 0x19;                    // length of what follows
       body[2] = 0x00;                    // status
       memcpy(body + 3, "PUEO-TEST-KEY", 13);
-      bleAdvertise(mfgData(0x004C, body, sizeof(body)));
+      bleAdvertise(mfgData(0x004C, body, sizeof(body)), s);
       s_bleLive = s;
       break;
     }
@@ -357,10 +376,10 @@ void send(Signal s) {
       static bool discoverable = true;
       if (discoverable) {
         const uint8_t model[3] = {0x2B, 0x71, 0xB2};
-        bleAdvertise(serviceData16(FastPair::kUuidFastPair, model, sizeof(model)));
+        bleAdvertise(serviceData16(FastPair::kUuidFastPair, model, sizeof(model)), s);
       } else {
         const uint8_t nd[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
-        bleAdvertise(serviceData16(FastPair::kUuidFastPair, nd, sizeof(nd)));
+        bleAdvertise(serviceData16(FastPair::kUuidFastPair, nd, sizeof(nd)), s);
       }
       discoverable = !discoverable;
       s_bleLive = s;
