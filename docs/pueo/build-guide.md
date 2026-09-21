@@ -3,15 +3,19 @@
 Wiring a CYD and four modules into a working unit, in the order that makes a
 fault easy to find.
 
-**Nothing in this guide has been wired yet.** Step 2 has been done -- a board
-was flashed and booted on 2026-09-20, and display, menu and touch work -- but
-no module has been soldered to anything, so steps 3 onward remain untested.
-The rest is derived from the pin map
-in [hardware.md](hardware.md), which `tools/check_pinmap.py` verifies against
-the CYD's own wiring, from the CYD schematic, and from module datasheets. The
-first unit goes together on 2026-09-20; whatever that gets wrong is a
-correction to this file, not a footnote. Treat the order as reasoned and the
-timings as untested.
+**Nothing in this guide has been wired yet.** Step 2 is done -- a board was
+flashed and run on 2026-09-20, and the display, the menus, touch, the WiFi
+scanner, the packet monitor, Spotter and Hunt all work -- but no module has
+been soldered to anything, so steps 3 onward remain untested. The rest is
+derived from the pin map in [hardware.md](hardware.md), which
+`tools/check_pinmap.py` verifies against each board's own wiring, from the
+CYD schematic, and from module datasheets. Treat the order as reasoned and
+the timings as untested.
+
+**Which board you have changes where two wires go.** Step 2 found that the
+2.8" and the 3.5" do not agree about GPIO 4, and the pin map now follows the
+panel. Every place that matters is marked below; if you are building on a
+3.5", read those before you cut anything.
 
 There is no PCB. [pcb-design.md](pcb-design.md) is design input for one, and
 it deliberately comes *after* this: a board freezes a pin map that bring-up
@@ -47,7 +51,7 @@ The PN532 runs from 5 V, not from either 3.3 V rail.
 
 | | |
 |---|---|
-| Base | CYD ESP32-2432S028R — 2.8″ ILI9341 240×320, XPT2046 resistive touch, microSD |
+| Base | CYD, either panel — see below |
 | Sub-GHz | CC1101 on an HW-863 breakout, 300–439 MHz, board SMA |
 | 2.4 GHz | NRF24L01+PA+LNA, board SMA |
 | NFC | PN532 V3 — **SPI mode, DIP CH1=OFF, CH2=ON** |
@@ -56,6 +60,28 @@ The PN532 runs from 5 V, not from either 3.3 V rail.
 
 Antennas on both radios before power. A PA module transmitting into an open
 SMA is a module you replace.
+
+### The two base boards
+
+Both are sold as a "cheap yellow display" and they are not the same board.
+
+| | 2.8″ ESP32-2432S028R | 3.5″ ESP32-3248S035R |
+|---|---|---|
+| Display | ILI9341, 240×320 | ST7796, 320×480 |
+| Touch | XPT2046 on its own bus, 25/32/39 | XPT2046 on the display's SPI, CS 33 |
+| Backlight | GPIO 21 | GPIO 27 |
+| RGB LED | 4 / 16 / 17 | **22** / 16 / 17 |
+| GPIO 4 is | the LED's red channel | **the audio amplifier's enable** |
+| GPIO 34 is | an LDR | the battery divider |
+| Flash image | `pueo-<ver>-merged.bin` | `pueo-<ver>-35-merged.bin` |
+
+The 3.5" figures are from lcdwiki's E32R35T page and QDtech's outline drawing
+(V1.0, 2024-08-14): PCB 55.50 × 101.50 × 5.80 mm, corners R3.50, four 3.20 mm
+mounting holes on a 47.90 × 94.50 pattern, 5.09 mm of SMD standing off the
+back. The enclosure is dimensioned from those numbers.
+
+There is no runtime detection. The image is built for one panel and the wrong
+one is a dark screen rather than an error message.
 
 ## Tools
 
@@ -111,6 +137,11 @@ starting point — and you will want one.
 esptool.py --chip esp32 -p COM7 write_flash 0x0 pueo-0.3.4-merged.bin
 ```
 
+On a 3.5" board flash `pueo-0.3.4-35-merged.bin` instead. If the screen stays
+dark, that is the first thing to check -- it is what the wrong image looks
+like, and it is not a soldering fault because you have not soldered anything
+yet.
+
 **3. The three bus lines, then the SD card.** Solder SCK, MOSI and MISO, then
 insert a card and confirm it still mounts. Testing the bus with the one
 device that was already wired to it isolates your soldering from everything
@@ -155,8 +186,13 @@ is in [hardware.md](hardware.md).
 **The RGB LED does nothing.** It is gone. On the 2.8" that is GPIO 4, 16 and 17;
 on the 3.5" the red channel is GPIO 22 instead of 4, and CC1101's GDO0 lands on
 it, so on that board the red LED flickers with sub-GHz traffic rather than going
-dark. GPIO 4, 16 and 17 are the only
-contiguous spare pins on this board and three radios needed six lines.
+dark.
+
+The LED is spent because those were the only contiguous spare pins on the
+board and three radios needed six lines. On the 3.5" the amplifier on GPIO 4
+is *not* spent the same way: NRF24 CSN moved to 25 rather than the pin map
+growing to cover it, because keying an amplifier at chip-select rates is not
+the same kind of trade as losing an LED.
 
 **CC1101 receive cannot be wired backwards.** GDO2 is on GPIO 35, which is
 input-only. If you swap GDO0 and GDO2 the transmit path fails rather than
