@@ -74,7 +74,7 @@
 namespace Spotter {
 
 enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Bodycam, Accessory,
-                            Vehicle };
+                            Vehicle, Camera, Pentest };
 
 /* How much a single match is worth. Corroboration -- a second, differently
  * labelled signature on the same MAC -- promotes Likely to Strong. It does
@@ -192,6 +192,71 @@ static const OuiSig kOuiSigs[] = {
   {{0xB8, 0xE2, 0x8C}, Kind::Alpr, Conf::Likely,  "Motorola Malaysia"},
   {{0x00, 0xBF, 0x15}, Kind::Alpr, Conf::Likely,  "Genetec"},
   {{0x0C, 0xBF, 0x15}, Kind::Alpr, Conf::Likely,  "Genetec"},
+
+  /* ── Fixed cameras and doorbells ──────────────────────────────────────
+   * From SquachWatch-CYD (GPL-3.0), every block re-checked against the IEEE
+   * registry here rather than taken on its word.
+   *
+   * Strong, on the same rule Axon gets: the block belongs to the vendor, and
+   * the label names the vendor rather than the product. These six are camera
+   * companies -- that is what they sell -- so the vendor claim and the
+   * product claim nearly coincide, which is not true of Motorola above.
+   *
+   * Understand what this does to BLE. Strong is the grade that reaches the
+   * BLE path, so this takes that set from two blocks to twenty-four. Ring
+   * doorbells are on ordinary streets in numbers that Flock cameras are not,
+   * and Spotter will say so. Those are true positives, but the screen goes
+   * from quiet to busy in a residential area, and that is a change in what
+   * the feature is for rather than a bug in it. */
+  {{0xAC, 0x9F, 0xC3}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x18, 0x7F, 0x88}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x34, 0x3E, 0xA4}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x54, 0xE0, 0x19}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x5C, 0x47, 0x5E}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x64, 0x9A, 0x63}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x90, 0x48, 0x6C}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x9C, 0x76, 0x13}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0xCC, 0x3B, 0xFB}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0xC4, 0xDB, 0xAD}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x24, 0x2B, 0xD6}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x00, 0xB4, 0x63}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0x50, 0xE4, 0x67}, Kind::Camera, Conf::Strong, "Ring"},
+  {{0xC0, 0x56, 0xE3}, Kind::Camera, Conf::Strong, "Hikvision"},
+  {{0x44, 0x19, 0xB6}, Kind::Camera, Conf::Strong, "Hikvision"},
+  {{0x28, 0x57, 0xBE}, Kind::Camera, Conf::Strong, "Hikvision"},
+  {{0x2C, 0xAA, 0x8E}, Kind::Camera, Conf::Strong, "Wyze Labs"},
+  {{0xD0, 0x3F, 0x27}, Kind::Camera, Conf::Strong, "Wyze Labs"},
+  {{0x7C, 0x78, 0xB2}, Kind::Camera, Conf::Strong, "Wyze Labs"},
+  {{0x00, 0x40, 0x8C}, Kind::Camera, Conf::Strong, "Axis Comms"},
+  {{0xB8, 0xA4, 0x4F}, Kind::Camera, Conf::Strong, "Axis Comms"},
+  {{0xE0, 0xA7, 0x00}, Kind::Camera, Conf::Strong, "Verkada"},
+  {{0x70, 0x1A, 0xD5}, Kind::Camera, Conf::Strong, "Avigilon Alta"},
+
+  /* Amazon owns Ring, and also Echo, Fire TV, Kindle and eero. A block of
+   * theirs is a coin flip at best, so it stays off the BLE path. */
+  {{0x34, 0xD2, 0x70}, Kind::Camera, Conf::Weak,   "Amazon (Ring parent)"},
+  {{0xF0, 0x27, 0x2D}, Kind::Camera, Conf::Weak,   "Amazon (Ring parent)"},
+  {{0xFC, 0x65, 0xDE}, Kind::Camera, Conf::Weak,   "Amazon (Ring parent)"},
+  {{0x68, 0x37, 0xE9}, Kind::Camera, Conf::Weak,   "Amazon (Ring parent)"},
+
+  /* Module vendors found inside cameras. Same class as the Liteon rows. */
+  {{0xB8, 0xD7, 0xAF}, Kind::Camera, Conf::Weak,   "Murata (module)"},
+  {{0x00, 0xE0, 0x4C}, Kind::Camera, Conf::Weak,   "Realtek (module)"},
+  {{0xA4, 0xC1, 0x38}, Kind::Camera, Conf::Weak,   "Telink (module)"},
+  {{0x4C, 0x69, 0x05}, Kind::Camera, Conf::Weak,   "unregistered OUI"},
+
+  /* ── Pentest hardware ─────────────────────────────────────────────────
+   * Not surveillance, but the same question: what is in range that someone
+   * brought deliberately.
+   *
+   * Flipper's block is their own MA-L assignment, so it grades like the
+   * others. The two Hak5 entries are locally-administered addresses -- the
+   * 0x02 bit in the first octet -- which is to say defaults a Pineapple ships
+   * with rather than anything IEEE assigned. Anyone can set them, so they are
+   * Weak and labelled LAA, which is also what keeps them off the BLE path. */
+  {{0x0C, 0xFA, 0x22}, Kind::Pentest, Conf::Strong, "Flipper Devices"},
+  {{0x02, 0xC0, 0xCA}, Kind::Pentest, Conf::Weak,   "Hak5 LAA default"},
+  {{0x02, 0x13, 0x37}, Kind::Pentest, Conf::Weak,   "Hak5 LAA default"},
 
   {{0xB8, 0x35, 0x32}, Kind::Alpr, Conf::Weak,    "unregistered OUI"},
 };

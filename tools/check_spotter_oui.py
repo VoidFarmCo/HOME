@@ -46,12 +46,37 @@ CONF_ENUM = re.compile(
 VENDOR_OWN = {
     "B4:1E:52": "Flock Safety",
     "00:25:DF": "Axon Enterprise",
+    "AC:9F:C3": "Ring",
+    "18:7F:88": "Ring",
+    "34:3E:A4": "Ring",
+    "54:E0:19": "Ring",
+    "5C:47:5E": "Ring",
+    "64:9A:63": "Ring",
+    "90:48:6C": "Ring",
+    "9C:76:13": "Ring",
+    "CC:3B:FB": "Ring",
+    "C4:DB:AD": "Ring",
+    "24:2B:D6": "Ring",
+    "00:B4:63": "Ring",
+    "50:E4:67": "Ring",
+    "C0:56:E3": "Hikvision",
+    "44:19:B6": "Hikvision",
+    "28:57:BE": "Hikvision",
+    "2C:AA:8E": "Wyze Labs",
+    "D0:3F:27": "Wyze Labs",
+    "7C:78:B2": "Wyze Labs",
+    "00:40:8C": "Axis Comms",
+    "B8:A4:4F": "Axis Comms",
+    "E0:A7:00": "Verkada",
+    "70:1A:D5": "Avigilon Alta",
+    "0C:FA:22": "Flipper Devices",
 }
 
 # Assignees that must never reach the BLE path however they are labelled.
 # Substring match against the entry's own label, which carries the name the
 # IEEE registry gives rather than the product it was found in.
 NEVER_ON_BLE = ("Liteon", "Espressif", "Qualcomm", "Atheros", "USI",
+                "Murata", "Realtek", "Telink", "module",
                 "Samsung", "unregistered", "not a vendor", "LAA",
                 "locally administered", "locally-administered")
 
