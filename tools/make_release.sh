@@ -81,6 +81,7 @@ INCLUDE=(
   "tools/check_fastpair_probe.py"
   "tools/check_ble_adv.py"
   "tools/trace_logo.py"
+  "tools/inline_logo.py"
   "tools/check_logo_scale.py"
   "tools/check_menu_tables.py"
   "tools/check_tracker_follow.py"
