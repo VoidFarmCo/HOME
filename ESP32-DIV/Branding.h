@@ -24,6 +24,8 @@
 #define PUEO_TAGLINE     "multi-radio field tool"
 #define PUEO_AUTHOR      "magikh0e"
 
+#define PUEO_URL         "pueo.magikh0e.pl"
+
 /* Shown under the name on the splash, and in the serial banner. */
 #define PUEO_UPSTREAM    "based on ESP32-DIV by CiferTech"
 #define PUEO_UPSTREAM_URL "github.com/cifertech/ESP32-DIV"

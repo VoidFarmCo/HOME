@@ -415,6 +415,34 @@ ship two flash images.
     It paints the remainder black now, and the bar and its peak marker
     redraw together because the marker sits on top of the fill.
 
+  * About was still upstream's page. The obfuscated strings in shared.h
+    decode to ESP32-DIV, CiferTech, cifertech@gmail.com, github.com/
+    cifertech and CiferTech.net -- so the About screen of this fork named
+    the fork nowhere and gave a stranger's email as the contact. Reasonable
+    while it was their sketch; it was never rebranded.
+
+    Page one is Pueo's now: the owl, the tagline, the author and the
+    version. Page two carries the board, the author, pueo.magikh0e.pl, and
+    then the credit back to the project this came from -- ESP32-DIV,
+    CiferTech, their repository, and the version it forked at.
+
+    Their email is not on it. ESP32-DIV is MIT and the licence's
+    requirement is the notice in LICENSE, which is untouched; the About
+    credit is voluntary and stays because the code came from somewhere.
+    An address is contact information rather than attribution, and on a
+    fork's About screen it points support at someone who did not ship it.
+
+    Pueo's strings stay plain text, which is what Branding.h already said
+    they would: the obfuscation is a single-byte XOR that defeats `strings`
+    and nothing else, and the name is already in plain text on the splash,
+    in the serial banner, on the site and throughout the repo.
+
+  * The logo could never have drawn. ESP32-DIV.ino includes icon.h and not
+    Branding.h, so PUEO_LOGO_BITMAP was undefined there and the #ifdef
+    guarding it silently took the other branch. It is also why using
+    PUEO_LOGO_H outside that guard failed to compile, which is the version
+    of this that announced itself.
+
   * About is two pages, and has the owl on it. It had no artwork at all --
     the logo is a fixed 200x200 bitmap, drawBitmap does not scale, and on a
     240x320 panel it does not share a page with four rows of credits. Two

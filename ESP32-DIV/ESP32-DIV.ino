@@ -9,6 +9,7 @@
 #include "Spotter.h"
 #include "TrackerHunt.h"
 #include "ducky.h"
+#include "Branding.h"
 #include "icon.h"
 #include "gps.h"
 #include "rfid.h"
@@ -4236,35 +4237,33 @@ void drawAboutPage(int page) {
   tft.setTextSize(1);
 
   if (page == 0) {
+    /* The mark, the name, what it is, who made it.
+     *
+     * This page used to print upstream's details and nothing else: the
+     * obfuscated strings in shared.h decode to ESP32-DIV, CiferTech, and
+     * their email, GitHub and site. Reasonable when this was their sketch;
+     * wrong on a fork that never rebranded the page. The credit to them is
+     * on page two, where it belongs and where it is a credit rather than
+     * the only thing the screen says. */
     int y = 40;
-#ifdef PUEO_LOGO_BITMAP
-    /* Centred on what is left after the status bar, not on the screen, or
-     * it sits low by half the bar. */
     const int lx = (PUEO_SCREEN_W - PUEO_LOGO_W) / 2;
-    const int ly = 24 + ((PUEO_SCREEN_H - 24) - PUEO_LOGO_H) / 2 - 16;
+    const int ly = 24 + ((PUEO_SCREEN_H - 24) - PUEO_LOGO_H) / 2 - 22;
     tft.drawBitmap(lx, ly, PUEO_LOGO_BITMAP,
                    PUEO_LOGO_W, PUEO_LOGO_H, UI_ICON);
     y = ly + PUEO_LOGO_H + 14;
-#else
-    /* No artwork compiled in: print the name so the page is not blank.
-     * With the bitmap the wordmark is already in it, which is why the
-     * name line only exists here -- same reason displayLogo() drops it. */
-    tft.setTextFont(2);
-    tft.setTextColor(UI_ICON, UI_BG);
-    tft.setCursor(16, y);
-    tftPrintObf(OBF_PN, sizeof(OBF_PN));
-    y += 22;
-#endif
 
+    /* No name line: the artwork carries the wordmark, which is what
+     * PUEO_LOGO_HAS_WORDMARK records and why displayLogo() drops its own. */
     tft.setTextFont(1);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 1);
+    y += 14;
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
-    tft.setCursor(16, y);
-    tft.print("by ");
-    tftPrintObf(OBF_DN, sizeof(OBF_DN));
-    tft.print(" - ");
-    tft.print(ESP32DIV_VERSION);
+    tft.drawCentreString("by " PUEO_AUTHOR "  -  " PUEO_VERSION,
+                         PUEO_SCREEN_W / 2, y, 1);
 
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
+    tft.setTextDatum(TL_DATUM);
     tft.setCursor(16, PUEO_SCREEN_H - 20);
     tft.print("SELECT / tap for details");
     return;
@@ -4273,22 +4272,19 @@ void drawAboutPage(int page) {
   tft.setTextFont(2);
   tft.setTextColor(UI_ICON, UI_BG);
   tft.setCursor(16, 40);
-  tftPrintObf(OBF_PN, sizeof(OBF_PN));
+  tft.print(PUEO_NAME " " PUEO_VERSION);
 
   tft.setTextFont(1);
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
-  tft.setCursor(16, 60);
-  tft.print("by ");
-  tftPrintObf(OBF_DN, sizeof(OBF_DN));
-  tft.print(" - ");
-  tft.print(ESP32DIV_VERSION);
+  tft.setCursor(16, 62);
+  tft.print(PUEO_TAGLINE);
 
   tft.drawFastHLine(12, 78, PUEO_SCREEN_W - 24, UI_LINE);
 
   const int xLabel = 16;
-  const int xValue = 80;
-  const int step = 22;
-  int y = 96;
+  const int xValue = 76;
+  const int step = 20;
+  int y = 94;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
@@ -4300,18 +4296,10 @@ void drawAboutPage(int page) {
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
-  tft.print("Mail");
+  tft.print("By");
   tft.setTextColor(UI_TEXT, UI_BG);
   tft.setCursor(xValue, y);
-  tftPrintObf(OBF_EM, sizeof(OBF_EM));
-  y += step;
-
-  tft.setTextColor(UI_DIM_TEXT, UI_BG);
-  tft.setCursor(xLabel, y);
-  tft.print("GitHub");
-  tft.setTextColor(UI_TEXT, UI_BG);
-  tft.setCursor(xValue, y);
-  tftPrintObf(OBF_GH, sizeof(OBF_GH));
+  tft.print(PUEO_AUTHOR);
   y += step;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
@@ -4319,7 +4307,30 @@ void drawAboutPage(int page) {
   tft.print("Web");
   tft.setTextColor(UI_TEXT, UI_BG);
   tft.setCursor(xValue, y);
-  tftPrintObf(OBF_WB, sizeof(OBF_WB));
+  tft.print(PUEO_URL);
+  y += step + 6;
+
+  /* The credit back to the project this was forked from.
+   *
+   * ESP32-DIV is MIT, and the licence's requirement is the notice in
+   * LICENSE, which is kept. This is not that -- it is here because the code
+   * came from somewhere and saying so costs nothing.
+   *
+   * Their project and repository, not their personal email: an address on a
+   * fork's About screen points support at someone who did not ship it. */
+  tft.drawFastHLine(12, y, PUEO_SCREEN_W - 24, UI_LINE);
+  y += 12;
+
+  tft.setTextColor(UI_DIM_TEXT, UI_BG);
+  tft.setCursor(xLabel, y);
+  tft.print(PUEO_UPSTREAM);
+  y += 14;
+  tft.setCursor(xLabel, y);
+  tft.print(PUEO_UPSTREAM_URL);
+  y += 14;
+  tft.setCursor(xLabel, y);
+  tft.print("forked at ");
+  tft.print(ESP32DIV_VERSION);
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(16, PUEO_SCREEN_H - 20);
