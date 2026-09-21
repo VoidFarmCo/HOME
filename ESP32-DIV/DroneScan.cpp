@@ -421,8 +421,23 @@ void setup() {
     if (s_scan) {
       s_scan->setAdvertisedDeviceCallbacks(&s_advCb, true);
       s_scan->setActiveScan(false);   // passive: never ask, only listen
-      s_scan->setInterval(160);
-      s_scan->setWindow(160);
+      /* Window under interval, on purpose.
+       *
+       * The ESP32 has one radio. A BLE scan whose window equals its interval
+       * asks for it continuously, and the coexistence arbiter then gives the
+       * WiFi side almost nothing -- which is fine for a BLE-only feature and
+       * ruinous for this one, because it listens on both.
+       *
+       * Measured with the bench beacon, which counts what it sends: 495 ALPR
+       * probe requests transmitted, and this screen found the first one after
+       * about five minutes. The frames were going out; there was no receiver
+       * awake to hear them. Hunt and Fast Pair keep a full window because
+       * they have no WiFi side to starve.
+       *
+       * 100 ms interval with a 50 ms window is half the airtime each. BLE
+       * sightings get rarer in exchange, which is the trade. */
+      s_scan->setInterval(160);   // 160 * 0.625 ms = 100 ms
+      s_scan->setWindow(80);      //  80 * 0.625 ms =  50 ms
     }
   }
 
