@@ -153,7 +153,7 @@ setup() {
   rm -rf "$LIB/TFT_eSPI" "$LIB/SmartRC-CC1101-Driver-Lib"
   unzip -q -o "$REPO/Libraries/TFT_eSPI-master.zip" -d "$LIB"
   mv "$LIB/TFT_eSPI-master" "$LIB/TFT_eSPI"
-  cp "$REPO/Libraries/User_Setup cyd.h" "$LIB/TFT_eSPI/User_Setup.h"
+  sync_user_setup
 
   # The CC1101 driver is vendored rather than unzipped and sed'd. Its changes
   # are real source edits now -- see libs/SmartRC-CC1101-Driver-Lib/VENDORED.md.
@@ -203,6 +203,31 @@ prefix_maps() {
   echo "$flags"
 }
 
+# TFT_eSPI reads its configuration from a copy inside the installed library,
+# not from the file in this repo. Editing the repo's copy therefore changes
+# nothing until something re-installs it, and `setup` is a one-time step
+# nobody re-runs.
+#
+# That is not a hypothetical. 0.3.4's first cut shipped a 2.8" image built
+# against the 3.5"'s driver, size and backlight pin, because the panel split
+# was added to Libraries/User_Setup cyd.h and the stale installed copy was
+# what the compiler read -- the exact bug the split existed to fix, still
+# present in the artifact that claimed to fix it, and invisible to a check
+# that reads the repo.
+#
+# So every compile re-syncs it. cmp first, so an unchanged file is not
+# rewritten: touching it would rebuild the whole library on every run.
+sync_user_setup() {
+  local src="$REPO/Libraries/User_Setup cyd.h"
+  local dst="$ARDUINO_DIRECTORIES_USER/libraries/TFT_eSPI/User_Setup.h"
+  [ -f "$src" ] || return 0
+  [ -d "$(dirname "$dst")" ] || return 0
+  if ! cmp -s "$src" "$dst"; then
+    cp "$src" "$dst"
+    echo "== User_Setup.h re-synced from Libraries/User_Setup cyd.h =="
+  fi
+}
+
 # -Wall -Wextra, and the sketch is expected to stay clean under both. If this
 # prints a warning, that is the whole point -- fix it rather than lowering the
 # level again.
@@ -212,6 +237,7 @@ prefix_maps() {
 # always prints noise is a build nobody reads. `tools/build.sh warnings`
 # shows everything.
 compile() {
+  sync_user_setup
   python "$REPO/tools/check_pinmap.py"
   echo
   local log="$PUEO_ARDUINO_ROOT/compile.log"

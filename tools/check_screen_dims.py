@@ -211,6 +211,25 @@ def main():
         ok(f'{panel/10:.1f}" inversion is {"ON" if panel == 28 else "OFF"}',
            inv_on == (panel == 28))
 
+    # The copy the compiler actually reads.
+    #
+    # TFT_eSPI takes its configuration from User_Setup.h inside the installed
+    # library, not from the file in this repo; build.sh copies one to the
+    # other. Every check above reads the repo's copy, so all of them passed
+    # while the installed one was still the old unconditional ST7796 -- and
+    # 0.3.4's first cut shipped a 2.8" image built with the 3.5"'s driver,
+    # size and backlight pin. A check that reads only the source cannot see
+    # that, which is the whole reason this one exists.
+    #
+    # Skipped when there is no install, so this still runs anywhere.
+    installed = (REPO / ".arduino" / "user" / "libraries" / "TFT_eSPI"
+                 / "User_Setup.h")
+    if installed.exists():
+        print("\nand the compiler reads the same file:")
+        ok("the installed User_Setup.h matches this repo's",
+           installed.read_bytes() == USER_SETUP.read_bytes(),
+           "run tools/build.sh to re-sync it")
+
     print("\nstatus-bar icons follow the right edge:")
     stray = []
     for name in UI_FILES:

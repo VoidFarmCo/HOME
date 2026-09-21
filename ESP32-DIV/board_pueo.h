@@ -16,7 +16,8 @@
  *     SD (onboard)      CS  5
  *     CC1101            CS  21 *    GDO0 22 (TX)   GDO2 35 (RX)
  *                       * 27 on the 2.8" panel; see CC1101_CS below
- *     NRF24L01+PA+LNA   CSN 4       CE   16        IRQ unconnected
+ *     NRF24L01+PA+LNA   CSN 4 *     CE   16        IRQ unconnected
+ *                       * 25 on the 3.5" panel; see CSN_PIN_1 below
  *     PN532 V3 (SPI)    SS  17
  *   GPS ATGM336H        ESP32 RX on GPIO 1, GPS RX not connected
  *
@@ -81,6 +82,25 @@
  * 25 (collides with the XPT2046 touch clock — a real bug on the stock CYD
  * profile, not just a Pueo problem).
  *
+ * CSN follows the panel, because the two boards do not agree about GPIO 4.
+ *
+ *   2.8" ESP32-2432S028R   GPIO 4 is the RGB LED's red channel
+ *   3.5" ESP32-3248S035R   GPIO 4 is the audio amplifier's enable
+ *                          (lcdwiki E32R35T; RGB red moves to 22)
+ *
+ * Spending the LED is the trade this board map already makes. Keying an
+ * amplifier enable at chip-select rates is not the same trade: it clicks,
+ * and it draws current off a rail already carrying the display.
+ *
+ * 25 is free on the 3.5" for the reason the paragraph above says it is not
+ * free on the 2.8" — that panel puts touch on its own bus at 25/32/39,
+ * while the 3.5" hangs its XPT2046 off the display's SPI behind TOUCH_CS.
+ * The pin that collides on one board is the spare on the other.
+ *
+ * Not changed on the 2.8": anyone who followed the build guide has CSN
+ * soldered to the GPIO 4 pad, and a published pin map is a thing people
+ * have already acted on.
+ *
  * radio2/radio3 in bluetooth.cpp are aliased onto the same physical module.
  * The three-radio BLE jammer modes therefore run degraded on one radio; they
  * are out of scope for the initial feature set either way.
@@ -90,7 +110,11 @@
  * double-assignment in the handoff resolves to "PN532 takes 17, NRF24 IRQ
  * stays off the board". */
 #define CE_PIN_1  16
+#if PUEO_PANEL_35
+#define CSN_PIN_1 25
+#else
 #define CSN_PIN_1 4
+#endif
 #define CE_PIN_2  CE_PIN_1
 #define CSN_PIN_2 CSN_PIN_1
 #define CE_PIN_3  CE_PIN_1

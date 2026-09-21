@@ -62,14 +62,25 @@ def read_user_setup(panel):
 
 
 # Soldered-down parts of the board that no config file describes.
+# Soldered-down parts no config file describes, per panel. The two boards do
+# not agree, and assuming the 2.8"'s map for both is how GPIO 4 read as a
+# spent LED on a board where it is the audio amplifier's enable.
+#
+#   2.8" ESP32-2432S028R   RGB 4/16/17, LDR 34, speaker 26
+#   3.5" ESP32-3248S035R   RGB 22/16/17, amp enable 4, amp DAC 26,
+#                          battery ADC 34, touch IRQ 36
+#                          (lcdwiki E32R35T, 55.50 x 101.50 x 5.80 mm)
 BOARD_FIXED = {
-     4: "RGB LED red",  16: "RGB LED green", 17: "RGB LED blue",
-    34: "LDR",          26: "speaker",
+    28: {4: "RGB LED red", 16: "RGB LED green", 17: "RGB LED blue",
+         34: "LDR", 26: "speaker"},
+    35: {22: "RGB LED red", 16: "RGB LED green", 17: "RGB LED blue",
+         4: "audio amp enable", 26: "audio amp DAC", 34: "battery ADC",
+         36: "touch IRQ"},
 }
 
 def reserved_for(panel):
     """Onboard hardware whose pads are already spoken for, for one panel."""
-    out = dict(BOARD_FIXED)
+    out = dict(BOARD_FIXED[panel])
     out.update(read_user_setup(panel))
     return out
 
@@ -80,7 +91,18 @@ def reserved_for(panel):
 # The backlight is deliberately absent: it is a pin the display needs, on
 # whichever panel this build targets, and taking it is the collision that
 # started this.
-REPURPOSABLE = {4, 16, 17, 26, 34}
+# Per panel, because "spare" is a property of the board and not of the number.
+#
+# The 2.8" gives up its RGB LED, its speaker and its LDR -- an LED, a buzzer
+# and a light sensor, none of which this tool uses. The 3.5" gives up its RGB
+# LED and nothing else: GPIO 4 and 26 are an audio amplifier's enable and its
+# DAC, 34 is the battery divider, 36 is the touch IRQ. Keying an amplifier at
+# chip-select rates is not the same kind of trade as losing an LED, which is
+# why CSN moved off 4 on that panel rather than this set growing to cover it.
+REPURPOSABLE = {
+    28: {4, 16, 17, 26, 34},
+    35: {22, 16, 17},
+}
 
 # Macros that actually drive a pad.
 SIGNALS = {
@@ -244,7 +266,7 @@ def check(panel):
         note = reserved.get(pin, "")
         tag = ""
         if note:
-            tag = (f"  [repurposed from {note}]" if pin in REPURPOSABLE
+            tag = (f"  [repurposed from {note}]" if pin in REPURPOSABLE[panel]
                    else f"  [!! board uses this for {note}]")
         print(f"  GPIO {pin:>2}  {label:<20}{tag}")
 
@@ -275,7 +297,7 @@ def check(panel):
 
     # Landing on onboard hardware we did not consciously give up.
     for macro, (pin, label) in sorted(pins.items()):
-        if pin in reserved and pin not in REPURPOSABLE:
+        if pin in reserved and pin not in REPURPOSABLE[panel]:
             errors.append("GPIO %d (%s) collides with onboard %s"
                           % (pin, label, reserved[pin]))
 

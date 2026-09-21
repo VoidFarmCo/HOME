@@ -20,14 +20,34 @@ the compiler will and cross-references them against the CYD's own wiring.
 | CC1101 CS | **21 / 27** | panel-dependent, see below |
 | CC1101 GDO0 (TX) | 22 | P3 header |
 | CC1101 GDO2 (RX) | 35 | P3 header, input-only pin |
-| NRF24 CSN | 4 | was RGB LED red |
+| NRF24 CSN | 4 / 25 | was RGB LED red (2.8"); 25 on the 3.5", see below |
 | NRF24 CE | 16 | was RGB LED green |
 | NRF24 IRQ | not connected | see below |
 | PN532 SS | 17 | was RGB LED blue, SPI mode (DIP CH1=OFF, CH2=ON) |
 | GPS TX -> ESP32 | 1 | UART0 TX pin on the P1 JST, see below |
 | GPS RX | not connected | |
 
-The onboard RGB LED is gone. GPIO 4/16/17 are the only contiguous spare pins on
+**The two boards do not agree about GPIO 4.** On the 2.8" ESP32-2432S028R it
+is the RGB LED's red channel. On the 3.5" ESP32-3248S035R -- lcdwiki's E32R35T,
+55.50 x 101.50 x 5.80 mm -- it is the **audio amplifier's enable**, and the RGB
+LED's red channel moves to GPIO 22.
+
+Spending an LED is the trade this pin map already makes. Keying an amplifier
+enable at chip-select rates is not: it clicks, and it draws current off a rail
+already carrying the display. So NRF24 CSN follows the panel, 4 on the 2.8" and
+**25 on the 3.5"**. 25 is free there for the same reason it is not free on the
+2.8": that panel puts touch on its own bus at 25/32/39, while the 3.5" hangs its
+XPT2046 off the display's SPI behind TOUCH_CS. The pin that collides on one
+board is the spare on the other.
+
+The 2.8" is left alone deliberately. A published pin map is a thing people have
+already soldered to.
+
+Two more differences on the 3.5", neither of which Pueo drives: GPIO 34 is the
+battery divider rather than an LDR, and GPIO 36 is the touch IRQ. GPIO 26 is the
+amplifier's DAC output rather than a plain speaker pin.
+
+The onboard RGB LED is gone on both. GPIO 4/16/17 are the only contiguous spare pins on
 this board, and three radios need six lines.
 
 ## CC1101 CS is the one pin the two panels cannot share

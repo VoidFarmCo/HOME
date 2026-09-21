@@ -262,6 +262,48 @@ ship two flash images.
     the numbers last. The trend is a 1.2 s baseline with a 2 dB deadband,
     both reasoned rather than measured. Still no distance anywhere.
 
+  * NRF24 CSN moves off GPIO 4 on the 3.5" panel. The two boards do not
+    agree about that pin: on the 2.8" it is the RGB LED's red channel, which
+    this pin map already spends, and on the 3.5" -- lcdwiki's E32R35T,
+    55.50 x 101.50 x 5.80 mm, which is the board that arrived -- it is the
+    audio amplifier's enable. Driving it as a chip select keys the amp at
+    SPI rates: it clicks, and it draws current off a rail already carrying
+    the display.
+
+    CSN follows the panel now, 4 on the 2.8" and 25 on the 3.5". 25 is free
+    there for the same reason it is not free on the 2.8": that panel puts
+    touch on its own bus at 25/32/39, while the 3.5" hangs its XPT2046 off
+    the display SPI behind TOUCH_CS. The pin that collides on one board is
+    the spare on the other. The 2.8" is untouched on purpose -- a published
+    pin map is a thing people have already soldered to.
+
+    The 3.5" moves RGB red to GPIO 22, where CC1101's GDO0 lands. That one
+    stays: spending the LED is the trade this map makes either way, and the
+    red channel flickering with sub-GHz traffic is not a cost.
+
+    check_pinmap.py carried one board map and applied it to both panels,
+    which is why GPIO 4 read as a spent LED on a board where it is an
+    amplifier. It knows both now, including that GPIO 34 is the battery
+    divider rather than an LDR there and 36 is the touch IRQ, and its
+    repurposable set is per panel -- the 2.8" gives up an LED, a buzzer and
+    a light sensor; the 3.5" gives up an LED and nothing else.
+
+  * The published 0.3.4 images were built against a stale TFT_eSPI
+    configuration, and the first two cuts of this release had it. TFT_eSPI
+    reads User_Setup.h from inside the installed library; build.sh setup
+    copies the repo's copy there and is a one-time step nobody re-runs. So
+    the panel split went into Libraries/User_Setup cyd.h and every build
+    kept reading the old unconditional ST7796 -- which means the 2.8" image
+    was built with the 3.5"'s driver, size and backlight pin. The exact bug
+    the split existed to fix, still in the artifact that claimed to fix it.
+
+    Caught by rebuilding the archive at a different path and comparing: the
+    3.5" image reproduced and the 2.8" one did not, and the sizes differed,
+    so it was not a path leak. Every compile re-syncs User_Setup.h now, and
+    check_screen_dims.py compares the installed copy against the repo's --
+    every other check it runs reads the source, which is why all of them
+    passed while the compiler was reading something else.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.

@@ -77,7 +77,7 @@ build.
 | VSPI SCK | 18 | microSD slot pin | **solder** |
 | VSPI MOSI | 23 | microSD slot pin | **solder** |
 | VSPI MISO | 19 | microSD slot pin | **solder** |
-| NRF24 CSN | 4 | RGB LED pad | **solder** |
+| NRF24 CSN | 4 / 25 | RGB LED pad (2.8"); see below for the 3.5" | **solder** |
 | NRF24 CE | 16 | RGB LED pad | **solder** |
 | PN532 SS | 17 | RGB LED pad | **solder** |
 
@@ -120,6 +120,13 @@ that follows.
 from +3V3_RF. Then the jamming detector: activity on screen is enough to say
 the bus and the chip select both work.
 
+**[verify] On a 3.5" board, CSN is GPIO 25, not GPIO 4.** GPIO 4 is the
+audio amplifier's enable on that panel and driving it as a chip select clicks
+the speaker. The firmware already picks 25 there; what this guide cannot do is
+solder the wire to the right pad for you. 25 is not on a header -- it is one of
+the pins the 2.8" uses for its separate touch bus, so on the 3.5" it is free but
+still needs finding on the silkscreen.
+
 **5. NRF24.** CSN and CE to the RGB LED pads, power from +3V3_RF, and the
 10 µF at the module. The channel scanner should show a populated 2.4 GHz
 band in any occupied building; a flat sweep means the module is not answering
@@ -145,7 +152,10 @@ exist at the same time. It returns when you leave the feature. This is
 inherent to the wiring, and the reasoning for choosing that pin over GPIO 3
 is in [hardware.md](hardware.md).
 
-**The RGB LED does nothing.** It is gone. GPIO 4, 16 and 17 are the only
+**The RGB LED does nothing.** It is gone. On the 2.8" that is GPIO 4, 16 and 17;
+on the 3.5" the red channel is GPIO 22 instead of 4, and CC1101's GDO0 lands on
+it, so on that board the red LED flickers with sub-GHz traffic rather than going
+dark. GPIO 4, 16 and 17 are the only
 contiguous spare pins on this board and three radios needed six lines.
 
 **CC1101 receive cannot be wired backwards.** GDO2 is on GPIO 35, which is
