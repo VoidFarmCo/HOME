@@ -641,6 +641,7 @@ const char* kindText(Kind k) {
     case Kind::Vehicle:   return "VEHICLE";
     case Kind::Camera:    return "CAMERA";
     case Kind::Pentest:   return "PENTEST";
+    case Kind::Tracker:   return "TRACKER";
     default:              return "?";
   }
 }

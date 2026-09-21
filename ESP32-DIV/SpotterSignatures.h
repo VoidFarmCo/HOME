@@ -74,7 +74,7 @@
 namespace Spotter {
 
 enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Bodycam, Accessory,
-                            Vehicle, Camera, Pentest };
+                            Vehicle, Camera, Pentest, Tracker };
 
 /* How much a single match is worth. Corroboration -- a second, differently
  * labelled signature on the same MAC -- promotes Likely to Strong. It does
@@ -290,6 +290,27 @@ static const BleSig kBleSigs[] = {
    * with a serial in the payload. SIG company IDs are assigned, so this is
    * a good deal more specific than an OUI. */
   {0x09C8, 0x0000, Kind::Accessory, Conf::Likely, "XUNTONG (Penguin)"},
+
+  /* ── Item trackers ────────────────────────────────────────────────────
+   * 16-bit service UUIDs, checked against the Bluetooth SIG's own assigned
+   * numbers rather than against the project they came from.
+   *
+   * Tile's two are assigned to "Tile, Inc." and Tile sells nothing but
+   * trackers, so the member claim and the product claim coincide. Strong.
+   *
+   * 0xFD5A is assigned to "Samsung Electronics Co., Ltd." -- not to SmartTag.
+   * That it is the SmartTag discovery UUID is widely reported and probably
+   * right, but it is a product claim the registry does not make, and Samsung
+   * ships rather a lot that is not a tracker. Likely, and the label says so.
+   *
+   * 0xFEAA is assigned to Google LLC and is Eddystone, the general beacon
+   * format. Retail and asset beacons use it as readily as Find My Device.
+   * Weak, and labelled for what the registry says rather than what it might
+   * be doing. */
+  {0x0000, 0xFEED, Kind::Tracker, Conf::Strong, "Tile"},
+  {0x0000, 0xFEEC, Kind::Tracker, Conf::Strong, "Tile"},
+  {0x0000, 0xFD5A, Kind::Tracker, Conf::Likely, "Samsung (SmartTag?)"},
+  {0x0000, 0xFEAA, Kind::Tracker, Conf::Weak,   "Eddystone beacon"},
 
   /* Raven camera GATT. The documented range is 0x3100-0x3500 and the struct
    * matches one value at a time, so these are the three that are actually
