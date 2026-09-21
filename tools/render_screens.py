@@ -432,6 +432,23 @@ def render_boot(t, brand):
     t.draw_string_tc(brand["PUEO_UPSTREAM"], cx, ty, WHITE)
 
 
+# PUEO_MARK_W / PUEO_MARK_H in Branding.h. Panel-independent: 200 fits both.
+MARK = 200
+
+
+def render_mark(t, bitmap, caption):
+    """showFeatureMark() in utils.cpp.
+
+    No status bar -- the mark is drawn over a cleared screen and the feature
+    paints its own chrome once the hold is over."""
+    t.fill_screen(UI_BG)
+    x = (W - MARK) // 2
+    y = (H - MARK) // 2 - 14
+    t.draw_bitmap(x, y, bitmap, MARK, MARK, UI_ICON)
+    tw = t.text_width(caption)
+    t.print_f2((W - tw) // 2, y + MARK + 12, caption, UI_TEXT, UI_BG)
+
+
 MENU = [
     ("WiFi", "bitmap_icon_wifi"), ("2.4GHz", "bitmap_icon_jammer"),
     ("More", "bitmap_icon_dots"), ("Settings", "bitmap_icon_setting"),
@@ -839,7 +856,11 @@ def main():
                      ("spotter", render_spotter),
                      ("hunt-pick", render_hunt_pick),
                      ("hunt-gauge", render_hunt_gauge),
-                     ("fastpair", render_fastpair)):
+                     ("fastpair", render_fastpair),
+                     ("hunt-mark",
+                      lambda t: render_mark(t, "bitmap_pueo_hunt", "Hunt")),
+                     ("spotter-mark",
+                      lambda t: render_mark(t, "bitmap_pueo_spotter", "Spotter"))):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
