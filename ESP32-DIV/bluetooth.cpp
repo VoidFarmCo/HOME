@@ -225,12 +225,28 @@ static bool bleRequireStackOrExit() {
   return false;
 }
 
-static int bleMaxLinesInZone(int contentTop, int lineHeight) {
+/* How many log lines fit between contentTop and the nav bar -- never more
+ * than `capacity`, the caller's buffer.
+ *
+ * capacity is not optional, and that is the whole point. This used to answer
+ * with whatever the screen could hold, and every caller fed it straight into
+ * `for (i = lines - 1; i > 0; i--) buf[i] = buf[i - 1];`. On a 240x320 panel
+ * the answer happened to be near enough each buffer's size for the overrun
+ * to go unnoticed. On a 320x480 one the sniffer's zone holds 31 lines and
+ * its buffer holds 16, so addLine() wrote 15 entries past the end -- into
+ * the members that follow, one of which is pBLEScan. The next scan called
+ * start() on a null pointer and the board rebooted.
+ *
+ * A screen being taller is not a reason to write past an array, so the
+ * clamp lives here rather than in three call sites that each have to
+ * remember it. */
+static int bleMaxLinesInZone(int contentTop, int lineHeight, int capacity) {
   const int h = bleContentBottom() - contentTop;
-  if (h <= 0 || lineHeight <= 0) {
+  if (h <= 0 || lineHeight <= 0 || capacity <= 0) {
     return 1;
   }
-  return h / lineHeight;
+  const int fits = h / lineHeight;
+  return fits < capacity ? fits : capacity;
 }
 
 static void bleClearBody(uint16_t color = TFT_BLACK) {
@@ -3660,7 +3676,7 @@ const unsigned long debounceDelay = 500;
 static constexpr int JAMMER_LOG_TOP = 48;
 
 static int jammerVisibleLines() {
-  return bleMaxLinesInZone(JAMMER_LOG_TOP, LINE_HEIGHT);
+  return bleMaxLinesInZone(JAMMER_LOG_TOP, LINE_HEIGHT, MAX_LINES);
 }
 
 static bool jammerLineFits(int yPos) {
@@ -5582,7 +5598,7 @@ volatile bool jammerToggleRequested = false;
 static constexpr int kProkillLogTop = 48;
 
 static int prokillVisibleLines() {
-  return bleMaxLinesInZone(kProkillLogTop, LINE_HEIGHT);
+  return bleMaxLinesInZone(kProkillLogTop, LINE_HEIGHT, MAX_LINES);
 }
 
 static bool prokillLineFits(int yPos) {
@@ -9422,7 +9438,7 @@ private:
   }
 
   static int snifferVisibleLines() {
-    return bleMaxLinesInZone(snifferContentTop(), LINE_HEIGHT);
+    return bleMaxLinesInZone(snifferContentTop(), LINE_HEIGHT, MAX_LINES);
   }
 
   static bool snifferLineFits(int lineIndex) {
