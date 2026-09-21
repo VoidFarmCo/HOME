@@ -452,6 +452,100 @@ static void subghzSetBruteNavLabels() {
   setTouchNavLabels("Prev", "Sel", "Exit", "Go", "Next");
 }
 
+/* ── is there actually a CC1101 on the end of the bus? ───────────────────
+ *
+ * ELECHOUSE_CC1101's reset sequence is `while(digitalRead(MISO_PIN));` --
+ * it waits for the chip to pull MISO low to say it is ready, and it waits
+ * forever. There are eight such loops in the library. With no module wired,
+ * MISO floats high and the first one never returns: the feature does not
+ * fail, it stops, and the whole device stops with it because this runs on
+ * the main task.
+ *
+ * Every SubGHz feature reached the library through Init() with nothing in
+ * front of it, so every one of them froze a board that had no radio -- which
+ * is every board, until the carrier exists. Opening the jamming detector on
+ * a bare CYD is how this was found.
+ *
+ * This is the same handshake with a deadline. Drive CS low, give the chip a
+ * few milliseconds to answer, and if it does not, say so and do not call
+ * into the library at all.
+ *
+ * A false here means "nothing answered", not "the chip is broken": a
+ * mis-wired MISO looks identical. That is the right thing to put on screen
+ * either way. */
+static bool cc1101Present() {
+  pinMode(CC1101_CS, OUTPUT);
+  pinMode(CC1101_MISO, INPUT);
+
+  digitalWrite(CC1101_CS, HIGH);
+  delayMicroseconds(50);
+  digitalWrite(CC1101_CS, LOW);
+
+  const uint32_t deadline = millis() + 10;   // the datasheet wants microseconds
+  bool ready = false;
+  while (millis() < deadline) {
+    if (digitalRead(CC1101_MISO) == LOW) {
+      ready = true;
+      break;
+    }
+  }
+
+  digitalWrite(CC1101_CS, HIGH);
+  return ready;
+}
+
+/* Probe, and if nothing answers say so and ask to leave. Returns false when
+ * the caller must abort -- and sets feature_exit_requested, so the dispatch
+ * loop in ESP32-DIV.ino unwinds the feature the same way a normal exit does. */
+static bool cc1101Ready(const char* feature);
+
+/* Draw the "no radio" screen and wait for the user to leave. Returns when
+ * they do; the caller must then exit the feature. */
+static void cc1101ReportMissing(const char* feature) {
+  tft.fillScreen(TFT_BLACK);
+  drawStatusBar(readBatteryVoltage(), true);
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.drawString("No CC1101", 12, 46);
+  tft.setTextFont(1);
+  tft.setTextColor(UI_TEXT, TFT_BLACK);
+  tft.drawString(feature, 12, 72);
+  tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
+  tft.drawString("needs the sub-GHz radio, and nothing", 12, 90);
+  tft.drawString("answered on the SPI bus.", 12, 102);
+  tft.drawString("Check the module is fitted and that", 12, 122);
+  tft.drawString("MISO, CS, SCK and MOSI are wired.", 12, 134);
+  tft.setTextColor(UI_ICON, TFT_BLACK);
+  tft.drawString("SELECT / tap to go back", 12, PUEO_SCREEN_H - 24);
+}
+
+static bool cc1101Ready(const char* feature) {
+  if (cc1101Present()) {
+    return true;
+  }
+  cc1101ReportMissing(feature);
+
+  /* Modal, deliberately. Setting the exit flag and returning would drop
+   * straight back to the submenu, and the message would be on screen for
+   * one frame -- which reads as the feature refusing to open for no reason,
+   * which is what the freeze looked like too. */
+  delay(250);
+  for (;;) {
+    int x, y;
+    if (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT) ||
+        readTouchXY(x, y)) {
+      break;
+    }
+    delay(20);
+  }
+  while (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
+    delay(10);
+  }
+
+  feature_exit_requested = true;
+  return false;
+}
+
 namespace replayat { void replayHandleNavButtons(); }
 namespace subjammer { void subjammerHandleNavButtons(); }
 namespace SavedProfile { void profileHandleNavButtons(); }
@@ -1311,6 +1405,7 @@ void runUI() {
 }
 
 void ReplayAttackSetup() {
+  if (!cc1101Ready("Replay Attack")) return;
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   subghzSetReplayNavLabels();
@@ -1389,6 +1484,7 @@ void ReplayAttackSetup() {
   updateDisplay();
   uiDrawn = false;
   subghzRedrawNavChrome();
+
 
   /* Bring radio up after UI/SPI activity so first entry RX matches re-entry. */
   ELECHOUSE_cc1101.Init();
@@ -2200,6 +2296,7 @@ void runUI() {
 }
 
 void saveSetup() {
+  if (!cc1101Ready("Saved Profiles")) return;
     Serial.begin(115200);
     setTouchButtonInputEnabled(true);
     subghzSetProfileNavLabels();
@@ -2727,6 +2824,7 @@ void runUI() {
 }
 
 void subjammerSetup() {
+  if (!cc1101Ready("Sub-GHz Jammer")) return;
     Serial.begin(115200);
     setTouchButtonInputEnabled(true);
     subghzSetJammerNavLabels();
@@ -3571,6 +3669,7 @@ void runUI() {
 }
 
 void subBruteSetup() {
+  if (!cc1101Ready("Sub-GHz Brute")) return;
   Serial.begin(115200);
   setTouchButtonInputEnabled(true);
   subghzSetBruteNavLabels();
@@ -4201,6 +4300,8 @@ static void exitCleanup() {
 }
 
 void Setup() {
+  if (!cc1101Ready("Jamming Detector")) return;
+
   setTouchButtonInputEnabled(true);
   setTouchNavLabels("Freq-", "Log", "Exit", "Reset", "Freq+");
 
