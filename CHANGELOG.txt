@@ -211,9 +211,56 @@ ship two flash images.
     no label on it, next to a labelled button that did nothing.
 
     It survived because they were the three that could not be opened by
-    touch in the first place. tools/check_nav_labels.py checks all 55 label
-    sites now -- the centre slot is never blank, and no slot promises a way
-    out that the feature does not route there.
+    touch in the first place.
+
+  * ...and then the labels were right and the bar was still blank.
+    setTouchNavLabels() only stores them; redrawTouchButtonBar() paints
+    them. Spotter and Fast Pair called it and then called redraw(true),
+    whose first act is fillScreen -- the bar drawn and erased inside one
+    setup, which from the outside cannot be told apart from never drawing
+    it. The repaint moves after redraw(true) in both.
+
+    tools/check_nav_labels.py covers all four ways this has broken: the
+    centre slot is never blank, no slot promises a way out the feature does
+    not route there, a file that sets labels repaints somewhere, and
+    nothing clears the screen between the repaint and the end of its
+    function. 147 checks.
+
+  * The BLE Sniffer rebooted the board, and the taller panel is why. Guru
+    Meditation, StoreProhibited, EXCVADDR 0x20, inside NimBLEScan::start
+    with `this` null. addLine() shifts its log:
+
+        const int visibleLines = snifferVisibleLines();
+        for (int i = visibleLines - 1; i > 0; i--)
+            displayLines[i] = displayLines[i - 1];
+
+    displayLines holds 16. snifferVisibleLines() answered with whatever the
+    screen could hold, which on 320x480 is 31 -- fifteen assignments past
+    the end of the array, into the members that follow it. One of those is
+    pBLEScan, and the next scan called start() through a null pointer.
+
+    bleMaxLinesInZone() takes the caller's capacity now and clamps to it,
+    and the argument is required, so the next log zone cannot repeat this
+    by forgetting. Overrun by panel, the firmware's own arithmetic:
+
+                  2.8"            3.5"
+      sniffer     18 vs 16  (+2)  31 vs 16  (+15)
+      jammer      19 vs 26  ok    32 vs 26  (+6)
+      prokill     19 vs 26  ok    32 vs 26  (+6)
+
+    The sniffer was already two past the end at 240x320, where they landed
+    in padding and nothing happened; the taller panel moved the landing
+    site onto a pointer rather than introducing the fault. The jammer and
+    prokill logs are the other way round -- correct before, broken by the
+    panel, not yet triggered.
+
+  * Hunt's gauge leads with the direction. A needle says where you are
+    standing, not what to do about it, and what to do is the whole
+    technique: move, watch which way it goes, keep the direction that
+    raises it. WARMER / COLDER / HOLD in large type, then a band in words
+    (FAR through ARM'S LENGTH), a strength bar with the peak marked, and
+    the numbers last. The trend is a 1.2 s baseline with a 2 dB deadband,
+    both reasoned rather than measured. Still no distance anywhere.
 
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
