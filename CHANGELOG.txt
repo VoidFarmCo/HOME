@@ -11,6 +11,70 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.3.5 - 2026-09-20
+------------------
+
+The status bar got taller on the screens that had room for it.
+
+  * The menu grids now draw a 34 px status bar instead of 20, and the name
+    and version in the middle of it are font 2 rather than 6x8 -- the same
+    height as the icons either side, so the bar reads as one row of content
+    instead of small text floating in a stripe.
+
+    Nothing moved to make space. The first tile is at Y_START = 44 and it is
+    still at 44; the 24 px between the bar and the tiles was bar-coloured
+    background, and this spends 14 of it.
+
+  * Only the menu grids. Every feature screen puts a toolbar immediately
+    under the bar -- 74 drawing calls have a literal y between 20 and 48,
+    eleven of them at exactly 20 -- so those screens cannot give up a pixel
+    and keep the short bar. The height is therefore a property of the screen
+    rather than of the build: shared state set by whichever function paints
+    the screen, because the bar is also repainted asynchronously by
+    statusBarTask, which has no idea what is on screen and would otherwise
+    repaint a tall bar at the short height and leave an orphan stripe.
+
+    All four menu painters already ended by forcing a bar redraw, which is
+    where they now declare their height, and every main-menu selection is
+    routed through displaySubmenu(), so features inherit the short bar
+    without having to know any of this exists. drawAboutPage declares its
+    own, being launched straight off a tile.
+
+  * The 2.8" panel is unchanged, and that is checked rather than asserted.
+    Its Y_START is 30, so it has no room to give and PUEO_STATUS_TALL is
+    defined equal to PUEO_STATUS_SHORT there; every branch is written so the
+    tall path folds away when the two are equal, and the centring reduces to
+    the constants it replaced -- (20 - 8) / 2 is the 6 that was y + 2.
+
+    Rebuilt, its image differs from the previous one in exactly 65 bytes:
+    the 32-byte ELF hash in esp_app_desc, the one-byte image checksum that
+    hash forces to change, and the 32-byte SHA-256 esptool appends. Splice
+    those three fields back and the image is the previous one, byte for
+    byte. None of this release's code is in it.
+
+  * The screen mounts take M2.5 x 5, not M3. Driven into a printed lid they
+    bite and hold without splitting the post; the M3 the file assumed came
+    from the board's own 3.20 hole pattern, which is an M3 clearance and is
+    the board's figure, not ours. It is simply loose around an M2.5 shank,
+    which does not matter -- the post's shoulder locates the board and the
+    screw only clamps it. No geometry changed: the 2.50 pilot and the 4.0
+    blind depth were already right, so the published STLs are unaffected.
+
+  * The RGB LED hole lands on the LED. Those two coordinates were eyeballed
+    off a photograph and were the only figures in the enclosure file with no
+    source behind them; a printed lid confirms them. Still the softest
+    numbers in it, and still worth measuring if yours misses.
+
+  * tools/check_status_bar.py, 19 checks. That both heights exist and that
+    the 2.8" has only one; that the centring is an identity at the short
+    height; that every screen-painting function declares a height, which is
+    the failure this is really for -- a new menu screen added later would
+    otherwise inherit a tall bar over its own toolbar; that nothing on a
+    tall-bar screen draws into the band the bar now occupies; and that the
+    tile row clears it. Each rule was mutation-tested: five deliberate
+    breakages, five failures, none silent.
+
+
 0.3.4 - 2026-09-20
 ------------------
 

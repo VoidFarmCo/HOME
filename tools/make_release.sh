@@ -71,6 +71,7 @@ INCLUDE=(
   "tools/build.sh"
   "tools/make_release.sh"
   "tools/check_pinmap.py"
+  "tools/check_status_bar.py"
   "tools/fuzz_ie_walk.py"
   "tools/check_spotter_merge.py"
   "tools/check_spotter_capture.py"

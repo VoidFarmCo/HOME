@@ -50,7 +50,7 @@ def set_panel(panel):
     """Resize the canvas and the layout to one of the two panels."""
     global PANEL, W, H
     global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
-    global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W
+    global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL
     PANEL = panel
     W, H = (320, 480) if panel == 35 else (240, 320)
     if panel == 35:
@@ -65,6 +65,9 @@ def set_panel(panel):
     # drawStatusBar()'s right-hand cluster: BLE icon, count, wifi bars, temp,
     # SD, plus gaps and a 4 px margin. Anchored to the right edge.
     STATUS_ICONS_W = 110
+    # PUEO_STATUS_TALL in shared.h: the menu grids get a taller bar on the
+    # 3.5", whose Y_START is 44. The 2.8"'s is 30 and has no room.
+    STATUS_TALL = 34 if panel == 35 else 20
 
 
 X_OFFSET_LEFT = 10
@@ -347,13 +350,30 @@ class Tft:
 
 
 # ── drawStatusBar(), 85% battery, something heard on both radios ───────────
-def status_bar(t):
-    t.fill_rect(0, 0, W, 20, UI_LABLE)
-    x, y = 7, 4
+def status_bar(t, h=20):
+    """drawStatusBar(). h is PUEO_STATUS_SHORT or PUEO_STATUS_TALL.
+
+    Everything is placed off y, exactly as the firmware does it, so the tall
+    bar is the one line below and not a second layout."""
+    t.fill_rect(0, 0, W, h, UI_LABLE)
+    x, y = 7, 4 + (h - 20) // 2
     t.draw_round_rect(x, y, 22, 10, 2, WHITE)
     t.fill_rect(x + 22, y + 3, 2, 4, WHITE)
     t.fill_round_rect(x + 2, y + 2, 85 * 20 // 100, 6, 1, GREEN)
     t.print_f1(x + 30, y + 2, "85%", GREEN, UI_LABLE)
+
+    # Name and version, centred in what is left between the battery block and
+    # the icon cluster, and dropped rather than overlapped if it will not fit.
+    # Font 2 once the bar is tall enough for 16 px, matching the icons.
+    build = "Pueo " + BRAND["PUEO_VERSION"]
+    big = h >= 28
+    text_w = t.text_width(build) if big else len(build) * 6
+    gap_l = x + 30 + 24
+    gap_r = W - STATUS_ICONS_W - 4
+    if gap_r - gap_l >= text_w:
+        bx = gap_l + (gap_r - gap_l - text_w) // 2
+        by = (h - (16 if big else 8)) // 2
+        (t.print_f2 if big else t.print_f1)(bx, by, build, UI_LINE, UI_LABLE)
 
     ble_icon_x, gap, icon_w = W - STATUS_ICONS_W, 3, 16
     ble_text_x = ble_icon_x + icon_w + gap
@@ -399,7 +419,7 @@ MENU = [
 
 
 def render_menu(t, selected=0):
-    """displayMenu() in ESP32-DIV.ino."""
+    """displayMenu() in ESP32-DIV.ino -- a tile grid, so the tall bar."""
     t.fill_screen(UI_BG)
     for i, (label, icon) in enumerate(MENU):
         col, row = i // 4, i % 4
@@ -422,7 +442,7 @@ def render_menu(t, selected=0):
                           icon, 16, 16, ink)
         tw = t.text_width(label)
         t.print_f2(x + (TILE_W - tw) // 2, y + TILE_TEXT_DY, label, ink, fill)
-    status_bar(t)
+    status_bar(t, STATUS_TALL)
 
 
 BT_PAGE0 = [
@@ -438,7 +458,7 @@ BT_PAGE0 = [
 
 
 def render_bluetooth(t, selected=3):
-    """displayPagedSubmenu() in ESP32-DIV.ino, Bluetooth page 0."""
+    """displayPagedSubmenu(), Bluetooth page 0 -- a tile grid, so the tall bar."""
     t.fill_screen(UI_BG)
     for i, (label, icon) in enumerate(BT_PAGE0):
         y = 30 + i * 30
@@ -455,7 +475,7 @@ def render_bluetooth(t, selected=3):
     icon_x = W - 10 - 16
     t.print_f2(icon_x - 4 - t.text_width(label), text_y, label, UI_TEXT, UI_BG)
     t.draw_bitmap(icon_x, icon_y, "bitmap_icon_navigate_right", 16, 16, UI_TEXT)
-    status_bar(t)
+    status_bar(t, STATUS_TALL)
 
 
 # Spotter rows, in the shape drawList() prints them. Each is what the
@@ -784,6 +804,8 @@ def main():
     glcd = load_glcd()
     fw, fg = load_font16()
     brand = load_branding()
+    global BRAND
+    BRAND = brand
     print("loaded %d bitmaps, %d glcd chars, %d font-2 glyphs"
           % (len(bitmaps), len(glcd), len(fg)))
     print("branding: %s %s, by %s"

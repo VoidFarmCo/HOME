@@ -37,6 +37,21 @@ void reclaimSharedSpiBus();
 /** Hold SD CS high and set a CC1101-safe SPI rate on the shared bus. */
 void holdSdInactiveOnSharedSpi();
 void drawStatusBar(float batteryVoltage, bool forceUpdate = false, bool bottomSeparator = false);
+
+/* Set by whichever function paints the screen, immediately before it forces
+ * the bar to redraw. Shared state rather than an argument because the bar is
+ * also repainted asynchronously by statusBarTask, which has no idea what is
+ * on screen and would otherwise repaint a tall bar at the short height and
+ * leave a 14 px orphan stripe behind it.
+ *
+ * On a panel with only one height this is a no-op that the compiler deletes,
+ * so the bar's geometry stays the compile-time constant it has always been
+ * there and that image rebuilds to the same bytes. */
+#if PUEO_STATUS_TALL == PUEO_STATUS_SHORT
+inline void setStatusBarHeight(int) {}
+#else
+void setStatusBarHeight(int height);
+#endif
 void startStatusBarTask();
 /** Request a status bar pass on the next update (e.g. after SD or ward state changes). */
 void requestStatusBarRedraw();

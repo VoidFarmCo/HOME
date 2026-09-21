@@ -923,6 +923,7 @@ void displaySubmenu() {
         last_submenu_index = current_submenu_index;
     }
 
+    setStatusBarHeight(PUEO_STATUS_SHORT);  // a list, whose first row is at y=30
     drawStatusBar(currentBatteryVoltage, true);
 }
 
@@ -980,6 +981,7 @@ void displayPagedSubmenu() {
         last_submenu_index = current_submenu_index;
     }
 
+    setStatusBarHeight(PUEO_STATUS_TALL);  // same tile grid, same 24 px of slack
     drawStatusBar(currentBatteryVoltage, true);
 }
 
@@ -1061,6 +1063,7 @@ void displayOtherMenuGrid() {
         last_other_menu_index = current_submenu_index;
     }
 
+    setStatusBarHeight(PUEO_STATUS_TALL);  // same tile grid, same 24 px of slack
     drawStatusBar(currentBatteryVoltage, true);
 }
 
@@ -1185,6 +1188,7 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
 
         last_menu_index = current_menu_index;
     }
+    setStatusBarHeight(PUEO_STATUS_TALL);  // the one screen with room above its tiles
     drawStatusBar(currentBatteryVoltage, true);
 }
 
@@ -4231,6 +4235,7 @@ void handleOtherSubmenuButtons() {
  */
 void drawAboutPage(int page) {
   tft.fillScreen(UI_BG);
+  setStatusBarHeight(PUEO_STATUS_SHORT);
   drawStatusBar(readBatteryVoltage(), true);
 
   tft.setTextDatum(TL_DATUM);

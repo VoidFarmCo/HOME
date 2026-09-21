@@ -301,11 +301,18 @@ SCREEN_LIP     = 1.0;     // lid left in front of the module
 SCREEN_STACK   = 4.20;    // RTP + LCD + tape, above the PCB's top face
 SCREEN_PCB_T   = 1.60;
 
-/* Mount posts. The board's four holes are 3.20, which is an M3 clearance
- * hole, so the screw passes through the PCB from behind and threads into
- * the post. 2.50 is the pilot for a self-tapping M3 in PLA or PETG -- not
- * BOSS_HOLE, which is 3.00 and is sized for the base's machine screws;
- * 3.00 here would strip on the first drive.
+/* Mount posts. The board's four holes are 3.20 -- that figure is the
+ * board's, off the outline sheet, and it is an M3 clearance hole. What
+ * actually threads into the post is smaller: M2.5 x 5, confirmed by
+ * driving them into a printed lid, where they bite and hold without
+ * splitting the post.
+ *
+ * So the 3.20 is loose around an M2.5 shank. It does not matter here --
+ * the post's shoulder locates the board, not the screw -- but it is the
+ * reason the two numbers disagree, and the reason this paragraph exists.
+ *
+ * 2.50 is the pilot -- not BOSS_HOLE, which is 3.00 and is sized for the
+ * base's machine screws; 3.00 here would strip on the first drive.
  *
  * The posts land in the 8.27 mm of bare PCB above and below the module,
  * which is the only place on this board where the PCB's top face is
@@ -324,18 +331,18 @@ SCREEN_POST_PILOT = 1.25; // 2.50 dia
  * the hole, which is six layers at 0.2 and is the figure to raise if your
  * printer leaves the last one thin.
  *
- * With the PCB at 1.60 that wants an M3 x 5: 3.4 mm of engagement and 0.6
- * spare at the bottom. An M3 x 6 bottoms out before it clamps. */
+ * With the PCB at 1.60 that wants a 5 mm screw: 3.4 mm of engagement and
+ * 0.6 spare at the bottom. A 6 mm bottoms out before it clamps. */
 SCREEN_SCREW_DEPTH = 4.0;
 
-/* [verify] The RGB LED sits in the strip above the screen. Its position is
- * NOT on the outline drawing -- these two numbers are eyeballed off a photo
- * and are the only figures in this file that are not from a source.
+/* The RGB LED sits in the strip above the screen. Its position is NOT on
+ * the outline drawing -- these two numbers were eyeballed off a photo, and
+ * were the only figures in this file that did not come from a source.
  *
- * Measure yours before printing a lid you intend to keep: put a rule on the
- * board's top edge and its left edge, and set LED_X as the offset from the
- * board's centreline (negative is left) and LED_Y as the offset from the
- * board's centre (positive is up). Then delete this paragraph. */
+ * A printed lid puts the hole over the LED, so they are close enough to
+ * keep. Still the softest numbers here: if yours misses, put a rule on the
+ * board's top and left edges and set LED_X as the offset from the board's
+ * centreline (negative is left) and LED_Y from its centre (positive up). */
 SCREEN_LED_X   = -14.0;
 SCREEN_LED_Y   =  46.4;   // ~4.3 down from the top edge, mid-strip
 SCREEN_LED_D   =  3.2;    // a light pipe, or just a hole
@@ -975,7 +982,7 @@ module lid() {
             translate([0, BEZEL_Y, -1])
                 linear_extrude(LID_H+2) rrect(BEZEL_W, BEZEL_L, BEZEL_R);
         }
-        // [verify] RGB LED, in the strip above the screen
+        // RGB LED, in the strip above the screen -- position checked on a print
         if (PANEL == "3.5")
             translate([SCREEN_LED_X, BEZEL_Y + SCREEN_LED_Y, LID_H - 2.5 - 1])
                 cylinder(h = 2.5 + 2, d = SCREEN_LED_D);

@@ -549,6 +549,16 @@ static int statusBarTempBand(float t) {
  * full redraw chose. */
 static constexpr int kStatusIconsWidth = 110;
 
+#if PUEO_STATUS_TALL == PUEO_STATUS_SHORT
+static constexpr int s_statusBarHeight = PUEO_STATUS_SHORT;
+#else
+static int s_statusBarHeight = PUEO_STATUS_SHORT;
+
+void setStatusBarHeight(int height) {
+  s_statusBarHeight = height;
+}
+#endif
+
 void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator) {
   static int lastBatteryPercentage = -1;
   static int lastWifiHalf          = -100000;
@@ -588,9 +598,12 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
       bleHalf == lastBleHalf && tempBand == lastTempBand && sdSnap == lastSdSnap;
 
   if (wardBlinkOnly) {
-    constexpr int kBarH   = 20;
-    constexpr int kY      = 4;
-    constexpr int kIconY  = kY - 2;
+    const int kBarH   = s_statusBarHeight;
+    /* Offsetting from the short bar's layout rather than centring outright
+     * keeps this an exact identity when the bar is short, which is why the
+     * 2.8" image comes back byte for byte. */
+    const int kY      = 4 + (kBarH - PUEO_STATUS_SHORT) / 2;
+    const int kIconY  = kY - 2;
     constexpr int kIconW  = 16;
     constexpr int kGap    = 3;
     constexpr int kBleIx  = PUEO_SCREEN_W - kStatusIconsWidth;
@@ -611,9 +624,11 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
   if (battCh || wifiHalf != lastWifiHalf || bleHalf != lastBleHalf || tempBand != lastTempBand ||
       sdSnap != lastSdSnap || wardGpsIcon != lastWardGpsIcon ||
       (wardGpsIcon && wardBlinkPhase != lastWardBlinkPhase) || forceUpdate) {
-    int barHeight = 20;
+    const int barHeight = s_statusBarHeight;
     int x = 7;
-    int y = 4;
+    /* Everything in the bar is placed relative to y -- the battery, the text
+     * cursors, iconY, wifiY -- so centring the block is this one line. */
+    int y = 4 + (barHeight - PUEO_STATUS_SHORT) / 2;
 
     tft.fillRect(0, 0, tft.width(), barHeight, UI_LABLE);
 
@@ -644,13 +659,37 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
      * bar is better than two strings on top of each other. */
     {
       const char* build = PUEO_NAME " " PUEO_VERSION;
-      const int   textW = (int)strlen(build) * 6;
-      const int   gapL  = x + 30 + 24;                       // past "100%"
-      const int   gapR  = PUEO_SCREEN_W - kStatusIconsWidth - 4;
+
+      /* Font 2 is 16 px tall, which matches the icons either side of it but
+       * does not fit a 20 px bar. So the big version is tied to the tall
+       * bar, and every branch below is written so that a panel with only one
+       * bar height -- where barHeight is a constant -- folds it away and
+       * emits exactly the code it emitted before this existed. */
+      const bool bigBuild = (barHeight >= 28);
+
+      int textW, fontH;
+      if (bigBuild) {
+        tft.setTextFont(2);
+        fontH = 16;
+        textW = tft.textWidth(build);   // font 2 is proportional
+      } else {
+        fontH = 8;
+        textW = (int)strlen(build) * 6;
+      }
+
+      const int gapL  = x + 30 + 24;                       // past "100%"
+      const int gapR  = PUEO_SCREEN_W - kStatusIconsWidth - 4;
       if (gapR - gapL >= textW) {
-        tft.setCursor(gapL + (gapR - gapL - textW) / 2, y + 2);
+        /* (barHeight - fontH) / 2 is 6 on the short bar, which is the y + 2
+         * this replaced -- the centring is an identity there, not a nudge. */
+        tft.setCursor(gapL + (gapR - gapL - textW) / 2,
+                      (barHeight - fontH) / 2);
         tft.setTextColor(UI_DIM_TEXT, UI_LABLE);
         tft.print(build);
+      }
+
+      if (bigBuild) {
+        tft.setTextFont(1);   // the icons below assume it
       }
     }
 

@@ -723,6 +723,30 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define PUEO_SCREEN_H 320
 #endif
 
+/* The status bar has two heights, and which one is showing is a property of
+ * the screen under it rather than of the build.
+ *
+ * Every feature screen puts a toolbar immediately below the bar -- a survey
+ * of the drawing calls finds 74 of them with a literal y between 20 and 48,
+ * eleven of those at exactly 20. Those screens cannot give the bar another
+ * pixel without something being painted over.
+ *
+ * The menu grid is the exception. Its first tile is at Y_START, which on the
+ * 3.5" panel is 44, so there are 24 px of bar-coloured nothing between the
+ * bar and the tiles. That is the space this spends, and it spends it without
+ * moving a tile.
+ *
+ * TALL is the same as SHORT on the 2.8", whose Y_START is 30 and which has
+ * no room to give. That panel is built every release and has never been
+ * booted; leaving its layout alone is also what lets the change be checked
+ * by rebuilding its image and getting the same bytes back. */
+#define PUEO_STATUS_SHORT 20
+#if PUEO_PANEL_35
+#define PUEO_STATUS_TALL  34
+#else
+#define PUEO_STATUS_TALL  PUEO_STATUS_SHORT
+#endif
+
 #ifndef TFT_WIDTH
 #define TFT_WIDTH PUEO_SCREEN_W
 #endif
