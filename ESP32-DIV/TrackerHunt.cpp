@@ -449,12 +449,14 @@ void enterGauge() {
   s_prevAngle = -1;
   s_screen    = Screen::Gauge;
   setTouchNavLabels("List", nullptr, "Exit", nullptr, "Reset");
+  redrawTouchButtonBar();
   s_dirty = true;
 }
 
 void enterPicker() {
   s_screen = Screen::Pick;
   setTouchNavLabels(nullptr, "Down", "Exit", "Up", "Hunt");
+  redrawTouchButtonBar();
   s_dirty = true;
 }
 

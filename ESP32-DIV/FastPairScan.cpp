@@ -482,6 +482,12 @@ void fastPairSetup() {
     scanStart();
   }
   redraw(true);
+
+  /* Last, and after redraw(true). Storing the labels does not paint them,
+   * and redraw(full) starts with fillScreen -- painting the bar before that
+   * puts it on screen and then wipes it, which is how this read as "the
+   * feature has no buttons" while the centre slot was quietly exiting. */
+  redrawTouchButtonBar();
 }
 
 void fastPairLoop() {

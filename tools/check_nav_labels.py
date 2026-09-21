@@ -8,19 +8,33 @@ left, where nothing reads it. On a touch-only board that is a feature you
 can open and cannot leave -- the exit was there the whole time, on an
 unlabelled button, next to a labelled one that did nothing.
 
-It survived because those three were also the three that could not be
-opened by touch at all (see check_menu_dispatch.py). Fixing that one
-uncovered this one.
+That hid behind check_menu_dispatch.py's bug: those same three could not be
+opened by touch at all, so nobody got far enough in to find they could not
+get out.
 
-Two rules:
+Then the labels were right and still invisible. setTouchNavLabels() only
+stores them; redrawTouchButtonBar() paints them. Spotter and Fast Pair did
+call it -- and then called redraw(true), whose first act is fillScreen. The
+bar was drawn and wiped inside one setup, which from the outside looks
+exactly like never drawing it.
 
-  * the centre slot is never an empty string. nullptr is fine -- it means
-    "use the default icon for this slot", which is still something to press.
-    "" is a blank button.
+Four rules, one per way this has actually broken:
 
-  * no slot is labelled with a word that means leaving when the feature
-    routes leaving somewhere else. Specifically: "Back" or "Exit" on the
-    left slot, while the centre is empty, is the exact shape of the bug.
+  1. the centre slot is never an empty string. nullptr is fine: it draws the
+     default icon, which is still something to press. "" is a blank button.
+
+  2. no slot promises a way out the feature does not route there -- "Back"
+     on the left while the centre is blank is the same bug as rule 1, named
+     separately so the report says why it matters.
+
+  3. a file that sets labels also repaints the bar. File-level rather than
+     per-call: several features set labels in a helper and repaint in the
+     caller, and a line-window rule would fail those for no reason.
+
+  4. nothing clears the screen between the repaint and the end of its
+     function. A clear is tft.fillScreen(), or a call to redraw() -- this
+     tree's idiom for a full repaint, and the one that hid the bug, because
+     the call site says redraw(true) and never says fillScreen.
 
 Reads source. Does not need a board.
 """
@@ -30,23 +44,27 @@ from pathlib import Path
 
 SKETCH = Path(__file__).resolve().parent.parent / "ESP32-DIV"
 
-CALL = re.compile(r"setTouchNavLabels\(", re.S)
+SET_LABELS = re.compile(r"\bsetTouchNavLabels\s*\(")
+REPAINT = re.compile(r"\bredrawTouchButtonBar\s*\(\s*\)")
+CLEAR = re.compile(r"\btft\.fillScreen\s*\(|\bredraw\s*\(")
+
+# utils.cpp and wifi.cpp each wrap the setter and forward their own
+# parameters. Those are not label sites.
+FORWARDER = re.compile(r"\bsetTouchNavLabels\(left, down, center, up, right\)")
+
 LEAVE_WORDS = {"back", "exit", "quit", "leave"}
 
-# The wrapper inside utils.cpp and wifi.cpp forwards its own parameters;
-# those are not label sites.
-FORWARDER = re.compile(r"setTouchNavLabels\(left, down, center, up, right\)")
 
-
-def split_args(text, start):
+def split_args(text, open_paren):
+    """The arguments of the call whose '(' is at open_paren, or None."""
     depth = 0
-    for i in range(start, len(text)):
+    for i in range(open_paren, len(text)):
         if text[i] in "([":
             depth += 1
         elif text[i] in ")]":
             depth -= 1
             if depth == 0:
-                inner = text[start + 1:i]
+                inner = text[open_paren + 1:i]
                 out, buf, d = [], "", 0
                 for ch in inner:
                     if ch in "([":
@@ -69,47 +87,78 @@ def literal(arg):
     return m.group(1) if m else None
 
 
+def line_of(src, pos):
+    return src[:pos].count("\n") + 1
+
+
 def main():
+    sources = sorted(SKETCH.glob("*.cpp"))
+    if not sources:
+        print("no sources under %s" % SKETCH, file=sys.stderr)
+        return 1
+
     checks = 0
     failures = []
 
-    for path in sorted(SKETCH.glob("*.cpp")):
+    for path in sources:
         src = path.read_text(encoding="utf-8", errors="replace")
-        for m in CALL.finditer(src):
+
+        # Rules 1 and 2: what each slot says.
+        for m in SET_LABELS.finditer(src):
             if FORWARDER.match(src, m.start()):
                 continue
             args = split_args(src, m.end() - 1)
             if args is None or len(args) != 5:
                 continue
-            line = src.count("\n", 0, m.start()) + 1
-            where = f"{path.name}:{line}"
-            left, _down, centre, _up, _right = args
             checks += 1
-
-            cl = literal(centre)
-            ll = literal(left)
-
-            if cl == "":
+            where = "%s:%d" % (path.name, line_of(src, m.start()))
+            centre = literal(args[2])
+            left = literal(args[0])
+            if centre == "":
                 failures.append(
-                    f"{where}: centre slot is \"\" -- that is the exit button, "
-                    f"with no label on it")
-            if ll is not None and ll.lower() in LEAVE_WORDS and cl == "":
+                    '%s: centre slot is "" -- that is the exit button, with '
+                    "no label on it" % where)
+            if left is not None and left.lower() in LEAVE_WORDS and centre == "":
                 failures.append(
-                    f"{where}: left says {ll!r} while the exit is the unlabelled centre")
+                    "%s: left says %r while the exit is the unlabelled centre"
+                    % (where, left))
 
-    if not checks:
-        print("no setTouchNavLabels call sites found; this check is testing nothing",
-              file=sys.stderr)
-        return 1
+        # Rule 3: whoever sets labels paints them somewhere.
+        sets = [m for m in SET_LABELS.finditer(src)
+                if not FORWARDER.match(src, m.start())]
+        if sets:
+            checks += 1
+            if not REPAINT.search(src):
+                failures.append(
+                    "%s: sets nav labels %dx and never calls "
+                    "redrawTouchButtonBar() -- the bar keeps the menu's icons"
+                    % (path.name, len(sets)))
+
+        # Rule 4: the repaint is not undone before the function returns.
+        # Scope runs from the repaint to the next line closing at column 0,
+        # which in this tree is the end of the enclosing function.
+        for m in REPAINT.finditer(src):
+            checks += 1
+            close = src.find("\n}", m.end())
+            span = src[m.end():close if close != -1 else len(src)]
+            cm = CLEAR.search(span)
+            if cm:
+                failures.append(
+                    "%s:%d: the nav bar is repainted and then %s() clears it "
+                    "again before the function returns"
+                    % (path.name, line_of(src, m.start()),
+                       cm.group(0).rstrip("( ").strip()))
 
     for f in failures:
         print("  FAIL  " + f)
+
     if failures:
-        print(f"\nFAILED: {len(failures)} of {checks} label sites")
+        print("\nFAILED: %d of %d" % (len(failures), checks))
         return 1
 
-    print(f"  ok    {checks} nav label sites, every centre slot is pressable")
-    print(f"\n{checks} checks passed")
+    print("  ok    every centre slot is pressable, painted, and not cleared "
+          "afterwards")
+    print("\n%d checks passed" % checks)
     return 0
 
 
