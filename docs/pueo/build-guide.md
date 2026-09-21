@@ -98,7 +98,7 @@ the difference is large: three joints on the 3.5", six on the 2.8".
 |---|---|---|---|
 | CC1101 CS | 27 / 21 | CN1, header | **SPI** JST, `IO21(CS)` |
 | CC1101 GDO2 (RX) | 35 | P3, header | **IO35/IO39** JST |
-| GPS TX → ESP32 | 1 | P1 JST | **UART** JST, `TXD` |
+| GPS TX → ESP32 | 1 | P1 / **P5** JST, see below | **UART** JST, `TXD` |
 | VSPI SCK | 18 | microSD pin, **solder** | **SPI** JST, `IO18(SCK)` |
 | VSPI MOSI | 23 | microSD pin, **solder** | **SPI** JST, `IO23(MOSI)` |
 | VSPI MISO | 19 | microSD pin, **solder** | **SPI** JST, `IO19(MISO)` |
@@ -127,10 +127,17 @@ What is left to solder on the 3.5" is the three RGB LED pads: GDO0, CE and
 the PN532's select. The LED is gone either way — that is what those pins were
 spent on — so the joints land on pads nothing else wants.
 
-**[verify] Read your own silkscreen before you cut a wire.** The 3.5" table
-above is off lcdwiki's board render rather than a board in front of a meter,
-and CYD revisions differ. The silkscreen is the authority and it is printed
-right next to each connector.
+**[verify] Read your own silkscreen before you cut a wire.** Neither column
+above came from a board under a meter -- the 3.5" is off lcdwiki's render and
+the 2.8" is off a product photo -- and CYD revisions differ. The silkscreen is
+the authority and it is printed next to each connector.
+
+One known discrepancy: this guide has called the 2.8"'s serial connector
+**P1** since it was written, and the boards in circulation label the
+four-pin JST carrying `GND TX RX VIN` as **P5**. If your board has both,
+the one with TX on it is the one you want. The 2.8" photo also shows no SPI
+breakout anywhere, which is the claim above about the microSD pins holding
+up rather than being an assumption.
 
 ## Order of work
 
