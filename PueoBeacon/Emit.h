@@ -43,8 +43,13 @@
 namespace Emit {
 
 /* Long enough to walk to the other board and read a screen; short enough
- * that a unit left powered on a bench stops shouting by itself. */
-constexpr uint32_t kAutoStopMs = 10u * 60u * 1000u;
+ * that a unit left powered on a bench stops shouting by itself.
+ *
+ * Fifteen rather than ten because Surveillance's dwell alarm triggers at
+ * ten, and a bench that stops at the same moment the thing it is testing
+ * starts would have exercised that alarm for approximately no time at all.
+ * A test rig has to outlast the longest threshold it is meant to trip. */
+constexpr uint32_t kAutoStopMs = 15u * 60u * 1000u;
 
 enum Signal : uint8_t {
   RemoteIdWifi = 0,   // DroneScan, Wi-Fi Beacon path

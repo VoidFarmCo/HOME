@@ -23,6 +23,33 @@ constexpr uint32_t kBleWindowMs  = 4000;  // BLE scan slice between WiFi hops
 constexpr uint32_t kRedrawMs     = 400;
 constexpr int      kRowH         = 30;
 
+/* ── dwell ────────────────────────────────────────────────────────────────
+ *
+ * The question this whole feature is pointed at is not "what is nearby",
+ * which the list already answers, but "has something been nearby for too
+ * long". A plate reader you walk past is present for ten seconds. A tracker
+ * in your bag is present for the whole afternoon.
+ *
+ * What the device can honestly say is "this has been in range for 22
+ * minutes". What it cannot say is "you are being followed": with no fix of
+ * its own it cannot tell a tracker that moves with you from a camera you
+ * are standing under. The label says DWELL rather than FOLLOWING for that
+ * reason, and the distinction is the whole of the honesty here.
+ *
+ * Ten minutes because it is longer than any doorway, queue or set of
+ * traffic lights, and shorter than a meal.
+ *
+ * The staleness window has to be longer than the gap between two sightings
+ * of the same device, or something that advertises intermittently drops out
+ * of the alarm between its own packets. The bench beacon is the worst case
+ * to hand: it gives each BLE decoy a three-second slice in every fifteen,
+ * so twelve seconds pass between one sighting and the next, and a twelve
+ * second window would have sat exactly on that boundary. Thirty is clear of
+ * it and still short enough that a device which has genuinely gone stops
+ * alarming while you are still looking at the screen. */
+constexpr uint32_t kDwellAlarmMs = 10u * 60u * 1000u;
+constexpr uint32_t kDwellStaleMs = 30u * 1000u;
+
 /* Tagged elements are walked with a hard cap as well as a length bound. A
  * probe request carries nowhere near this many; the cap is there so that a
  * frame built to lie about its lengths ends the loop rather than running it. */
@@ -679,18 +706,22 @@ void forgetDrawn() {
   memset(s_shownTag, 0, sizeof(s_shownTag));
 }
 
-/* Repaint one line if it differs from what is there. The fillRect is the
- * width of the screen because the replacement can be shorter than what it
- * replaces, and drawString only paints the glyphs it draws. */
-void showAt(char* shown, size_t shownSz, const char* text, int x, int y,
-            int h, uint16_t colour, bool force) {
-  if (!force && strncmp(shown, text, shownSz - 1) == 0) {
-    return;
+
+/* In range long enough to be worth mentioning, and still here. */
+bool dwelling(const Hit& h) {
+  const uint32_t now = millis();
+  if ((uint32_t)(now - h.lastMs) > kDwellStaleMs) {
+    return false;
   }
-  tft.fillRect(0, y, PUEO_SCREEN_W, h, TFT_BLACK);
-  tft.setTextColor(colour, TFT_BLACK);
-  tft.drawString(text, x, y);
-  snprintf(shown, shownSz, "%s", text);
+  return (uint32_t)(h.lastMs - h.firstMs) >= kDwellAlarmMs;
+}
+
+int dwellCount() {
+  int n = 0;
+  for (int i = 0; i < s_hitCount; i++) {
+    if (dwelling(s_hits[i])) n++;
+  }
+  return n;
 }
 
 void drawHeader() {
@@ -698,13 +729,19 @@ void drawHeader() {
   tft.setTextSize(1);
 
   char buf[42];
-  snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d",
-           (unsigned)s_chan, (unsigned long)s_frames, s_hitCount);
+  const int dwell = dwellCount();
+  if (dwell > 0) {
+    snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d  dwell %d",
+             (unsigned)s_chan, (unsigned long)s_frames, s_hitCount, dwell);
+  } else {
+    snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d",
+             (unsigned)s_chan, (unsigned long)s_frames, s_hitCount);
+  }
   /* The whole 18 px band is this line's, so clearing it here also clears
    * the recording tag, which is why the tag is repainted unconditionally
    * whenever the line above it changed. */
   const bool hdrChanged = strncmp(s_shownHdr, buf, sizeof(s_shownHdr) - 1) != 0;
-  showAt(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18, TFT_WHITE, false);
+  uiShowLine(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18, TFT_WHITE, TFT_BLACK);
 
   char tag[16] = "";
   uint16_t tagColour = TFT_RED;
@@ -734,10 +771,10 @@ void drawList() {
   tft.setTextSize(1);
 
   if (s_hitCount == 0) {
-    showAt(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
-           8, top + 6, 10, TFT_DARKGREY, false);
-    showAt(s_shownRow[0][1], sizeof(s_shownRow[0][1]), "nothing matched yet",
-           8, top + 20, 10, TFT_DARKGREY, false);
+    uiShowLine(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
+           8, top + 6, 10, TFT_DARKGREY, TFT_BLACK);
+    uiShowLine(s_shownRow[0][1], sizeof(s_shownRow[0][1]), "nothing matched yet",
+           8, top + 20, 10, TFT_DARKGREY, TFT_BLACK);
     return;
   }
 
@@ -764,14 +801,14 @@ void drawList() {
 
     char line[48];
     snprintf(line, sizeof(line), "%-9s %s", kindText(h.kind), h.label);
-    showAt(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line,
-           8, y, 10, confColour(h.conf), false);
+    uiShowLine(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line,
+               8, y, 10, confColour(h.conf), TFT_BLACK);
 
     snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X %s %ddBm x%u",
              h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
              h.viaBle ? "BLE" : "WiFi", (int)h.rssiBest, (unsigned)h.hits);
-    showAt(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line,
-           8, y + 11, 10, TFT_LIGHTGREY, false);
+    uiShowLine(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line,
+           8, y + 11, 10, TFT_LIGHTGREY, TFT_BLACK);
 
     /* Third line: what is true of the device rather than of its address.
      *
@@ -803,10 +840,20 @@ void drawList() {
         snprintf(rot, sizeof(rot), "+%u ", (unsigned)h.addrChanges);
       }
 
-      snprintf(line, sizeof(line), "%s%s%s%s", fpTxt,
-               (!h.viaBle && (h.mac[0] & 0x02)) ? "rnd " : "", rot, age);
-      showAt(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line,
-             8, y + 21, 10, TFT_DARKGREY, false);
+      /* DWELL goes in the text, not only in the colour.
+       *
+       * uiShowLine repaints when the string changes and compares nothing
+       * else, so a row that crossed the threshold while its text stayed the
+       * same would keep the old colour until something else moved. The
+       * marker changes the string, which is what makes the repaint happen.
+       * The age is in that string and ticks, so in practice it would repaint
+       * anyway -- but relying on that would be relying on a coincidence. */
+      const bool dwell = dwelling(h);
+      snprintf(line, sizeof(line), "%s%s%s%s%s", fpTxt,
+               (!h.viaBle && (h.mac[0] & 0x02)) ? "rnd " : "", rot,
+               dwell ? "DWELL " : "", age);
+      uiShowLine(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line,
+                 8, y + 21, 10, dwell ? UI_WARN : TFT_DARKGREY, TFT_BLACK);
     }
 
     /* Drawn after the first line, which clears the band it sits in. */
