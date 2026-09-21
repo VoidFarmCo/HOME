@@ -1,10 +1,15 @@
 # Pueo
 
-Open-source firmware for a handheld multi-radio field tool built on the
-ESP32-2432S028R "cheap yellow display" — a 2.8" touchscreen ESP32 carrying a
-CC1101 for sub-GHz, an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and a
-an ATGM336H for GPS, in a printed enclosure zoned to keep the radios
-apart. It
+Open-source firmware for a handheld multi-radio field tool built on a
+"cheap yellow display" — a touchscreen ESP32 carrying a CC1101 for sub-GHz,
+an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and an ATGM336H for GPS, in
+a printed enclosure zoned to keep the radios apart.
+
+Two panels, one flash image each. The 3.5" ESP32-3248S035R is the reference
+board — the one this has run on, the one with a dimensioned enclosure, and
+the one that brings its SPI bus out on a connector rather than asking for
+three joints on a microSD slot. The 2.8" ESP32-2432S028R is supported and
+built for every release. It
 covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
 clone, GPS wardriving and jam detection. It is a fork of CiferTech's
 ESP32-DIV, which is MIT; this fork is GPL-3.0-or-later. It diverges mainly
