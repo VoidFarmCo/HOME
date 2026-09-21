@@ -253,8 +253,80 @@ BEZEL_W   = (PANEL == "3.5") ? 56.0 : 56.0;   // board + 0.5 clearance
 BEZEL_L   = (PANEL == "3.5") ? 102.0 : 92.5;
 
 /* Corner radius of the window. The 3.5" board's own corners are R3.50, so a
- * 2 mm window leaves four crescents of lid covering the PCB corners. */
+ * 2 mm window leaves four crescents of lid covering the PCB corners.
+ *
+ * Only the 2.8" cuts a board-sized window now; see the block below for what
+ * the 3.5" does instead. */
 BEZEL_R   = (PANEL == "3.5") ? 3.5 : 2;
+
+/* ---------- 3.5" screen: aperture, rebate, and four M3 posts ----------
+ *
+ * Every number here is off QDtech's E32R35T outline drawing, V1.0
+ * 2024-08-14, and the drawing's vertical chains close on the 101.50 overall
+ * to the hundredth, which is why these are stated rather than measured.
+ *
+ *   PCB           55.50 x 101.50 x 5.80, corners R3.50
+ *   LCD BL        55.50 x  84.96   the module outline, centred on the board
+ *   RTP AA        49.96 x  77.24   what the aperture exposes
+ *   LCD AA        48.96 x  73.44   the image, 0.50 inside the aperture
+ *   holes         47.90 x  94.50   four at 3.20, centred on the board
+ *   stack         1.20 RTP + 2.50 LCD + 0.50 tape = 4.20 above the PCB
+ *
+ * The window used to be the board's whole outline, so the PCB dropped
+ * through the lid and nothing covered its edges. Now the lid face covers
+ * the board and only the screen shows: an aperture at the touch panel's
+ * active area, and behind it a rebate the module's shoulder sits up into.
+ *
+ * SCREEN_LIP is the lid material left in front of the module -- what the
+ * module actually bears against, and what stops it falling out the front.
+ * The glass therefore sits SCREEN_LIP below the outer face. At 1.0 mm that
+ * reads as flush and protects the glass edge from a desk. Set it to 0 for
+ * literally flush and the lid stops retaining the screen at all, which is
+ * the trade rather than an oversight.
+ *
+ * The visible area is not concentric with the board: LCD AA sits 2.35 mm
+ * toward the top. The old BEZEL_Y fudge was 2, arrived at by eye, which is
+ * 0.35 off the drawing -- keep the derived number.
+ */
+SCREEN_APER_W  = 49.96;   // RTP AA; clears the LCD AA by 0.50 a side
+SCREEN_APER_L  = 77.24;
+SCREEN_APER_DY = 2.35;    // LCD AA centre above the board centre
+SCREEN_APER_R  = 1.5;     // aperture corner radius, cosmetic
+
+SCREEN_MOD_W   = 55.50 + 0.40;   // LCD BL + print clearance
+SCREEN_MOD_L   = 84.96 + 0.40;
+SCREEN_MOD_R   = 1.0;
+
+SCREEN_LIP     = 1.0;     // lid left in front of the module
+SCREEN_STACK   = 4.20;    // RTP + LCD + tape, above the PCB's top face
+SCREEN_PCB_T   = 1.60;
+
+/* Mount posts. The board's four holes are 3.20, which is an M3 clearance
+ * hole, so the screw passes through the PCB from behind and threads into
+ * the post. 2.50 is the pilot for a self-tapping M3 in PLA or PETG -- not
+ * BOSS_HOLE, which is 3.00 and is sized for the base's machine screws;
+ * 3.00 here would strip on the first drive.
+ *
+ * The posts land in the 8.27 mm of bare PCB above and below the module,
+ * which is the only place on this board where the PCB's top face is
+ * exposed -- the module is exactly as wide as the board. */
+SCREEN_HOLE_DX = 47.90 / 2;
+SCREEN_HOLE_DY = 94.50 / 2;
+SCREEN_POST_R  = 3.0;     // 23.95 + 3.0 = 26.95, inside the 27.75 half-width
+SCREEN_POST_PILOT = 1.25; // 2.50 dia
+
+/* [verify] The RGB LED sits in the strip above the screen. Its position is
+ * NOT on the outline drawing -- these two numbers are eyeballed off a photo
+ * and are the only figures in this file that are not from a source.
+ *
+ * Measure yours before printing a lid you intend to keep: put a rule on the
+ * board's top edge and its left edge, and set LED_X as the offset from the
+ * board's centreline (negative is left) and LED_Y as the offset from the
+ * board's centre (positive is up). Then delete this paragraph. */
+SCREEN_LED_X   = -14.0;
+SCREEN_LED_Y   =  46.4;   // ~4.3 down from the top edge, mid-strip
+SCREEN_LED_D   =  3.2;    // a light pipe, or just a hole
+
 /* The longer window eats into the chin. Nudging it 2 mm toward the top,
  * where nothing lives, keeps a printable margin around the owl. */
 BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the face
@@ -331,16 +403,49 @@ module lid() {
             // screw pillars matching the base bosses
             for (p = BOSS_POS)
                 translate([p[0], p[1], 0]) cylinder(h=LID_H, r=BOSS_R);
+            // 3.5" screen posts, hanging off the plate down to the PCB's
+            // top face. Height falls out of the stack: the module's front
+            // bears on the lip, so the PCB sits SCREEN_STACK below it.
+            if (PANEL == "3.5")
+                for (dx = [-1, 1], dy = [-1, 1])
+                    translate([dx * SCREEN_HOLE_DX,
+                               BEZEL_Y + dy * SCREEN_HOLE_DY,
+                               LID_H - SCREEN_LIP - SCREEN_STACK])
+                        cylinder(h = SCREEN_STACK + SCREEN_LIP - 2.5,
+                                 r = SCREEN_POST_R);
         }
-        // CYD window
-        translate([0, BEZEL_Y, -1])
-            linear_extrude(LID_H+2) rrect(BEZEL_W, BEZEL_L, BEZEL_R);
+        // The window. On the 2.8" this is still the board's outline; on the
+        // 3.5" it is the screen's aperture, with the rebate cut below it.
+        if (PANEL == "3.5") {
+            // aperture, through the lip
+            translate([0, BEZEL_Y + SCREEN_APER_DY, LID_H - 2.5 - 1])
+                linear_extrude(2.5 + 2)
+                    rrect(SCREEN_APER_W, SCREEN_APER_L, SCREEN_APER_R);
+            // rebate for the module, from the plate's underside up to the lip
+            translate([0, BEZEL_Y, LID_H - 2.5])
+                linear_extrude(2.5 - SCREEN_LIP + 0.01)
+                    rrect(SCREEN_MOD_W, SCREEN_MOD_L, SCREEN_MOD_R);
+        } else {
+            translate([0, BEZEL_Y, -1])
+                linear_extrude(LID_H+2) rrect(BEZEL_W, BEZEL_L, BEZEL_R);
+        }
+        // [verify] RGB LED, in the strip above the screen
+        if (PANEL == "3.5")
+            translate([SCREEN_LED_X, BEZEL_Y + SCREEN_LED_Y, LID_H - 2.5 - 1])
+                cylinder(h = 2.5 + 2, d = SCREEN_LED_D);
         // screw clearance holes, countersunk from outside
         for (p = BOSS_POS)
             translate([p[0], p[1], 0]) {
                 translate([0,0,-1]) cylinder(h=LID_H+2, r=1.7);
                 translate([0,0,LID_H-2.2]) cylinder(h=2.4, r1=1.7, r2=3.2);
             }
+        // pilot holes down the screen posts
+        if (PANEL == "3.5")
+            for (dx = [-1, 1], dy = [-1, 1])
+                translate([dx * SCREEN_HOLE_DX,
+                           BEZEL_Y + dy * SCREEN_HOLE_DY,
+                           LID_H - SCREEN_LIP - SCREEN_STACK - 1])
+                    cylinder(h = SCREEN_STACK + 2, r = SCREEN_POST_PILOT);
         // owl, cut into the outer face
         if (LOGO)
             translate([0, LOGO_Y, LID_H - LOGO_DEPTH])
