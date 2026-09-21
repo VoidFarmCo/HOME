@@ -549,6 +549,39 @@ static int statusBarTempBand(float t) {
  * full redraw chose. */
 static constexpr int kStatusIconsWidth = 110;
 
+void drawBitmapScaled(int16_t x, int16_t y, const uint8_t* bmp,
+                      int16_t w, int16_t h, uint16_t colour, uint8_t scale) {
+  if (scale <= 1) {
+    tft.drawBitmap(x, y, bmp, w, h, colour);
+    return;
+  }
+  const int dstW      = (int)w * scale;
+  const int srcStride = (w + 7) / 8;
+  const int dstStride = (dstW + 7) / 8;
+  /* 32x32 is what the menu asks for and what the buffer is sized for.
+   * Anything bigger is not a case this has, so draw it unscaled rather than
+   * overrun: a small icon is a cosmetic fault, a smashed stack is not. */
+  if (dstStride * (int)h * scale > 128) {
+    tft.drawBitmap(x, y, bmp, w, h, colour);
+    return;
+  }
+  uint8_t buf[128];
+  memset(buf, 0, sizeof(buf));
+  for (int r = 0; r < h; r++) {
+    for (int c = 0; c < w; c++) {
+      if (!(bmp[r * srcStride + (c >> 3)] & (0x80 >> (c & 7)))) continue;
+      for (int sy = 0; sy < scale; sy++) {
+        uint8_t* row = buf + (r * scale + sy) * dstStride;
+        for (int sx = 0; sx < scale; sx++) {
+          const int dc = c * scale + sx;
+          row[dc >> 3] |= (uint8_t)(0x80 >> (dc & 7));
+        }
+      }
+    }
+  }
+  tft.drawBitmap(x, y, buf, (int16_t)dstW, (int16_t)(h * scale), colour);
+}
+
 #if PUEO_STATUS_TALL == PUEO_STATUS_SHORT
 static constexpr int s_statusBarHeight = PUEO_STATUS_SHORT;
 #else

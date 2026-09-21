@@ -117,14 +117,43 @@ def main():
        "setStatusBarHeight(" in fns.get("drawAboutPage", ""))
 
     print("\nnothing is drawn under a tall bar:")
+    # Two ways a y reaches the screen, and the first version of this check
+    # knew about one. displayPagedSubmenu draws its rows with
+    # drawBitmap(10, yPos, ...) where yPos = 30 + i * 30: the origin is a
+    # literal in an assignment, not an argument, so a sweep of call sites saw
+    # nothing, the function was called a tile grid in a comment, and it got a
+    # tall bar that painted over the top of its own first row. It shipped.
     draw = re.compile(r"\.\w+\(\s*(?:[^,()]+|\([^()]*\))\s*,\s*(\d+)\s*[,)]")
+    # `int yPos = 30 + ...`, `const int y = 44;`, `yTop = Y_START`
+    origin = re.compile(r"\b\w*[yY]\w*\s*=\s*(\d+|[A-Z_][A-Z_0-9]*)\b")
+    # Panel-dependent constants appear twice, once per branch of
+    # `#if TFT_WIDTH >= 320`. Read the 3.5" branch first: it is the panel with
+    # a tall bar, and taking the other one resolves Y_START to 30 and
+    # condemns the very layout this exists to bless.
+    consts = {}
+    b35 = re.search(r"#if TFT_WIDTH >= 320(.*?)#else", ino, re.S)
+    for src in ([b35.group(1)] if b35 else []) + [ino]:
+        for m in re.finditer(r"\b([A-Z_][A-Z_0-9]*)\s*=\s*(\d+)\s*;", src):
+            consts.setdefault(m.group(1), int(m.group(2)))
+
     tall_fns = [n for n, b in fns.items() if "PUEO_STATUS_TALL" in b]
     ok("something actually asks for the tall bar", bool(tall_fns), str(tall_fns))
     for n in tall_fns:
-        bad = sorted({int(m.group(1)) for m in draw.finditer(fns[n])
-                      if s35 <= int(m.group(1)) < t35})
-        ok("%s draws nothing between %d and %d" % (n, s35, t35),
-           not bad, "literal y at %s" % bad)
+        body = fns[n]
+        bad = {"arg y=%d" % int(m.group(1)) for m in draw.finditer(body)
+               if s35 <= int(m.group(1)) < t35}
+        for m in origin.finditer(body):
+            tok = m.group(1)
+            v = int(tok) if tok.isdigit() else consts.get(tok)
+            if v is not None and s35 <= v < t35:
+                bad.add("%s (=%d)" % (" ".join(m.group(0).split()), v))
+        ok("%s puts nothing between %d and %d" % (n, s35, t35),
+           not bad, "; ".join(sorted(bad)))
+
+    # The converse: the list screens must actually be declared short.
+    short_fns = [n for n, b in fns.items() if "PUEO_STATUS_SHORT" in b]
+    ok("displayPagedSubmenu is short, being a list whose first row is at 30",
+       "displayPagedSubmenu" in short_fns, str(sorted(short_fns)))
 
     # The tiles themselves are placed from Y_START, not a literal, so they are
     # checked against the constant rather than by the sweep above.
@@ -133,7 +162,6 @@ def main():
     ok("the 3.5\" tile row clears the tall bar",
        y_start is not None and y_start >= t35,
        "Y_START=%s TALL=%s" % (y_start, t35))
-
     print("\nthe height reaches the bar:")
     ok("utils.cpp reads the height for the full repaint",
        re.search(r"barHeight\s*=\s*s_statusBarHeight", utils) is not None)

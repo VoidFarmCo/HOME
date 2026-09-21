@@ -47,6 +47,15 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate = false, bool bottomSe
  * On a panel with only one height this is a no-op that the compiler deletes,
  * so the bar's geometry stays the compile-time constant it has always been
  * there and that image rebuilds to the same bytes. */
+/* drawBitmap() with an integer scale. scale 1 is drawBitmap itself.
+ *
+ * TFT_eSPI cannot scale a bitmap, and the icons are 1-bit 16x16 blobs in
+ * icon.h. Rather than redraw 143 of them at 32x32, this doubles the bits
+ * into a scratch bitmap and makes one drawBitmap call -- a fillRect per lit
+ * pixel would be up to 256 SPI transactions per icon, eight icons a grid. */
+void drawBitmapScaled(int16_t x, int16_t y, const uint8_t* bmp,
+                      int16_t w, int16_t h, uint16_t colour, uint8_t scale);
+
 #if PUEO_STATUS_TALL == PUEO_STATUS_SHORT
 inline void setStatusBarHeight(int) {}
 #else

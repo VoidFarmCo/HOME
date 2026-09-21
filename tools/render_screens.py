@@ -50,13 +50,14 @@ def set_panel(panel):
     """Resize the canvas and the layout to one of the two panels."""
     global PANEL, W, H
     global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
-    global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL
+    global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL, TILE_ICON
     PANEL = panel
     W, H = (320, 480) if panel == 35 else (240, 320)
     if panel == 35:
         TILE_W, TILE_H, COLUMN_WIDTH = 145, 92, 155
         Y_START, Y_SPACING = 44, 106
-        TILE_ICON_DY, TILE_TEXT_DY = 27, 49
+        # icon(32) + 6 gap + label(16) = 54, centred in a 92 px tile
+        TILE_ICON_DY, TILE_TEXT_DY = 19, 57
     else:
         TILE_W, TILE_H, COLUMN_WIDTH = 100, 60, 120
         Y_START, Y_SPACING = 30, 75
@@ -68,6 +69,8 @@ def set_panel(panel):
     # PUEO_STATUS_TALL in shared.h: the menu grids get a taller bar on the
     # 3.5", whose Y_START is 44. The 2.8"'s is 30 and has no room.
     STATUS_TALL = 34 if panel == 35 else 20
+    # PUEO_TILE_ICON in shared.h. The 2.8" tile is 100x60 and has no room.
+    TILE_ICON = 32 if panel == 35 else 16
 
 
 X_OFFSET_LEFT = 10
@@ -256,6 +259,25 @@ class Tft:
                     if 0 <= xx < W and 0 <= yy < H:
                         px[xx, yy] = c
 
+    def draw_bitmap_scaled(self, x, y, name, w, h, c, scale):
+        """drawBitmapScaled() in utils.cpp -- the bits doubled, not new art."""
+        if scale <= 1:
+            self.draw_bitmap(x, y, name, w, h, c)
+            return
+        data = self.bm[name]
+        stride = (w + 7) // 8
+        px = self.im.load()
+        for row in range(h):
+            for col in range(w):
+                i = row * stride + (col >> 3)
+                if i >= len(data) or not (data[i] & (0x80 >> (col & 7))):
+                    continue
+                for sy in range(scale):
+                    for sx in range(scale):
+                        xx, yy = x + col * scale + sx, y + row * scale + sy
+                        if 0 <= xx < W and 0 <= yy < H:
+                            px[xx, yy] = c
+
     # -- font 1, size 1: 5 columns then a 1px gap --
     def _glcd_char(self, x, y, ch, c, bg):
         cols = self.glcd[ord(ch) & 0xFF]
@@ -412,7 +434,7 @@ def render_boot(t, brand):
 
 MENU = [
     ("WiFi", "bitmap_icon_wifi"), ("2.4GHz", "bitmap_icon_jammer"),
-    ("More", None), ("Settings", "bitmap_icon_setting"),
+    ("More", "bitmap_icon_dots"), ("Settings", "bitmap_icon_setting"),
     ("Bluetooth", "bitmap_icon_spoofer"), ("SubGHz", "bitmap_icon_analyzer"),
     ("Tools", "bitmap_icon_stat"), ("About", "bitmap_icon_question"),
 ]
@@ -431,15 +453,8 @@ def render_menu(t, selected=0):
         ink = UI_BG if sel else UI_TEXT
         t.fill_round_rect(x, y, TILE_W, TILE_H, 5, fill)
         t.draw_round_rect(x, y, TILE_W, TILE_H, 5, edge)
-        if icon is None:                      # the "More" tile's three icons
-            triple_w = 16 * 3 + 4 * 2
-            ix = x + (TILE_W - triple_w) // 2
-            for k, nm in enumerate(("bitmap_icon_led", "bitmap_icon_satellite",
-                                    "bitmap_icon_down_dots")):
-                t.draw_bitmap(ix + k * 20, y + TILE_ICON_DY, nm, 16, 16, ink)
-        else:
-            t.draw_bitmap(x + (TILE_W - 16) // 2, y + TILE_ICON_DY,
-                          icon, 16, 16, ink)
+        t.draw_bitmap_scaled(x + (TILE_W - TILE_ICON) // 2, y + TILE_ICON_DY,
+                             icon, 16, 16, ink, TILE_ICON // 16)
         tw = t.text_width(label)
         t.print_f2(x + (TILE_W - tw) // 2, y + TILE_TEXT_DY, label, ink, fill)
     status_bar(t, STATUS_TALL)
@@ -458,7 +473,11 @@ BT_PAGE0 = [
 
 
 def render_bluetooth(t, selected=3):
-    """displayPagedSubmenu(), Bluetooth page 0 -- a tile grid, so the tall bar."""
+    """displayPagedSubmenu(), Bluetooth page 0.
+
+    A list, not a tile grid: rows at 30 + i * 30, so the short bar. Calling
+    it a grid in a comment is how it got a tall one that painted over its
+    own first row."""
     t.fill_screen(UI_BG)
     for i, (label, icon) in enumerate(BT_PAGE0):
         y = 30 + i * 30
@@ -475,7 +494,7 @@ def render_bluetooth(t, selected=3):
     icon_x = W - 10 - 16
     t.print_f2(icon_x - 4 - t.text_width(label), text_y, label, UI_TEXT, UI_BG)
     t.draw_bitmap(icon_x, icon_y, "bitmap_icon_navigate_right", 16, 16, UI_TEXT)
-    status_bar(t, STATUS_TALL)
+    status_bar(t)
 
 
 # Spotter rows, in the shape drawList() prints them. Each is what the

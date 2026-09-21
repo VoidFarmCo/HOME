@@ -11,6 +11,52 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.3.6 - 2026-09-20
+------------------
+
+A bug 0.3.5 shipped, and the menu tiles growing icons to match their size.
+
+  * The Bluetooth page, and every other paged submenu, had the top of its
+    first row painted over. 0.3.5 gave displayPagedSubmenu the tall status
+    bar on the grounds that it was a tile grid. It is not: it is a list, its
+    rows are at 30 + i * 30, and a 34 px bar covers the top four pixels of
+    the first one. The comment introducing the change called it a tile grid,
+    which is the whole of the mistake.
+
+    tools/check_status_bar.py did not catch it, and the reason is worth
+    keeping. It swept the literal y arguments of drawing calls, and this
+    screen draws with drawBitmap(10, yPos, ...) -- the origin is a literal in
+    an assignment, not an argument, so there was nothing at the call site to
+    see. It now also resolves y-ish assignments, including through named
+    constants, and it reads the 3.5" branch of the panel #if when it does,
+    because taking the other branch resolves Y_START to 30 and condemns the
+    layout it exists to bless. Re-running the old check against the shipped
+    tree passes; the new one names all three yPos origins.
+
+  * Menu tile icons are 32 px on the 3.5" instead of 16. The tiles grew to
+    145x92 when that panel arrived and the icons did not, so they had been
+    sitting at the size they were drawn for a 240x320 screen. The icon and
+    label block re-centres around them: 32 + 6 + 16 = 54 in a 92 px tile.
+
+    The art is unchanged -- drawBitmapScaled() doubles the bits of the same
+    1-bit 16x16 icons into a scratch bitmap and makes one drawBitmap call,
+    rather than 143 icons being redrawn or a fillRect being issued per lit
+    pixel. Doubled bits look doubled, and that is the trade: every edge is
+    two pixels and the diagonals step. Redrawn 32x32 art would be sharper.
+
+    The 2.8" keeps 16. Its tile is 100x60, where a 32 px icon and a 16 px
+    label leave four pixels of tile.
+
+  * The "More" tile is one icon rather than three. It previewed the section
+    with a LED, a satellite and an ellipsis crammed side by side, which read
+    as clutter at 16 px and would have been 108 px wide at 32. It is now
+    bitmap_icon_dots and an ordinary row of the menu table, which deletes
+    drawMainMenuOtherTripleIcons() and the three places that branched on the
+    tile's index. This one applies to both panels, so unlike the status bar
+    the 2.8" image does move here -- deliberately, and unverified on a board
+    like everything else about that panel.
+
+
 0.3.5 - 2026-09-20
 ------------------
 

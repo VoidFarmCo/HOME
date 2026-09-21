@@ -740,6 +740,17 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  * no room to give. That panel is built every release and has never been
  * booted; leaving its layout alone is also what lets the change be checked
  * by rebuilding its image and getting the same bytes back. */
+/* Menu tile icon size. A 16 px icon on the 3.5"'s 145x92 tile looks like
+ * what it is -- a leftover from the 240x320 layout the tiles grew out of.
+ * 32 fills it. The 2.8" tile is 100x60 and a 32 px icon plus a 16 px label
+ * leaves four pixels of tile, so that panel keeps 16 and its grid does not
+ * move. The icons are 16x16 bitmaps either way; 32 is the 16 doubled. */
+#if PUEO_PANEL_35
+#define PUEO_TILE_ICON 32
+#else
+#define PUEO_TILE_ICON 16
+#endif
+
 #define PUEO_STATUS_SHORT 20
 #if PUEO_PANEL_35
 #define PUEO_STATUS_TALL  34

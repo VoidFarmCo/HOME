@@ -45,7 +45,7 @@ const char *menu_items[NUM_MENU_ITEMS] = {
 const unsigned char *bitmap_icons[NUM_MENU_ITEMS] = {
     bitmap_icon_wifi,
     bitmap_icon_jammer,
-    bitmap_icon_dialog,
+    bitmap_icon_dots,
     bitmap_icon_setting,
     bitmap_icon_spoofer,
     bitmap_icon_analyzer,
@@ -829,8 +829,9 @@ const int X_OFFSET_LEFT = 10;
 const int X_OFFSET_RIGHT = X_OFFSET_LEFT + COLUMN_WIDTH;
 const int Y_START = 44;
 const int Y_SPACING = 106;
-const int TILE_ICON_DY = 27;   // icon+label block centred in a taller tile
-const int TILE_TEXT_DY = 49;
+// icon(32) + 6 gap + label(16) = 54, centred in a 92 px tile
+const int TILE_ICON_DY = 19;
+const int TILE_TEXT_DY = 57;
 #else
 const int TILE_W = 100;
 const int TILE_H = 60;
@@ -981,7 +982,7 @@ void displayPagedSubmenu() {
         last_submenu_index = current_submenu_index;
     }
 
-    setStatusBarHeight(PUEO_STATUS_TALL);  // same tile grid, same 24 px of slack
+    setStatusBarHeight(PUEO_STATUS_SHORT);  // a list: first row is at y=30
     drawStatusBar(currentBatteryVoltage, true);
 }
 
@@ -1006,7 +1007,9 @@ void displayOtherMenuGrid() {
 
             tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
             tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
-            tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, other_submenu_icons[i], 16, 16, UI_ICON);
+            drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
+                             y_position + TILE_ICON_DY, other_submenu_icons[i],
+                             16, 16, UI_ICON, PUEO_TILE_ICON / 16);
 
             tft.setTextColor(UI_TEXT, UI_FG);
             int textWidth = tft.textWidth(other_submenu_items[i]);
@@ -1031,8 +1034,10 @@ void displayOtherMenuGrid() {
                 tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
                 tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
                 tft.setTextColor(UI_TEXT, UI_FG);
-                tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY,
-                               other_submenu_icons[last_other_menu_index], 16, 16, UI_ICON);
+                drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
+                                 y_position + TILE_ICON_DY,
+                                 other_submenu_icons[last_other_menu_index],
+                                 16, 16, UI_ICON, PUEO_TILE_ICON / 16);
                 int textWidth = tft.textWidth(other_submenu_items[last_other_menu_index]);
                 int textX = x_position + (TILE_W - textWidth) / 2;
                 int textY = y_position + TILE_TEXT_DY;
@@ -1052,8 +1057,10 @@ void displayOtherMenuGrid() {
         tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_ICON);
 
         tft.setTextColor(UI_BG, UI_ICON);
-        tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, other_submenu_icons[current_submenu_index],
-                       16, 16, UI_BG);
+        drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
+                         y_position + TILE_ICON_DY,
+                         other_submenu_icons[current_submenu_index],
+                         16, 16, UI_BG, PUEO_TILE_ICON / 16);
         int textWidth = tft.textWidth(other_submenu_items[current_submenu_index]);
         int textX = x_position + (TILE_W - textWidth) / 2;
         int textY = y_position + TILE_TEXT_DY;
@@ -1063,22 +1070,10 @@ void displayOtherMenuGrid() {
         last_other_menu_index = current_submenu_index;
     }
 
-    setStatusBarHeight(PUEO_STATUS_TALL);  // same tile grid, same 24 px of slack
+    setStatusBarHeight(PUEO_STATUS_TALL);  // a tile grid, same 24 px of slack
     drawStatusBar(currentBatteryVoltage, true);
 }
 
-/** Main menu "Other" tile (index 2): triple preview icons (LED / satellite / dots). */
-static constexpr int MAIN_MENU_OTHER_IDX = 2;
-static constexpr int MAIN_MENU_OTHER_ICON_GAP = 4;
-
-static void drawMainMenuOtherTripleIcons(int x_position, int y_position, uint16_t iconColor) {
-    const int tripleW = 16 * 3 + MAIN_MENU_OTHER_ICON_GAP * 2;
-    int ix = x_position + (TILE_W - tripleW) / 2;
-    const int iy = y_position + TILE_ICON_DY;
-    tft.drawBitmap(ix, iy, bitmap_icon_led, 16, 16, iconColor);
-    tft.drawBitmap(ix + 16 + MAIN_MENU_OTHER_ICON_GAP, iy, bitmap_icon_satellite, 16, 16, iconColor);
-    tft.drawBitmap(ix + 32 + MAIN_MENU_OTHER_ICON_GAP * 2, iy, bitmap_icon_down_dots, 16, 16, iconColor);
-}
 
 void displayMenu() {
 
@@ -1113,11 +1108,9 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
 
             tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
             tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
-            if (i == MAIN_MENU_OTHER_IDX) {
-                drawMainMenuOtherTripleIcons(x_position, y_position, icon_colors[i]);
-            } else {
-                tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, bitmap_icons[i], 16, 16, icon_colors[i]);
-            }
+                drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
+                                 y_position + TILE_ICON_DY, bitmap_icons[i],
+                                 16, 16, icon_colors[i], PUEO_TILE_ICON / 16);
 
             tft.setTextColor(UI_TEXT, UI_FG);
             int textWidth = tft.textWidth(menu_items[i]);
@@ -1141,11 +1134,9 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
                 tft.fillRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_FG);
                 tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_LINE);
                 tft.setTextColor(UI_TEXT, UI_FG);
-                if (last_menu_index == MAIN_MENU_OTHER_IDX) {
-                    drawMainMenuOtherTripleIcons(x_position, y_position, icon_colors[last_menu_index]);
-                } else {
-                    tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, bitmap_icons[last_menu_index], 16, 16, icon_colors[last_menu_index]);
-                }
+                    drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
+                                     y_position + TILE_ICON_DY, bitmap_icons[last_menu_index],
+                                     16, 16, icon_colors[last_menu_index], PUEO_TILE_ICON / 16);
                 int textWidth = tft.textWidth(menu_items[last_menu_index]);
                 int textX = x_position + (TILE_W - textWidth) / 2;
                 int textY = y_position + TILE_TEXT_DY;
@@ -1175,11 +1166,9 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
         tft.drawRoundRect(x_position, y_position, TILE_W, TILE_H, 5, UI_ICON);
 
         tft.setTextColor(UI_BG, UI_ICON);
-        if (current_menu_index == MAIN_MENU_OTHER_IDX) {
-            drawMainMenuOtherTripleIcons(x_position, y_position, UI_BG);
-        } else {
-            tft.drawBitmap(x_position + (TILE_W - 16) / 2, y_position + TILE_ICON_DY, bitmap_icons[current_menu_index], 16, 16, UI_BG);
-        }
+            drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
+                             y_position + TILE_ICON_DY, bitmap_icons[current_menu_index],
+                             16, 16, UI_BG, PUEO_TILE_ICON / 16);
         int textWidth = tft.textWidth(menu_items[current_menu_index]);
         int textX = x_position + (TILE_W - textWidth) / 2;
         int textY = y_position + TILE_TEXT_DY;
