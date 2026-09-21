@@ -36,6 +36,17 @@ constexpr uint32_t kLostMs = 3000;
 /* A row drops off the picker after a minute without a sighting. */
 constexpr uint32_t kForgetMs = 60000;
 
+/* The trend compares now against a baseline this old. Too short and it
+ * reports the smoothing's own ripple; too long and it still says WARMER
+ * three steps after you walked past the thing. A second and a bit is about
+ * one pace, which is the unit people actually move in while hunting. */
+constexpr uint32_t kTrendWindowMs = 1200;
+
+/* How much of a change counts. Smoothed RSSI still drifts a dB or so
+ * standing still, so anything under this is HOLD rather than a direction
+ * the screen has no business claiming. */
+constexpr float kTrendDeadband = 2.0f;
+
 constexpr uint32_t kRedrawMs = 60;
 constexpr int      kRowH     = 22;
 
@@ -61,6 +72,9 @@ int8_t   s_peak     = kRssiFar;
 uint32_t s_lockSeen = 0;
 uint32_t s_lockHits = 0;
 int      s_prevAngle = -1;
+float    s_trendBase = 0.0f;
+uint32_t s_trendAt   = 0;
+int      s_trend     = 0;        // +1 warmer, -1 colder, 0 hold
 
 BLEScan* s_scan = nullptr;
 
@@ -299,10 +313,12 @@ Dial dial() {
   Dial d;
   d.cx = PUEO_SCREEN_W / 2;
   /* The arc is the top half of a circle, so it needs r of height, and the
-   * readout below needs about 46. Whichever of width and height runs out
-   * first sets the radius. */
+   * readout below needs about 90: trend word, band, bar and the numbers.
+   * Whichever of width and height runs out first sets the radius, which on
+   * both panels is the width -- the reserve is stated so it stays true if
+   * the readout grows again. */
   const int byWidth  = PUEO_SCREEN_W / 2 - 10;
-  const int byHeight = (bottom - top - 46);
+  const int byHeight = (bottom - top - 90);
   d.r  = byWidth < byHeight ? byWidth : byHeight;
   d.cy = top + d.r;
   return d;
@@ -368,8 +384,8 @@ void drawGaugeChrome(const Dial& d) {
 
   drawArc(d);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawString("FAR", d.cx - d.r, d.cy + 4);
-  tft.drawString("NEAR", d.cx + d.r - 20, d.cy + 4);
+  tft.drawString("far", d.cx - d.r, d.cy + 2);
+  tft.drawString("near", d.cx + d.r - 22, d.cy + 2);
   tft.fillCircle(d.cx, d.cy, 3, TFT_DARKGREY);
 }
 
@@ -382,6 +398,17 @@ void drawGauge() {
     drawGaugeChrome(d);
     s_chrome = true;
     s_prevAngle = -1;
+  }
+
+  /* Sampled here rather than in the scan callback: the callback fires per
+   * advertisement, at whatever rate the tracker happens to advertise, and a
+   * window measured in sightings would mean something different for a Tile
+   * than for an AirTag. */
+  if (!lost && (uint32_t)(now - s_trendAt) >= kTrendWindowMs) {
+    const float delta = s_smooth - s_trendBase;
+    s_trend = (delta > kTrendDeadband) ? 1 : (delta < -kTrendDeadband ? -1 : 0);
+    s_trendBase = s_smooth;
+    s_trendAt   = now;
   }
 
   const int deg = angleFor(lost ? (float)kRssiFar : s_smooth);
@@ -407,33 +434,81 @@ void drawGauge() {
     s_prevAngle = deg;
   }
 
-  const int ty = d.cy + 16;
-  tft.fillRect(0, ty, PUEO_SCREEN_W, 30, TFT_BLACK);
+  /* The readout, in the order it is useful.
+   *
+   * A needle alone says where you are and not what to do about it. The
+   * technique is to move and watch the direction, so the direction is the
+   * biggest thing on the screen and the number is the smallest. */
+  const int ty = d.cy + 14;
+  tft.fillRect(0, ty, PUEO_SCREEN_W, contentBottom() - ty, TFT_BLACK);
   tft.setTextFont(1);
 
   if (lost) {
-    tft.setTextSize(2);
+    tft.setTextSize(3);
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawCentreString("NO SIGNAL", d.cx, ty, 1);
+    tft.drawCentreString("LOST", d.cx, ty, 1);
     tft.setTextSize(1);
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.drawCentreString("moved off, shielded, or changed address",
-                         d.cx, ty + 18, 1);
+                         d.cx, ty + 30, 1);
+    tft.drawCentreString("Exit and re-pick if it does not come back",
+                         d.cx, ty + 42, 1);
     return;
   }
 
-  char big[16];
-  snprintf(big, sizeof(big), "%d dBm", (int)(s_smooth - 0.5f));
-  tft.setTextSize(2);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawCentreString(big, d.cx, ty, 1);
+  const char* trendWord = "HOLD";
+  uint16_t    trendCol  = TFT_DARKGREY;
+  if (s_trend > 0) {
+    trendWord = "WARMER";
+    trendCol  = TFT_GREEN;
+  } else if (s_trend < 0) {
+    trendWord = "COLDER";
+    trendCol  = TFT_BLUE;
+  }
+  tft.setTextSize(3);
+  tft.setTextColor(trendCol, TFT_BLACK);
+  tft.drawCentreString(trendWord, d.cx, ty, 1);
 
-  char sub[48];
-  snprintf(sub, sizeof(sub), "now %d   best %d   %lu seen",
-           (int)s_lastRssi, (int)s_peak, (unsigned long)s_lockHits);
+  /* A coarse band, in words. Not metres: see the header. The thresholds are
+   * where the needle sits, not where the tracker is, and the last one says
+   * "arm's length" rather than a number because that is the honest claim. */
+  const int sm = (int)(s_smooth - 0.5f);
+  const char* band;
+  uint16_t bandCol;
+  if (sm < -85)      { band = "FAR";          bandCol = TFT_DARKGREY; }
+  else if (sm < -70) { band = "CLOSER";       bandCol = TFT_WHITE;    }
+  else if (sm < -55) { band = "NEAR";         bandCol = ORANGE;       }
+  else if (sm < -45) { band = "VERY CLOSE";   bandCol = ORANGE;       }
+  else               { band = "ARM'S LENGTH"; bandCol = TFT_RED;      }
+  tft.setTextSize(2);
+  tft.setTextColor(bandCol, TFT_BLACK);
+  tft.drawCentreString(band, d.cx, ty + 30, 1);
+
+  /* Strength bar. The same value as the needle, in the shape people read
+   * signal from, because a bar filling is easier to catch out of the corner
+   * of an eye than a needle rotating. */
+  const int bw = PUEO_SCREEN_W - 40;
+  const int bx = 20;
+  const int by = ty + 54;
+  int fill = (int)(((float)(sm - kRssiFar) /
+                    (float)(kRssiNear - kRssiFar)) * (float)bw);
+  if (fill < 0)  fill = 0;
+  if (fill > bw) fill = bw;
+  tft.drawRect(bx, by, bw, 10, TFT_DARKGREY);
+  tft.fillRect(bx + 1, by + 1, fill, 8, bandCol);
+  if (s_peak > kRssiFar) {
+    int px = bx + (int)(((float)(s_peak - kRssiFar) /
+                         (float)(kRssiNear - kRssiFar)) * (float)bw);
+    if (px < bx)      px = bx;
+    if (px > bx + bw) px = bx + bw;
+    tft.drawFastVLine(px, by - 3, 16, TFT_GREEN);
+  }
+
+  char line[52];
+  snprintf(line, sizeof(line), "%d dBm    best %d    %lu seen",
+           sm, (int)s_peak, (unsigned long)s_lockHits);
   tft.setTextSize(1);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawCentreString(sub, d.cx, ty + 18, 1);
+  tft.drawCentreString(line, d.cx, by + 18, 1);
 }
 
 void enterGauge() {
@@ -447,6 +522,9 @@ void enterGauge() {
   s_lockHits  = 0;
   s_chrome    = false;
   s_prevAngle = -1;
+  s_trendBase = s_smooth;
+  s_trendAt   = millis();
+  s_trend     = 0;
   s_screen    = Screen::Gauge;
   setTouchNavLabels("List", nullptr, "Exit", nullptr, "Reset");
   redrawTouchButtonBar();
