@@ -3,6 +3,7 @@
 #include "SettingsStore.h"
 #include "Touchscreen.h"
 #include "config.h"
+#include "esp_ota_ops.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
@@ -10003,6 +10004,35 @@ void performSDUpdate() {
   runUI();
   uiDrawn = false;
   fwClearBody(TFT_BLACK);
+
+  /* An OTA write needs somewhere to write to, and this firmware is built on
+   * a single-slot partition table. huge_app buys 3.00 MB for the sketch
+   * instead of min_spiffs's 1.88, at the cost of the spare slot this
+   * feature copies into -- a trade made deliberately, because the sketch was
+   * at 89% of the smaller one and nobody here has ever run this.
+   *
+   * Said here rather than left to Update.begin(), which fails with a number
+   * and no explanation. */
+  if (esp_ota_get_next_update_partition(nullptr) == nullptr) {
+    tft.setCursor(10, 10 + yshift);
+    tft.setTextColor(TFT_RED, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.println("SD Update unavailable");
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setCursor(10, 34 + yshift);
+    tft.println("This build uses a single app");
+    tft.setCursor(10, 46 + yshift);
+    tft.println("partition, so there is no spare");
+    tft.setCursor(10, 58 + yshift);
+    tft.println("slot to write an update into.");
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setCursor(10, 78 + yshift);
+    tft.println("Flash over USB instead:");
+    tft.setCursor(10, 90 + yshift);
+    tft.println("pueo-<version>-35-merged.bin");
+    delay(2500);
+    return;
+  }
   tft.setCursor(10, 10 + yshift);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(1);

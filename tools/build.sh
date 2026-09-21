@@ -82,9 +82,22 @@ CORE_VERSION="2.0.10"
 ESP32_INDEX="https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json"
 CORE_DIR="$ARDUINO_DIRECTORIES_DATA/packages/esp32/hardware/esp32/$CORE_VERSION"
 
-# CYD is a plain ESP32 dev module. min_spiffs buys a 1.9 MB app partition;
-# the sketch currently sits at ~92% of it.
-FQBN="esp32:esp32:esp32:PartitionScheme=min_spiffs"
+# CYD is a plain ESP32 dev module.
+#
+# huge_app, not min_spiffs. min_spiffs splits the flash into two 1.88 MB app
+# slots so an over-the-air update can be written into the one that is not
+# running; huge_app gives a single 3.00 MB slot instead. The sketch was at
+# 89% of 1.88 and is at about 56% of 3.00.
+#
+# The second slot was buying exactly one thing: Tools > Update Firmware,
+# which writes a .bin from the SD card into the spare slot. That feature is
+# upstream's, is not mentioned anywhere in this changelog because nobody
+# here has ever run it, and duplicates what a USB cable does. It now refuses
+# with an explanation rather than failing obscurely -- see performSDUpdate.
+#
+# NVS keeps its offset in both tables, so settings survive the change, and
+# the merged image rewrites the partition table at 0x8000 anyway.
+FQBN="esp32:esp32:esp32:PartitionScheme=huge_app"
 
 # Library versions are pinned because several of these broke their APIs and
 # Library Manager hands you the newest by default:
