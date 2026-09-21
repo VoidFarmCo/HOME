@@ -304,6 +304,47 @@ ship two flash images.
     every other check it runs reads the source, which is why all of them
     passed while the compiler was reading something else.
 
+  * Every feature this fork adds has a render now. tools/render_screens.py
+    gained Hunt's picker and gauge and the Fast Pair list, which needed
+    primitives the menus never call -- pixels, lines, filled triangles and
+    circles, and font 1 at setTextSize(2) and (3). The scaled text is drawn
+    cell by cell rather than upscaled: TFT_eSPI scales the 5x7 cell and not
+    the string, so the inter-character gap scales with it.
+
+    Writing the fixtures found two things, which is the argument for a
+    renderer that replays the firmware's own drawing rather than a mockup
+    agreeing with whatever it was drawn from.
+
+    Target::label was 18 bytes and the longest Kind::Tracker label is
+    "Samsung (SmartTag?)" at 19, so that row reached the screen as
+    "Samsung (SmartTag" -- the truncation turning a hedge into a claim,
+    which is the opposite of what the question mark is for. 24 now.
+
+    And the Fast Pair fixture first read "PAIRING  Pixel Buds Pro". kModels
+    in FastPair.cpp is a sentinel and nothing else, on the grounds that a
+    name needs a source rather than a spam list, so modelName() returns
+    nullptr for everything and the device can only print the raw hex. A
+    render showing a product name would have been inventing a capability.
+
+  * The 3.5" lid shows only the screen. It cut the board's whole outline,
+    so the PCB dropped through and nothing covered its edges. Now an
+    aperture at the touch panel's active area (49.96 x 77.24), a rebate
+    behind it for the module (55.90 x 85.36), a 1 mm lip the module bears
+    against, and four M3 posts on the board's own 47.90 x 94.50 hole
+    pattern. All off the E32R35T outline drawing.
+
+    The post height is not a choice: the module bears on the lip, so the
+    PCB sits 4.20 behind it and the posts come out at 2.70. The pilot is
+    2.50 for a self-tapping M3, not BOSS_HOLE's 3.00, which is sized for
+    the base's machine screws and would strip on the first drive.
+
+    The window was also the board's exact outline before that -- 55.5 x
+    101.5 under a comment claiming 0.5 of clearance that was not in the
+    arithmetic. An FDM part printed to a board's exact size does not accept
+    the board.
+
+    [verify] The RGB LED hole is the one figure here not from the drawing.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.
