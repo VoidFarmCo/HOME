@@ -94,7 +94,7 @@ const char *wifi_page1_items[WIFI_PAGE1_FEATURES] = {
 
 // Bluetooth submenu uses the same paged footer layout as WiFi.
 static constexpr int BT_PAGE0_FEATURES = 8;
-static constexpr int BT_PAGE1_FEATURES = 5;
+static constexpr int BT_PAGE1_FEATURES = 3;
 static int bluetooth_submenu_page = 0;
 
 const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
@@ -109,10 +109,8 @@ const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
 
 const char *bluetooth_page1_items[BT_PAGE1_FEATURES] = {
     "Skimmer Detect",
-    "Spotter",
     "Hunt",
-    "Fast Pair",
-    "Drones"};
+    "Fast Pair"};
 
 static FeatureUI::Button s_pagedFooterBtns[2];
 static int s_pagedFooterFocus = -1;  // 0=back, 1=page btn, -1=none
@@ -148,11 +146,13 @@ static constexpr uint8_t OTHER_LAYER_HOME = 0;
 static constexpr uint8_t OTHER_LAYER_RFID = 1;
 static constexpr uint8_t OTHER_LAYER_GPS  = 2;
 
-const int other_NUM_SUBMENU_ITEMS = 3;
+const int other_NUM_SUBMENU_ITEMS = 5;
 static constexpr int OTHER_GRID_COLS = 2;
 const char *other_submenu_items[other_NUM_SUBMENU_ITEMS] = {
     "RFID/NFC",
     "GPS",
+    "Surveillance",
+    "Drone Detector",
     "Main Menu"};
 
 const int rfid_NUM_SUBMENU_ITEMS = 9;
@@ -237,10 +237,8 @@ const unsigned char *bluetooth_page0_icons[BT_PAGE0_FEATURES] = {
 
 const unsigned char *bluetooth_page1_icons[BT_PAGE1_FEATURES] = {
     bitmap_icon_Wireless_4,
-    bitmap_icon_Wireless_4,
     bitmap_icon_compass,
-    bitmap_icon_ble,
-    bitmap_icon_satellite
+    bitmap_icon_ble
 };
 
 const unsigned char *nrf_submenu_icons[nrf_NUM_SUBMENU_ITEMS] = {
@@ -272,6 +270,8 @@ const unsigned char *tools_submenu_icons[tools_NUM_SUBMENU_ITEMS] = {
 
 const unsigned char *other_submenu_icons[other_NUM_SUBMENU_ITEMS] = {
     bitmap_icon_rfid_chip,
+    bitmap_icon_satellite,
+    bitmap_icon_eye,
     bitmap_icon_satellite,
     bitmap_icon_go_back
 };
@@ -2327,84 +2327,18 @@ void handleBluetoothSubmenuButtons() {
             }
         }
 
+
+
+
+
         if (bluetooth_submenu_page == 1 && current_submenu_index == 1) {
             current_submenu_index = 1;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
-            Spotter::spotterSetup();
+            TrackerHunt::setup();
             while (bluetooth_submenu_page == 1 && current_submenu_index == 1 && !feature_exit_requested) {
                 current_submenu_index = 1;
-                in_sub_menu = true;
-                Spotter::spotterLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            Spotter::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
-            current_submenu_index = 4;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            DroneScan::setup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
-                current_submenu_index = 4;
-                in_sub_menu = true;
-                DroneScan::loop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            DroneScan::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
-            current_submenu_index = 2;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            TrackerHunt::setup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
-                current_submenu_index = 2;
                 in_sub_menu = true;
                 TrackerHunt::loop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2432,14 +2366,14 @@ void handleBluetoothSubmenuButtons() {
             }
         }
 
-        if (bluetooth_submenu_page == 1 && current_submenu_index == 3) {
-            current_submenu_index = 3;
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
+            current_submenu_index = 2;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             FastPairScan::fastPairSetup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
-                current_submenu_index = 3;
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+                current_submenu_index = 2;
                 in_sub_menu = true;
                 FastPairScan::fastPairLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2788,75 +2722,9 @@ void handleBluetoothSubmenuButtons() {
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
-                    Spotter::spotterSetup();
+                    TrackerHunt::setup();
                     while (bluetooth_submenu_page == 1 && current_submenu_index == 1 && !feature_exit_requested) {
                         current_submenu_index = 1;
-                        in_sub_menu = true;
-                        Spotter::spotterLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    Spotter::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
-                    current_submenu_index = 4;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    DroneScan::setup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
-                        current_submenu_index = 4;
-                        in_sub_menu = true;
-                        DroneScan::loop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    DroneScan::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
-                    current_submenu_index = 2;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    TrackerHunt::setup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
-                        current_submenu_index = 2;
                         in_sub_menu = true;
                         TrackerHunt::loop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2882,14 +2750,14 @@ void handleBluetoothSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 3) {
-                    current_submenu_index = 3;
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
+                    current_submenu_index = 2;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     FastPairScan::fastPairSetup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
-                        current_submenu_index = 3;
+                    while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+                        current_submenu_index = 2;
                         in_sub_menu = true;
                         FastPairScan::fastPairLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -4151,7 +4019,43 @@ void handleOtherSubmenuButtons() {
                 current_submenu_index = 0;
                 updateActiveSubmenu();
                 submenu_initialized = false;
+                displaySubmenu();
+            } else if (current_submenu_index == 2) {
+                feature_active = true;
+                feature_exit_requested = false;
+                Spotter::spotterSetup();
+                while (!feature_exit_requested) {
+                    Spotter::spotterLoop();
+                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                        break;
+                    }
+                }
+                Spotter::exit();
+                feature_active = false;
+                feature_exit_requested = false;
+                other_menu_grid_initialized = false;
+                last_other_menu_index = -1;
+                submenu_initialized = false;
                 displaySubmenu();
+                delay(200);
+            } else if (current_submenu_index == 3) {
+                feature_active = true;
+                feature_exit_requested = false;
+                DroneScan::setup();
+                while (!feature_exit_requested) {
+                    DroneScan::loop();
+                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                        break;
+                    }
+                }
+                DroneScan::exit();
+                feature_active = false;
+                feature_exit_requested = false;
+                other_menu_grid_initialized = false;
+                last_other_menu_index = -1;
+                submenu_initialized = false;
+                displaySubmenu();
+                delay(200);
             }
         } else if (other_layer == OTHER_LAYER_RFID) {
             if (current_submenu_index == rfid_NUM_SUBMENU_ITEMS - 1) {
@@ -4196,8 +4100,13 @@ void handleOtherSubmenuButtons() {
                 int y_position = Y_START + row * Y_SPACING;
                 int button_x1 = x_position;
                 int button_y1 = y_position;
-                int button_x2 = x_position + 100;
-                int button_y2 = y_position + 60;
+                /* TILE_W/TILE_H, not 100x60. Those are the 2.8" tile size,
+                 * and on the 3.5" the tiles are 145x92 -- so two thirds of
+                 * every tile in this grid did not respond to a tap. It
+                 * survived the panel sweep by looking like a hit box rather
+                 * than like a dimension. */
+                int button_x2 = x_position + TILE_W;
+                int button_y2 = y_position + TILE_H;
                 if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
                     touched_slot = i;
                     break;
@@ -4251,7 +4160,43 @@ void handleOtherSubmenuButtons() {
                 current_submenu_index = 0;
                 updateActiveSubmenu();
                 submenu_initialized = false;
+                displaySubmenu();
+            } else if (current_submenu_index == 2) {
+                feature_active = true;
+                feature_exit_requested = false;
+                Spotter::spotterSetup();
+                while (!feature_exit_requested) {
+                    Spotter::spotterLoop();
+                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                        break;
+                    }
+                }
+                Spotter::exit();
+                feature_active = false;
+                feature_exit_requested = false;
+                other_menu_grid_initialized = false;
+                last_other_menu_index = -1;
+                submenu_initialized = false;
                 displaySubmenu();
+                delay(200);
+            } else if (current_submenu_index == 3) {
+                feature_active = true;
+                feature_exit_requested = false;
+                DroneScan::setup();
+                while (!feature_exit_requested) {
+                    DroneScan::loop();
+                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                        break;
+                    }
+                }
+                DroneScan::exit();
+                feature_active = false;
+                feature_exit_requested = false;
+                other_menu_grid_initialized = false;
+                last_other_menu_index = -1;
+                submenu_initialized = false;
+                displaySubmenu();
+                delay(200);
             }
         } else if (other_layer == OTHER_LAYER_RFID) {
             if (current_submenu_index == rfid_NUM_SUBMENU_ITEMS - 1) {
@@ -4587,8 +4532,13 @@ void handleButtons() {
 
                 int button_x1 = x_position;
                 int button_y1 = y_position;
-                int button_x2 = x_position + 100;
-                int button_y2 = y_position + 60;
+                /* TILE_W/TILE_H, not 100x60. Those are the 2.8" tile size,
+                 * and on the 3.5" the tiles are 145x92 -- so two thirds of
+                 * every tile in this grid did not respond to a tap. It
+                 * survived the panel sweep by looking like a hit box rather
+                 * than like a dimension. */
+                int button_x2 = x_position + TILE_W;
+                int button_y2 = y_position + TILE_H;
 
                 if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
                     current_menu_index = i;
