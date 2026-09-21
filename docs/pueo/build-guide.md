@@ -61,7 +61,35 @@ The PN532 runs from 5 V, not from either 3.3 V rail.
 Antennas on both radios before power. A PA module transmitting into an open
 SMA is a module you replace.
 
-### The two base boards
+### "Cheap yellow display" names at least four boards
+
+Two vendors, and they do not agree about GPIO 4. Get this wrong and the
+NRF24's chip select lands on an audio amplifier.
+
+| | Sunton **ESP32-2432S028R** | lcdwiki **E32R28T** | lcdwiki **E32R35T** |
+|---|---|---|---|
+| Size | 2.8" | 2.8" | 3.5" |
+| Driver | ILI9341 | ILI9341V | ST7796 |
+| RGB LED | **4** / 16 / 17 | **22** / 16 / 17 | **22** / 16 / 17 |
+| GPIO 4 is | the LED's red | **amp enable** | **amp enable** |
+| Outline | ~56 × 92.5 mm | 50.00 × 86.00 | 55.50 × 101.50 |
+| Serial hdr | P5 | 1.25 mm JST | UART JST |
+
+**Pueo's 2.8" build targets the Sunton board**, where GPIO 4 is the LED's
+red channel and spending it is the trade this pin map makes. On any lcdwiki
+E32 board that pin is an amplifier's enable, and the 2.8" image would key it
+at chip-select rates. The 3.5" image already moves CSN to GPIO 25 for
+exactly that reason; the 2.8" image does not, because the board it is for
+does not need it to.
+
+The lcdwiki 4.0" E32R40T follows the same family pattern and is untried
+here.
+
+If your 2.8" board's silkscreen reads `ESP32 2432S028`, it is the Sunton and
+the 2.8" column below is for you. If it reads `E32R28T`, it is not, and
+nothing in this tree has been built for it.
+
+### The two panels this tree builds for
 
 Both are sold as a "cheap yellow display" and they are not the same board.
 
@@ -98,7 +126,7 @@ the difference is large: three joints on the 3.5", six on the 2.8".
 |---|---|---|---|
 | CC1101 CS | 27 / 21 | CN1, header | **SPI** JST, `IO21(CS)` |
 | CC1101 GDO2 (RX) | 35 | P3, header | **IO35/IO39** JST |
-| GPS TX → ESP32 | 1 | P1 / **P5** JST, see below | **UART** JST, `TXD` |
+| GPS TX → ESP32 | 1 | **P5** JST, `TX` | **UART** JST, `TXD` |
 | VSPI SCK | 18 | microSD pin, **solder** | **SPI** JST, `IO18(SCK)` |
 | VSPI MOSI | 23 | microSD pin, **solder** | **SPI** JST, `IO23(MOSI)` |
 | VSPI MISO | 19 | microSD pin, **solder** | **SPI** JST, `IO19(MISO)` |
@@ -132,12 +160,10 @@ above came from a board under a meter -- the 3.5" is off lcdwiki's render and
 the 2.8" is off a product photo -- and CYD revisions differ. The silkscreen is
 the authority and it is printed next to each connector.
 
-One known discrepancy: this guide has called the 2.8"'s serial connector
-**P1** since it was written, and the boards in circulation label the
-four-pin JST carrying `GND TX RX VIN` as **P5**. If your board has both,
-the one with TX on it is the one you want. The 2.8" photo also shows no SPI
-breakout anywhere, which is the claim above about the microSD pins holding
-up rather than being an assumption.
+The 2.8"'s serial connector is **P5** -- a four-pin JST carrying
+`GND TX RX VIN`. This guide called it P1 until someone read it off a board.
+The same board shows no SPI breakout anywhere, which is the claim above
+about the microSD pins holding up rather than being an assumption.
 
 ## Order of work
 

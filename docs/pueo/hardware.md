@@ -24,8 +24,16 @@ the compiler will and cross-references them against the CYD's own wiring.
 | NRF24 CE | 16 | was RGB LED green |
 | NRF24 IRQ | not connected | see below |
 | PN532 SS | 17 | was RGB LED blue, SPI mode (DIP CH1=OFF, CH2=ON) |
-| GPS TX -> ESP32 | 1 | UART0 TX pin on the P1 JST, see below |
+| GPS TX -> ESP32 | 1 | UART0 TX pin on the P5 JST, see below |
 | GPS RX | not connected | |
+
+**Which 2.8" board you have matters more than it should.** "Cheap yellow
+display" names boards from at least two vendors. This tree targets Sunton's
+**ESP32-2432S028R**, whose silkscreen reads `ESP32 2432S028`. lcdwiki's
+2.8" is the **E32R28T** -- a different board, 50.00 x 86.00 mm against the
+Sunton's larger outline, and it puts the RGB LED's red channel on GPIO 22
+and an audio amplifier's enable on GPIO 4. Nothing here has been built for
+it, and the 2.8" image would drive that amplifier as a chip select.
 
 **The two boards do not agree about GPIO 4.** On the 2.8" ESP32-2432S028R it
 is the RGB LED's red channel. On the 3.5" ESP32-3248S035R -- lcdwiki's E32R35T,

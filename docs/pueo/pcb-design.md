@@ -32,7 +32,7 @@ Of the ten signals the firmware needs, only four reach a CYD header:
 | CC1101 CS | 27 | CN1 header |
 | CC1101 GDO0 | 22 | P3 header |
 | CC1101 GDO2 | 35 | P3 header |
-| GPS RX | 1 | P1 JST |
+| GPS RX | 1 | P5 JST |
 | VSPI SCK | 18 | **microSD slot pin** |
 | VSPI MOSI | 23 | **microSD slot pin** |
 | VSPI MISO | 19 | **microSD slot pin** |
@@ -47,7 +47,7 @@ one documented place** instead of thirty scattered across four modules — and
 an intermittent joint on MISO presents exactly like the bus faults that cost
 a week of firmware archaeology, so reducing their count is not cosmetic.
 
-**[verify]** Confirm CN1/P3/P1 pinouts against your actual board before
+**[verify]** Confirm CN1/P3/P5 pinouts against your actual board before
 committing. CYD revisions differ, and the silkscreen is the authority.
 
 ## Architecture

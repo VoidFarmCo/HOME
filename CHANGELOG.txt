@@ -362,6 +362,26 @@ ship two flash images.
     The table is per panel now. [verify] it against your own silkscreen: it
     is read off a product render rather than a board in front of a meter.
 
+  * "Cheap yellow display" names boards from at least two vendors, and they
+    do not agree about GPIO 4.
+
+    This tree targets Sunton's ESP32-2432S028R, silkscreened
+    `ESP32 2432S028`, where GPIO 4 is the RGB LED's red channel and
+    spending it is the trade this pin map makes. lcdwiki's 2.8" is the
+    E32R28T: a different board, 50.00 x 86.00 mm, RGB red on GPIO 22 and an
+    audio amplifier's enable on GPIO 4 -- the same layout as their 3.5" and
+    4.0" parts. The 2.8" image would key that amplifier at chip-select
+    rates, which is the fault the 3.5" build already moves CSN to avoid.
+
+    Documented rather than handled. Nothing here has been built for the
+    lcdwiki 2.8", and a board profile is the answer if one ever is.
+
+  * The 2.8"'s serial connector is P5, not P1. The guide had called it P1
+    since it was written; someone read it off a board. The same board shows
+    no SPI breakout anywhere, which turns the claim the 2.8" wiring rests
+    on -- that SCK, MOSI and MISO come off the microSD slot's own pins --
+    from an assumption into an observation.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.
