@@ -4218,16 +4218,57 @@ void handleOtherSubmenuButtons() {
     }
 }
 
-void handleAboutPage() {
-  feature_active = true;
-  feature_exit_requested = false;
-
+/* About, in two pages.
+ *
+ * It was one page of text and no artwork at all. The owl is a fixed 200x200
+ * bitmap and drawBitmap does not scale, so on a 240x320 panel it does not
+ * share a page with four rows of credits -- there is nowhere for them to go.
+ * Two pages fits it on both panels instead of picking one to go without.
+ *
+ * Page 1 is the mark and who made it. Page 2 is the detail: board, contact,
+ * where the source is. Tap or SELECT moves on, and again leaves.
+ */
+void drawAboutPage(int page) {
   tft.fillScreen(UI_BG);
-  currentBatteryVoltage = readBatteryVoltage();
-  drawStatusBar(currentBatteryVoltage, true);
+  drawStatusBar(readBatteryVoltage(), true);
 
   tft.setTextDatum(TL_DATUM);
   tft.setTextSize(1);
+
+  if (page == 0) {
+    int y = 40;
+#ifdef PUEO_LOGO_BITMAP
+    /* Centred on what is left after the status bar, not on the screen, or
+     * it sits low by half the bar. */
+    const int lx = (PUEO_SCREEN_W - PUEO_LOGO_W) / 2;
+    const int ly = 24 + ((PUEO_SCREEN_H - 24) - PUEO_LOGO_H) / 2 - 16;
+    tft.drawBitmap(lx, ly, PUEO_LOGO_BITMAP,
+                   PUEO_LOGO_W, PUEO_LOGO_H, UI_ICON);
+    y = ly + PUEO_LOGO_H + 14;
+#else
+    /* No artwork compiled in: print the name so the page is not blank.
+     * With the bitmap the wordmark is already in it, which is why the
+     * name line only exists here -- same reason displayLogo() drops it. */
+    tft.setTextFont(2);
+    tft.setTextColor(UI_ICON, UI_BG);
+    tft.setCursor(16, y);
+    tftPrintObf(OBF_PN, sizeof(OBF_PN));
+    y += 22;
+#endif
+
+    tft.setTextFont(1);
+    tft.setTextColor(UI_DIM_TEXT, UI_BG);
+    tft.setCursor(16, y);
+    tft.print("by ");
+    tftPrintObf(OBF_DN, sizeof(OBF_DN));
+    tft.print(" - ");
+    tft.print(ESP32DIV_VERSION);
+
+    tft.setTextColor(UI_DIM_TEXT, UI_BG);
+    tft.setCursor(16, PUEO_SCREEN_H - 20);
+    tft.print("SELECT / tap for details");
+    return;
+  }
 
   tft.setTextFont(2);
   tft.setTextColor(UI_ICON, UI_BG);
@@ -4242,12 +4283,12 @@ void handleAboutPage() {
   tft.print(" - ");
   tft.print(ESP32DIV_VERSION);
 
-  tft.drawFastHLine(12, 78, 216, UI_LINE);
+  tft.drawFastHLine(12, 78, PUEO_SCREEN_W - 24, UI_LINE);
 
   const int xLabel = 16;
   const int xValue = 80;
-  int y = 96;
   const int step = 22;
+  int y = 96;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
@@ -4281,23 +4322,46 @@ void handleAboutPage() {
   tftPrintObf(OBF_WB, sizeof(OBF_WB));
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
-  tft.setCursor(16, 300);
+  tft.setCursor(16, PUEO_SCREEN_H - 20);
   tft.print("SELECT / tap to go back");
+}
+
+void handleAboutPage() {
+  feature_active = true;
+  feature_exit_requested = false;
+
+  currentBatteryVoltage = readBatteryVoltage();
+  int page = 0;
+  drawAboutPage(page);
 
   while (!feature_exit_requested) {
+    bool advance = false;
+
     if (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
       last_interaction_time = millis();
-      feature_exit_requested = true;
-      delay(200);
-      break;
+      advance = true;
+    } else {
+      int x, ty;
+      if (readTouchXY(x, ty)) {
+        last_interaction_time = millis();
+        advance = true;
+      }
     }
 
-    int x, ty;
-    if (readTouchXY(x, ty)) {
-      last_interaction_time = millis();
-      feature_exit_requested = true;
+    if (advance) {
       delay(200);
-      break;
+      /* Wait for the release before deciding again, or one press walks
+       * both pages and leaves. */
+      while (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
+        delay(10);
+      }
+      if (page == 0) {
+        page = 1;
+        drawAboutPage(page);
+      } else {
+        feature_exit_requested = true;
+        break;
+      }
     }
 
     delay(20);
@@ -4313,6 +4377,7 @@ void handleAboutPage() {
   is_main_menu = false;
   displayMenu();
 }
+
 
 void handleSettingsSubmenuButtons() {
 

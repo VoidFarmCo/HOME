@@ -630,6 +630,30 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
     tft.setTextSize(1);
     tft.print(String(batteryPercentage) + "%");
 
+    /* Name and version, centred in what is left of the bar.
+     *
+     * The status bar is the one piece of chrome every screen draws, so this
+     * is the only place a build can identify itself without each feature
+     * having to remember to. Which matters more than it sounds: flashing
+     * the wrong panel's image is a dark screen, and flashing a stale one
+     * looks exactly like a fix not working.
+     *
+     * Centred between the battery block and the icon cluster rather than at
+     * a fixed x, because the cluster moves with the panel. It is dropped
+     * rather than overlapped if that gap ever gets too small -- an empty
+     * bar is better than two strings on top of each other. */
+    {
+      const char* build = PUEO_NAME " " PUEO_VERSION;
+      const int   textW = (int)strlen(build) * 6;
+      const int   gapL  = x + 30 + 24;                       // past "100%"
+      const int   gapR  = PUEO_SCREEN_W - kStatusIconsWidth - 4;
+      if (gapR - gapL >= textW) {
+        tft.setCursor(gapL + (gapR - gapL - textW) / 2, y + 2);
+        tft.setTextColor(UI_DIM_TEXT, UI_LABLE);
+        tft.print(build);
+      }
+    }
+
     const int iconW         = 16;
     const int gap           = 3;
     const int wifiBarsWidth = 24;

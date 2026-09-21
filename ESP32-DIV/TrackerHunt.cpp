@@ -72,6 +72,17 @@ int8_t   s_peak     = kRssiFar;
 uint32_t s_lockSeen = 0;
 uint32_t s_lockHits = 0;
 int      s_prevAngle = -1;
+/* What the readout is currently showing. It used to be cleared and redrawn
+ * whole on every frame, which on a 60 ms timer over SPI is a visible blink
+ * on text that mostly does not change -- HOLD and LOST worst of all, because
+ * those are the states where nothing is changing at all. Each line is
+ * compared against what is on the glass and only touched when it differs. */
+char     s_shownTrend[12] = {0};
+char     s_shownBand[16]  = {0};
+char     s_shownNums[56]  = {0};
+int      s_shownFill      = -1;
+int      s_shownPeakPx    = -1;
+int8_t   s_shownLost      = -1;   // -1 = nothing drawn yet
 float    s_trendBase = 0.0f;
 uint32_t s_trendAt   = 0;
 int      s_trend     = 0;        // +1 warmer, -1 colder, 0 hold
@@ -389,6 +400,22 @@ void drawGaugeChrome(const Dial& d) {
   tft.fillCircle(d.cx, d.cy, 3, TFT_DARKGREY);
 }
 
+/* Redraw one centred line only if the text changed, clearing just its own
+ * band first. drawCentreString paints a background behind each glyph, but a
+ * shorter string leaves the tail of the longer one behind, so the clear has
+ * to happen -- just not over the whole readout, and not when nothing moved. */
+void showLine(char* shown, size_t shownSz, const char* text,
+              int cx, int y, uint8_t size, uint16_t colour, bool force) {
+  if (!force && strncmp(shown, text, shownSz - 1) == 0) {
+    return;
+  }
+  tft.fillRect(0, y, PUEO_SCREEN_W, 8 * size, TFT_BLACK);
+  tft.setTextSize(size);
+  tft.setTextColor(colour, TFT_BLACK);
+  tft.drawCentreString(text, cx, y, 1);
+  snprintf(shown, shownSz, "%s", text);
+}
+
 void drawGauge() {
   const Dial d = dial();
   const uint32_t now = millis();
@@ -440,18 +467,26 @@ void drawGauge() {
    * technique is to move and watch the direction, so the direction is the
    * biggest thing on the screen and the number is the smallest. */
   const int ty = d.cy + 14;
-  tft.fillRect(0, ty, PUEO_SCREEN_W, contentBottom() - ty, TFT_BLACK);
   tft.setTextFont(1);
 
+  /* Crossing between lost and found changes the shape of the readout, so
+   * that transition clears it once. Staying in either state does not. */
+  const bool crossed = (s_shownLost != (int8_t)(lost ? 1 : 0));
+  if (crossed) {
+    tft.fillRect(0, ty, PUEO_SCREEN_W, contentBottom() - ty, TFT_BLACK);
+    s_shownTrend[0] = s_shownBand[0] = s_shownNums[0] = '\0';
+    s_shownFill = s_shownPeakPx = -1;
+    s_shownLost = lost ? 1 : 0;
+  }
+
   if (lost) {
-    tft.setTextSize(3);
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawCentreString("LOST", d.cx, ty, 1);
-    tft.setTextSize(1);
-    tft.drawCentreString("moved off, shielded, or changed address",
-                         d.cx, ty + 30, 1);
-    tft.drawCentreString("Exit and re-pick if it does not come back",
-                         d.cx, ty + 42, 1);
+    showLine(s_shownTrend, sizeof(s_shownTrend), "LOST",
+             d.cx, ty, 3, TFT_DARKGREY, crossed);
+    showLine(s_shownBand, sizeof(s_shownBand), "moved off, shielded, or",
+             d.cx, ty + 30, 1, TFT_DARKGREY, crossed);
+    showLine(s_shownNums, sizeof(s_shownNums),
+             "changed address -- Exit and re-pick", d.cx, ty + 42, 1,
+             TFT_DARKGREY, crossed);
     return;
   }
 
@@ -464,9 +499,8 @@ void drawGauge() {
     trendWord = "COLDER";
     trendCol  = TFT_BLUE;
   }
-  tft.setTextSize(3);
-  tft.setTextColor(trendCol, TFT_BLACK);
-  tft.drawCentreString(trendWord, d.cx, ty, 1);
+  showLine(s_shownTrend, sizeof(s_shownTrend), trendWord,
+           d.cx, ty, 3, trendCol, crossed);
 
   /* A coarse band, in words. Not metres: see the header. The thresholds are
    * where the needle sits, not where the tracker is, and the last one says
@@ -479,36 +513,55 @@ void drawGauge() {
   else if (sm < -55) { band = "NEAR";         bandCol = ORANGE;       }
   else if (sm < -45) { band = "VERY CLOSE";   bandCol = ORANGE;       }
   else               { band = "ARM'S LENGTH"; bandCol = TFT_RED;      }
-  tft.setTextSize(2);
-  tft.setTextColor(bandCol, TFT_BLACK);
-  tft.drawCentreString(band, d.cx, ty + 30, 1);
+  showLine(s_shownBand, sizeof(s_shownBand), band,
+           d.cx, ty + 30, 2, bandCol, crossed);
 
   /* Strength bar. The same value as the needle, in the shape people read
    * signal from, because a bar filling is easier to catch out of the corner
    * of an eye than a needle rotating. */
-  const int bw = PUEO_SCREEN_W - 40;
-  const int bx = 20;
-  const int by = ty + 54;
+  const int bw  = PUEO_SCREEN_W - 40;
+  const int bx  = 20;
+  const int by  = ty + 54;
+  const int inner = bw - 2;                 // between the border's own pixels
   int fill = (int)(((float)(sm - kRssiFar) /
-                    (float)(kRssiNear - kRssiFar)) * (float)bw);
-  if (fill < 0)  fill = 0;
-  if (fill > bw) fill = bw;
-  tft.drawRect(bx, by, bw, 10, TFT_DARKGREY);
-  tft.fillRect(bx + 1, by + 1, fill, 8, bandCol);
+                    (float)(kRssiNear - kRssiFar)) * (float)inner);
+  if (fill < 0)     fill = 0;
+  if (fill > inner) fill = inner;
+
+  int px = -1;
   if (s_peak > kRssiFar) {
-    int px = bx + (int)(((float)(s_peak - kRssiFar) /
-                         (float)(kRssiNear - kRssiFar)) * (float)bw);
-    if (px < bx)      px = bx;
-    if (px > bx + bw) px = bx + bw;
-    tft.drawFastVLine(px, by - 3, 16, TFT_GREEN);
+    px = bx + 1 + (int)(((float)(s_peak - kRssiFar) /
+                         (float)(kRssiNear - kRssiFar)) * (float)inner);
+    if (px < bx + 1)         px = bx + 1;
+    if (px > bx + 1 + inner) px = bx + 1 + inner;
+  }
+
+  /* The bar only redraws when it moves, and when it does it paints the
+   * whole interior -- fill, then the remainder in black.
+   *
+   * The remainder is the part that was missing: fillRect drew the new fill
+   * and left whatever was beyond it alone, so a bar that had once been long
+   * never got shorter. Walking away from a tracker left the bar where the
+   * closest approach had put it, which is the one direction a hunt most
+   * needs to see. */
+  if (crossed || fill != s_shownFill || px != s_shownPeakPx) {
+    tft.drawRect(bx, by, bw, 10, TFT_DARKGREY);
+    tft.fillRect(bx + 1, by + 1, fill, 8, bandCol);
+    if (fill < inner) {
+      tft.fillRect(bx + 1 + fill, by + 1, inner - fill, 8, TFT_BLACK);
+    }
+    if (px >= 0) {
+      tft.drawFastVLine(px, by - 3, 16, TFT_GREEN);
+    }
+    s_shownFill   = fill;
+    s_shownPeakPx = px;
   }
 
   char line[52];
   snprintf(line, sizeof(line), "%d dBm    best %d    %lu seen",
            sm, (int)s_peak, (unsigned long)s_lockHits);
-  tft.setTextSize(1);
-  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawCentreString(line, d.cx, by + 18, 1);
+  showLine(s_shownNums, sizeof(s_shownNums), line,
+           d.cx, by + 18, 1, TFT_DARKGREY, crossed);
 }
 
 void enterGauge() {
@@ -522,6 +575,11 @@ void enterGauge() {
   s_lockHits  = 0;
   s_chrome    = false;
   s_prevAngle = -1;
+  /* The readout caches what it has drawn. drawGaugeChrome() is about to
+   * clear the screen, so the cache has to stop agreeing with it or the
+   * first frame skips everything that happens to be unchanged. -1 makes
+   * the next frame cross and redraw the lot. */
+  s_shownLost = -1;
   s_trendBase = s_smooth;
   s_trendAt   = millis();
   s_trend     = 0;

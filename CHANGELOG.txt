@@ -399,6 +399,45 @@ ship two flash images.
     3.5"'s 55.50 x 101.50 x 5.80, and there is no outline drawing here for
     it, so a lid would be guesswork.
 
+  * Hunt's readout flickered, and its bar could not shrink.
+
+    The whole readout was cleared and redrawn every 60 ms whether or not
+    anything had changed, which on SPI is a visible blink -- worst on HOLD
+    and LOST, because those are the states where nothing is changing at
+    all. The needle was already guarded against this; the text was not.
+    Each line compares against what is on the glass now and only redraws
+    when it differs, clearing its own band rather than the whole block.
+
+    Chasing it found the worse one. The strength bar painted the new fill
+    and left whatever was beyond it alone, so a bar that had once been long
+    never got shorter: walking away from a tracker left it pinned at the
+    closest approach, which is the one direction a hunt most needs to see.
+    It paints the remainder black now, and the bar and its peak marker
+    redraw together because the marker sits on top of the fill.
+
+  * About is two pages, and has the owl on it. It had no artwork at all --
+    the logo is a fixed 200x200 bitmap, drawBitmap does not scale, and on a
+    240x320 panel it does not share a page with four rows of credits. Two
+    pages fits it on both panels rather than picking one to go without.
+    Page one is the mark and the by-line, page two is board, contact and
+    where the source is. Tap or SELECT moves on, again leaves, with a wait
+    for the release in between so one press does not walk both and exit.
+
+    Its rule was 216 px wide and its back hint sat at y=300 -- 240x320
+    figures that survived the whole panel sweep because ESP32-DIV.ino was
+    not in the file list that sweep worked from. It is in
+    check_screen_dims.py's list now.
+
+  * The status bar carries the build. "Pueo <version>", centred in the gap
+    between the battery block and the icon cluster, computed rather than
+    placed at a fixed x because the cluster moves with the panel, and
+    dropped rather than overlapped if that gap is ever too small.
+
+    The status bar is the one piece of chrome every screen draws, so it is
+    the only place a build can say what it is without each feature having
+    to remember to. Worth the six pixels: flashing a stale image looks
+    exactly like a fix not working.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.

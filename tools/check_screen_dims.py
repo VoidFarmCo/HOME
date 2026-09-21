@@ -25,7 +25,12 @@ USER_SETUP = REPO / "Libraries" / "User_Setup cyd.h"
 UI_FILES = ["wifi.cpp", "bluetooth.cpp", "subghz.cpp", "utils.cpp",
             "ducky.cpp", "Touchscreen.h", "menu.cpp", "KeyboardUI.cpp",
             "Spotter.cpp", "FastPairScan.cpp", "TrackerFollow.cpp",
-            "TrackerHunt.cpp", "rfid.cpp", "gps.cpp"]
+            "TrackerHunt.cpp", "rfid.cpp", "gps.cpp",
+            # The sketch draws too -- the About page, and the menu grid.
+            # It was missing from this list, which is how the About page
+            # kept a 216 px rule and a back hint at y=300 through an entire
+            # sweep that existed to find exactly that.
+            "ESP32-DIV.ino"]
 
 # What the 43 looked like. Any of these coming back means a screen has gone
 # back to believing it is 240x320.
