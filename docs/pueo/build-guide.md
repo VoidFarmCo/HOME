@@ -285,8 +285,7 @@ around this, but if the symptom returns it points here first.
 one the firmware expects, which is worth running once even though it checks
 the source rather than your soldering.
 
-The enclosure in [pueo-enclosure.scad](pueo-enclosure.scad) is dimensioned
-around these modules and can be printed while you build. Print
-[logo-fit-test.scad](logo-fit-test.scad) first — 76 × 56 × 3 mm, about 10 g,
-and it tells you whether your printer holds the logo detail before you commit
-to a full lid.
+The enclosure is dimensioned around these modules and can be printed while
+you build. The STLs are published at
+[pueo.magikh0e.pl/enclosure.html](https://pueo.magikh0e.pl/enclosure.html);
+the OpenSCAD they are rendered from is not, and is not in this archive.

@@ -100,6 +100,10 @@ The SVG is generated. Re-run the tracer rather than editing it.
 
 ## Rendering
 
+The OpenSCAD is not published and is not in the source archive — the STLs at
+[pueo.magikh0e.pl/enclosure.html](https://pueo.magikh0e.pl/enclosure.html)
+are what is offered. Inside the repository, where the file lives:
+
 ```bash
 openscad -D 'PART="lid"' -o lid.stl docs/pueo/pueo-enclosure.scad
 ```
@@ -138,15 +142,9 @@ asserts height, width, centring and area against figures derived from the
 source bitmap, plus the lid's removed volume. 14 checks. It skips cleanly
 when OpenSCAD is absent, since the firmware build does not need it.
 
-## The test tile
+## Which way up
 
-`docs/pueo/logo-fit-test.scad` — 76 × 56 × 3 mm, about 10 g.
-
-```bash
-openscad -o logo-fit-test.stl docs/pueo/logo-fit-test.scad
-```
-
-**Which way up decides the test.** The lid is a tray, so printed
+**Orientation decides whether the logo reads.** The lid is a tray, so printed
 outer-face-up its ceiling is an 80 × 165 bridge. It has to print
 outer-face-**down**, which puts the logo against the bed. Bed-side grooves
 behave differently from top-side ones: glass-smooth floor, crisp walls, and

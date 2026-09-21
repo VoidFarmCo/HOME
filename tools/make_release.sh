@@ -144,6 +144,21 @@ done
 # Dragged in by cp -r, and not wanted in a source archive.
 rm -rf "$STAGE/.arduino"
 
+# The enclosure sources are not published. The STLs are what the site offers
+# and what people print; the .scad files stay in the repository, where they
+# are edited, and go no further. docs/pueo ships wholesale, so without this
+# they would ride along in every archive and the decision would hold only on
+# the website.
+#
+# Asserted rather than assumed: a file added to docs/pueo later should not
+# quietly reinstate this.
+rm -f "$STAGE"/docs/pueo/*.scad
+if find "$STAGE" -name '*.scad' -print -quit | grep -q .; then
+  echo "refusing to cut: a .scad reached the archive" >&2
+  find "$STAGE" -name '*.scad' >&2
+  exit 1
+fi
+
 cat > "$STAGE/BUILDING.txt" <<TXT
 Pueo ${VERSION} - source archive
 
