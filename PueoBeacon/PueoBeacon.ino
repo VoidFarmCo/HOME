@@ -29,6 +29,7 @@
  * better one.
  * ────────────────────────────────────────────────────────────────────────── */
 
+#include "BeaconArt.h"
 #include "Emit.h"
 
 #include <TFT_eSPI.h>
@@ -37,6 +38,7 @@
  * backlight pin and the rotation, all of which move with PUEO_PANEL -- so
  * the two images cannot disagree about the board they are on. */
 #include "Branding.h"
+#include "icon.h"
 #include "shared.h"
 
 TFT_eSPI tft = TFT_eSPI();
@@ -75,6 +77,84 @@ constexpr uint8_t kWifiCount = sizeof(kWifiSignals) / sizeof(kWifiSignals[0]);
 constexpr uint8_t kBleCount  = sizeof(kBleSignals) / sizeof(kBleSignals[0]);
 
 uint8_t s_wifiIdx = 0;
+
+/* ── the splash ──────────────────────────────────────────────────────────
+ *
+ * Two boards, same case, same panel, and one of them transmits. Telling them
+ * apart mattered enough already -- a detector was overwritten with this
+ * firmware because nothing on screen or in the build output distinguished
+ * them -- so this one says what it is before it says anything else, and says
+ * it in the warning colour rather than the owl's.
+ *
+ * The artwork is the beacon's own: an owl calling from a mast with the arcs
+ * going outward, the mirror of the Hunt mark where they come inward. See
+ * BeaconArt.h. */
+/* Long enough to read what the board is and pull the power if it is the
+ * wrong one. The splash is the only moment before it starts transmitting,
+ * so it counts down out loud rather than just sitting there. */
+constexpr uint32_t kSplashMs = 5000;
+
+void drawSplash() {
+  tft.fillScreen(kBg);
+
+  constexpr int kMarkW = 200, kMarkH = 200;
+  const int lx = (PUEO_SCREEN_W - kMarkW) / 2;
+  const int ly = (PUEO_SCREEN_H - kMarkH) / 2 - 40;
+  tft.drawBitmap(lx, ly, bitmap_pueo_beacon, kMarkW, kMarkH, kWarn);
+  int y = ly + kMarkH + 12;
+
+  tft.setTextDatum(TC_DATUM);
+  const int cx = PUEO_SCREEN_W / 2;
+
+  tft.setTextFont(2);
+  tft.setTextColor(kWarn, kBg);
+  tft.drawString("BEACON", cx, y);
+  y += 22;
+
+  tft.setTextFont(1);
+  tft.setTextColor(kText, kBg);
+  tft.drawString("bench transmitter", cx, y);
+  y += 14;
+  tft.setTextColor(kDim, kBg);
+  tft.drawString(PUEO_VERSION, cx, y);
+
+  /* The one thing worth reading before it starts. */
+  tft.setTextColor(kStop, kBg);
+  tft.drawString("THIS BOARD TRANSMITS", cx, PUEO_SCREEN_H - 54);
+  tft.setTextColor(kDim, kBg);
+  tft.drawString("WiFi + BLE, lowest power, 10 min", cx, PUEO_SCREEN_H - 40);
+
+  /* Counts down rather than waiting quietly, so the delay reads as a
+   * deliberate hold and not as a slow boot. Only the line that changes is
+   * repainted -- a full clear once a second is a flash once a second, which
+   * is the same fault four feature screens had. */
+  const int countY = PUEO_SCREEN_H - 22;
+  const uint32_t until = millis() + kSplashMs;
+  int shown = -1;
+  for (;;) {
+    const uint32_t now = millis();
+    if ((int32_t)(until - now) <= 0) {
+      break;
+    }
+    const int left = (int)((until - now + 999u) / 1000u);
+    if (left != shown) {
+      shown = left;
+      char msg[40];
+      snprintf(msg, sizeof(msg), "broadcasting in %d...", left);
+      tft.fillRect(0, countY, PUEO_SCREEN_W, 16, kBg);
+      tft.setTextColor(kWarn, kBg);
+      tft.drawString(msg, cx, countY);
+    }
+    delay(20);
+  }
+
+  tft.fillRect(0, countY, PUEO_SCREEN_W, 16, kBg);
+  tft.setTextColor(kLive, kBg);
+  tft.drawString("broadcasting", cx, countY);
+  delay(300);
+
+  tft.setTextDatum(TL_DATUM);
+}
 
 void drawFrame() {
   tft.fillScreen(kBg);
@@ -155,6 +235,8 @@ void setup() {
 
   tft.init();
   tft.setRotation(TFT_ROTATION);
+
+  drawSplash();
   drawFrame();
 
   Emit::begin();
