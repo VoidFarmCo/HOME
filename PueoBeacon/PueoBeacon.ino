@@ -127,6 +127,18 @@ void drawBody() {
     y += 24;
   }
 
+  /* A refused frame is the difference between "nobody is listening" and
+   * "nothing is being said", and those two look identical from the other
+   * board. Say which it is here. */
+  const uint32_t fails = Emit::txFailures();
+  if (fails) {
+    tft.setTextColor(kStop, kBg);
+    char warn[48];
+    snprintf(warn, sizeof(warn), "WiFi TX REFUSED x%lu - frames not sent",
+             (unsigned long)fails);
+    tft.drawString(warn, 8, PUEO_SCREEN_H - 26);
+  }
+
   tft.setTextColor(kDim, kBg);
   tft.drawString("all payloads say PUEO-TEST", 8, PUEO_SCREEN_H - 14);
 }

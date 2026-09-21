@@ -16,10 +16,28 @@
 #include <esp_wifi.h>
 #include <string.h>
 
+/* ── why raw injection needs this ────────────────────────────────────────
+ *
+ * esp_wifi_80211_tx refuses frames the IDF does not like the look of, and a
+ * hand-built beacon or probe request is exactly that. The IDF's check is
+ * overridden with one that says yes; build.sh weakens the library's copy of
+ * the symbol so this strong definition wins the link.
+ *
+ * The detector has had this in wifi.cpp since upstream. The beacon is a
+ * separate sketch and did not inherit it, so every Wi-Fi frame this emitted
+ * was rejected before it reached the air -- while BLE, which does not go
+ * through this path, worked perfectly. The symptom was a bench where the
+ * glasses decoy was found and the plate reader and body camera never were,
+ * which reads like two broken detectors rather than one missing function. */
+extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
+  return 0;
+}
+
 namespace Emit {
 namespace {
 
 uint32_t s_sent[kSignalCount];
+uint32_t s_txFail = 0;
 Signal   s_bleLive = kSignalCount;
 bool     s_wifiUp  = false;
 
@@ -54,6 +72,18 @@ void wifiUp() {
 uint8_t s_frame[256];
 
 /* 802.11 header, shared by the beacon and the probe request. */
+/* Send, and count a refusal. The first version of this discarded the return
+ * value, so a transmitter that was emitting nothing at all looked exactly
+ * like a transmitter nobody was listening to. */
+bool tx(const uint8_t* frame, size_t len) {
+  const esp_err_t r = esp_wifi_80211_tx(WIFI_IF_AP, frame, (int)len, false);
+  if (r != ESP_OK) {
+    s_txFail++;
+    return false;
+  }
+  return true;
+}
+
 size_t hdr(uint8_t subtype, const uint8_t* src, const uint8_t* dst) {
   memset(s_frame, 0, sizeof(s_frame));
   s_frame[0] = subtype;
@@ -251,7 +281,7 @@ void send(Signal s) {
       s_frame[at++] = s_ridCounter++;
       memcpy(s_frame + at, body, bodyLen); at += bodyLen;
 
-      esp_wifi_80211_tx(WIFI_IF_AP, s_frame, at, false);
+      if (!tx(s_frame, at)) return;
       break;
     }
 
@@ -259,7 +289,7 @@ void send(Signal s) {
       size_t at = hdr(0x40, s_alprMac, (const uint8_t*)"\xFF\xFF\xFF\xFF\xFF\xFF");
       at = addSsid(at, kTestSsid);
       at = addRates(at);
-      esp_wifi_80211_tx(WIFI_IF_AP, s_frame, at, false);
+      if (!tx(s_frame, at)) return;
       break;
     }
 
@@ -269,7 +299,7 @@ void send(Signal s) {
       s_frame[at - 4] = 0x64;
       at = addSsid(at, kTestSsid);
       at = addRates(at);
-      esp_wifi_80211_tx(WIFI_IF_AP, s_frame, at, false);
+      if (!tx(s_frame, at)) return;
       break;
     }
 
@@ -356,5 +386,7 @@ void allStop() {
 uint32_t sentCount(Signal s) {
   return (s < kSignalCount) ? s_sent[s] : 0;
 }
+
+uint32_t txFailures() { return s_txFail; }
 
 }  // namespace Emit

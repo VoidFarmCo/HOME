@@ -320,6 +320,20 @@ merge() {
 
 upload() {
   local port="${1:?usage: tools/build.sh upload <port>}"
+
+  # Say which firmware is going onto which port, before it goes.
+  #
+  # There are two roles and two panels now, and the port number does not
+  # change when the board on the end of the cable does. A detector was
+  # overwritten with the beacon image this way: same COM port, different
+  # board, and nothing in the output said which of the two was being sent.
+  # The upload succeeded and reported success, because it was a successful
+  # upload of the wrong thing.
+  echo "== uploading $PUEO_ROLE firmware, $PUEO_PANEL\" panel, to $port =="
+  if [ "$PUEO_ROLE" = "beacon" ]; then
+    echo "   (this is the bench TRANSMITTER, not Pueo)"
+  fi
+
   arduino-cli upload -b "$FQBN" -p "$port" --input-dir "$BUILD_PATH" "$REPO/$SKETCH_DIR"
 }
 

@@ -78,4 +78,8 @@ void allStop();
 /* Counters, for the screen. */
 uint32_t sentCount(Signal s);
 
+/* Frames esp_wifi_80211_tx refused. Non-zero means nothing is going out on
+ * Wi-Fi no matter what the sent counters say. */
+uint32_t txFailures();
+
 }  // namespace Emit

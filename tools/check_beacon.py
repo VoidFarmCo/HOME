@@ -173,6 +173,19 @@ def main():
        emit.count("PUEO-TEST") >= 3, "%d mentions" % emit.count("PUEO-TEST"))
     ok("the screen says it is transmitting", "TRANSMITTING" in ino)
 
+    # The one that cost an evening. The detector carries this override in
+    # wifi.cpp and the beacon is a separate sketch, so it did not inherit it:
+    # every hand-built frame was refused by the IDF before it reached the air,
+    # while BLE sailed through. A bench that finds the glasses and never the
+    # plate reader looks like two broken detectors, not one missing function.
+    ok("the beacon overrides the raw-frame sanity check",
+       "ieee80211_raw_frame_sanity_check" in emit,
+       "without it esp_wifi_80211_tx refuses every hand-built frame")
+    ok("and it checks whether the frame was accepted",
+       "const esp_err_t r = esp_wifi_80211_tx" in emit,
+       "a discarded return makes a dead transmitter look like a dead receiver")
+    ok("a refusal is shown on the screen", "TX REFUSED" in ino)
+
     print("\nand it is a separate image from the detector:")
     build = (REPO / "tools" / "build.sh").read_text(encoding="utf-8",
                                                     errors="replace")
