@@ -6,6 +6,7 @@
 #include "Touchscreen.h"
 #include "config.h"
 #include "FastPairScan.h"
+#include "DroneScan.h"
 #include "Spotter.h"
 #include "TrackerHunt.h"
 #include "ducky.h"
@@ -93,7 +94,7 @@ const char *wifi_page1_items[WIFI_PAGE1_FEATURES] = {
 
 // Bluetooth submenu uses the same paged footer layout as WiFi.
 static constexpr int BT_PAGE0_FEATURES = 8;
-static constexpr int BT_PAGE1_FEATURES = 4;
+static constexpr int BT_PAGE1_FEATURES = 5;
 static int bluetooth_submenu_page = 0;
 
 const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
@@ -110,7 +111,8 @@ const char *bluetooth_page1_items[BT_PAGE1_FEATURES] = {
     "Skimmer Detect",
     "Spotter",
     "Hunt",
-    "Fast Pair"};
+    "Fast Pair",
+    "Drones"};
 
 static FeatureUI::Button s_pagedFooterBtns[2];
 static int s_pagedFooterFocus = -1;  // 0=back, 1=page btn, -1=none
@@ -237,7 +239,8 @@ const unsigned char *bluetooth_page1_icons[BT_PAGE1_FEATURES] = {
     bitmap_icon_Wireless_4,
     bitmap_icon_Wireless_4,
     bitmap_icon_compass,
-    bitmap_icon_ble
+    bitmap_icon_ble,
+    bitmap_icon_satellite
 };
 
 const unsigned char *nrf_submenu_icons[nrf_NUM_SUBMENU_ITEMS] = {
@@ -2359,6 +2362,41 @@ void handleBluetoothSubmenuButtons() {
             }
         }
 
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
+            current_submenu_index = 4;
+            in_sub_menu = true;
+            feature_active = true;
+            feature_exit_requested = false;
+            DroneScan::setup();
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
+                current_submenu_index = 4;
+                in_sub_menu = true;
+                DroneScan::loop();
+                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                    in_sub_menu = true;
+                    is_main_menu = false;
+                    submenu_initialized = false;
+                    feature_active = false;
+                    feature_exit_requested = false;
+                    displaySubmenu();
+                    delay(200);
+                    while (isButtonPressed(BTN_SELECT)) {
+                    }
+                    break;
+                }
+            }
+            DroneScan::exit();
+            if (feature_exit_requested) {
+                in_sub_menu = true;
+                is_main_menu = false;
+                submenu_initialized = false;
+                feature_active = false;
+                feature_exit_requested = false;
+                displaySubmenu();
+                delay(200);
+            }
+        }
+
         if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
             current_submenu_index = 2;
             in_sub_menu = true;
@@ -2769,6 +2807,39 @@ void handleBluetoothSubmenuButtons() {
                         }
                     }
                     Spotter::exit();
+                    if (feature_exit_requested) {
+                        in_sub_menu = true;
+                        is_main_menu = false;
+                        submenu_initialized = false;
+                        feature_active = false;
+                        feature_exit_requested = false;
+                        displaySubmenu();
+                        delay(200);
+                    }
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
+                    current_submenu_index = 4;
+                    in_sub_menu = true;
+                    feature_active = true;
+                    feature_exit_requested = false;
+                    DroneScan::setup();
+                    while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
+                        current_submenu_index = 4;
+                        in_sub_menu = true;
+                        DroneScan::loop();
+                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+                            in_sub_menu = true;
+                            is_main_menu = false;
+                            submenu_initialized = false;
+                            feature_active = false;
+                            feature_exit_requested = false;
+                            displaySubmenu();
+                            delay(200);
+                            while (isButtonPressed(BTN_SELECT)) {
+                            }
+                            break;
+                        }
+                    }
+                    DroneScan::exit();
                     if (feature_exit_requested) {
                         in_sub_menu = true;
                         is_main_menu = false;

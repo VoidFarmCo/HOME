@@ -150,30 +150,18 @@ outer-face-**down**, which puts the logo against the bed. Bed-side grooves
 behave differently from top-side ones: glass-smooth floor, crisp walls, and
 the material above bridges a 0.5 mm gap without noticing.
 
-So the tile carries the same owl on **both faces**, back to back in the same
-place:
+In practice that means **turning the lid over in the slicer**. Printed the
+way it is modelled it wants support across the whole cavity; flipped, it
+wants none, and the logo ends up on the bed.
 
-| face | what it tells you |
-|---|---|
-| underside | the real case — what the lid will get |
-| top | the comparison, if top-side detail turns out better |
+## Printed
 
-Print it flat and as-is. Everything on the underside is already mirrored in
-the model, so it reads correctly when the tile is turned over.
+It has been printed. The owl reads at the 30 mm the lid allows, in PLA on a
+0.4 mm nozzle, which is the one thing about this that could not be settled
+by measuring the artwork.
 
-Alongside the underside owl is a **groove ladder** — eight slots at the
-shipped 0.6 mm depth and widths 0.3 to 1.6 mm, labelled. That is the part
-that generalises past this logo: the narrowest groove that still has a
-visible floor is this printer's limit for a debossed line, and anything
-thinner in the artwork is decoration that will not survive. 0.3 is below a
-0.4 mm nozzle and is meant to fail.
-
-## Not verified
-
-Nothing here has been printed. Stroke widths are measured off the artwork,
-the geometry is confirmed manifold, and the scale is now asserted rather
-than eyeballed — but whether a 0.51 mm groove at 0.6 mm deep reads well in a
-given filament and layer height is what the tile is for.
-
-`docs/pueo/nrf24-fit-test.scad` is the precedent: print the small thing that
-answers one question before committing to the big one.
+That is one printer and one filament, so it is evidence rather than a
+guarantee. The stroke widths are still what they were — about 0.51 mm at the
+thinnest, one extrusion wide — so a printer that lays a wider line, or a
+filament that squashes more on the first layer, can still lose them. If
+yours does, the artwork is the thing to thicken, not the depth.
