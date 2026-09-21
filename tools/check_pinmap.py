@@ -38,20 +38,26 @@ TFT_ROLES = {
 }
 
 
-def read_user_setup():
-    """Active (uncommented) `#define NAME <int>` pins from User_Setup."""
+def read_user_setup(panel):
+    """Display pins from User_Setup, as the given panel's build sees them.
+
+    Run through the same Pre() as the sketch headers rather than scanned line
+    by line. User_Setup now branches on PUEO_PANEL_35 -- the two CYDs put the
+    backlight on different pins -- and a line scanner takes whichever branch
+    happens to be written first, which is how CC1101's chip select on GPIO 21
+    read as a collision for the 3.5" build and as clear for the 2.8" one when
+    the truth is the other way round.
+    """
     out = {}
     if not USER_SETUP.exists():
         return out
-    for line in USER_SETUP.read_text(encoding="utf-8", errors="ignore").splitlines():
-        line = line.strip()
-        if line.startswith("//") or not line.startswith("#define"):
-            continue
-        m = re.match(r"#define\s+(\w+)\s+(-?\d+)", line)
-        if m and m.group(1) in TFT_ROLES:
-            pin = int(m.group(2))
-            if pin >= 0:
-                out[pin] = TFT_ROLES[m.group(1)]
+    pre = Pre()
+    pre.macros["PUEO_PANEL_35"] = 1 if panel == 35 else 0
+    pre.run(USER_SETUP)
+    for macro, role in TFT_ROLES.items():
+        pin = pre.resolve(macro)
+        if isinstance(pin, int) and not isinstance(pin, bool) and pin >= 0:
+            out[pin] = role
     return out
 
 
@@ -61,8 +67,11 @@ BOARD_FIXED = {
     34: "LDR",          26: "speaker",
 }
 
-CYD_RESERVED = dict(BOARD_FIXED)
-CYD_RESERVED.update(read_user_setup())
+def reserved_for(panel):
+    """Onboard hardware whose pads are already spoken for, for one panel."""
+    out = dict(BOARD_FIXED)
+    out.update(read_user_setup(panel))
+    return out
 
 # Pins we knowingly repurpose. The RGB LED is the only block of spare GPIO left
 # on this board; giving it up is what makes room for three radios. The backlight
@@ -205,11 +214,21 @@ class Pre:
         return None
 
 
-def main():
+PANELS = (28, 35)
+
+
+def check(panel):
+    """Print one panel's map and return its list of errors."""
+    reserved = reserved_for(panel)
+
     pre = Pre()
+    # Seeded before the headers run, so shared.h and board_pueo.h take their
+    # #ifndef defaults as a build with -DPUEO_PANEL_35=<n> would.
+    pre.macros["PUEO_PANEL_35"] = 1 if panel == 35 else 0
     pre.run(SKETCH / "shared.h")
 
-    print(f"board: {pre.macros.get('ESP32DIV_BOARD_NAME', '?')}")
+    print(f'{panel / 10:.1f}" panel  --  board: '
+          f"{pre.macros.get('ESP32DIV_BOARD_NAME', '?')}")
     print()
 
     pins = {}
@@ -222,7 +241,7 @@ def main():
             pins[macro] = (pin, label)
 
     for macro, (pin, label) in sorted(pins.items(), key=lambda kv: kv[1][0]):
-        note = CYD_RESERVED.get(pin, "")
+        note = reserved.get(pin, "")
         tag = ""
         if note:
             tag = (f"  [repurposed from {note}]" if pin in REPURPOSABLE
@@ -256,9 +275,9 @@ def main():
 
     # Landing on onboard hardware we did not consciously give up.
     for macro, (pin, label) in sorted(pins.items()):
-        if pin in CYD_RESERVED and pin not in REPURPOSABLE:
+        if pin in reserved and pin not in REPURPOSABLE:
             errors.append("GPIO %d (%s) collides with onboard %s"
-                          % (pin, label, CYD_RESERVED[pin]))
+                          % (pin, label, reserved[pin]))
 
     # Outputs on input-only pads.
     for macro, (pin, label) in sorted(pins.items()):
@@ -266,14 +285,26 @@ def main():
             errors.append("GPIO %d (%s) is input-only and cannot drive this signal"
                           % (pin, label))
 
-    if errors:
-        print("COLLISIONS")
-        for e in errors:
-            print("  x " + e)
-        return 1
+    return errors
 
-    print("no collisions")
-    return 0
+
+def main():
+    # Both panels, because both are published as flash images. A pin map that
+    # is clean for one and not the other is still a broken release, and which
+    # one is broken is not something a single-panel check can tell you.
+    rc = 0
+    for i, panel in enumerate(PANELS):
+        if i:
+            print()
+        errors = check(panel)
+        if errors:
+            print("COLLISIONS")
+            for e in errors:
+                print("  x " + e)
+            rc = 1
+        else:
+            print("no collisions")
+    return rc
 
 
 if __name__ == "__main__":

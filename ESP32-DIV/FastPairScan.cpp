@@ -60,7 +60,7 @@ uint8_t s_target[6];
 bool    s_targetPublic = false;
 
 int contentBottom() {
-  return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : 320;
+  return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : PUEO_SCREEN_H;
 }
 
 /* ── collection ──────────────────────────────────────────────────────────── */
@@ -167,7 +167,7 @@ uint16_t frameColour(FastPair::Frame f) {
 }
 
 void drawHeader() {
-  tft.fillRect(0, 20, 240, 18, TFT_BLACK);
+  tft.fillRect(0, 20, PUEO_SCREEN_W, 18, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -182,7 +182,7 @@ void drawList() {
   const int bottom = contentBottom();
   const int rows = (bottom - top) / kRowH;
 
-  tft.fillRect(0, top, 240, bottom - top, TFT_BLACK);
+  tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
 
@@ -215,7 +215,7 @@ void drawList() {
     const bool selected = (s_scroll + i) == s_sel;
 
     if (selected) {
-      tft.fillRect(0, y - 2, 240, kRowH - 2, 0x18E3);
+      tft.fillRect(0, y - 2, PUEO_SCREEN_W, kRowH - 2, 0x18E3);
     }
     const uint16_t bg = selected ? 0x18E3 : TFT_BLACK;
 

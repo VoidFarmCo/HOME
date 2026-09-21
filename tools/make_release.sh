@@ -150,6 +150,16 @@ Pueo ${VERSION} - source archive
   tools/build.sh merge      single flash image at offset 0
   tools/build.sh upload COM7
 
+Builds for the 3.5" ESP32-3248S035R by default. For the 2.8" ESP32-2432S028R
+put PUEO_PANEL=28 in front of every one of those:
+
+  PUEO_PANEL=28 tools/build.sh
+  PUEO_PANEL=28 tools/build.sh merge
+
+The panels differ in the display driver, the backlight pin, CC1101's chip
+select and which SPI bus touch is on. The wrong image is a dark screen
+rather than an error.
+
 Requires arduino-cli and Python 3 with Pillow (only for the bitmap tools).
 
 Everything is installed into its own root rather than a global Arduino
@@ -177,12 +187,31 @@ rm -rf "$STAGE"
 SIZE=$(du -b "$OUT/${NAME}.zip" | cut -f1)
 echo "$OUT/${NAME}.zip  ($(( SIZE / 1024 )) KB)"
 
+# One image per CYD panel, because the two are not interchangeable: the
+# display driver, the backlight pin, CC1101's chip select and which SPI bus
+# the touch controller sits on all move between them. Flashing the wrong one
+# is a dark screen, not an error message, so it is not a thing to let someone
+# discover on their own board.
+#
+# The unsuffixed name keeps meaning what it has meant since 0.1.0 -- the 2.8"
+# ESP32-2432S028R -- even though the tree itself now defaults to the 3.5".
+# Repointing a filename whose digest is already published elsewhere is how a
+# checksum starts failing for a reason nobody can reconstruct later.
+#
+# Build path comes from build.sh rather than being spelled again here; it
+# moved with the panel once already.
 if [ "$WITH_BIN" = "1" ]; then
-  bash tools/build.sh >/dev/null
-  bash tools/build.sh merge >/dev/null
-  BIN="${PUEO_ARDUINO_ROOT:-$HOME/.pueo-esp32}/build/pueo-merged.bin"
-  cp "$BIN" "$OUT/pueo-${VERSION}-merged.bin"
-  echo "$OUT/pueo-${VERSION}-merged.bin  ($(( $(du -b "$OUT/pueo-${VERSION}-merged.bin" | cut -f1) / 1024 )) KB)"
+  for panel in 28 35; do
+    case "$panel" in
+      28) suffix="";    label='2.8"' ;;
+      35) suffix="-35"; label='3.5"' ;;
+    esac
+    out="$OUT/pueo-${VERSION}${suffix}-merged.bin"
+    PUEO_PANEL="$panel" bash tools/build.sh >/dev/null
+    PUEO_PANEL="$panel" bash tools/build.sh merge >/dev/null
+    cp "$(PUEO_PANEL="$panel" bash tools/build.sh path)/pueo-merged.bin" "$out"
+    echo "$out  ($(( $(du -b "$out" | cut -f1) / 1024 )) KB)  $label panel"
+  done
 fi
 
 ( cd "$OUT" && sha256sum pueo-${VERSION}-* > "pueo-${VERSION}.sha256" )
@@ -231,9 +260,11 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
   fi
 
   cp "$OUT/${NAME}.zip" "$DEST/"
-  if [ -f "$OUT/pueo-${VERSION}-merged.bin" ]; then
-    cp "$OUT/pueo-${VERSION}-merged.bin" "$DEST/"
-  fi
+  # Both panel images, each only if it was built -- a run without --with-bin
+  # publishes the archive and the digests alone, as it always has.
+  for img in "pueo-${VERSION}-merged.bin" "pueo-${VERSION}-35-merged.bin"; do
+    [ -f "$OUT/$img" ] && cp "$OUT/$img" "$DEST/"
+  done
   cp "$OUT/pueo-${VERSION}.sha256" "$DEST/"
 
   # The changelog goes under the name the site links, so the copy beside the
@@ -264,8 +295,11 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
   # CHANGELOG.txt, which is published beside the downloads and ships inside
   # every archive.
   #
-  # Only ever three exact filenames per version. No globbing over the
-  # directory, because this runs against somebody's website tree.
+  # Only ever four exact filenames per version. No globbing over the
+  # directory, because this runs against somebody's website tree. The -35
+  # image exists only from 0.3.4 on; rm -f makes its absence a no-op for
+  # every earlier version, and leaving the name out instead would make it
+  # the one artefact that is never pruned.
   PUBLISH_KEEP_ALWAYS="0.2.1"
 
   published=$(ls "$DEST" 2>/dev/null \
@@ -280,6 +314,7 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
     fi
     rm -f "$DEST/pueo-$v-src.zip" \
           "$DEST/pueo-$v-merged.bin" \
+          "$DEST/pueo-$v-35-merged.bin" \
           "$DEST/pueo-$v.sha256"
     echo "pruned $v"
     pruned=$((pruned + 1))

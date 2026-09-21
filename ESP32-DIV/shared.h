@@ -141,8 +141,8 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #if BOARD_HAS_ESP32S3
 #define ESP32DIV_FFT_SAMPLES       256
 #define ESP32DIV_FFT_PALETTE_SIZE  128
-#define ESP32DIV_PKT_GRAPH_WIDTH   240
-#define ESP32DIV_JD_WAVE_WIDTH     220
+#define ESP32DIV_PKT_GRAPH_WIDTH   PUEO_SCREEN_W
+#define ESP32DIV_JD_WAVE_WIDTH     (PUEO_SCREEN_W - 20)
 #define ESP32DIV_JD_RSSI_SAMPLES   128
 #define ESP32DIV_BLE_SCANNER_BARS  128
 #define ESP32DIV_BLE_SCANNER_CHANS 128
@@ -156,8 +156,8 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #else
 #define ESP32DIV_FFT_SAMPLES       256
 #define ESP32DIV_FFT_PALETTE_SIZE  128
-#define ESP32DIV_PKT_GRAPH_WIDTH   240
-#define ESP32DIV_JD_WAVE_WIDTH     220
+#define ESP32DIV_PKT_GRAPH_WIDTH   PUEO_SCREEN_W
+#define ESP32DIV_JD_WAVE_WIDTH     (PUEO_SCREEN_W - 20)
 #define ESP32DIV_JD_RSSI_SAMPLES   64
 #define ESP32DIV_BLE_SCANNER_BARS  64
 #define ESP32DIV_BLE_SCANNER_CHANS 64
@@ -283,8 +283,16 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  * XPT2046 sits on the display's own SPI bus behind TOUCH_CS. Bring-up on
  * 2026-09-20 read rails (x=4095 y=0 z=4095, unchanging under a press) on the
  * 25/32/39 trio, which is what an absent device looks like.
- * TODO: make this follow the board profile rather than being set by hand. */
+ *
+ * It follows the panel now. Set by hand it was 1 for both boards, so the
+ * 2.8" build drove touch through the display's bus, where its controller
+ * is not -- and the only symptom would have been a panel that never
+ * reports a press. */
+#if PUEO_PANEL_35
 #define TOUCH_SHARES_TFT_SPI 1
+#else
+#define TOUCH_SHARES_TFT_SPI 0
+#endif
 #endif
 
 #if defined(BOARD_CYD)
@@ -695,11 +703,31 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #endif
 
 /*──────────────────── Display & Touch ────────────────────*/
+
+/* The panel's dimensions, in one place, for the whole UI.
+ *
+ * Every feature screen used to carry its own copy of these as literals --
+ * 43 of them across four files -- which is why the 3.5" board drew each app
+ * into the top-left 240x320 of a 320x480 display and left the rest black.
+ *
+ * Deliberately not TFT_eSPI's TFT_WIDTH/TFT_HEIGHT: those are only correct
+ * once TFT_eSPI.h has been included, and several of these screens compute
+ * layout in headers that do not include it. These follow PUEO_PANEL_35
+ * directly, which is also what User_Setup branches on, so the two cannot
+ * disagree. */
+#if PUEO_PANEL_35
+#define PUEO_SCREEN_W 320
+#define PUEO_SCREEN_H 480
+#else
+#define PUEO_SCREEN_W 240
+#define PUEO_SCREEN_H 320
+#endif
+
 #ifndef TFT_WIDTH
-#define TFT_WIDTH 240
+#define TFT_WIDTH PUEO_SCREEN_W
 #endif
 #ifndef TFT_HEIGHT
-#define TFT_HEIGHT 320
+#define TFT_HEIGHT PUEO_SCREEN_H
 #endif
 #ifndef STATUS_BAR_Y_OFFSET
 #define STATUS_BAR_Y_OFFSET 0

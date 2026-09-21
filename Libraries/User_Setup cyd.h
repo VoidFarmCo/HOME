@@ -1,6 +1,42 @@
  
 //ESP32-DIV CYD
 
+// ── Which CYD panel ─────────────────────────────────────────────────────────
+//
+// Both boards are called a "cheap yellow display" and they are not the same
+// display. Everything that differs between them is here, in one block,
+// rather than spread through the vendor sections below -- the six settings
+// were scattered when this file targeted one board, and the 2.8" image in
+// 0.3.4 was built with the 3.5"'s driver because six edits are easy to make
+// five of.
+//
+// PUEO_PANEL_35 arrives as a -D from tools/build.sh, so this file sees the
+// same value the sketch does. Undefined means 3.5", matching board_pueo.h.
+//
+//   PUEO_PANEL=35   3.5" ESP32-3248S035R   ST7796    320x480   backlight 27
+//   PUEO_PANEL=28   2.8" ESP32-2432S028R   ILI9341   240x320   backlight 21
+//
+// The inversion flag is not cosmetic trivia: with ST7796's setting on an
+// ILI9341 every colour comes out as its complement, which during bring-up
+// showed up as orange rendering cyan.
+//
+// The SPI pins, TFT_CS/DC/RST and TOUCH_CS are identical on both boards and
+// stay in their usual sections. Only these six move.
+
+#if defined(PUEO_PANEL_35) && PUEO_PANEL_35 == 0
+  #define ILI9341_2_DRIVER
+  #define TFT_WIDTH  240
+  #define TFT_HEIGHT 320
+  #define TFT_INVERSION_ON
+  #define TFT_BL   21
+#else
+  #define ST7796_DRIVER
+  #define TFT_WIDTH  320
+  #define TFT_HEIGHT 480
+  #define TFT_INVERSION_OFF
+  #define TFT_BL   27
+#endif
+
 
 
 // User defined information reported by "Read_User_Setup" test & diagnostics example
@@ -51,7 +87,7 @@
 //#define ST7789_2_DRIVER    // Minimal configuration option, define additional parameters below for this display
 //#define R61581_DRIVER
 //#define RM68140_DRIVER
-#define ST7796_DRIVER        // 3.5" ESP32-3248S035R, 320x480
+//#define ST7796_DRIVER      // set in the panel block at the top
 //#define SSD1351_DRIVER
 //#define SSD1963_480_DRIVER
 //#define SSD1963_800_DRIVER
@@ -79,11 +115,11 @@
 // #define TFT_WIDTH  80
 // #define TFT_WIDTH  128
 // #define TFT_WIDTH  172 // ST7789 172 x 320
-#define TFT_WIDTH  320 // ST7796 320 x 480
+// #define TFT_WIDTH  320 // set in the panel block at the top
 // #define TFT_HEIGHT 160
 // #define TFT_HEIGHT 128
 // #define TFT_HEIGHT 240 // ST7789 240 x 240
-#define TFT_HEIGHT 480 // ST7796 320 x 480
+// #define TFT_HEIGHT 480 // set in the panel block at the top
 // #define TFT_HEIGHT 240 // GC9A01 240 x 240
 
 // For ST7735 ONLY, define the type of display, originally this was based on the
@@ -107,8 +143,8 @@
 // If colours are inverted (white shows as black) then uncomment one of the next
 // 2 lines try both options, one of the options should correct the inversion.
 
-// #define TFT_INVERSION_ON
- #define TFT_INVERSION_OFF
+// #define TFT_INVERSION_ON  // set in the panel block at the top
+// #define TFT_INVERSION_OFF // set in the panel block at the top
 
 
 // ##################################################################################
@@ -123,7 +159,7 @@
 // driven with a PWM signal or turned OFF/ON then this must be handled by the user
 // sketch. e.g. with digitalWrite(TFT_BL, LOW);
 
-#define TFT_BL   27            // LED back-light control pin (3.5" board; 21 on the 2.8")
+// #define TFT_BL 27           // set in the panel block at the top
 #define TFT_BACKLIGHT_ON HIGH  // Level to turn ON back-light (HIGH or LOW)
 
 

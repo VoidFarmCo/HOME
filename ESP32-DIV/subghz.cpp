@@ -469,8 +469,8 @@ namespace replayat {
 #define ADDR_PROFILE_START 1300
 #define MAX_PROFILES       5
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 constexpr int SCREEN_HEIGHT = 320;
 
 static bool uiDrawn = false;
@@ -833,7 +833,7 @@ static constexpr int kReplayStatusLineY = 80;
 static constexpr int kReplayValueLineH = 11;
 
 static void replayDrawStatusSeparator() {
-  tft.drawFastHLine(0, kReplayStatusLineY, 240, UI_LINE);
+  tft.drawFastHLine(0, kReplayStatusLineY, PUEO_SCREEN_W, UI_LINE);
 }
 
 static void replayDrawValueCell(int x, int y, int w, int h, const String& text, uint16_t color) {
@@ -857,7 +857,7 @@ static void replayDrawStaticChrome() {
   const int bodyBottom = subghzContentBottom();
   const int infoH = min(kReplayStatusLineY - 40, bodyBottom - 40);
   if (infoH > 0) {
-    tft.fillRect(0, 40, 240, infoH, TFT_BLACK);
+    tft.fillRect(0, 40, PUEO_SCREEN_W, infoH, TFT_BLACK);
   }
   replayDrawStatusSeparator();
 
@@ -997,7 +997,7 @@ void sendSignal() {
     mySwitch.enableTransmit(REPLAY_TX_PIN);
     ELECHOUSE_cc1101.SetTx();
 
-    tft.fillRect(0, 40, 240, kReplayStatusLineY - 40, TFT_BLACK);
+    tft.fillRect(0, 40, PUEO_SCREEN_W, kReplayStatusLineY - 40, TFT_BLACK);
 
     tft.setCursor(10, 30 + yshift);
     tft.print("Sending...");
@@ -1008,7 +1008,7 @@ void sendSignal() {
     mySwitch.send(receivedValue, receivedBitLength);
 
     delay(500);
-    tft.fillRect(0, 40, 240, kReplayStatusLineY - 40, TFT_BLACK);
+    tft.fillRect(0, 40, PUEO_SCREEN_W, kReplayStatusLineY - 40, TFT_BLACK);
     tft.setCursor(10, 30 + yshift);
     tft.print("Done!");
 
@@ -1210,7 +1210,7 @@ void runUI() {
     constexpr int ICON_SIZE = 16;
     constexpr int ICON_NUM = 6;
 
-    static int iconX[ICON_NUM] = {90, 130, 170, 210, 50, 10};
+    static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, PUEO_SCREEN_W - 190, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
 
     static const unsigned char* icons[ICON_NUM] = {
@@ -1230,8 +1230,8 @@ void runUI() {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, UI_ICON);
             }
         }
-        tft.drawFastHLine(0, 19, 240, UI_LINE);
-        tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, 240, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
 
@@ -1418,8 +1418,8 @@ void ReplayAttackLoop() {
     maintainTouchNavBar();
     runUI();
     if (uiDrawn) {
-      tft.drawFastHLine(0, 19, 240, UI_LINE);
-      tft.drawFastHLine(0, 36, 240, UI_LINE);
+      tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+      tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
       if (s_replayDisp.valid) {
         replayDrawStatusSeparator();
       }
@@ -1605,7 +1605,7 @@ static bool uiDrawn = false;
 #define MAX_PROFILES       5
 #define MAX_NAME_LENGTH    16
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 constexpr int SCREEN_HEIGHT = 320;
 
 RCSwitch mySwitch = RCSwitch();
@@ -1676,7 +1676,7 @@ static void profileClearContentArea(uint16_t color = TFT_BLACK) {
   const int top = 40;
   const int h = subghzContentBottom() - top;
   if (h > 0) {
-    tft.fillRect(0, top, 240, h, color);
+    tft.fillRect(0, top, PUEO_SCREEN_W, h, color);
   }
 }
 
@@ -1969,7 +1969,7 @@ void updateDisplay() {
     tft.startWrite();
     const int bodyH = subghzContentBottom() - 40;
     if (bodyH > 0) {
-      tft.fillRect(0, 40, 240, bodyH, TFT_BLACK);
+      tft.fillRect(0, 40, PUEO_SCREEN_W, bodyH, TFT_BLACK);
     }
 
     if (sdTotalProfiles == 0) {
@@ -2097,7 +2097,7 @@ void runUI() {
     constexpr int ICON_SIZE = 16;
     constexpr int ICON_NUM = 4;
 
-    static int iconX[ICON_NUM] = {130, 170, 210, 10};
+    static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
 
     static const unsigned char* icons[ICON_NUM] = {
@@ -2115,8 +2115,8 @@ void runUI() {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, UI_ICON);
             }
         }
-        tft.drawFastHLine(0, 19, 240, UI_LINE);
-        tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, 240, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
 
@@ -2314,7 +2314,7 @@ static bool uiDrawn = false;
 static unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 200;
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 constexpr int SCREEN_HEIGHT = 64;
 
 static constexpr uint8_t JAM_BTN_LEFT  = 4;
@@ -2454,7 +2454,7 @@ void subjammerHandleNavButtons() {
 }
 
 static void jammerDrawStatusSeparator() {
-  tft.drawFastHLine(0, kJammerStatusLineY, 240, UI_LINE);
+  tft.drawFastHLine(0, kJammerStatusLineY, PUEO_SCREEN_W, UI_LINE);
 }
 
 static void jammerDrawValueCell(int x, int y, int w, int h, const String& text, uint16_t color) {
@@ -2478,7 +2478,7 @@ static void jammerDrawStaticChrome() {
   const int bodyBottom = subghzContentBottom();
   const int bodyH = min(kJammerStatusLineY - 40, bodyBottom - 40);
   if (bodyH > 0) {
-    tft.fillRect(0, 40, 240, bodyH, TFT_BLACK);
+    tft.fillRect(0, 40, PUEO_SCREEN_W, bodyH, TFT_BLACK);
   }
   jammerDrawStatusSeparator();
 
@@ -2495,7 +2495,7 @@ static void jammerDrawStaticChrome() {
 }
 
 static void jammerDrawProgressBar(int progress) {
-  tft.fillRect(0, kJammerProgressY, 240, 4, TFT_BLACK);
+  tft.fillRect(0, kJammerProgressY, PUEO_SCREEN_W, 4, TFT_BLACK);
   if (progress > 0) {
     tft.fillRect(0, kJammerProgressY, progress, 4, UI_WARN);
   }
@@ -2581,15 +2581,15 @@ void updateDisplay() {
 }
 
 void runUI() {
-    constexpr int SCREEN_WIDTH = 240;
-    #define SCREENHEIGHT 320
+    constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+    #define SCREENHEIGHT PUEO_SCREEN_H
     #undef STATUS_BAR_Y_OFFSET
     constexpr int STATUS_BAR_Y_OFFSET = 20;
     constexpr int STATUS_BAR_HEIGHT = 16;
     constexpr int ICON_SIZE = 16;
     constexpr int ICON_NUM = 6;
 
-    static int iconX[ICON_NUM] = {50, 90, 130, 170, 210, 10};
+    static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 190, PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
 
     static const unsigned char* icons[ICON_NUM] = {
@@ -2609,8 +2609,8 @@ void runUI() {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, UI_ICON);
             }
         }
-        tft.drawFastHLine(0, 19, 240, UI_LINE);
-        tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, 240, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
 
@@ -2776,8 +2776,8 @@ void subjammerLoop() {
     maintainTouchNavBar();
     runUI();
     if (uiDrawn) {
-      tft.drawFastHLine(0, 19, 240, UI_LINE);
-      tft.drawFastHLine(0, 36, 240, UI_LINE);
+      tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+      tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
       if (s_jammerDisp.valid) {
         jammerDrawStatusSeparator();
       }
@@ -3211,10 +3211,10 @@ static void updateDisplay(bool force = false) {
   if (force || !s_chromeDrawn) {
     const int bodyBottom = subghzContentBottom();
     if (bodyBottom > kBarBottom) {
-      tft.fillRect(0, kBarBottom + 1, 240, bodyBottom - kBarBottom - 1, TFT_BLACK);
+      tft.fillRect(0, kBarBottom + 1, PUEO_SCREEN_W, bodyBottom - kBarBottom - 1, TFT_BLACK);
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarBottom, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarBottom, PUEO_SCREEN_W, UI_LINE);
 
     drawPanelFrame(settingsPanelY(), settingsPanelH(), "Settings");
     drawPanelFrame(progressPanelY(), progressPanelH(), "Progress");
@@ -3477,7 +3477,7 @@ void runUI() {
   static constexpr int kIconN = 6;
   static constexpr int kScreenW = 240;
 
-  static int iconX[kIconN] = {50, 90, 130, 170, 210, 10};
+  static int iconX[kIconN] = {PUEO_SCREEN_W - 190, PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = kBarY;
 
   static const unsigned char* icons[kIconN] = {
@@ -3496,8 +3496,8 @@ void runUI() {
         tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
       }
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarY + kBarH, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     s_uiDrawn = true;
   }
 
@@ -3641,8 +3641,8 @@ void subBruteLoop() {
   maintainTouchNavBar();
   runUI();
   if (s_uiDrawn) {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarBottom, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarBottom, PUEO_SCREEN_W, UI_LINE);
   }
   bruteHandleNavButtons();
 
@@ -3861,7 +3861,7 @@ static void jdRunUI() {
   static constexpr int kIconN = 5;
   static constexpr int kBackIdx = 4;
 
-  static int iconX[kIconN] = {90, 130, 170, 210, 10};
+  static int iconX[kIconN] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = kBarY;
 
   static const unsigned char* icons[kIconN] = {
@@ -3873,12 +3873,12 @@ static void jdRunUI() {
   };
 
   if (!s_jdUiDrawn) {
-    tft.fillRect(0, kBarY, 240, kBarH, DARK_GRAY);
+    tft.fillRect(0, kBarY, PUEO_SCREEN_W, kBarH, DARK_GRAY);
     for (int i = 0; i < kIconN; i++) {
       tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarY + kBarH, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     s_jdUiDrawn = true;
   }
 
@@ -3993,7 +3993,7 @@ static void jdDrawStaticChrome() {
   }
 
   const int bodyBottom = jdWaveBottom();
-  tft.fillRect(0, kJdBarBottom + 1, 240, bodyBottom - kJdBarBottom - 1, TFT_BLACK);
+  tft.fillRect(0, kJdBarBottom + 1, PUEO_SCREEN_W, bodyBottom - kJdBarBottom - 1, TFT_BLACK);
 
   jdDrawPanelFrame(kJdInfoY, kJdInfoH, "Monitor");
   tft.setTextSize(1);

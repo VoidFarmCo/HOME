@@ -22,10 +22,10 @@ extern XPT2046_Touchscreen ts;
 #define TOUCH_Y_MAX 3800
 #endif
 #ifndef DISPLAY_WIDTH
-#define DISPLAY_WIDTH 240
+#define DISPLAY_WIDTH PUEO_SCREEN_W
 #endif
 #ifndef DISPLAY_HEIGHT
-#define DISPLAY_HEIGHT 320
+#define DISPLAY_HEIGHT PUEO_SCREEN_H
 #endif
 
 extern bool feature_active;

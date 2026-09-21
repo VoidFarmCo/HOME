@@ -105,7 +105,7 @@ static int animationState = 0;
 static int activeIcon = -1;
 
 static const int ICON_NUM = 2;
-static int iconX[ICON_NUM] = {210, 10};
+static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 30, 10};
 static int iconY = 20;
 
 static const unsigned char* icons[ICON_NUM] = {
@@ -266,15 +266,15 @@ static void drawSettingsPage();
 
 static void drawIconHeader() {
     if (!uiDrawn) {
-        tft.drawFastHLine(0, 19, 240, UI_LINE);
-        tft.fillRect(0, 20, 240, 16, DARK_GRAY);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.fillRect(0, 20, PUEO_SCREEN_W, 16, DARK_GRAY);
 
         for (int i = 0; i < ICON_NUM; i++) {
             if (icons[i] != NULL) {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, TFT_WHITE);
             }
         }
-        tft.drawFastHLine(0, 36, 240, UI_LINE);
+        tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
 }

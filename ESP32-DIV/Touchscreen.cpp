@@ -60,8 +60,8 @@ static bool readSharedTouchSample(int16_t& x, int16_t& y, int16_t& z, uint16_t z
 }
 #endif
 
-static void ensureTouchSpiReady() {
 #if !TOUCH_SHARES_TFT_SPI
+static void ensureTouchSpiReady() {
   // This begin() only does anything the first time. SPIClass::begin() returns
   // immediately once _spi is set, so it cannot re-attach the pins after a
   // radio or the SD card has pointed the bus elsewhere -- which is exactly
@@ -73,8 +73,8 @@ static void ensureTouchSpiReady() {
     // back at T_CLK/T_DIN/T_OUT when something else took it.
     SpiBus::claim(SpiBus::Dev::Touch);
   }
-#endif
 }
+#endif
 
 /* TEMPORARY bring-up diagnostic -- remove before committing. Reports what
  * the controller is actually doing, so a dead panel can be told apart from

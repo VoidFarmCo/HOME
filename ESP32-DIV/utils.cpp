@@ -542,6 +542,13 @@ static int statusBarTempBand(float t) {
   return 0;
 }
 
+/* Width of the right-hand status icon cluster: BLE icon, its count, the wifi
+ * bars, the temperature icon and the SD icon, plus the gaps between them and
+ * a 4 px margin. Both paths below anchor to it, and they must agree -- the
+ * blink-only path repaints one icon in place and has to land on the pixel the
+ * full redraw chose. */
+static constexpr int kStatusIconsWidth = 110;
+
 void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator) {
   static int lastBatteryPercentage = -1;
   static int lastWifiHalf          = -100000;
@@ -586,7 +593,7 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
     constexpr int kIconY  = kY - 2;
     constexpr int kIconW  = 16;
     constexpr int kGap    = 3;
-    constexpr int kBleIx  = 130;
+    constexpr int kBleIx  = PUEO_SCREEN_W - kStatusIconsWidth;
     constexpr int kBleDrawX = kBleIx + 25;
     const int wardGpsX    = kBleDrawX - kGap - kIconW;
     if (wardSatVisible) {
@@ -627,7 +634,7 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
     const int gap           = 3;
     const int wifiBarsWidth = 24;
 
-    const int bleIconX      = 130;
+    const int bleIconX      = PUEO_SCREEN_W - kStatusIconsWidth;
     const int bleTextX      = bleIconX + iconW + gap;
     const int wifiBarsX     = bleTextX + 12 + gap;
     const int tempIconX     = wifiBarsX + wifiBarsWidth + gap;
@@ -1289,10 +1296,10 @@ namespace Terminal {
 #define TEXT_HEIGHT 16
 #define BOT_FIXED_AREA 0
 #define TOP_FIXED_AREA 86
-#define DISPLAY_WIDTH 240
-#define DISPLAY_HEIGHT 320
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+#define DISPLAY_WIDTH PUEO_SCREEN_W
+#define DISPLAY_HEIGHT PUEO_SCREEN_H
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 
 static bool uiDrawn = false;
 
@@ -1386,7 +1393,7 @@ void runUI() {
     constexpr int ICON_SIZE = 16;
     constexpr int ICON_NUM = 3;
 
-    static int iconX[ICON_NUM] = {210, 170, 10};
+    static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 30, PUEO_SCREEN_W - 70, 10};
     static int iconY = STATUS_BAR_Y_OFFSET;
 
     static const unsigned char* icons[ICON_NUM] = {
@@ -1396,7 +1403,7 @@ void runUI() {
     };
 
     if (!uiDrawn) {
-        tft.drawLine(0, 19, 240, 19, TFT_WHITE);
+        tft.drawLine(0, 19, PUEO_SCREEN_W, 19, TFT_WHITE);
         tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
         for (int i = 0; i < ICON_NUM; i++) {

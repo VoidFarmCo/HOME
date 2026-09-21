@@ -16,6 +16,40 @@
 extern "C" {
 #include "lwip/etharp.h"
 #include "lwip/netif.h"
+
+/* ── Network list rows ──────────────────────────────────────────────────────
+ *
+ * Eight screens print a network as one line of font 1, and all eight used to
+ * cut the SSID at 11 characters and pad the field to 15. Those two numbers
+ * are one measurement -- what fits beside the fixed columns on a 240 px row
+ * -- written out sixteen times, and on a 320 px panel they threw away 13
+ * characters of every SSID for no reason.
+ *
+ * Stated once here, as a function of the panel: font 1 is 6 px per
+ * character, the row starts at x=10, and the fixed columns are "NN: " and
+ * " -RR dBm ChCC AUTH".
+ */
+static constexpr int kRowCharW    = 6;
+static constexpr int kRowLeftX    = 10;
+static constexpr int kRowChars    = (PUEO_SCREEN_W - kRowLeftX) / kRowCharW;
+static constexpr int kRowFixed    = 4 + 18;
+static constexpr int kSsidField   = kRowChars - kRowFixed;
+/* Enough for the whole formatted line, whichever panel this is. */
+static constexpr int kRowBufChars = kRowChars + 32;
+
+/* Copy at most kSsidField characters, ending in "..." when something was
+ * dropped. `dst` must hold kSsidField + 1. */
+static void fitSsid(char* dst, const char* src) {
+  const size_t len = strnlen(src, kSsidField + 1);
+  if ((int)len > kSsidField) {
+    memcpy(dst, src, kSsidField - 3);
+    memcpy(dst + kSsidField - 3, "...", 4);
+  } else {
+    memcpy(dst, src, len);
+    dst[len] = '\0';
+  }
+}
+
 }
 
 /** Active-scan dwell per channel for STA scans (Arduino default 300 ms; shared.h WIFI_SCAN_ACTIVE_MS). */
@@ -365,7 +399,7 @@ static uint16_t pcapChannelFlags(uint16_t freqMHz) {
 }
 
 #define MAX_X ESP32DIV_PKT_GRAPH_WIDTH
-#define MAX_Y 320
+#define MAX_Y PUEO_SCREEN_H
 
 arduinoFFT FFT = arduinoFFT();
 
@@ -435,8 +469,11 @@ void do_sampling_FFT() {
   FFT.Compute(vReal, vImag, samples, FFT_FORWARD);
   FFT.ComplexToMagnitude(vReal, vImag, samples);
 
-  // Original layout: mirrored waterfall centered at x=120 (full ~240px width with 256-pt FFT).
-  unsigned int left_x = 120;
+  // Mirrored waterfall, drawn out from the centre line in both directions:
+  // 128 bins each way, so it is (samples >> 1) * 2 wide whatever the panel is.
+  // It was centred on a literal 120, which is the middle of a 240 px screen
+  // and two thirds of the way across a 320 px one.
+  unsigned int left_x = PUEO_SCREEN_W / 2;
   unsigned int graph_y_offset = 91;
   int max_k = 0;
 
@@ -468,7 +505,7 @@ void do_sampling_FFT() {
     }
   }
 
-  unsigned int area_graph_x_offset = 120;
+  unsigned int area_graph_x_offset = PUEO_SCREEN_W / 2;
   unsigned int area_graph_height = 50;
   unsigned int area_graph_y_offset = 38;
 
@@ -708,14 +745,14 @@ void draw() {
 static bool uiDrawn = false;
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
   constexpr int ICON_SIZE = 16;
   constexpr int ICON_NUM = 3;
 
-  static int iconX[ICON_NUM] = {170, 210, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   static const unsigned char* icons[ICON_NUM] = {
@@ -962,8 +999,8 @@ void ptmLoop() {
     }
   }
 
-  tft.drawFastHLine(0, 90, 240, UI_LINE);
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 90, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   do_sampling_FFT();
   delay(10);
@@ -1346,15 +1383,15 @@ void beaconSpam() {
 static bool uiDrawn = false;
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
   constexpr int ICON_SIZE = 16;
   constexpr int ICON_NUM = 3;
 
-  static int iconX[ICON_NUM] = {10, 190, 220};
+  static int iconX[ICON_NUM] = {10, PUEO_SCREEN_W - 50, PUEO_SCREEN_W - 20};
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   static const unsigned char* icons[ICON_NUM] = {
@@ -1364,8 +1401,8 @@ void runUI() {
   };
 
   if (!uiDrawn) {
-    tft.fillRect(0, STATUS_BAR_Y_OFFSET, 120, STATUS_BAR_HEIGHT, DARK_GRAY);
-    tft.fillRect(120, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH - 120, STATUS_BAR_HEIGHT, DARK_GRAY);
+    tft.fillRect(0, STATUS_BAR_Y_OFFSET, (PUEO_SCREEN_W / 2), STATUS_BAR_HEIGHT, DARK_GRAY);
+    tft.fillRect((PUEO_SCREEN_W / 2), STATUS_BAR_Y_OFFSET, SCREEN_WIDTH - 120, STATUS_BAR_HEIGHT, DARK_GRAY);
     for (int i = 0; i < ICON_NUM; i++) {
       if (icons[i] != NULL) {
         tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, TFT_WHITE);
@@ -1485,7 +1522,7 @@ void beaconSpamSetup() {
 
   spamDrawIdleHint();
 
-  tft.fillRect(0, 20, 120, 16, DARK_GRAY);
+  tft.fillRect(0, 20, (PUEO_SCREEN_W / 2), 16, DARK_GRAY);
   tft.fillRect(120, 20, tft.width() - 120, 16, DARK_GRAY);
 
   lastSpamChannel = 0xFF;
@@ -1615,8 +1652,8 @@ static int deauthVisibleLines() {
 #define MAX_CHANNELS 14
 constexpr int MAX_SSID_LENGTH = 8;
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -1644,7 +1681,7 @@ static bool s_scanBannerShown = false;
 static unsigned long s_listenUntilMs = 0;
 static int s_knownNetworkCount = 0;
 
-static int iconX[ICON_NUM] = {210, 10};
+static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 30, 10};
 static int iconY = STATUS_BAR_Y_OFFSET;
 
 void scrollTerminal() {
@@ -2071,11 +2108,9 @@ void deauthdetectLoop() {
 
 namespace WifiScan {
 
-#define TFT_WIDTH 240
-#define TFT_HEIGHT 320
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -2280,7 +2315,7 @@ static int current_page = 0;
 
 static bool uiDrawn = false;
 
-static int iconX[ICON_NUM] = {220, 10};
+static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
 static const unsigned char* icons[ICON_NUM] = {
   bitmap_icon_undo,
   bitmap_icon_go_back
@@ -2299,7 +2334,7 @@ static void drawTabBar(const char* leftButton, bool leftDisabled,
     wifiScanUpdateNavLabels();
     return;
   }
-  tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+  tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
 
   if (leftButton && leftButton[0]) drawButton(0,   304, 57, 16, leftButton, false, leftDisabled);
   if (prevButton && prevButton[0]) drawButton(117, 304, 57, 16, prevButton, false, prevDisabled);
@@ -2310,18 +2345,15 @@ static int last_rendered_page = -1;
 static int last_rendered_index = -1;
 
 static void drawNetworkRow(int i, int y, bool isSel) {
-  char buf[64];
-  char ssid[16];
-  String fullSSID = WiFi.SSID(i);
-  strncpy(ssid, fullSSID.c_str(), 11);
-  ssid[11] = '\0';
-  if (fullSSID.length() > 11) strcat(ssid, "...");
+  char buf[kRowBufChars];
+  char ssid[kSsidField + 1];
+  fitSsid(ssid, WiFi.SSID(i).c_str());
 
   const int rssi = WiFi.RSSI(i);
   const int ch = WiFi.channel(i);
   const int auth = WiFi.encryptionType(i);
   const char* enc = (auth == WIFI_AUTH_OPEN) ? "OPEN" : "WPA2";
-  snprintf(buf, sizeof(buf), "%02d: %-15s %3d dBm Ch%2d %s", i + 1, ssid, rssi, ch, enc);
+  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s", i + 1, kSsidField, ssid, rssi, ch, enc);
 
   // Clear only this row (avoid overlapping next row).
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
@@ -2340,7 +2372,7 @@ void displayWiFiList(bool fullRedraw = false) {
   int networkCount = WiFi.scanComplete();
 
   if (fullRedraw) {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     wifiScanClearBody();
     tft.setTextSize(1);
   }
@@ -2600,7 +2632,7 @@ void runUI() {
     static int iconY = STATUS_BAR_Y_OFFSET;
 
     if (!uiDrawn) {
-        tft.drawFastHLine(0, 19, 240, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
         tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
         for (int i = 0; i < ICON_NUM; i++) {
@@ -2772,7 +2804,7 @@ void wifiscanLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   static bool lastDetailView = false;
   static bool lastScanning = true;
 
@@ -3139,7 +3171,7 @@ static bool cpDumpAllCredentialsToSD(int* outCount) {
 
 static void cpCredListStatus(const String& msg, uint16_t color) {
   const int y = max(50, wifiContentBottom() - 16);
-  tft.fillRect(0, y, 240, 16, TFT_BLACK);
+  tft.fillRect(0, y, PUEO_SCREEN_W, 16, TFT_BLACK);
   tft.setTextColor(color, TFT_BLACK);
   tft.setTextSize(1);
   tft.setCursor(2, y + 4);
@@ -3403,8 +3435,8 @@ static void cpCloneDrawRow(int displayNum, const String& ssid, int rssi, int ch,
 
   const char* enc = (auth == WIFI_AUTH_OPEN) ? "OPEN" : "WPA2";
   char buf[64];
-  snprintf(buf, sizeof(buf), "%02d: %-15s %3d dBm Ch%2d %s",
-           displayNum, ssidBuf, rssi, ch, enc);
+  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s",
+           displayNum, kSsidField, ssidBuf, rssi, ch, enc);
 
   tft.fillRect(0, y, tft.width(), CP_CLONE_ROW_H, TFT_BLACK);
   tft.setCursor(2, y);
@@ -3985,15 +4017,15 @@ void handleCredList(int x, int y) {
 static bool uiDrawn = false;
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
   constexpr int ICON_SIZE = 16;
   constexpr int ICON_NUM = 6;
 
-  static int iconX[ICON_NUM] = {90, 130, 170, 210, 50, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, PUEO_SCREEN_W - 190, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   static const unsigned char* icons[ICON_NUM] = {
@@ -4301,7 +4333,7 @@ void cportalLoop() {
 
 namespace Deauther {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 constexpr int SCREEN_HEIGHT = 320;
 
 static unsigned long deautherLastButtonPress = 0;
@@ -4359,15 +4391,15 @@ static void deautherUpdateNavLabels(bool onAttackScreen) {
 
 static void deautherDrawApRow(int i, int y, bool isSel) {
   char buf[64];
-  char ssid[16];
-  strncpy(ssid, (char*)ap_list[i].ssid, 11);
+  char ssid[kSsidField + 1];
+  fitSsid(ssid, (const char*)ap_list[i].ssid);
   ssid[11] = '\0';
   if (strlen((char*)ap_list[i].ssid) > 11) {
     strcat(ssid, "...");
   }
   const char* enc = ap_list[i].authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2";
-  snprintf(buf, sizeof(buf), "%02d: %-15s %3d dBm Ch%2d %s",
-           i + 1, ssid, ap_list[i].rssi, ap_list[i].primary, enc);
+  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s",
+           i + 1, kSsidField, ssid, ap_list[i].rssi, ap_list[i].primary, enc);
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
   tft.setCursor(2, y);
@@ -4435,7 +4467,7 @@ void drawTabBar(const char* leftButton, bool leftDisabled, const char* prevButto
         return;
     }
 
-    tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+    tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
 
     if (leftButton && leftButton[0]) {
         drawButton(0, 304, 57, 16, leftButton, false, leftDisabled);
@@ -4450,7 +4482,7 @@ void drawTabBar(const char* leftButton, bool leftDisabled, const char* prevButto
 }
 
 void drawScanScreen() {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -4568,7 +4600,7 @@ void resetWifi() {
 }
 
 void drawAttackScreen() {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -4753,15 +4785,15 @@ void handleTouch() {
 static bool uiDrawn = false;
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
   constexpr int ICON_SIZE = 16;
   constexpr int ICON_NUM = 2;
 
-  static int iconX[ICON_NUM] = {220, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   static const unsigned char* icons[ICON_NUM] = {
@@ -4862,7 +4894,7 @@ void deautherSetup() {
     redrawTouchButtonBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     tft.setTextColor(GREEN, BLACK);
     tft.setTextSize(1);
@@ -4892,14 +4924,14 @@ void deautherLoop() {
         return;
     }
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     deautherHandleNavButtons();
     handleTouch();
     updateStatusBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     uint32_t current_time = millis();
     if (attack_running && selected_ap_index != -1) {
@@ -4957,7 +4989,7 @@ void deautherLoop() {
 
 namespace ProbeRequestFlood {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 constexpr int SCREEN_HEIGHT = 320;
 
 // Larger row height = easier touch selection.
@@ -5007,15 +5039,15 @@ static void probeUpdateNavLabels(bool onAttackScreen) {
 
 static void probeDrawApRow(int i, int y, bool isSel) {
   char buf[64];
-  char ssid[16];
-  strncpy(ssid, (char*)ap_list[i].ssid, 11);
+  char ssid[kSsidField + 1];
+  fitSsid(ssid, (const char*)ap_list[i].ssid);
   ssid[11] = '\0';
   if (strlen((char*)ap_list[i].ssid) > 11) {
     strcat(ssid, "...");
   }
   const char* enc = ap_list[i].authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2";
-  snprintf(buf, sizeof(buf), "%02d: %-15s %3d dBm Ch%2d %s",
-           i + 1, ssid, ap_list[i].rssi, ap_list[i].primary, enc);
+  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s",
+           i + 1, kSsidField, ssid, ap_list[i].rssi, ap_list[i].primary, enc);
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
   tft.setCursor(2, y);
@@ -5127,7 +5159,7 @@ void drawTabBar(const char* leftButton, bool leftDisabled, const char* prevButto
         return;
     }
 
-    tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+    tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
 
     if (leftButton && leftButton[0]) {
         drawButton(0, 304, 57, 16, leftButton, false, leftDisabled);
@@ -5142,7 +5174,7 @@ void drawTabBar(const char* leftButton, bool leftDisabled, const char* prevButto
 }
 
 void drawScanScreen() {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -5260,7 +5292,7 @@ void resetWifi() {
 }
 
 void drawAttackScreen() {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -5443,15 +5475,15 @@ void handleTouch() {
 }
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
   constexpr int ICON_SIZE = 16;
   constexpr int ICON_NUM = 2;
 
-  static int iconX[ICON_NUM] = {220, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   static const unsigned char* icons[ICON_NUM] = {
@@ -5552,7 +5584,7 @@ void probeRequestFloodSetup() {
     redrawTouchButtonBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     tft.setTextColor(GREEN, BLACK);
     tft.setTextSize(1);
@@ -5582,14 +5614,14 @@ void probeRequestFloodLoop() {
         return;
     }
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     probeHandleNavButtons();
     handleTouch();
     updateStatusBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     uint32_t current_time = millis();
     if (attack_running && selected_ap_index != -1) {
@@ -5647,7 +5679,7 @@ void probeRequestFloodLoop() {
 
 namespace HiddenSsidReveal {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 constexpr int SCREEN_HEIGHT = 320;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
@@ -6019,7 +6051,7 @@ static void drawTabBar(const char* leftButton, bool leftDisabled, const char* pr
     return;
   }
 
-  tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+  tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
   if (leftButton && leftButton[0]) {
     drawButton(0, 304, 57, 16, leftButton, false, leftDisabled);
   }
@@ -6047,8 +6079,8 @@ static void drawApRow(int i, int y, bool isSel) {
   }
 
   const char* tag = s_aps[i].has_name ? "OK" : "??";
-  snprintf(buf, sizeof(buf), "%02d: %-14s %3d Ch%2d %s",
-           i + 1, name, s_aps[i].rssi, s_aps[i].channel, tag);
+  snprintf(buf, sizeof(buf), "%02d: %-*s %3d Ch%2d %s",
+           i + 1, kSsidField, name, s_aps[i].rssi, s_aps[i].channel, tag);
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
   tft.setCursor(2, y);
@@ -6060,7 +6092,7 @@ static void drawApRow(int i, int y, bool isSel) {
 }
 
 static void drawScanScreen(bool fullRedraw) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   tft.setTextSize(1);
 
   if (s_scanning) {
@@ -6237,7 +6269,7 @@ static void drawRevealScreen(bool fullRedraw) {
     return;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   wifiClearBody(TFT_BLACK);
   tft.setTextSize(1);
   s_lastRenderedIndex = -1;
@@ -6574,7 +6606,7 @@ static void handleTouch() {
 }
 
 static void runUI() {
-  static int iconX[ICON_NUM] = {220, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
   static const unsigned char* icons[ICON_NUM] = {
       bitmap_icon_undo,
@@ -6704,7 +6736,7 @@ void hiddenSsidSetup() {
   redrawTouchButtonBar();
   runUI();
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   tft.setTextColor(GREEN, BLACK);
   tft.setTextSize(1);
   tft.setCursor(10, 50);
@@ -6731,7 +6763,7 @@ void hiddenSsidLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   handleNavButtons();
   handleTouch();
@@ -6746,7 +6778,7 @@ void hiddenSsidLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   const bool onReveal = (s_selectedIndex >= 0 || s_listenAll);
   const uint32_t now = millis();
@@ -6772,7 +6804,7 @@ void hiddenSsidLoop() {
 
 namespace WpsScanner {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -6832,7 +6864,7 @@ static void drawTabBar(const char* leftButton, bool leftDisabled,
     updateNavLabels();
     return;
   }
-  tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+  tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
   if (leftButton && leftButton[0]) {
     drawButton(0, 304, 57, 16, leftButton, false, leftDisabled);
   }
@@ -6895,8 +6927,8 @@ static void drawApRow(int i, int y, bool isSel) {
     snprintf(name, sizeof(name), "(hidden)");
   }
 
-  snprintf(buf, sizeof(buf), "%02d: %-14s %3d Ch%2d %s",
-           i + 1, name, (int)s_aps[i].rssi, (int)s_aps[i].channel,
+  snprintf(buf, sizeof(buf), "%02d: %-*s %3d Ch%2d %s",
+           i + 1, kSsidField, name, (int)s_aps[i].rssi, (int)s_aps[i].channel,
            authShort(s_aps[i].authmode));
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
@@ -6909,7 +6941,7 @@ static void drawApRow(int i, int y, bool isSel) {
 }
 
 static void displayScanning() {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   wifiClearBody(TFT_BLACK);
   s_lastRenderedIndex = -1;
   s_lastRenderedPage = -1;
@@ -6923,7 +6955,7 @@ static void displayScanning() {
 }
 
 static void drawScanScreen(bool fullRedraw) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   tft.setTextSize(1);
 
   if (s_scanning) {
@@ -7116,7 +7148,7 @@ static void handleTouch() {
 }
 
 static void runUI() {
-  static int iconX[ICON_NUM] = {220, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
   static const unsigned char* icons[ICON_NUM] = {
       bitmap_icon_undo,
@@ -7214,7 +7246,7 @@ void wpsScannerSetup() {
   runUI();
   updateNavLabels();
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   runScan();
 }
 
@@ -7245,7 +7277,7 @@ void wpsScannerLoop() {
 
 namespace ArpScanner {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -7332,7 +7364,7 @@ static void drawTabBar(const char* leftButton, bool leftDisabled,
     updateNavLabels();
     return;
   }
-  tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+  tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
   if (leftButton && leftButton[0]) {
     drawButton(0, 304, 57, 16, leftButton, false, leftDisabled);
   }
@@ -7405,7 +7437,7 @@ static struct netif* staNetif() {
 }
 
 static void displayBusy(const char* line1, const char* line2) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   wifiClearBody(TFT_BLACK);
   s_lastRenderedIndex = -1;
   s_lastRenderedPage = -1;
@@ -7504,7 +7536,7 @@ static void drawHostRow(int i, int y, bool isSel) {
 
 static void drawListCommon(bool fullRedraw, int count, const char* header,
                            void (*drawRow)(int, int, bool)) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   tft.setTextSize(1);
 
   if (s_scanning) {
@@ -7993,7 +8025,7 @@ static void handleTouch() {
 }
 
 static void runUI() {
-  static int iconX[ICON_NUM] = {220, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
   static const unsigned char* icons[ICON_NUM] = {
       bitmap_icon_undo,
@@ -8098,7 +8130,7 @@ void arpScannerSetup() {
   runUI();
   updateNavLabels();
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   scanAccessPoints();
 }
 
@@ -8129,7 +8161,7 @@ void arpScannerLoop() {
 
 namespace KarmaAttack {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -8960,7 +8992,7 @@ static void updateHeader(bool force) {
 }
 
 static void drawDashboard(bool full) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   if (full) {
     wifiClearBody(TFT_BLACK);
     invalidateHeaderCache();
@@ -9138,7 +9170,7 @@ static void handleNavButtons() {
 }
 
 static void runUI() {
-  static int iconX[ICON_NUM] = {220, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
   static const unsigned char* icons[ICON_NUM] = {
       bitmap_icon_undo,
@@ -9313,7 +9345,7 @@ namespace FirmwareUpdate {
 
 const char* host = "esp32";
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 constexpr int SCREEN_HEIGHT = 320;
 
 #define BUTTON_WIDTH 230
@@ -9664,7 +9696,7 @@ static void fwRestoreNavChrome() {
 static void fwClearBody(uint16_t color = TFT_BLACK) {
   const int bottom = fwContentBottom();
   if (bottom > 37) {
-    tft.fillRect(0, 37, 240, bottom - 37, color);
+    tft.fillRect(0, 37, PUEO_SCREEN_W, bottom - 37, color);
   }
   fwRestoreNavChrome();
 }
@@ -9750,8 +9782,8 @@ static void fwStoreFooter(const FeatureUI::Button* src, uint8_t count) {
 }
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
@@ -9917,9 +9949,9 @@ static void drawNetworkTabBar(bool prevDisabled, bool nextDisabled) {
 }
 
 void drawMenu() {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   const int bodyBottom = fwContentBottom();
-  tft.fillRect(0, 37, 240, bodyBottom - 37, TFT_BLACK);
+  tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
 
   tft.setTextSize(1);
 
@@ -10213,8 +10245,8 @@ void performSDUpdate() {
 
 bool selectWiFiNetwork() {
   uiDrawn = false;
-  tft.fillRect(0, 37, 240, 320, TFT_BLACK);
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   tft.setCursor(10, 50);
   tft.setTextColor(GREEN);
   tft.setTextSize(1);
@@ -10225,8 +10257,8 @@ bool selectWiFiNetwork() {
 
   int numNetworks = WiFi.scanNetworks();
   if (numNetworks <= 0) {
-    tft.fillRect(0, 37, 240, 320, TFT_BLACK);
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     tft.setTextColor(GREEN);
     tft.setCursor(10, 50);
     tft.println("No networks found.");
@@ -10317,12 +10349,10 @@ bool selectWiFiNetwork() {
     for (int i = startIndex; i < end_index && y_pos < 300; i++) {
       if (x >= 10 && x < SCREEN_WIDTH - 10 && y >= y_pos && y < y_pos + NETWORK_ROW_HEIGHT) {
         char buf[64];
-        char ssid[16];
-        strncpy(ssid, networks[i].ssid, 11);
-        ssid[11] = '\0';
-        if (strlen(networks[i].ssid) > 11) strcat(ssid, "...");
+        char ssid[kSsidField + 1];
+        fitSsid(ssid, networks[i].ssid);
         const char* enc = networks[i].authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2";
-        snprintf(buf, sizeof(buf), "%02d: %-15s %3d dBm Ch%2d %s", i + 1, ssid, networks[i].rssi, networks[i].channel, enc);
+        snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s", i + 1, kSsidField, ssid, networks[i].rssi, networks[i].channel, enc);
         tft.setTextColor(ORANGE, TFT_BLACK);
         tft.setTextSize(1);
         tft.setCursor(10, y_pos);
@@ -10364,9 +10394,9 @@ bool selectWiFiNetwork() {
 }
 
 void drawNetworkList(int startIndex, int numNetworks, NetworkInfo* networks, int selectedIndex) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   const int bodyBottom = fwContentBottom();
-  tft.fillRect(0, 37, 240, bodyBottom - 37, TFT_BLACK);
+  tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
   tft.setTextSize(1);
 
   if (numNetworks == 0) {
@@ -10385,12 +10415,10 @@ void drawNetworkList(int startIndex, int numNetworks, NetworkInfo* networks, int
 
     for (int i = start_index; i < end_index && y < 300; i++) {
       char buf[64];
-      char ssid[16];
-      strncpy(ssid, networks[i].ssid, 11);
-      ssid[11] = '\0';
-      if (strlen(networks[i].ssid) > 11) strcat(ssid, "...");
+      char ssid[kSsidField + 1];
+      fitSsid(ssid, networks[i].ssid);
       const char* enc = networks[i].authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2";
-      snprintf(buf, sizeof(buf), "%02d: %-15s %3d dBm Ch%2d %s", i + 1, ssid, networks[i].rssi, networks[i].channel, enc);
+      snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s", i + 1, kSsidField, ssid, networks[i].rssi, networks[i].channel, enc);
       tft.setCursor(10, y);
       tft.setTextColor(i == selectedIndex ? ORANGE : (networks[i].authmode == WIFI_AUTH_OPEN ? ORANGE : TFT_WHITE));
       tft.println(buf);
@@ -10463,7 +10491,7 @@ void performWebOTAUpdate() {
   updateStatusBar();
   runUI();
   const int bodyBottom = fwContentBottom();
-  tft.fillRect(0, 37, 240, bodyBottom - 37, TFT_BLACK);
+  tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
   tft.setCursor(10, 10 + yshift);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(1);
@@ -10573,7 +10601,7 @@ void performWebOTAUpdate() {
     bool success = !Update.hasError();
     server.send(200, "text/plain", success ? "OK" : "FAIL");
     if (success) {
-      tft.fillRect(0, 37, 240, 320, TFT_BLACK);
+      tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
       tft.setCursor(10, 10 + yshift);
       tft.setTextColor(TFT_GREEN, TFT_BLACK);
       tft.setTextSize(1);
@@ -10584,7 +10612,7 @@ void performWebOTAUpdate() {
       delay(2000);
       ESP.restart();
     } else {
-      tft.fillRect(0, 37, 240, 320, TFT_BLACK);
+      tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
       tft.setCursor(10, 10 + yshift);
       tft.setTextColor(UI_WARN, TFT_BLACK);
       tft.println("X Update Failed!");
@@ -10608,7 +10636,7 @@ void performWebOTAUpdate() {
   }, [&inUpdate]() {
     HTTPUpload& upload = server.upload();
     if (upload.status == UPLOAD_FILE_START) {
-      tft.fillRect(0, 37, 240, 320, TFT_BLACK);
+      tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
       tft.setCursor(10, 10 + yshift);
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.setTextSize(1);
@@ -10625,7 +10653,7 @@ void performWebOTAUpdate() {
       }
       totalUploaded += upload.currentSize;
       int percent = (totalUploaded * 100) / (upload.totalSize ? upload.totalSize : 1000000);
-      tft.fillRect(10, 30 + yshift, 220, 10, TFT_BLACK);
+      tft.fillRect(10, 30 + yshift, (PUEO_SCREEN_W - 20), 10, TFT_BLACK);
       tft.setCursor(10, 30 + yshift);
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
       tft.printf("Progress: %d%%", percent);
@@ -10681,7 +10709,7 @@ void updateSetup() {
 
   fwResetNavCache();
   tft.fillScreen(TFT_BLACK);
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(0);

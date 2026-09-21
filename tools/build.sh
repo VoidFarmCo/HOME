@@ -3,6 +3,7 @@
 #
 #   tools/build.sh setup    install core + libraries (once, ~1 GB)
 #   tools/build.sh          compile
+#   PUEO_PANEL=28 ...       target the 2.8" panel instead of the 3.5"
 #   tools/build.sh upload COM7
 #
 # Nothing here touches a global Arduino install. The core lives under
@@ -24,7 +25,26 @@ PUEO_ARDUINO_ROOT="${PUEO_ARDUINO_ROOT:-$HOME/.pueo-esp32}"
 export ARDUINO_DIRECTORIES_DATA="$PUEO_ARDUINO_ROOT/data"
 export ARDUINO_DIRECTORIES_USER="$REPO/.arduino/user"
 export ARDUINO_DIRECTORIES_DOWNLOADS="$PUEO_ARDUINO_ROOT/downloads"
-BUILD_PATH="$PUEO_ARDUINO_ROOT/build"
+
+# Which CYD panel this build targets. 35 is board_pueo.h's own default, so
+# `tools/build.sh` with nothing set builds what the tree says it is.
+#
+#   PUEO_PANEL=35   3.5" ESP32-3248S035R   ST7796    320x480   (default)
+#   PUEO_PANEL=28   2.8" ESP32-2432S028R   ILI9341   240x320
+#
+# The two differ in more than a display driver: CC1101_CS, the backlight pin
+# and which SPI bus the touch controller sits on all move with the panel. So
+# they get separate build directories. Sharing one lets arduino-cli reuse
+# objects compiled for the other panel -- which links, and boots, and is
+# wrong, with a blank screen or a chip select sitting on top of the
+# backlight and nothing on the console saying why.
+PUEO_PANEL="${PUEO_PANEL:-35}"
+case "$PUEO_PANEL" in
+  35) PANEL_DEF="-DPUEO_PANEL_35=1" ;;
+  28) PANEL_DEF="-DPUEO_PANEL_35=0" ;;
+  *)  echo "PUEO_PANEL must be 28 or 35, not '$PUEO_PANEL'" >&2; exit 2 ;;
+esac
+BUILD_PATH="$PUEO_ARDUINO_ROOT/build-$PUEO_PANEL"
 
 # arduino-cli's winget install does not land on the Git Bash PATH.
 if ! command -v arduino-cli >/dev/null 2>&1; then
@@ -199,8 +219,8 @@ compile() {
   local rc=0
   local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "compiler.c.extra_flags=$maps" \
-    --build-property "compiler.cpp.extra_flags=$maps" \
+    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF" \
+    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF" \
     --build-path "$BUILD_PATH" "$REPO/ESP32-DIV" >"$log" 2>&1 || rc=$?
 
   grep -E "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*(warning|error):" "$log" || true
@@ -228,8 +248,8 @@ warnings() {
   rm -rf "$BUILD_PATH-warnings"
   local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "compiler.c.extra_flags=$maps" \
-    --build-property "compiler.cpp.extra_flags=$maps" \
+    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF" \
+    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF" \
     --build-path "$BUILD_PATH-warnings" "$REPO/ESP32-DIV" 2>&1 \
     | grep -E "warning:|Sketch uses|Global variables"
 }
@@ -253,8 +273,9 @@ upload() {
 case "${1:-compile}" in
   setup)    setup ;;
   compile)  compile ;;
+  path)     echo "$BUILD_PATH" ;;
   warnings) warnings ;;
   merge)    merge ;;
   upload)   shift; upload "$@" ;;
-  *) echo "usage: tools/build.sh [setup|compile|warnings|merge|upload <port>]" >&2; exit 2 ;;
+  *) echo "usage: tools/build.sh [setup|compile|warnings|merge|path|upload <port>]" >&2; exit 2 ;;
 esac

@@ -629,7 +629,7 @@ BLEScan* s_scan = nullptr;
 /* ── UI ──────────────────────────────────────────────────────────────────── */
 
 int contentBottom() {
-  return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : 320;
+  return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : PUEO_SCREEN_H;
 }
 
 const char* kindText(Kind k) {
@@ -655,7 +655,7 @@ uint16_t confColour(Conf c) {
 }
 
 void drawHeader() {
-  tft.fillRect(0, 20, 240, 18, TFT_BLACK);
+  tft.fillRect(0, 20, PUEO_SCREEN_W, 18, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -679,7 +679,7 @@ void drawList() {
   const int bottom = contentBottom();
   const int rows = (bottom - top) / kRowH;
 
-  tft.fillRect(0, top, 240, bottom - top, TFT_BLACK);
+  tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
   tft.setTextFont(1);
 
   if (s_hitCount == 0) {

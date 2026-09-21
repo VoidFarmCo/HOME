@@ -39,7 +39,11 @@
 #define BOARD_CYD
 
 #ifndef ESP32DIV_BOARD_NAME
+#if PUEO_PANEL_35
+#define ESP32DIV_BOARD_NAME "Pueo (CYD 3.5)"
+#else
 #define ESP32DIV_BOARD_NAME "Pueo (CYD 2.8)"
+#endif
 #endif
 
 /* ── CC1101 SubGHz ──────────────────────────────────────────────────────────

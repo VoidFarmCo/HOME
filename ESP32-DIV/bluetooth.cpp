@@ -299,15 +299,15 @@ int spooferlineIndex = 0;
 
 static bool uiDrawn = false;
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
 constexpr int ICON_SIZE = 16;
 constexpr int ICON_NUM = 5;
 
-static int iconX[ICON_NUM] = {90, 130, 170, 210, 10};
+static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
 static int iconY = STATUS_BAR_Y_OFFSET;
 
 BLEAdvertising *pAdvertising;
@@ -585,7 +585,7 @@ static bool spooferLineFits(int yPos) {
 }
 
 void Printspoofer(String text, uint16_t color, bool extraSpace = false) {
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   const int visibleLines = spooferVisibleLines();
   if (spooferlineIndex >= visibleLines) {
     for (int i = 0; i < visibleLines - 1; i++) {
@@ -754,8 +754,8 @@ void updateSpoofer() {
   }
 
   if (needChrome) {
-    tft.drawFastHLine(0, panelTop - 1, 240, UI_LINE);
-    tft.fillRect(0, panelTop, 240, panelH, DARK_GRAY);
+    tft.drawFastHLine(0, panelTop - 1, PUEO_SCREEN_W, UI_LINE);
+    tft.fillRect(0, panelTop, PUEO_SCREEN_W, panelH, DARK_GRAY);
 
     tft.setTextSize(1);
     tft.setTextColor(TFT_WHITE, DARK_GRAY);
@@ -1094,11 +1094,11 @@ void runUI() {
     bitmap_icon_go_back
   };
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   if (!uiDrawn) {
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     tft.fillRect(80, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -1174,7 +1174,7 @@ void spooferSetup() {
   drawStatusBar(currentBatteryVoltage, true);
   redrawTouchButtonBar();
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   randomSeed(analogRead(0));
   setupTouchscreen();
@@ -1182,7 +1182,7 @@ void spooferSetup() {
   tft.setTextFont(1);
   tft.setTextSize(1);
 
-  tft.fillRect(0, 20, 240, 16, DARK_GRAY);
+  tft.fillRect(0, 20, PUEO_SCREEN_W, 16, DARK_GRAY);
   tft.setTextFont(1);
   tft.setTextColor(TFT_WHITE);
   tft.setTextSize(1);
@@ -1215,7 +1215,7 @@ void spooferSetup() {
 #endif
 
   uiDrawn = false;
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   redrawTouchButtonBar();
 }
 
@@ -1233,7 +1233,7 @@ void spooferLoop() {
     }
 
     runUI();
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     handleButtonPress(BTN_RIGHT, changeDeviceTypeNext);
     handleButtonPress(BTN_LEFT, changeDeviceTypePrev);
@@ -1266,8 +1266,8 @@ void exit() {
 namespace SourApple {
 static bool uiDrawn = false;
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -1296,11 +1296,11 @@ void runUI() {
     bitmap_icon_go_back
   };
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   if (!uiDrawn) {
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -1370,14 +1370,14 @@ void updatedisplay() {
   for (int offset = 0; offset <= lineHeight; offset += 2) {
     const int baseY = (MAX_LINES - 1) * lineHeight - offset + 51;
     if (baseY + lineHeight <= scrollBottom) {
-      tft.fillRect(0, baseY, 240, lineHeight, TFT_BLACK);
+      tft.fillRect(0, baseY, PUEO_SCREEN_W, lineHeight, TFT_BLACK);
     }
 
     for (int i = 0; i < MAX_LINES; i++) {
       int y = -lineHeight + (i * lineHeight) + offset;
       const int drawY = y + 51;
       if (y >= -lineHeight && drawY + lineHeight <= scrollBottom) {
-        tft.fillRect(0, drawY, 240, lineHeight, TFT_BLACK);
+        tft.fillRect(0, drawY, PUEO_SCREEN_W, lineHeight, TFT_BLACK);
         tft.setCursor(5, drawY + 4);
         tft.print(lines[i]);
       }
@@ -1449,12 +1449,12 @@ void sourappleSetup() {
   redrawTouchButtonBar();
 
   tft.setTextSize(1);
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   uiDrawn = false;
 
   setupTouchscreen();
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9);
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
@@ -1472,7 +1472,7 @@ void sourappleLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   runUI();
 
   /* The payload changes every burst; the address changes once a second.
@@ -1511,7 +1511,7 @@ void exit() {
 
 namespace AirTagSpoofer {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -2015,7 +2015,7 @@ void airTagSetup() {
   runUI();
   updateNavLabels();
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9);
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
 
@@ -2061,7 +2061,7 @@ void exit() {
 
 namespace AirTagSniffer {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -2719,7 +2719,7 @@ void airTagSnifferSetup() {
   redrawTouchButtonBar();
   runUI();
   updateNavLabels();
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   updateHeader(true);
   redrawList();
 
@@ -2785,7 +2785,7 @@ void exit() {
 
 namespace BleSkimmer {
 
-constexpr int SCREEN_WIDTH = 240;
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -3517,7 +3517,7 @@ void bleSkimmerSetup() {
   redrawTouchButtonBar();
   runUI();
   updateNavLabels();
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   updateHeader(true);
   redrawList();
 
@@ -3753,9 +3753,9 @@ void updateTFT() {
 
   const int bodyH = bleContentBottom() - 39;
   if (bodyH > 0) {
-    tft.fillRect(0, 39, 240, bodyH, TFT_BLACK);
+    tft.fillRect(0, 39, PUEO_SCREEN_W, bodyH, TFT_BLACK);
   }
-  tft.fillRect(0, 19, 240, 16, DARK_GRAY);
+  tft.fillRect(0, 19, PUEO_SCREEN_W, 16, DARK_GRAY);
 
   tft.setTextSize(1);
 
@@ -3789,8 +3789,8 @@ void updateTFT() {
     xPos += spacing;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
-  tft.drawFastHLine(0, 35, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 35, PUEO_SCREEN_W, UI_LINE);
 }
 
 void checkModeChange() {
@@ -3880,8 +3880,8 @@ namespace BleSniffer { void exit(); }
 
 namespace BleScan {
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -3950,7 +3950,7 @@ static String hexPreview(const std::string& raw, size_t maxBytes) {
 static void bleScanClearBody() {
   const int h = bleContentBottom() - 37;
   if (h > 0) {
-    tft.fillRect(0, 37, 240, h, TFT_BLACK);
+    tft.fillRect(0, 37, PUEO_SCREEN_W, h, TFT_BLACK);
   }
 }
 
@@ -3971,7 +3971,7 @@ const unsigned long debounceTime = 200;
 
 static bool uiDrawn = false;
 
-static int iconX[ICON_NUM] = {220, 10};
+static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 20, 10};
 static const unsigned char* icons[ICON_NUM] = {
   bitmap_icon_undo,
   bitmap_icon_go_back
@@ -3990,7 +3990,7 @@ static void drawTabBar(const char* leftButton, bool leftDisabled,
     bleScanUpdateNavLabels();
     return;
   }
-  tft.fillRect(0, 304, SCREEN_WIDTH, 16, FEATURE_BG);
+  tft.fillRect(0, (PUEO_SCREEN_H - 16), SCREEN_WIDTH, 16, FEATURE_BG);
   if (leftButton && leftButton[0]) drawButton(0,   304, 57, 16, leftButton, false, leftDisabled);
   if (prevButton && prevButton[0]) drawButton(117, 304, 57, 16, prevButton, false, prevDisabled);
   if (nextButton && nextButton[0]) drawButton(177, 304, 57, 16, nextButton, false, nextDisabled);
@@ -4320,7 +4320,7 @@ void runUI() {
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   if (!uiDrawn) {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -4489,7 +4489,7 @@ void bleScanLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   handleButtons();
 
   runUI();
@@ -4827,14 +4827,14 @@ void scan() {
 }
 
 void runUI() {
-  constexpr int SCREEN_WIDTH = 240;
+  constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
   #undef STATUS_BAR_Y_OFFSET
   constexpr int STATUS_BAR_Y_OFFSET = 20;
   constexpr int STATUS_BAR_HEIGHT = 16;
   constexpr int ICON_SIZE = 16;
   constexpr int ICON_NUM = 3;
 
-  static int iconX[ICON_NUM] = {170, 210, 10};
+  static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   static const unsigned char* icons[ICON_NUM] = {
@@ -4850,7 +4850,7 @@ void runUI() {
     tft.setCursor(35, 24);
     tft.print("2.4GHz Scanner");
 
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
     tft.fillRect(160, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -5680,7 +5680,7 @@ void initializeRadios() {
 }
 
 void updateTFT() {
-  tft.fillRect(0, 19, 240, 16, DARK_GRAY);
+  tft.fillRect(0, 19, PUEO_SCREEN_W, 16, DARK_GRAY);
 
   tft.setTextSize(1);
 
@@ -5714,8 +5714,8 @@ void updateTFT() {
     xPos += spacing;
   }
 
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
-  tft.drawFastHLine(0, 35, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 35, PUEO_SCREEN_W, UI_LINE);
 
 }
 
@@ -5803,7 +5803,7 @@ void prokillLoop() {
   }
 
   maintainTouchNavBar();
-  tft.drawFastHLine(0, 19, 240, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
   checkModeChange();
 
@@ -6548,7 +6548,7 @@ void runUI() {
   static constexpr int kIconSz = 16;
   static constexpr int kIconN = 5;
   // Same spacing as BleSpoofer: back @10, then 40px steps from 90.
-  static int iconX[kIconN] = {90, 130, 170, 210, 10};
+  static int iconX[kIconN] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = kBarY;
 
   static const unsigned char* icons[kIconN] = {
@@ -6560,15 +6560,15 @@ void runUI() {
   };
 
   if (!uiDrawn) {
-    tft.fillRect(0, kBarY, 240, kBarH, DARK_GRAY);
+    tft.fillRect(0, kBarY, PUEO_SCREEN_W, kBarH, DARK_GRAY);
 
     for (int i = 0; i < kIconN; i++) {
       if (icons[i] != NULL) {
         tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
       }
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarY + kBarH, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
 
@@ -7391,7 +7391,7 @@ void runUI() {
   static constexpr int kBarH = 16;
   static constexpr int kIconSz = 16;
   static constexpr int kIconN = 5;
-  static int iconX[kIconN] = {90, 130, 170, 210, 10};
+  static int iconX[kIconN] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = kBarY;
   static const unsigned char* icons[kIconN] = {
     bitmap_icon_LEFT,
@@ -7402,12 +7402,12 @@ void runUI() {
   };
 
   if (!uiDrawn) {
-    tft.fillRect(0, kBarY, 240, kBarH, DARK_GRAY);
+    tft.fillRect(0, kBarY, PUEO_SCREEN_W, kBarH, DARK_GRAY);
     for (int i = 0; i < kIconN; i++) {
       if (icons[i]) tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarY + kBarH, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
 
@@ -8292,7 +8292,7 @@ void runUI() {
   static constexpr int kIconSz = 16;
   static constexpr int kIconN = 3;
   // Same 3-icon spacing as Scanner: 170 / 210 / 10.
-  static int iconX[kIconN] = {170, 210, 10};
+  static int iconX[kIconN] = {PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = kBarY;
 
   static const unsigned char* icons[kIconN] = {
@@ -8302,14 +8302,14 @@ void runUI() {
   };
 
   if (!uiDrawn) {
-    tft.fillRect(0, kBarY, 240, kBarH, DARK_GRAY);
+    tft.fillRect(0, kBarY, PUEO_SCREEN_W, kBarH, DARK_GRAY);
     for (int i = 0; i < kIconN; i++) {
       if (icons[i] != NULL) {
         tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
       }
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarY + kBarH, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
 
@@ -9140,7 +9140,7 @@ void runUI() {
   static constexpr int kBarH = 16;
   static constexpr int kIconSz = 16;
   static constexpr int kIconN = 5;
-  static int iconX[kIconN] = {90, 130, 170, 210, 10};
+  static int iconX[kIconN] = {PUEO_SCREEN_W - 150, PUEO_SCREEN_W - 110, PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
   static int iconY = kBarY;
   static const unsigned char* icons[kIconN] = {
     bitmap_icon_LEFT,
@@ -9151,12 +9151,12 @@ void runUI() {
   };
 
   if (!uiDrawn) {
-    tft.fillRect(0, kBarY, 240, kBarH, DARK_GRAY);
+    tft.fillRect(0, kBarY, PUEO_SCREEN_W, kBarH, DARK_GRAY);
     for (int i = 0; i < kIconN; i++) {
       if (icons[i]) tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
     }
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, kBarY + kBarH, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
 
@@ -9307,8 +9307,8 @@ void exit() {
 
 namespace BleSniffer {
 
-constexpr int SCREEN_WIDTH = 240;
-#define SCREENHEIGHT 320
+constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
+#define SCREENHEIGHT PUEO_SCREEN_H
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -9317,7 +9317,7 @@ constexpr int ICON_NUM = 3;
 
 static bool uiDrawn = false;
 
-static int iconX[ICON_NUM] = {170, 210, 10};
+static int iconX[ICON_NUM] = {PUEO_SCREEN_W - 70, PUEO_SCREEN_W - 30, 10};
 static const unsigned char* icons[ICON_NUM] = {
   bitmap_icon_undo,
   bitmap_icon_eye2,
@@ -9441,7 +9441,7 @@ private:
     {
       const int bodyH = bleContentBottom() - 37;
       if (bodyH > 0) {
-        tft.fillRect(0, 37, 240, bodyH, TFT_BLACK);
+        tft.fillRect(0, 37, PUEO_SCREEN_W, bodyH, TFT_BLACK);
       }
     }
     tft.setTextSize(1);
@@ -9458,7 +9458,7 @@ private:
     tft.print(status + " | Dev: " + String(deviceCount) + " Sus: " + String(suspiciousCount));
     uint16_t dotColor = isBLEScanActive ? BLUE : GREEN;
     tft.fillCircle(tft.width() - 10, 46, STATUS_DOT_SIZE / 2, dotColor);
-    tft.drawFastHLine(0, 56, 240, UI_LINE);
+    tft.drawFastHLine(0, 56, PUEO_SCREEN_W, UI_LINE);
   }
 
   void updateDisplay() {
@@ -9718,8 +9718,8 @@ void runUI() {
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   if (!uiDrawn) {
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
-    tft.drawFastHLine(0, 36, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
     tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -9842,7 +9842,7 @@ public:
     }
 
     unsigned long now = millis();
-    tft.drawFastHLine(0, 19, 240, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
     runUI();
     if (feature_exit_requested || featureExitButtonPressed()) {
@@ -10017,7 +10017,7 @@ void blesnifferSetup() {
   {
     const int bodyH = bleContentBottom() - 37;
     if (bodyH > 0) {
-      tft.fillRect(0, 37, 240, bodyH, TFT_BLACK);
+      tft.fillRect(0, 37, PUEO_SCREEN_W, bodyH, TFT_BLACK);
     }
   }
   sniffer.setup();
