@@ -52,7 +52,13 @@ The 2.8" is left alone deliberately. A published pin map is a thing people have
 already soldered to.
 
 Two more differences on the 3.5", neither of which Pueo drives: GPIO 34 is the
-battery divider rather than an LDR, and GPIO 36 is the touch IRQ. GPIO 26 is the
+battery divider rather than an LDR, and GPIO 36 is the touch IRQ.
+
+**The lcdwiki 4.0" E32R40T is pin-identical to the 3.5"** on every line
+lcdwiki publishes, at the same 320x480, differing only in the controller's
+suffix -- which TFT_eSPI covers with one driver. The 3.5" image should run
+on it unchanged. Untried here: two datasheets agreeing is a reason to
+expect it to work, not a report that it did. GPIO 26 is the
 amplifier's DAC output rather than a plain speaker pin.
 
 The onboard RGB LED is gone on both. GPIO 4/16/17 are the only contiguous spare pins on

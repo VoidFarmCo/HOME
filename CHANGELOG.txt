@@ -382,6 +382,23 @@ ship two flash images.
     on -- that SCK, MOSI and MISO come off the microSD slot's own pins --
     from an assumption into an observation.
 
+  * The lcdwiki 4.0" E32R40T should run the 3.5" image unchanged. Every pin
+    lcdwiki publishes for it matches the E32R35T -- display SPI 14/13/12,
+    CS 15, DC 2, touch on that bus behind CS 33 with IRQ 36, backlight 27,
+    SD 5/18/23/19, RGB 22/16/17, amp 4 and 26, battery 34 -- at the same
+    320x480. The only difference is the controller's suffix, ST7796S
+    against the 3.5"'s ST7796U, and TFT_eSPI drives both with one
+    ST7796_DRIVER.
+
+    So PUEO_PANEL_35 is right about everything it selects and wrong only
+    about the diagonal in its name. Recorded rather than acted on: nothing
+    here has been on a 4.0" board, and two datasheets agreeing is a reason
+    to expect it to work rather than a report that it did.
+
+    The enclosure does not carry over. 60.88 x 111.11 x 5.65 against the
+    3.5"'s 55.50 x 101.50 x 5.80, and there is no outline drawing here for
+    it, so a lid would be guesswork.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.

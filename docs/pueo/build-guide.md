@@ -82,8 +82,26 @@ at chip-select rates. The 3.5" image already moves CSN to GPIO 25 for
 exactly that reason; the 2.8" image does not, because the board it is for
 does not need it to.
 
-The lcdwiki 4.0" E32R40T follows the same family pattern and is untried
-here.
+**The lcdwiki 4.0" E32R40T should run the 3.5" image unchanged.** Every pin
+lcdwiki lists for it is the same as the E32R35T's -- display SPI on
+14/13/12 with CS 15 and DC 2, touch on that bus behind CS 33 with IRQ 36,
+backlight 27, SD on 5/18/23/19, RGB on 22/16/17, amplifier on 4 and 26,
+battery on 34 -- and the resolution is the same 320x480. The only entry
+that differs at all is the controller's suffix, ST7796S against the 3.5"'s
+ST7796U, and TFT_eSPI drives the family with one `ST7796_DRIVER`.
+
+So the firmware needs nothing: flash `pueo-<version>-35-merged.bin`. The
+name is then wrong about the diagonal and right about everything it
+actually selects.
+
+What does not carry over is the enclosure. The 4.0" is 60.88 x 111.11 x
+5.65 mm against the 3.5"'s 55.50 x 101.50 x 5.80, and there is no outline
+drawing here for it -- no aperture, no module outline, no mounting-hole
+pattern -- so a lid for it would be guesswork. [verify] and measure before
+cutting one.
+
+None of this has been on a 4.0" board. It is two datasheets agreeing, which
+is a good reason to expect it to work and not the same thing as it working.
 
 If your 2.8" board's silkscreen reads `ESP32 2432S028`, it is the Sunton and
 the 2.8" column below is for you. If it reads `E32R28T`, it is not, and
