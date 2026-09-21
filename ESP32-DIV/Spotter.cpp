@@ -794,7 +794,7 @@ void spotterSetup() {
   memset(s_capSeen, 0, sizeof(s_capSeen));
 
   setTouchButtonInputEnabled(true);
-  setTouchNavLabels("Back", "Down", "", "Up", "Log");
+  setTouchNavLabels(nullptr, "Down", "Exit", "Up", "Log");
 
   // Radio up in station mode, unassociated, purely to listen.
   WiFi.mode(WIFI_STA);

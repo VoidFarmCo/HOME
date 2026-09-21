@@ -204,6 +204,17 @@ ship two flash images.
     to the declared entry count now, and catches an orphaned handler left
     behind by a removed entry as well.
 
+  * ...and once they opened, there was no way out of them. Exit is
+    BTN_SELECT, which is the centre slot of the touch nav bar, and every
+    other feature labels it "Exit". Those same three passed "" for the
+    centre and put "Back" on the left, where nothing reads it: an exit with
+    no label on it, next to a labelled button that did nothing.
+
+    It survived because they were the three that could not be opened by
+    touch in the first place. tools/check_nav_labels.py checks all 55 label
+    sites now -- the centre slot is never blank, and no slot promises a way
+    out that the feature does not route there.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.

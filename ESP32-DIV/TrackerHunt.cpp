@@ -448,13 +448,13 @@ void enterGauge() {
   s_chrome    = false;
   s_prevAngle = -1;
   s_screen    = Screen::Gauge;
-  setTouchNavLabels("List", "", "", "", "Reset");
+  setTouchNavLabels("List", nullptr, "Exit", nullptr, "Reset");
   s_dirty = true;
 }
 
 void enterPicker() {
   s_screen = Screen::Pick;
-  setTouchNavLabels("Back", "Down", "", "Up", "Hunt");
+  setTouchNavLabels(nullptr, "Down", "Exit", "Up", "Hunt");
   s_dirty = true;
 }
 

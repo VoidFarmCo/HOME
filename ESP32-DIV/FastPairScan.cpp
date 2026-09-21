@@ -475,7 +475,7 @@ void fastPairSetup() {
   memset(s_target, 0, sizeof(s_target));
 
   setTouchButtonInputEnabled(true);
-  setTouchNavLabels("Back", "Down", "", "Up", "Probe");
+  setTouchNavLabels(nullptr, "Down", "Exit", "Up", "Probe");
 
   if (ensureBleStackReady()) {
     s_scan = BLEDevice::getScan();
