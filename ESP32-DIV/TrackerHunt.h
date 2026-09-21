@@ -52,7 +52,12 @@ struct Target {
   int8_t   best;          // strongest seen since it entered the list
   uint32_t lastSeen;      // millis()
   uint16_t hits;
-  char     label[18];     // "AirTag", "Tile", "SmartTag", ...
+  /* Wide enough for the longest Kind::Tracker label in
+   * SpotterSignatures.h, which is "Samsung (SmartTag?)" at 19 characters.
+   * It was 18, so that row reached the screen as "Samsung (SmartTag" --
+   * the truncation turned a hedge into a claim, which is the opposite of
+   * what the question mark is there for. */
+  char     label[24];
 };
 
 void setup();

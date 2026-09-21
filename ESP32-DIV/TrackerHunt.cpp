@@ -179,7 +179,7 @@ class HuntCallbacks : public BLEAdvertisedDeviceCallbacks {
       return;
     }
 
-    char label[18];
+    char label[24];
     if (!identify(dev, label, sizeof(label))) {
       return;
     }

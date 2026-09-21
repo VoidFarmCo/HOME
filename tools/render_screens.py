@@ -23,6 +23,7 @@ device shows less than one of a working one -- stated here rather than
 implied.
 """
 import argparse
+import math
 import os
 import re
 import sys
@@ -58,6 +59,7 @@ CYAN = rgb(0x07FF)
 RED = rgb(0xF800)              # TFT_RED, Conf::Strong
 LIGHTGREY = rgb(0xD69A)        # TFT_LIGHTGREY, the address line
 DARKGREY = rgb(0x7BEF)         # TFT_DARKGREY, Conf::Weak and the third line
+BLUE = rgb(0x001F)             # TFT_BLUE, Hunt's COLDER
 
 
 def _strip_comments(src):
@@ -186,6 +188,25 @@ class Tft:
     def draw_fast_hline(self, x, y, w, c):
         self.d.rectangle([x, y, x + w - 1, y], fill=c)
 
+    def draw_fast_vline(self, x, y, h, c):
+        self.d.rectangle([x, y, x, y + h - 1], fill=c)
+
+    def draw_rect(self, x, y, w, h, c):
+        self.d.rectangle([x, y, x + w - 1, y + h - 1], outline=c)
+
+    def draw_pixel(self, x, y, c):
+        if 0 <= x < W and 0 <= y < H:
+            self.im.putpixel((x, y), c)
+
+    def draw_line(self, x0, y0, x1, y1, c):
+        self.d.line([x0, y0, x1, y1], fill=c)
+
+    def fill_triangle(self, x0, y0, x1, y1, x2, y2, c):
+        self.d.polygon([(x0, y0), (x1, y1), (x2, y2)], fill=c)
+
+    def fill_circle(self, x, y, r, c):
+        self.d.ellipse([x - r, y - r, x + r, y + r], fill=c)
+
     # -- 1bpp bitmap, rows of ceil(w/8) bytes, MSB first --
     def draw_bitmap(self, x, y, name, w, h, c):
         data = self.bm[name]
@@ -220,6 +241,38 @@ class Tft:
         for ch in s:
             self._glcd_char(x, y, ch, c, bg)
             x += 6
+
+    def print_f1_size(self, x, y, s, c, bg, size):
+        """setTextSize(n) with font 1: the same 5x7 cells, n x n pixels each.
+
+        Written out rather than drawn at 1x and upscaled. TFT_eSPI scales
+        the cell, not the string, so the one-pixel gap between characters
+        scales with it -- upscaling a finished bitmap puts that gap in the
+        wrong place and rounds the glyph edges."""
+        cw = 6 * size
+        for i, ch in enumerate(s):
+            cx = x + i * cw
+            for col in range(5):
+                bits = self.glcd[ord(ch) & 0xFF][col]
+                for row in range(8):
+                    if bits & (1 << row):
+                        fill = c
+                    elif bg is not None:
+                        fill = bg
+                    else:
+                        continue
+                    self.d.rectangle(
+                        [cx + col * size, y + row * size,
+                         cx + col * size + size - 1,
+                         y + row * size + size - 1], fill=fill)
+            if bg is not None:
+                self.d.rectangle([cx + 5 * size, y,
+                                  cx + 6 * size - 1,
+                                  y + 8 * size - 1], fill=bg)
+
+    def centre_f1(self, s, cx, y, c, bg=None, size=1):
+        """drawCentreString(s, x, y, 1): x is the centre, not the left."""
+        self.print_f1_size(cx - (6 * size * len(s)) // 2, y, s, c, bg, size)
 
     def print_f1(self, x, y, s, c, bg=None):
         """Cursor-relative print in font 1, which is what drawStatusBar uses
@@ -466,6 +519,217 @@ def render_spotter(t):
             t.print_f1(224, y, "**", RED, BLACK)
 
 
+# ── Hunt ───────────────────────────────────────────────────────────────────
+#
+# Replays TrackerHunt.cpp's drawPicker() and drawGauge(). Rendered without
+# the touch nav bar, so contentBottom() is the panel height -- on the board
+# the bar takes the bottom strip and the picker shows two fewer rows.
+#
+# The addresses are locally-administered (the 0x02 bit set) and invented.
+# Real ones would be somebody's tracker, and a Find My address is rotating
+# anyway, so a screenshot of one says nothing true for longer than an hour.
+
+HUNT_TARGETS = [
+    {"label": "Find My",  "mac": "4E:11:A0:3C:97:22", "rssi": -52, "age": 0},
+    {"label": "Tile",     "mac": "E2:0C:7B:44:19:83", "rssi": -67, "age": 2},
+    {"label": "Find My",  "mac": "56:9D:2F:08:B1:6E", "rssi": -74, "age": 1},
+    {"label": "Samsung (SmartTag?)", "mac": "7A:31:C4:5D:02:AF",
+     "rssi": -81, "age": 6},
+    {"label": "Eddystone beacon", "mac": "62:88:EE:13:40:D7",
+     "rssi": -89, "age": 14},
+]
+
+HUNT_ROW_H = 22
+HUNT_SEL_BG = rgb(0x2124)
+
+
+def render_hunt_pick(t):
+    """drawPicker() in TrackerHunt.cpp."""
+    t.fill_screen(BLACK)
+    status_bar(t)
+
+    top = 22
+    bottom = H
+    rows = (bottom - top - 18) // HUNT_ROW_H
+    sel_index = 0
+
+    t.fill_rect(0, top, W, bottom - top, BLACK)
+    t.print_f1(8, top + 2, "trackers in range: %d" % len(HUNT_TARGETS),
+               WHITE, BLACK)
+
+    y = top + 18
+    for i, d in enumerate(HUNT_TARGETS[:rows]):
+        sel = i == sel_index
+        bg = HUNT_SEL_BG if sel else BLACK
+        if sel:
+            t.fill_rect(0, y, W, HUNT_ROW_H, HUNT_SEL_BG)
+        t.print_f1(8, y + 2, d["label"], UI_ICON if sel else WHITE, bg)
+        t.print_f1(8, y + 12, d["mac"], UI_ICON if sel else DARKGREY, bg)
+        t.print_f1(W - 96, y + 6, "%4d dBm  %2ds" % (d["rssi"], d["age"]),
+                   UI_ICON if sel else WHITE, bg)
+        y += HUNT_ROW_H
+
+
+# The gauge's own constants, from TrackerHunt.cpp.
+HUNT_RSSI_FAR = -100
+HUNT_RSSI_NEAR = -35
+
+
+def _dial():
+    top, bottom = 30, H
+    by_w = W // 2 - 10
+    by_h = bottom - top - 90
+    r = by_w if by_w < by_h else by_h
+    return W // 2, top + r, r
+
+
+def _angle_for(rssi):
+    rssi = max(HUNT_RSSI_FAR, min(HUNT_RSSI_NEAR, rssi))
+    frac = (rssi - HUNT_RSSI_FAR) / float(HUNT_RSSI_NEAR - HUNT_RSSI_FAR)
+    return int(180.0 - frac * 180.0 + 0.5)
+
+
+def _polar(cx, cy, deg, radius):
+    a = math.radians(deg)
+    return (cx + int(math.cos(a) * radius + 0.5),
+            cy - int(math.sin(a) * radius + 0.5))
+
+
+def render_hunt_gauge(t):
+    """drawGauge() in TrackerHunt.cpp, locked on the strongest row."""
+    lock = HUNT_TARGETS[0]
+    smooth = -47          # a few seconds of walking toward it
+    peak = -45
+    last = -49
+    seen = 143
+    trend = 1             # WARMER
+
+    cx, cy, r = _dial()
+    t.fill_screen(BLACK)
+    status_bar(t)
+
+    # drawGaugeChrome()
+    t.fill_rect(0, 22, W, H - 22, BLACK)
+    t.print_f1(8, 24, lock["label"], UI_ICON, BLACK)
+    t.print_f1(W - 104, 24, lock["mac"], DARKGREY, BLACK)
+
+    for deg in range(0, 181, 2):
+        x, y = _polar(cx, cy, deg, r)
+        col = RED if deg <= 40 else (UI_ICON if deg <= 80 else DARKGREY)
+        t.draw_pixel(x, y, col)
+    for deg in range(0, 181, 30):
+        x0, y0 = _polar(cx, cy, deg, r)
+        x1, y1 = _polar(cx, cy, deg, r - 8)
+        t.draw_line(x0, y0, x1, y1, DARKGREY)
+    t.print_f1(cx - r, cy + 2, "far", DARKGREY, BLACK)
+    t.print_f1(cx + r - 22, cy + 2, "near", DARKGREY, BLACK)
+    t.fill_circle(cx, cy, 3, DARKGREY)
+
+    # peak marker, then the needle
+    pdeg = _angle_for(peak)
+    px0, py0 = _polar(cx, cy, pdeg, r)
+    px1, py1 = _polar(cx, cy, pdeg, r - 12)
+    t.draw_line(px0, py0, px1, py1, GREEN)
+
+    deg = _angle_for(smooth)
+    tx, ty_ = _polar(cx, cy, deg, r - 10)
+    bx0, by0 = _polar(cx, cy, (deg + 90) % 360, 5)
+    bx1, by1 = _polar(cx, cy, (deg + 270) % 360, 5)
+    t.fill_triangle(tx, ty_, bx0, by0, bx1, by1, RED)
+
+    # the readout
+    ty = cy + 14
+    t.fill_rect(0, ty, W, H - ty, BLACK)
+    word, wcol = ("WARMER", GREEN) if trend > 0 else (
+        ("COLDER", BLUE) if trend < 0 else ("HOLD", DARKGREY))
+    t.centre_f1(word, cx, ty, wcol, BLACK, 3)
+
+    sm = smooth
+    if sm < -85:
+        band, bcol = "FAR", DARKGREY
+    elif sm < -70:
+        band, bcol = "CLOSER", WHITE
+    elif sm < -55:
+        band, bcol = "NEAR", UI_ICON
+    elif sm < -45:
+        band, bcol = "VERY CLOSE", UI_ICON
+    else:
+        band, bcol = "ARM'S LENGTH", RED
+    t.centre_f1(band, cx, ty + 30, bcol, BLACK, 2)
+
+    bw, bx, by = W - 40, 20, ty + 54
+    fill = int((sm - HUNT_RSSI_FAR) / float(HUNT_RSSI_NEAR - HUNT_RSSI_FAR) * bw)
+    fill = max(0, min(bw, fill))
+    t.draw_rect(bx, by, bw, 10, DARKGREY)
+    t.fill_rect(bx + 1, by + 1, fill, 8, bcol)
+    ppx = bx + int((peak - HUNT_RSSI_FAR) /
+                   float(HUNT_RSSI_NEAR - HUNT_RSSI_FAR) * bw)
+    t.draw_fast_vline(max(bx, min(bx + bw, ppx)), by - 3, 16, GREEN)
+
+    t.centre_f1("%d dBm    best %d    %d seen" % (sm, peak, seen),
+                cx, by + 18, DARKGREY, BLACK, 1)
+
+
+# ── Fast Pair ──────────────────────────────────────────────────────────────
+#
+# Replays FastPairScan.cpp's drawHeader() and drawList(). Three lines per
+# device at kRowH = 30, the same shape as Spotter's list.
+#
+# Colour is the frame type and nothing else: green is a device advertising a
+# Model ID, which is what pairing mode looks like; cyan is an account-key
+# frame, meaning it already belongs to somebody; grey is an empty filter.
+#
+# Addresses and model IDs are invented. Every Model ID row shows the raw
+# hex, because that is what the device does: kModels in FastPair.cpp is a
+# sentinel and nothing else, on the grounds that a name needs a source
+# rather than a spam list, so modelName() returns nullptr for everything.
+# A render showing "Pixel Buds Pro" would be inventing a capability.
+
+FASTPAIR_DEVS = [
+    {"line1": "PAIRING  model 0E30A0", "col": GREEN,
+     "mac": "F0:9E:4A:22:8B:01", "addr": "pub", "rssi": -44,
+     "line3": "batt 90/85/60+ x37 22s", "sel": True},
+    {"line1": "paired   filter 6 bytes", "col": CYAN,
+     "mac": "5C:3A:11:9D:74:E2", "addr": "rnd", "rssi": -61,
+     "line3": "x214 4m", "sel": False},
+    {"line1": "PAIRING  model 92BBBD", "col": GREEN,
+     "mac": "A4:C1:38:0B:66:1F", "addr": "pub", "rssi": -72,
+     "line3": "x12 9s", "sel": False},
+    {"line1": "paired   no account keys", "col": LIGHTGREY,
+     "mac": "6E:82:D5:40:AA:3C", "addr": "rnd", "rssi": -79,
+     "line3": "x88 11m", "sel": False},
+    {"line1": "paired   filter 10 bytes", "col": CYAN,
+     "mac": "72:0D:9C:57:31:B8", "addr": "rnd", "rssi": -86,
+     "line3": "x5 1h", "sel": False},
+]
+
+FASTPAIR_SEL_BG = rgb(0x18E3)
+
+
+def render_fastpair(t):
+    """drawHeader() and drawList() in FastPairScan.cpp."""
+    t.fill_screen(BLACK)
+    status_bar(t)
+
+    t.fill_rect(0, 20, W, 18, BLACK)
+    t.print_f1(8, 24, "devices %d   adverts 1962" % len(FASTPAIR_DEVS),
+               WHITE, BLACK)
+
+    top, row_h = 42, 30
+    rows = (H - top) // row_h
+    t.fill_rect(0, top, W, H - top, BLACK)
+
+    for i, d in enumerate(FASTPAIR_DEVS[:rows]):
+        y = top + i * row_h
+        bg = FASTPAIR_SEL_BG if d["sel"] else BLACK
+        if d["sel"]:
+            t.fill_rect(0, y - 2, W, row_h - 2, FASTPAIR_SEL_BG)
+        t.print_f1(8, y, d["line1"], d["col"], bg)
+        t.print_f1(8, y + 11, "%s %s %ddBm"
+                   % (d["mac"], d["addr"], d["rssi"]), LIGHTGREY, bg)
+        t.print_f1(8, y + 21, d["line3"], DARKGREY, bg)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(REPO, "render"))
@@ -491,7 +755,10 @@ def main():
     for name, fn in (("boot", lambda t: render_boot(t, brand)),
                      ("menu", render_menu),
                      ("bluetooth", render_bluetooth),
-                     ("spotter", render_spotter)):
+                     ("spotter", render_spotter),
+                     ("hunt-pick", render_hunt_pick),
+                     ("hunt-gauge", render_hunt_gauge),
+                     ("fastpair", render_fastpair)):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
