@@ -169,6 +169,30 @@ static const OuiSig kOuiSigs[] = {
    * 82:6B:F2 has the locally-administered bit set, which makes it a
    * randomised address that happens to keep recurring. */
   {{0x82, 0x6B, 0xF2}, Kind::Alpr, Conf::Weak,    "LAA, not a vendor"},
+  /* Vendors whose product lines include plate readers, from SquachWatch-CYD
+   * (GPL-3.0) and checked here against the IEEE registry rather than taken on
+   * its word: all seven are MA-L blocks assigned to the named company.
+   *
+   * Likely rather than Strong, which is a narrower call than the one Axon
+   * gets. Axon is a small company -- tasers, body cameras, fleet, evidence --
+   * so its block means Axon hardware and that is nearly always interesting.
+   * Motorola Solutions is the public-safety radio industry, plus Avigilon,
+   * plus Vigilant's LPR line; one of its addresses is far more likely a
+   * handheld radio than a camera. Genetec is narrower but still sells VMS and
+   * access control alongside AutoVu.
+   *
+   * Strong is also what reaches the BLE path, so promoting these would widen
+   * BLE matching on the strength of a guess about which product it is.
+   * Corroboration still gets them there: a Motorola block plus an ALPR
+   * network name on the same address promotes to Strong on its own. */
+  {{0x00, 0x04, 0x7D}, Kind::Alpr, Conf::Likely,  "Motorola Solutions"},
+  {{0x00, 0x18, 0x85}, Kind::Alpr, Conf::Likely,  "Motorola Solutions"},
+  {{0x00, 0x1F, 0x92}, Kind::Alpr, Conf::Likely,  "Motorola Solutions"},
+  {{0x4C, 0xCC, 0x34}, Kind::Alpr, Conf::Likely,  "Motorola Solutions"},
+  {{0xB8, 0xE2, 0x8C}, Kind::Alpr, Conf::Likely,  "Motorola Malaysia"},
+  {{0x00, 0xBF, 0x15}, Kind::Alpr, Conf::Likely,  "Genetec"},
+  {{0x0C, 0xBF, 0x15}, Kind::Alpr, Conf::Likely,  "Genetec"},
+
   {{0xB8, 0x35, 0x32}, Kind::Alpr, Conf::Weak,    "unregistered OUI"},
 };
 
