@@ -654,23 +654,74 @@ uint16_t confColour(Conf c) {
   }
 }
 
+/* ── why the list is painted a line at a time ─────────────────────────────
+ *
+ * drawList() used to clear the whole list area and redraw every row, four
+ * times a second. With nothing in range that is invisible: the area is black
+ * and stays black. With a steady stream of hits it is a black flash behind
+ * every row, four times a second, which is what the bench transmitter made
+ * obvious the first time it was pointed at this screen.
+ *
+ * Hunt had the same fault and the same fix: remember what each line says and
+ * repaint only the lines whose text changed. Most of them do not change most
+ * of the time -- a MAC never does, a label never does, and the counters move
+ * far more slowly than the redraw does. */
+constexpr int kMaxVisRows = 16;
+char s_shownRow[kMaxVisRows][3][48];
+char s_shownStar[kMaxVisRows];
+char s_shownHdr[48];
+char s_shownTag[16];
+
+void forgetDrawn() {
+  memset(s_shownRow, 0, sizeof(s_shownRow));
+  memset(s_shownStar, 0, sizeof(s_shownStar));
+  memset(s_shownHdr, 0, sizeof(s_shownHdr));
+  memset(s_shownTag, 0, sizeof(s_shownTag));
+}
+
+/* Repaint one line if it differs from what is there. The fillRect is the
+ * width of the screen because the replacement can be shorter than what it
+ * replaces, and drawString only paints the glyphs it draws. */
+void showAt(char* shown, size_t shownSz, const char* text, int x, int y,
+            int h, uint16_t colour, bool force) {
+  if (!force && strncmp(shown, text, shownSz - 1) == 0) {
+    return;
+  }
+  tft.fillRect(0, y, PUEO_SCREEN_W, h, TFT_BLACK);
+  tft.setTextColor(colour, TFT_BLACK);
+  tft.drawString(text, x, y);
+  snprintf(shown, shownSz, "%s", text);
+}
+
 void drawHeader() {
-  tft.fillRect(0, 20, PUEO_SCREEN_W, 18, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+
   char buf[42];
   snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d",
            (unsigned)s_chan, (unsigned long)s_frames, s_hitCount);
-  tft.drawString(buf, 8, 24);
+  /* The whole 18 px band is this line's, so clearing it here also clears
+   * the recording tag, which is why the tag is repainted unconditionally
+   * whenever the line above it changed. */
+  const bool hdrChanged = strncmp(s_shownHdr, buf, sizeof(s_shownHdr) - 1) != 0;
+  showAt(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18, TFT_WHITE, false);
 
+  char tag[16] = "";
+  uint16_t tagColour = TFT_RED;
+  int tagX = 180;
   if (s_logging) {
-    tft.setTextColor(TFT_RED, TFT_BLACK);
-    snprintf(buf, sizeof(buf), "REC %lu", (unsigned long)s_logRows);
-    tft.drawString(buf, 180, 24);
+    snprintf(tag, sizeof(tag), "REC %lu", (unsigned long)s_logRows);
   } else if (s_logFailed) {
-    tft.setTextColor(ORANGE, TFT_BLACK);
-    tft.drawString("no SD", 196, 24);
+    snprintf(tag, sizeof(tag), "no SD");
+    tagColour = ORANGE;
+    tagX = 196;
+  }
+  if (hdrChanged || strncmp(s_shownTag, tag, sizeof(s_shownTag) - 1) != 0) {
+    if (tag[0] != ' ') {
+      tft.setTextColor(tagColour, TFT_BLACK);
+      tft.drawString(tag, tagX, 24);
+    }
+    snprintf(s_shownTag, sizeof(s_shownTag), "%s", tag);
   }
 }
 
@@ -679,14 +730,14 @@ void drawList() {
   const int bottom = contentBottom();
   const int rows = (bottom - top) / kRowH;
 
-  tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
   tft.setTextFont(1);
+  tft.setTextSize(1);
 
   if (s_hitCount == 0) {
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.setTextSize(1);
-    tft.drawString("listening...", 8, top + 6);
-    tft.drawString("nothing matched yet", 8, top + 20);
+    showAt(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
+           8, top + 6, 10, TFT_DARKGREY, false);
+    showAt(s_shownRow[0][1], sizeof(s_shownRow[0][1]), "nothing matched yet",
+           8, top + 20, 10, TFT_DARKGREY, false);
     return;
   }
 
@@ -697,21 +748,30 @@ void drawList() {
     s_scroll = 0;
   }
 
-  for (int i = 0; i < rows && (s_scroll + i) < s_hitCount; i++) {
+  /* The list scrolled, so row 3 is now a different device and every cached
+   * line is about the wrong one. Nothing else invalidates the whole list. */
+  static int s_lastScroll = -1;
+  const bool moved = (s_scroll != s_lastScroll);
+  s_lastScroll = s_scroll;
+  if (moved) {
+    forgetDrawn();
+  }
+
+  int i = 0;
+  for (; i < rows && i < kMaxVisRows && (s_scroll + i) < s_hitCount; i++) {
     const Hit& h = s_hits[s_scroll + i];
     const int y = top + i * kRowH;
 
-    tft.setTextSize(1);
-    tft.setTextColor(confColour(h.conf), TFT_BLACK);
-    char line[44];
+    char line[48];
     snprintf(line, sizeof(line), "%-9s %s", kindText(h.kind), h.label);
-    tft.drawString(line, 8, y);
+    showAt(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line,
+           8, y, 10, confColour(h.conf), false);
 
-    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X %s %ddBm x%u",
              h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
              h.viaBle ? "BLE" : "WiFi", (int)h.rssiBest, (unsigned)h.hits);
-    tft.drawString(line, 8, y + 11);
+    showAt(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line,
+           8, y + 11, 10, TFT_LIGHTGREY, false);
 
     /* Third line: what is true of the device rather than of its address.
      *
@@ -743,21 +803,40 @@ void drawList() {
         snprintf(rot, sizeof(rot), "+%u ", (unsigned)h.addrChanges);
       }
 
-      tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
       snprintf(line, sizeof(line), "%s%s%s%s", fpTxt,
                (!h.viaBle && (h.mac[0] & 0x02)) ? "rnd " : "", rot, age);
-      tft.drawString(line, 8, y + 21);
+      showAt(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line,
+             8, y + 21, 10, TFT_DARKGREY, false);
     }
 
-    if (h.corroborated) {
+    /* Drawn after the first line, which clears the band it sits in. */
+    const char want = h.corroborated ? '*' : ' ';
+    if (s_shownStar[i] != want) {
       tft.setTextColor(TFT_RED, TFT_BLACK);
-      tft.drawString("**", 224, y);
+      tft.drawString(h.corroborated ? "**" : "  ", PUEO_SCREEN_W - 32, y);
+      s_shownStar[i] = want;
+    } else if (h.corroborated) {
+      tft.setTextColor(TFT_RED, TFT_BLACK);
+      tft.drawString("**", PUEO_SCREEN_W - 32, y);
     }
+  }
+
+  /* Rows that existed a moment ago and do not now. Without this a list that
+   * shrinks leaves the tail of the old one on screen, which no amount of
+   * per-line caching would ever overwrite. */
+  for (; i < rows && i < kMaxVisRows; i++) {
+    if (s_shownRow[i][0][0] == ' ') {
+      continue;
+    }
+    tft.fillRect(0, top + i * kRowH, PUEO_SCREEN_W, kRowH, TFT_BLACK);
+    s_shownRow[i][0][0] = s_shownRow[i][1][0] = s_shownRow[i][2][0] = ' ';
+    s_shownStar[i] = 0;
   }
 }
 
 void redraw(bool full) {
   if (full) {
+    forgetDrawn();          // the screen is about to be black; the cache lies
     tft.fillScreen(TFT_BLACK);
     drawStatusBar(readBatteryVoltage(), true);
   }
