@@ -49,24 +49,7 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate = false, bool bottomSe
  * On a panel with only one height this is a no-op that the compiler deletes,
  * so the bar's geometry stays the compile-time constant it has always been
  * there and that image rebuilds to the same bytes. */
-/* Repaint one line of text only if it differs from what is already there.
- *
- * Four screens have now had the same fault. A list redraw that clears its
- * area and repaints every row is invisible when the area is empty -- which
- * is how every one of them was written and tested -- and is a black flash
- * behind every row, several times a second, the moment anything is actually
- * found. Hunt had it, then Spotter, then Fast Pair and Drones on the same
- * evening, once a bench transmitter existed to supply a steady stream of
- * hits. It is the same bug four times because it was the same code four
- * times.
- *
- * `shown` is the caller's record of what this line last said; it owns the
- * storage, one buffer per line slot. Returns true if it repainted, which is
- * what a caller needs when clearing a band also wipes something drawn beside
- * it. `h` is the height to clear -- the replacement can be shorter than what
- * it replaces, and drawString only paints the glyphs it draws. */
-bool uiShowLine(char* shown, size_t shownSz, const char* text,
-                int x, int y, int h, uint16_t fg, uint16_t bg);
+#include "UiLine.h"   // uiShowLine, shared with the beacon sketch
 
 /* A feature's own mark, held for a beat as it opens.
  *

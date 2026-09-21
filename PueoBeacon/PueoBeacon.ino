@@ -40,6 +40,7 @@
 #include "Branding.h"
 #include "icon.h"
 #include "shared.h"
+#include "UiLine.h"   // after shared.h: it needs PUEO_SCREEN_W
 
 TFT_eSPI tft = TFT_eSPI();
 
@@ -167,25 +168,38 @@ void drawFrame() {
   tft.drawFastHLine(0, 42, PUEO_SCREEN_W, kDim);
 }
 
+/* One buffer per line. This screen had the same fault as the four it exists
+ * to test: clear the whole area, redraw every row, four times a second. See
+ * UiLine.h. */
+char s_shownHead[2][48];
+char s_shownName[Emit::kSignalCount][40];
+char s_shownCnt[Emit::kSignalCount][16];
+char s_shownBy[Emit::kSignalCount][32];
+
+void forgetDrawn() {
+  memset(s_shownHead, 0, sizeof(s_shownHead));
+  memset(s_shownName, 0, sizeof(s_shownName));
+  memset(s_shownCnt, 0, sizeof(s_shownCnt));
+  memset(s_shownBy, 0, sizeof(s_shownBy));
+}
+
 void drawBody() {
   const int top = 50;
-  tft.fillRect(0, top, PUEO_SCREEN_W, PUEO_SCREEN_H - top, kBg);
   tft.setTextFont(1);
 
   int y = top;
   if (!s_running) {
-    tft.setTextColor(kStop, kBg);
-    tft.drawString("STOPPED - auto-stop after 10 min", 8, y);
-    tft.setTextColor(kDim, kBg);
-    tft.drawString("reset the board to transmit again", 8, y + 12);
+    uiShowLine(s_shownHead[0], sizeof(s_shownHead[0]),
+               "STOPPED - the auto-stop ran out", 8, y, 12, kStop, kBg);
+    uiShowLine(s_shownHead[1], sizeof(s_shownHead[1]),
+               "reset the board to transmit again", 8, y + 12, 12, kDim, kBg);
     y += 32;
   } else {
-    tft.setTextColor(kLive, kBg);
     const uint32_t leftS = (Emit::kAutoStopMs - (millis() - s_started)) / 1000u;
     char hdr[48];
     snprintf(hdr, sizeof(hdr), "TRANSMITTING - stops in %lu:%02lu",
              (unsigned long)(leftS / 60), (unsigned long)(leftS % 60));
-    tft.drawString(hdr, 8, y);
+    uiShowLine(s_shownHead[0], sizeof(s_shownHead[0]), hdr, 8, y, 14, kLive, kBg);
     y += 16;
   }
 
@@ -195,32 +209,46 @@ void drawBody() {
     const uint32_t n = Emit::sentCount(s);
     const bool isLiveBle = (s == live);
 
-    tft.setTextColor(isLiveBle ? kLive : (n ? kText : kDim), kBg);
-    tft.drawString(Emit::name(s), 8, y);
+    /* The live marker is in the string, not only in the colour. uiShowLine
+     * compares text and nothing else, so a row that went live while its name
+     * stayed the same would keep the colour it had. */
+    char nm[40];
+    snprintf(nm, sizeof(nm), "%s%s", isLiveBle ? "> " : "  ", Emit::name(s));
+    const bool nameRedrawn =
+        uiShowLine(s_shownName[i], sizeof(s_shownName[i]), nm, 8, y, 12,
+                   isLiveBle ? kLive : (n ? kText : kDim), kBg);
 
+    /* Shares a band with the name, so it repaints whenever that cleared. */
     char cnt[16];
     snprintf(cnt, sizeof(cnt), "%lu", (unsigned long)n);
-    tft.drawString(cnt, PUEO_SCREEN_W - 44, y);
+    if (nameRedrawn ||
+        strncmp(s_shownCnt[i], cnt, sizeof(s_shownCnt[i]) - 1) != 0) {
+      tft.setTextColor(kDim, kBg);
+      tft.drawString(cnt, PUEO_SCREEN_W - 44, y);
+      snprintf(s_shownCnt[i], sizeof(s_shownCnt[i]), "%s", cnt);
+    }
 
-    tft.setTextColor(kDim, kBg);
-    tft.drawString(Emit::detectedBy(s), 20, y + 10);
+    uiShowLine(s_shownBy[i], sizeof(s_shownBy[i]), Emit::detectedBy(s),
+               20, y + 10, 10, kDim, kBg);
     y += 24;
   }
 
   /* A refused frame is the difference between "nobody is listening" and
    * "nothing is being said", and those two look identical from the other
    * board. Say which it is here. */
+  static char shownFail[48];
+  char warn[48] = "";
   const uint32_t fails = Emit::txFailures();
   if (fails) {
-    tft.setTextColor(kStop, kBg);
-    char warn[48];
     snprintf(warn, sizeof(warn), "WiFi TX REFUSED x%lu - frames not sent",
              (unsigned long)fails);
-    tft.drawString(warn, 8, PUEO_SCREEN_H - 26);
   }
+  uiShowLine(shownFail, sizeof(shownFail), warn, 8, PUEO_SCREEN_H - 26, 12,
+             kStop, kBg);
 
-  tft.setTextColor(kDim, kBg);
-  tft.drawString("all payloads say PUEO-TEST", 8, PUEO_SCREEN_H - 14);
+  static char shownFoot[40];
+  uiShowLine(shownFoot, sizeof(shownFoot), "all payloads say PUEO-TEST",
+             8, PUEO_SCREEN_H - 14, 12, kDim, kBg);
 }
 
 }  // namespace
@@ -238,6 +266,7 @@ void setup() {
 
   drawSplash();
   drawFrame();
+  forgetDrawn();
 
   Emit::begin();
   s_started = millis();
