@@ -860,7 +860,7 @@ def main():
                      ("hunt-mark",
                       lambda t: render_mark(t, "bitmap_pueo_hunt", "Hunt")),
                      ("spotter-mark",
-                      lambda t: render_mark(t, "bitmap_pueo_spotter", "Spotter"))):
+                      lambda t: render_mark(t, "bitmap_pueo_spotter", "Surveillance"))):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
