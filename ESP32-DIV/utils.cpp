@@ -549,6 +549,18 @@ static int statusBarTempBand(float t) {
  * full redraw chose. */
 static constexpr int kStatusIconsWidth = 110;
 
+bool uiShowLine(char* shown, size_t shownSz, const char* text,
+                int x, int y, int h, uint16_t fg, uint16_t bg) {
+  if (strncmp(shown, text, shownSz - 1) == 0) {
+    return false;
+  }
+  tft.fillRect(0, y, PUEO_SCREEN_W, h, bg);
+  tft.setTextColor(fg, bg);
+  tft.drawString(text, x, y);
+  snprintf(shown, shownSz, "%s", text);
+  return true;
+}
+
 void showFeatureMark(const unsigned char* bitmap, const char* caption,
                      int holdMs) {
   tft.fillScreen(UI_BG);

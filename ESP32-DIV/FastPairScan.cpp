@@ -166,15 +166,27 @@ uint16_t frameColour(FastPair::Frame f) {
   }
 }
 
+/* See uiShowLine in utils.h. Three lines per row, plus the row's selected
+ * state, because the highlight changes every line's background. */
+constexpr int kMaxVisRows = 16;
+char s_shownRow[kMaxVisRows][3][44];
+char s_shownSel[kMaxVisRows];
+char s_shownHdr[44];
+
+void forgetDrawn() {
+  memset(s_shownRow, 0, sizeof(s_shownRow));
+  memset(s_shownSel, 0, sizeof(s_shownSel));
+  memset(s_shownHdr, 0, sizeof(s_shownHdr));
+}
+
 void drawHeader() {
-  tft.fillRect(0, 20, PUEO_SCREEN_W, 18, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   char buf[40];
   snprintf(buf, sizeof(buf), "devices %d   adverts %lu",
            s_devCount, (unsigned long)s_adverts);
-  tft.drawString(buf, 8, 24);
+  uiShowLine(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18,
+             TFT_WHITE, TFT_BLACK);
 }
 
 void drawList() {
@@ -182,14 +194,15 @@ void drawList() {
   const int bottom = contentBottom();
   const int rows = (bottom - top) / kRowH;
 
-  tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
 
   if (s_devCount == 0) {
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString("listening...", 8, top + 6);
-    tft.drawString("no Fast Pair advertisements yet", 8, top + 20);
+    uiShowLine(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
+               8, top + 6, 11, TFT_DARKGREY, TFT_BLACK);
+    uiShowLine(s_shownRow[0][1], sizeof(s_shownRow[0][1]),
+               "no Fast Pair advertisements yet", 8, top + 20, 11,
+               TFT_DARKGREY, TFT_BLACK);
     return;
   }
 
@@ -209,19 +222,31 @@ void drawList() {
     s_scroll = 0;
   }
 
-  for (int i = 0; i < rows && (s_scroll + i) < s_devCount; i++) {
+  /* A scroll makes every cached line describe a different device. */
+  static int s_lastScroll = -1;
+  if (s_scroll != s_lastScroll) {
+    s_lastScroll = s_scroll;
+    forgetDrawn();
+  }
+
+  int i = 0;
+  for (; i < rows && i < kMaxVisRows && (s_scroll + i) < s_devCount; i++) {
     const Device& d = s_dev[s_scroll + i];
     const int y = top + i * kRowH;
     const bool selected = (s_scroll + i) == s_sel;
-
-    if (selected) {
-      tft.fillRect(0, y - 2, PUEO_SCREEN_W, kRowH - 2, 0x18E3);
-    }
     const uint16_t bg = selected ? 0x18E3 : TFT_BLACK;
+
+    /* The highlight is the background of all three lines, so a row whose
+     * selected state changed has to repaint whatever its text says. */
+    const char wantSel = selected ? 1 : 0;
+    if (s_shownSel[i] != wantSel) {
+      s_shownSel[i] = wantSel;
+      tft.fillRect(0, y - 2, PUEO_SCREEN_W, kRowH - 2, bg);
+      s_shownRow[i][0][0] = s_shownRow[i][1][0] = s_shownRow[i][2][0] = '\0';
+    }
 
     /* Line 1: what state it is in, and the model if it told us. */
     char line[40];
-    tft.setTextColor(frameColour(d.frame), bg);
     if (d.frame == FastPair::Frame::ModelId) {
       const char* name = FastPair::modelName(d.modelId);
       if (name != nullptr) {
@@ -236,14 +261,15 @@ void drawList() {
     } else {
       snprintf(line, sizeof(line), "paired   no account keys");
     }
-    tft.drawString(line, 8, y);
+    uiShowLine(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line, 8, y, 11,
+               frameColour(d.frame), bg);
 
     /* Line 2: the address, which is all the identity there is. */
-    tft.setTextColor(TFT_LIGHTGREY, bg);
     snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X %s %ddBm",
              d.mac[0], d.mac[1], d.mac[2], d.mac[3], d.mac[4], d.mac[5],
              d.addrPublic ? "pub" : "rnd", (int)d.rssiLast);
-    tft.drawString(line, 8, y + 11);
+    uiShowLine(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line, 8, y + 11,
+               11, TFT_LIGHTGREY, bg);
 
     /* Line 3: battery, if offered, then how long it has been around. */
     {
@@ -272,10 +298,18 @@ void drawList() {
       } else {
         snprintf(age, sizeof(age), "%luh", (unsigned long)(secs / 3600u));
       }
-      tft.setTextColor(TFT_DARKGREY, bg);
       snprintf(line, sizeof(line), "%sx%u %s", batt, (unsigned)d.seen, age);
-      tft.drawString(line, 8, y + 21);
+      uiShowLine(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line, 8, y + 21,
+                 11, TFT_DARKGREY, bg);
     }
+  }
+
+  /* Rows the list no longer has. */
+  for (; i < rows && i < kMaxVisRows; i++) {
+    if (s_shownRow[i][0][0] == '\0' && s_shownSel[i] == 0) continue;
+    tft.fillRect(0, top + i * kRowH - 2, PUEO_SCREEN_W, kRowH, TFT_BLACK);
+    memset(s_shownRow[i], 0, sizeof(s_shownRow[i]));
+    s_shownSel[i] = 0;
   }
 }
 

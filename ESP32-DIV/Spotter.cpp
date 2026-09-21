@@ -717,7 +717,7 @@ void drawHeader() {
     tagX = 196;
   }
   if (hdrChanged || strncmp(s_shownTag, tag, sizeof(s_shownTag) - 1) != 0) {
-    if (tag[0] != ' ') {
+    if (tag[0] != '\0') {
       tft.setTextColor(tagColour, TFT_BLACK);
       tft.drawString(tag, tagX, 24);
     }
@@ -825,11 +825,11 @@ void drawList() {
    * shrinks leaves the tail of the old one on screen, which no amount of
    * per-line caching would ever overwrite. */
   for (; i < rows && i < kMaxVisRows; i++) {
-    if (s_shownRow[i][0][0] == ' ') {
+    if (s_shownRow[i][0][0] == '\0') {
       continue;
     }
     tft.fillRect(0, top + i * kRowH, PUEO_SCREEN_W, kRowH, TFT_BLACK);
-    s_shownRow[i][0][0] = s_shownRow[i][1][0] = s_shownRow[i][2][0] = ' ';
+    s_shownRow[i][0][0] = s_shownRow[i][1][0] = s_shownRow[i][2][0] = '\0';
     s_shownStar[i] = 0;
   }
 }
@@ -857,7 +857,7 @@ void hopChannel() {
 /* ── Feature entry points ────────────────────────────────────────────────── */
 
 void spotterSetup() {
-  showFeatureMark(bitmap_pueo_spotter, "Spotter");
+  showFeatureMark(bitmap_pueo_spotter, "Surveillance");
 
   s_hitCount = 0;
   s_frames = 0;

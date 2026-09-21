@@ -64,6 +64,18 @@ volatile uint8_t s_qTail = 0;
 Slot s_queue[kQueueSlots];
 volatile uint32_t s_qDropped = 0;
 
+/* What each line currently says, so only the lines that changed repaint.
+ * Five slots per row: four lines down the left, plus the radio/RSSI tag that
+ * shares the first line's band. See uiShowLine. */
+constexpr uint8_t kLinesPerRow = 5;
+char s_shownRow[kMaxCraft][kLinesPerRow][64];
+char s_shownHdr[2][64];
+
+void forgetDrawn() {
+  memset(s_shownRow, 0, sizeof(s_shownRow));
+  memset(s_shownHdr, 0, sizeof(s_shownHdr));
+}
+
 int contentBottom() {
   return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : PUEO_SCREEN_H;
 }
@@ -265,42 +277,42 @@ const char* statusText(uint8_t s) {
 }
 
 void drawHeader() {
-  tft.fillRect(0, PUEO_STATUS_SHORT, PUEO_SCREEN_W, 30, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
 
   char buf[56];
   snprintf(buf, sizeof(buf), "ch %-2u  seen %-4lu  craft %u",
            (unsigned)s_chan, (unsigned long)s_frames, (unsigned)s_craftCount);
-  tft.setTextColor(UI_TEXT, TFT_BLACK);
-  tft.drawString(buf, 8, PUEO_STATUS_SHORT + 4);
+  uiShowLine(s_shownHdr[0], sizeof(s_shownHdr[0]), buf,
+             8, PUEO_STATUS_SHORT + 4, 11, UI_TEXT, TFT_BLACK);
 
   /* The limit, on screen rather than in a README. An empty list here does
    * not mean the sky is empty. */
-  tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-  tft.drawString("WiFi beacon + BLE4 only - not BT5 long range", 8,
-                 PUEO_STATUS_SHORT + 16);
-  tft.drawFastHLine(0, PUEO_STATUS_SHORT + 30, PUEO_SCREEN_W, UI_LINE);
+  if (uiShowLine(s_shownHdr[1], sizeof(s_shownHdr[1]),
+                 "WiFi beacon + BLE4 only - not BT5 long range", 8,
+                 PUEO_STATUS_SHORT + 16, 11, UI_DIM_TEXT, TFT_BLACK)) {
+    tft.drawFastHLine(0, PUEO_STATUS_SHORT + 30, PUEO_SCREEN_W, UI_LINE);
+  }
 }
 
 void drawList() {
   const int top = PUEO_STATUS_SHORT + 34;
   const int bottom = contentBottom();
-  tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
   tft.setTextFont(1);
   tft.setTextSize(1);
 
   if (s_craftCount == 0) {
-    tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-    tft.drawString("listening...", 8, top + 6);
+    uiShowLine(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
+               8, top + 6, 11, UI_DIM_TEXT, TFT_BLACK);
     return;
   }
 
   const uint32_t now = millis();
   int y = top + 2;
   const int rowH = 40;
+  uint8_t i = 0;
 
-  for (uint8_t i = 0; i < s_craftCount && y + rowH <= bottom; i++) {
+  for (; i < s_craftCount && y + rowH <= bottom; i++) {
     const Craft& c = s_craft[i];
     if (!c.used) continue;
     const DroneId::Report& r = c.rep;
@@ -312,25 +324,29 @@ void drawList() {
     const uint32_t ageS = (now - c.lastMs) / 1000u;
     const uint16_t colour = (ageS <= 5) ? UI_OK : UI_DIM_TEXT;
 
-    tft.setTextColor(colour, TFT_BLACK);
-    snprintf(line, sizeof(line), "%s",
-             r.uasId[0] ? r.uasId : "(no ID yet)");
-    tft.drawString(line, 8, y);
+    /* The identity line owns its band, so the radio/RSSI tag beside it is
+     * repainted whenever that line was redrawn under it. */
+    snprintf(line, sizeof(line), "%s", r.uasId[0] ? r.uasId : "(no ID yet)");
+    const bool idRedrawn = uiShowLine(s_shownRow[i][0], sizeof(s_shownRow[i][0]),
+                                      line, 8, y, 11, colour, TFT_BLACK);
 
     snprintf(line, sizeof(line), "%s %d", c.viaBle ? "BLE" : "WiFi", (int)c.rssi);
-    tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-    tft.drawString(line, PUEO_SCREEN_W - 76, y);
+    if (idRedrawn || strncmp(s_shownRow[i][3], line,
+                             sizeof(s_shownRow[i][3]) - 1) != 0) {
+      tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
+      tft.drawString(line, PUEO_SCREEN_W - 76, y);
+      snprintf(s_shownRow[i][3], sizeof(s_shownRow[i][3]), "%s", line);
+    }
 
-    tft.setTextColor(UI_TEXT, TFT_BLACK);
     if (r.haveLocation) {
       snprintf(line, sizeof(line), "%.5f %.5f  %.0fm",
                r.latitude, r.longitude, (double)r.altitudeGeo);
     } else {
       snprintf(line, sizeof(line), "%s, no position sent", uaTypeText(r.uaType));
     }
-    tft.drawString(line, 8, y + 11);
+    uiShowLine(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line,
+               8, y + 11, 11, UI_TEXT, TFT_BLACK);
 
-    tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
     if (r.haveLocation) {
       if (r.speedHorizontal >= 0.0f) {
         snprintf(line, sizeof(line), "%s  %.0f m/s  %s",
@@ -343,7 +359,8 @@ void drawList() {
     } else {
       snprintf(line, sizeof(line), "%s", statusText(r.status));
     }
-    tft.drawString(line, 8, y + 21);
+    uiShowLine(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line,
+               8, y + 21, 11, UI_DIM_TEXT, TFT_BLACK);
 
     if (r.haveOperator) {
       snprintf(line, sizeof(line), "operator %.5f %.5f",
@@ -352,8 +369,20 @@ void drawList() {
       snprintf(line, sizeof(line), "%us ago  %u frames",
                (unsigned)ageS, (unsigned)c.frames);
     }
-    tft.drawString(line, 8, y + 31);
+    uiShowLine(s_shownRow[i][4], sizeof(s_shownRow[i][4]), line,
+               8, y + 31, 11, UI_DIM_TEXT, TFT_BLACK);
 
+    y += rowH;
+  }
+
+  /* Rows that existed a moment ago and do not now. Per-line caching never
+   * repaints a row it no longer draws, so without this the tail of a longer
+   * list stays on screen. */
+  for (; i < kMaxCraft && y + rowH <= bottom; i++) {
+    if (s_shownRow[i][0][0] != 0) {
+      tft.fillRect(0, y, PUEO_SCREEN_W, rowH, TFT_BLACK);
+      memset(s_shownRow[i], 0, sizeof(s_shownRow[i]));
+    }
     y += rowH;
   }
 }
@@ -361,7 +390,7 @@ void drawList() {
 }  // namespace
 
 void setup() {
-  showFeatureMark(bitmap_pueo_hunt, "Drones");
+  showFeatureMark(bitmap_pueo_hunt, "Drone Detector");
 
   memset(s_craft, 0, sizeof(s_craft));
   s_craftCount = 0;
