@@ -345,6 +345,22 @@ ship two flash images.
 
     [verify] The RGB LED hole is the one figure here not from the drawing.
 
+  * The build guide had half its wiring table wrong for the 3.5" board.
+    lcdwiki's render of the E32R35T shows the silkscreen, and it brings the
+    whole VSPI bus out on a four-pin JST: SPI with IO23(MOSI) IO19(MISO)
+    IO18(SCK) IO21(CS). The guide said the SPI bus "is not brought out
+    anywhere on a CYD" and had those three lines coming off the microSD
+    slot's own pins, which it called the whole difficulty of the build.
+
+    True on the 2.8". Not on the 3.5", where the I2C header also carries
+    IO25 -- where NRF24's chip select now goes -- with 3.3 V and ground
+    beside it. Seven of the ten signals are on connectors there. What is
+    left to solder is the three RGB LED pads, which this pin map spends
+    anyway, so three joints rather than six.
+
+    The table is per panel now. [verify] it against your own silkscreen: it
+    is read off a product render rather than a board in front of a meter.
+
   * Known, and not fixed here: updateSdCardStatus() reports "SD Card
     detected" with an empty slot. SD_CD is GPIO 38, input-only with no
     internal pull-up, and floating.

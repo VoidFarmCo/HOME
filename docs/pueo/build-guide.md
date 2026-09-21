@@ -91,33 +91,46 @@ ten joints land on pads smaller than the wire you are used to.
 
 ## The ten signals
 
-Four reach a header. Six do not, and that is the whole difficulty of this
-build.
+**How many of them you have to solder depends on which board you have**, and
+the difference is large: three joints on the 3.5", six on the 2.8".
 
-| Signal | GPIO | Where it lands | |
+| Signal | GPIO | 2.8" ESP32-2432S028R | 3.5" ESP32-3248S035R |
 |---|---|---|---|
-| CC1101 CS | 21 / 27 | P3 header (3.5") or CN1 (2.8") | header |
-| CC1101 GDO0 (TX) | 22 | P3 header | header |
-| CC1101 GDO2 (RX) | 35 | P3 header | header |
-| GPS TX → ESP32 | 1 | P1 JST | header |
-| VSPI SCK | 18 | microSD slot pin | **solder** |
-| VSPI MOSI | 23 | microSD slot pin | **solder** |
-| VSPI MISO | 19 | microSD slot pin | **solder** |
-| NRF24 CSN | 4 / 25 | RGB LED pad (2.8"); see below for the 3.5" | **solder** |
-| NRF24 CE | 16 | RGB LED pad | **solder** |
-| PN532 SS | 17 | RGB LED pad | **solder** |
+| CC1101 CS | 27 / 21 | CN1, header | **SPI** JST, `IO21(CS)` |
+| CC1101 GDO2 (RX) | 35 | P3, header | **IO35/IO39** JST |
+| GPS TX → ESP32 | 1 | P1 JST | **UART** JST, `TXD` |
+| VSPI SCK | 18 | microSD pin, **solder** | **SPI** JST, `IO18(SCK)` |
+| VSPI MOSI | 23 | microSD pin, **solder** | **SPI** JST, `IO23(MOSI)` |
+| VSPI MISO | 19 | microSD pin, **solder** | **SPI** JST, `IO19(MISO)` |
+| NRF24 CSN | 4 / 25 | RGB LED pad, **solder** | **I2C** JST, `IO25(SCL)` |
+| CC1101 GDO0 (TX) | 22 | P3, header | RGB LED pad, **solder** |
+| NRF24 CE | 16 | RGB LED pad, **solder** | RGB LED pad, **solder** |
+| PN532 SS | 17 | RGB LED pad, **solder** | RGB LED pad, **solder** |
 
 Not connected, deliberately: **NRF24 IRQ** (nothing in the tree reads it; the
 driver polls) and **GPS RX** (the module only ever talks).
 
-The SPI bus is not brought out anywhere on a CYD. SCK, MOSI and MISO come off
-the microSD slot's own pins, which means those three joints have to be good
-enough that the card slot still works afterwards — Spotter's capture log and
-the wardriver both write to it.
+**On the 2.8", the SPI bus is not brought out anywhere.** SCK, MOSI and MISO
+come off the microSD slot's own pins, which means those three joints have to
+be good enough that the card slot still works afterwards — Spotter's capture
+log and the wardriver both write to it. That is the whole difficulty of the
+build on that board.
 
-**[verify] Check CN1, P3 and P1 against your own board before you cut a
-wire.** CYD revisions differ and the silkscreen is the authority. This is the
-single most likely thing in this guide to be wrong for your unit.
+**On the 3.5" it is brought out, on a four-pin JST.** The silkscreen labels
+it `SPI` and lists `IO23(MOSI) IO19(MISO) IO18(SCK) IO21(CS)` — which is the
+whole VSPI bus plus CC1101's chip select, on a connector. The `I2C` header
+next to it carries `3V3 IO32(SDA) IO25(SCL) GND`, and IO25 is where NRF24's
+chip select goes on this panel, so that comes off a connector too, with 3.3 V
+and ground beside it.
+
+What is left to solder on the 3.5" is the three RGB LED pads: GDO0, CE and
+the PN532's select. The LED is gone either way — that is what those pins were
+spent on — so the joints land on pads nothing else wants.
+
+**[verify] Read your own silkscreen before you cut a wire.** The 3.5" table
+above is off lcdwiki's board render rather than a board in front of a meter,
+and CYD revisions differ. The silkscreen is the authority and it is printed
+right next to each connector.
 
 ## Order of work
 
@@ -142,10 +155,12 @@ dark, that is the first thing to check -- it is what the wrong image looks
 like, and it is not a soldering fault because you have not soldered anything
 yet.
 
-**3. The three bus lines, then the SD card.** Solder SCK, MOSI and MISO, then
-insert a card and confirm it still mounts. Testing the bus with the one
-device that was already wired to it isolates your soldering from everything
-that follows.
+**3. The three bus lines, then the SD card.** On the 2.8", solder SCK, MOSI
+and MISO to the microSD slot pins; on the 3.5", plug into the `SPI` header
+instead. Either way, insert a card and confirm it still mounts. Testing the
+bus with the one device that was already wired to it isolates your work from
+everything that follows, and on the 2.8" it is specifically testing that
+three joints on a card slot did not kill the card slot.
 
 **4. CC1101.** Four wires, three of them to headers, plus power and ground
 from +3V3_RF. Then the jamming detector: activity on screen is enough to say
