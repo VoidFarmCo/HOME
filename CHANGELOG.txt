@@ -10,6 +10,204 @@ been read closely it is said so in the entry that did it.
 Digests for each release are in dist/pueo-<version>.sha256.
 
 
+0.3.4 - 2026-09-20
+------------------
+
+The first release built after any of this ran on a board, and the first to
+ship two flash images.
+
+  * It boots, draws and responds to touch. Nothing is wired to it yet, so
+    every radio claim in here is still untested and stays marked that way.
+
+  * Two merged images, because the board that arrived was not the board this
+    targets. pueo-0.3.4-merged.bin is the 2.8" ESP32-2432S028R, the same
+    thing that name has meant since 0.1.0. pueo-0.3.4-35-merged.bin is the
+    3.5" ESP32-3248S035R: ST7796 instead of ILI9341, 320x480 instead of
+    240x320, backlight on GPIO 27 instead of 21, CC1101 chip select moved to
+    21 to get off it, and an XPT2046 hanging off the display's own SPI bus
+    rather than the separate T_CLK/T_DIN/T_OUT trio.
+
+    Flashing the wrong one is a dark screen, not an error. There is no
+    runtime detection and this release does not pretend there is; the panel
+    is chosen at compile time by PUEO_PANEL_35, which tools/build.sh now
+    exposes as PUEO_PANEL=28 or PUEO_PANEL=35, with a separate build
+    directory each so arduino-cli cannot reuse the other panel's objects.
+
+    The first 2.8" image cut this way was wrong twice over, and neither
+    fault would have announced itself:
+
+      Libraries/User_Setup cyd.h still said ST7796 at 320x480 with the
+      backlight on 27. PUEO_PANEL_35 reached the sketch's own macros and
+      stopped there, so the "2.8" build was an ILI9341 panel driven with the
+      3.5"'s driver, dimensions and backlight pin. It branches on
+      PUEO_PANEL_35 now -- the define arrives as a -D, so the library's
+      configuration header sees the same value the sketch does -- and the
+      six settings that differ sit in one block at the top rather than
+      scattered through the vendor sections, which is how five of six came
+      to be edited at bring-up.
+
+      TOUCH_SHARES_TFT_SPI was 1 for both boards, under a comment explaining
+      why the 2.8" needs 0. That build would have driven touch through the
+      display's bus, where the 2.8"'s controller is not. It follows the
+      panel now.
+
+    tools/check_pinmap.py reads User_Setup through the same small
+    preprocessor it uses on the sketch headers, and checks both panels every
+    run. Scanning the file line by line was fine while it described one
+    board; against a branch it took whichever TFT_BL came first, which
+    reported CC1101's chip select as colliding on the 3.5" and clear on the
+    2.8" when the truth is the other way round.
+
+  * Three touch fixes that were wrong on every board, not just this one.
+
+    The calibrator advanced the instant readTouchRawXY returned true, with
+    no wait for release, so one press satisfied all four targets in
+    milliseconds. The first real run returned (3658,3701) (3635,3705)
+    (3636,3705) (3551,354) - three of them the same press. It now waits for
+    release and takes the median of a nine-sample burst after a settle
+    delay.
+
+    Its endpoint arithmetic used min(xs[0],xs[3]) and max(xs[1],xs[2]),
+    which assumes raw counts rise with the screen coordinate. On a panel
+    where they fall, that picks one reading from each edge pair instead of
+    the correct end. It now averages each pair and extrapolates from the
+    20 px target inset out to the screen edges, which has no opinion about
+    direction.
+
+    mapTouchToScreen chose its Y inversion on defined(BOARD_CYD), which asks
+    the wrong question - the two CYDs disagree about Y. It keys on
+    TOUCH_INVERT_Y now.
+
+  * utils.cpp named ILI9341_VSCRSADD and ILI9341_VSCRDEF for terminal
+    scrolling and would not compile against another driver. 0x33 and 0x37
+    are MIPI DCS commands, identical across ILI9341, ST7789 and ST7796, so
+    they are named locally and the code no longer cares which panel it is on.
+
+  * Spotter goes from 54 signatures to 99, across eight kinds instead of
+    five. Every OUI was checked against the IEEE registry - MA-L, MA-M and
+    MA-S - and every service UUID against the Bluetooth SIG's assigned
+    numbers, before it went in the table.
+
+    Plate readers gain seven vendor blocks: Motorola Solutions and Genetec,
+    both Likely rather than Strong, because both sell a great deal besides
+    plate readers and an OUI cannot tell you which product is in range.
+
+    Fixed cameras and doorbells arrive as a new Camera kind, 31 rows: Ring
+    (13 blocks), Hikvision, Wyze, Axis, Verkada and Avigilon. These are the
+    cameras that are already on the street, as opposed to the ones mounted
+    on a pole by a contract.
+
+    A Pentest kind covers a Flipper Zero's own IEEE block, Strong, and two
+    Hak5 locally-administered addresses, Weak - an LAA is chosen by the
+    device, so it is a hint and never a finding.
+
+    A Tracker kind matches four BLE service UUIDs: Tile's 0xFEED and 0xFEEC
+    are Strong, Samsung's 0xFD5A is Likely because SmartTag is one of many
+    things behind it, and Eddystone's 0xFEAA is Weak because anyone can
+    broadcast one.
+
+    Amazon's own blocks are in at Weak, deliberately: they own Ring, and
+    also Echo, and also Kindle.
+
+    A prefix published by another project as "modern Axon" was rejected
+    outright - E4:05:40 is in none of the three IEEE registries. 00:25:DF is
+    Axon Enterprise's only registered block and remains the only Axon row.
+
+  * Every feature screen now fills the panel. The menu grid was made
+    panel-aware at bring-up; nothing else was, so on a 3.5" board each app
+    drew into the top-left 240x320 of a 320x480 display and left a third of
+    the screen black, with the status icons bunched at 60% of the width and
+    the packet monitor's waterfall centred on a line two thirds of the way
+    across.
+
+    The dimensions were not in one place to fix. They were in 221: 49
+    declarations (`#define SCREENHEIGHT 320`, `constexpr int SCREEN_WIDTH =
+    240`), 31 status-bar icon rows laid out right-to-left from x=240, and
+    141 coordinates sitting in the argument lists of tft.* calls. Same shape
+    as the bus map and the pin map before it -- one fact, restated
+    everywhere, corrected in some places and not others.
+
+    All of it reads PUEO_SCREEN_W / PUEO_SCREEN_H from shared.h now. The
+    2.8" values are unchanged and that build's flash and RAM figures did not
+    move, so nothing here touched that board.
+
+    Three one-shots under tools/ record how, and each refuses to run twice:
+    screen_dims_from_panel.py, icon_rows_from_width.py and
+    screen_coords_from_panel.py. The last rewrites by argument position
+    rather than by value -- a 240 in a width slot is the panel, a 240
+    somewhere else is a number -- and prints every change it makes. It ran
+    in two passes because its first file list named the four big UI files
+    and missed Spotter and the Fast Pair scanner, which is the same mistake
+    in miniature.
+
+    Roughly 48 three-digit literals are deliberately left: right-aligned
+    labels and mid-screen cursors where 240 is not the only reading. They
+    are offset, not clipped.
+
+    tools/check_screen_dims.py holds the line: the dimensions have one home,
+    both panels reach it, and User_Setup agrees with the sketch about the
+    driver, the size, the backlight pin and the inversion flag. 26 checks,
+    mutation-tested against six ways of breaking it.
+
+    Network list rows were a second copy of the same problem: eight screens
+    cutting the SSID at 11 characters and padding the field to 15, which is
+    one measurement of a 240 px row written out sixteen times. One helper
+    now derives both from the panel, which is 29 characters of SSID on the
+    3.5" instead of 11 and an ellipsis.
+
+  * Hunt -- a new Bluetooth feature, for finding a tracker that is already
+    known to be there. AirTagSniffer asks whether there is one in range and
+    TrackerFollow asks whether one has been beside you for twenty minutes;
+    this is for after the answer is yes.
+
+    A picker lists what has been heard in the last minute -- Find My by
+    Apple's 0x12 Continuity type, and Tile, SmartTag and Eddystone by
+    service UUID, read out of SpotterSignatures.h rather than copied into a
+    second table. Locking one opens a gauge whose needle swings left to
+    right with smoothed RSSI, with a marker at the best reading of the hunt.
+
+    The needle is signal strength and the screen never prints a distance. A
+    tracker under a car seat reads weaker than one twice as far away in open
+    air, and turning round with the board in your hand moves the needle more
+    than walking a metre does. What survives all that is the direction of
+    change, which is why there is a peak marker and not a number in metres.
+
+    The lock is on a BLE address, and Find My devices rotate theirs. A
+    rotation ends the lock and the device returns to the list as a new row;
+    nothing here can follow it across the change, because that is what the
+    rotation is for.
+
+    Passive scan, continuous window. Never connects, never asks a device
+    anything.
+
+  * check_pinmap.py stopped carrying its own copy of the CYD's wiring and
+    reads "Libraries/User_Setup cyd.h" instead. The hardcoded table had no
+    entry for GPIO 27, so it could not see CC1101's chip select land on the
+    3.5" panel's backlight - it exited 0 on a build whose screen would have
+    gone dark. The rewritten one exits 1.
+
+  * The enclosure lid cuts for either panel, off a PANEL parameter, and
+    docs/pueo/build-guide.md is new: wiring a CYD and four modules by hand,
+    in the order that makes a fault easy to find. Ten signals, four of which
+    reach a header.
+
+  * Spotter, Fast Pair and Hunt were unreachable by touch. A submenu
+    selection is dispatched twice -- once from the hardware buttons, once
+    from the touch nav bar -- as two hand-maintained if/else chains over the
+    same indices, and nothing made them agree. The button chain had all four
+    of Bluetooth page 2; the touch chain stopped after Skimmer Detect, so
+    the other three drew a tile, took the tap, highlighted and did nothing.
+
+    Not panel-specific. True of Spotter since it landed and of Fast Pair
+    since before that; it went unnoticed because everything anyone reached
+    by touch was on page 1. tools/check_menu_dispatch.py holds both chains
+    to the declared entry count now, and catches an orphaned handler left
+    behind by a removed entry as well.
+
+  * Known, and not fixed here: updateSdCardStatus() reports "SD Card
+    detected" with an empty slot. SD_CD is GPIO 38, input-only with no
+    internal pull-up, and floating.
+
 0.3.3 - 2026-09-20
 ------------------
 

@@ -108,7 +108,7 @@ boot screen and menu come up and touch responds, you have a known-good
 starting point — and you will want one.
 
 ```bash
-esptool.py --chip esp32 -p COM7 write_flash 0x0 pueo-0.3.3-merged.bin
+esptool.py --chip esp32 -p COM7 write_flash 0x0 pueo-0.3.4-merged.bin
 ```
 
 **3. The three bus lines, then the SD card.** Solder SCK, MOSI and MISO, then

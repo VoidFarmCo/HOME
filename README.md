@@ -65,12 +65,21 @@ Inherited from ESP32-DIV unless marked.
 | Probe Req Flood | MouseJack Inject | | AirTag Sniffer | SD file manager |
 | Captive Portal | | | Skimmer Detect | Serial monitor |
 | Hidden SSID | | | **Spotter** *(new)* | BLE Ducky |
-| WPS / ARP scan | | | | |
+| WPS / ARP scan | | | **Hunt** *(new)* | |
 | Karma Attack | | | | |
 
-**Spotter** is the one feature Pueo adds: passive detection of ALPR cameras
-and smart glasses, matching Wi-Fi OUIs and BLE service UUIDs against a
-signature table. It only listens — it never transmits.
+Two features are Pueo's own, and both only listen.
+
+**Spotter** is passive detection of surveillance and tracking hardware that
+announces itself — plate readers and their accessories, body cameras, fixed
+cameras and doorbells, smart glasses, item trackers, vehicle modules and
+pentest kit — matching Wi-Fi OUIs, network names, BLE device names and
+service UUIDs against a table of 99 signatures across eight kinds.
+
+**Hunt** is for after Spotter says yes: pick a tracker — Find My, Tile,
+SmartTag, Eddystone — and a needle swings with signal strength so the thing
+can be walked down. It shows strength rather than distance, because RSSI is
+not distance; what it is good for is which way the needle moves when you do.
 
 **IR is gone.** There is no IR LED or receiver on this board, so its
 protocol tables could never run here. Removing them freed **139,752 bytes**
