@@ -549,6 +549,28 @@ static int statusBarTempBand(float t) {
  * full redraw chose. */
 static constexpr int kStatusIconsWidth = 110;
 
+void showFeatureMark(const unsigned char* bitmap, const char* caption,
+                     int holdMs) {
+  tft.fillScreen(UI_BG);
+
+  /* Centred on the panel, lifted a little so the artwork and its caption
+   * read as one block rather than the mark sitting low. */
+  const int x = (PUEO_SCREEN_W - PUEO_MARK_W) / 2;
+  const int y = (PUEO_SCREEN_H - PUEO_MARK_H) / 2 - 14;
+  tft.drawBitmap(x, y, bitmap, PUEO_MARK_W, PUEO_MARK_H, UI_ICON);
+
+  if (caption != nullptr) {
+    tft.setTextFont(2);
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    tft.drawString(caption, PUEO_SCREEN_W / 2, y + PUEO_MARK_H + 12);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextFont(1);
+  }
+
+  delay(holdMs);
+}
+
 void drawBitmapScaled(int16_t x, int16_t y, const uint8_t* bmp,
                       int16_t w, int16_t h, uint16_t colour, uint8_t scale) {
   if (scale <= 1) {

@@ -4,6 +4,7 @@
 #include "config.h"
 #include "shared.h"
 #include "utils.h"
+#include "icon.h"   // after utils.h: icon.h needs PROGMEM
 
 #include <math.h>
 #include <stdio.h>
@@ -601,6 +602,8 @@ void enterPicker() {
 /* ── Entry points ────────────────────────────────────────────────────────── */
 
 void setup() {
+  showFeatureMark(bitmap_pueo_hunt, "Hunt");
+
   s_count   = 0;
   s_sel     = 0;
   s_scroll  = 0;

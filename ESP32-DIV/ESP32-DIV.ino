@@ -4587,10 +4587,21 @@ void setup() {
 
   tft.fillScreen(TFT_BLACK);
 
-  loading(100, UI_ICON, 0, 0, 2, true);
+  /* Boot splash, and which mark gets the longer beat.
+   *
+   * Nothing here is waiting on init -- both are blocking delays, and the
+   * split was never chosen. The skull is upstream's animation at its
+   * upstream timing, 2 repeats x 10 frames x 100 ms, and the owl got the
+   * 500 ms that displayLogo() happened to be called with. The fork spent
+   * four times as long on the inherited mark as on its own.
+   *
+   * One pass of the skull is still a nod to where this came from; the owl
+   * now holds long enough to read the name under it. Total splash goes from
+   * 2.5 s to 2.2 s, so this costs nothing at boot. */
+  loading(100, UI_ICON, 0, 0, PUEO_BOOT_SKULL_REPEATS, true);
 
   tft.fillScreen(TFT_BLACK);
-  displayLogo(TFT_WHITE, 500);
+  displayLogo(TFT_WHITE, PUEO_BOOT_LOGO_MS);
 
   initSDCard();
 

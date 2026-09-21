@@ -18,7 +18,7 @@
  * upstream's release this was forked from -- showing that on the splash
  * would claim to be an ESP32-DIV build it no longer is. Both appear in the
  * serial banner, which is the honest way round. */
-#define PUEO_VERSION     "0.3.6"
+#define PUEO_VERSION     "0.3.7"
 
 #define PUEO_NAME        "Pueo"
 #define PUEO_TAGLINE     "multi-radio field tool"
@@ -67,6 +67,28 @@
  * also frees 26px, which is what lets the logo go to 200 -- see the layout
  * note above. */
 #define PUEO_LOGO_HAS_WORDMARK 1
+
+/* -- Feature marks ----------------------------------------------------------
+ * Hunt and Spotter each open on their own artwork rather than on nothing.
+ * 200x200 is where the detail survives one bit: at 160 the radio mast on the
+ * Spotter mark smears and the Hunt mark's arcs merge. See icon.h. */
+#define PUEO_MARK_W 200
+#define PUEO_MARK_H 200
+#define PUEO_MARK_HOLD_MS 800
+
+/* -- Boot splash ------------------------------------------------------------
+ * How long each mark holds. Neither was ever chosen: the skull ran at its
+ * upstream timing of 2 passes and the owl got whatever displayLogo() was
+ * called with, which was 500 ms -- four times as long on the inherited mark
+ * as on this project's.
+ *
+ * One pass of the skull is still a nod to where this came from. The owl gets
+ * the longer half now, which is the right way round for a fork that has its
+ * own name on the box.
+ *
+ * The skull is repeats x 10 frames x 100 ms, so one pass is 1.0 s. */
+#define PUEO_BOOT_SKULL_REPEATS 1
+#define PUEO_BOOT_LOGO_MS       1500
 
 #define PUEO_LOGO_W 200
 #define PUEO_LOGO_H 200

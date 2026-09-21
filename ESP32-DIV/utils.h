@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "Branding.h"
+
 #include <SD.h>
 #include <SPI.h>
 #include <TFT_eSPI.h>
@@ -47,6 +49,15 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate = false, bool bottomSe
  * On a panel with only one height this is a no-op that the compiler deletes,
  * so the bar's geometry stays the compile-time constant it has always been
  * there and that image rebuilds to the same bytes. */
+/* A feature's own mark, held for a beat as it opens.
+ *
+ * Upstream's features open on the skull animation. Pueo's own open on their
+ * own artwork, and for less time: 800 ms against the skull's three seconds,
+ * because this is a signature rather than a loading bar -- nothing is being
+ * waited on while it shows. */
+void showFeatureMark(const unsigned char* bitmap, const char* caption,
+                     int holdMs = PUEO_MARK_HOLD_MS);
+
 /* drawBitmap() with an integer scale. scale 1 is drawBitmap itself.
  *
  * TFT_eSPI cannot scale a bitmap, and the icons are 1-bit 16x16 blobs in
