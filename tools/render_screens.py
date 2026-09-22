@@ -449,6 +449,49 @@ def render_mark(t, bitmap, caption):
     t.print_f2((W - tw) // 2, y + MARK + 12, caption, UI_TEXT, UI_BG)
 
 
+# dwellAlert() in Spotter.cpp draws on TFT_BLACK rather than on UI_BG, and
+# uses UI_WARN, TFT_WHITE and UI_DIM_TEXT. On the dark theme those resolve to
+# the accent, white and GRAY.
+BLACK = (0, 0, 0)
+UI_WARN = UI_ICON                  # UI.warn is the accent preset
+UI_DIM_TEXT = rgb(0x8410)          # GRAY, per uiDimTextColor() on dark
+
+
+def render_dwell(t, huntable):
+    """dwellAlert() in Spotter.cpp, drawn at step 0 -- before the fade.
+
+    The alert fades out over six steps by redrawing the same mark in a colour
+    blended towards the background, so every later frame is this one dimmer.
+    Rendering the first is rendering the alert.
+
+    `huntable` is the gate on the suggestion: Hunt lists BLE trackers and
+    nothing else, so a dwelling plate reader or body camera gets the duration
+    and no advice."""
+    mw = mh = 200
+    x = (W - mw) // 2
+    y = (H - mh) // 2 - 30
+    cx = W // 2
+
+    t.fill_screen(BLACK)
+    t.draw_bitmap(x, y, "bitmap_pueo_dwell", mw, mh, UI_WARN)
+
+    if huntable:
+        sub_line = "AirTag  12 min"
+        hint1, hint2 = "may be travelling with you", "Hunt can walk you to it"
+    else:
+        sub_line = "Flock Safety camera  12 min"
+        hint1, hint2 = "in range this whole time", None
+
+    def centred(text, yy, colour):
+        t.print_f2(cx - t.text_width(text) // 2, yy, text, colour, BLACK)
+
+    centred("DWELL", y + mh + 6, UI_WARN)
+    centred(sub_line, y + mh + 26, WHITE)
+    centred(hint1, y + mh + 46, UI_DIM_TEXT)
+    if hint2 is not None:
+        centred(hint2, y + mh + 64, UI_WARN)
+
+
 MENU = [
     ("WiFi", "bitmap_icon_wifi"), ("2.4GHz", "bitmap_icon_jammer"),
     ("More", "bitmap_icon_dots"), ("Settings", "bitmap_icon_setting"),
@@ -860,7 +903,9 @@ def main():
                      ("hunt-mark",
                       lambda t: render_mark(t, "bitmap_pueo_hunt", "Hunt")),
                      ("spotter-mark",
-                      lambda t: render_mark(t, "bitmap_pueo_spotter", "Surveillance"))):
+                      lambda t: render_mark(t, "bitmap_pueo_spotter", "Surveillance")),
+                     ("dwell-tracker", lambda t: render_dwell(t, True)),
+                     ("dwell-other", lambda t: render_dwell(t, False))):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
