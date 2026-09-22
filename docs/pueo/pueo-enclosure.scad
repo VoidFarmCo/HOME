@@ -347,6 +347,46 @@ SCREEN_LED_X   = -14.0;
 SCREEN_LED_Y   =  46.4;   // ~4.3 down from the top edge, mid-strip
 SCREEN_LED_D   =  3.2;    // a light pipe, or just a hole
 
+/* ---------- micro-SD access, 3.5" lid ----------
+ *
+ * The card goes in the socket on the BACK of the display board, which the
+ * lid holds face-down. Without an opening the only way to the slot is four
+ * screws and lifting the screen out -- reported from a printed case, not
+ * predicted. A card is not a thing you fit once: it comes out to be read.
+ *
+ * The socket sits hard against one long edge of the PCB and ejects sideways,
+ * so this is a slot through the lid's side wall rather than a hole in the
+ * face. It is cut oversize on purpose. The card is 11 mm wide and 1 mm
+ * thick; the opening is 16 x 4, which swallows a couple of millimetres of
+ * error in either direction and still leaves wall on both sides. Getting a
+ * finger and a fingernail in matters more than a close fit.
+ *
+ * TWO NUMBERS TO CHECK BEFORE PRINTING, both on the board itself:
+ *
+ *   SD_SIDE  which long edge the slot mouth is on, looking at the SCREEN.
+ *            -1 is the left edge, +1 the right. Read off the back and
+ *            remember it mirrors: a socket on the right of the back view is
+ *            on the LEFT of the front.
+ *   SD_Y     the socket mouth's centre, measured from the middle of the
+ *            board along its length, positive toward the ESP32 module end.
+ *
+ * Both below came off the lcdwiki outline drawing and a photograph of the
+ * back, not off calipers, which puts them in the same class as SCREEN_LED_X
+ * -- close enough to print, worth measuring if yours misses. The slot is
+ * generous enough that a small error still opens onto the socket.       */
+SD_SLOT   = (PANEL == "3.5");
+SD_SIDE   = -1;       // -1 = left edge viewed from the front   [VERIFY]
+SD_Y      = 6.7;      // mm above the board centre              [VERIFY]
+SD_W      = 16;       // opening along the board's length
+SD_HT     = 4;        // opening through the wall's height
+
+/* Z falls out of the screen stack rather than being chosen. The PCB's back
+ * face is the reference: the module's front bears on the lip, so the front
+ * face is SCREEN_LIP below the outer face and the back face is one PCB
+ * thickness and one screen stack below that. The socket stands about 2 mm
+ * proud of it, and the slot straddles that. */
+SD_Z      = LID_H - SCREEN_LIP - SCREEN_STACK - SCREEN_PCB_T - 1.0;
+
 /* The longer window eats into the chin. Nudging it 2 mm toward the top,
  * where nothing lives, keeps a printable margin around the owl. */
 BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the face
@@ -1000,6 +1040,13 @@ module lid() {
                            LID_H - SCREEN_LIP - SCREEN_STACK - 0.5])
                     cylinder(h = SCREEN_SCREW_DEPTH + 0.5,
                              r = SCREEN_POST_PILOT);
+        // micro-SD slot, through the side wall
+        if (SD_SLOT)
+            translate([SD_SIDE * W/2, BEZEL_Y + SD_Y, SD_Z])
+                rotate([0, 90, 0])
+                    linear_extrude(4*WALL, center = true)
+                        offset(r = 1) offset(r = -1)
+                            square([SD_HT, SD_W], center = true);
         // owl, cut into the outer face
         if (LOGO)
             translate([0, LOGO_Y, LID_H - LOGO_DEPTH])
