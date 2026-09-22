@@ -11,6 +11,75 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.6 - 2026-09-21
+------------------
+
+Two corrections. One to the enclosure, and one to a line in 0.4.5's own
+notes that was already wrong when it was written.
+
+  * The 0.4.5 entry says the SD slot in the 3.5" lid has not been
+    printed. It was printed within the hour of that cut, would not
+    take a card, and is fixed. The entry is left standing rather than
+    quietly edited: a published release's notes are a record of what was
+    believed at the cut, and revising them afterwards is how a changelog
+    stops being evidence of anything. This is the correction, in the place
+    corrections go -- the same way 0.4.3 carried the correction to 0.4.0.
+
+  * The lid screw boss that was standing in front of the slot. The middle of
+    the three lid screws on that side sat at y = 5, which is nowhere near
+    the board -- it is outboard of the PCB entirely -- but squarely across
+    the 15 mm of gap a card crosses between the wall and the socket mouth.
+    8 mm of clear span for an 11 mm card.
+
+    It took two goes. The first moved it DOWN, to sit just below the slot,
+    on the argument that a screw beside the opening stiffens the edge a
+    16 mm hole weakens and that the spans come out evener -- 77.5 and 71.5
+    against 103 and 46. Both true; neither survived the part. Down is
+    pinched between the slot and the battery pocket, so it only fits with
+    the radius cut, and cutting the radius left the cylinder exactly tangent
+    to the wall rather than overlapping it, which is not a 2-manifold, so it
+    needed moving outboard as well. Three adjustments holding each other up.
+    And it still was not clean: the slot is cut with a prism longer than the
+    wall is thick, so it bit a 3 x 0.9 x 4 mm notch out of the corner of the
+    boss it had just been necessary to narrow.
+
+    Up needs none of it. Full radius, original x, 2.9 mm clear of the slot
+    and 5.4 mm clear of the card, nothing tangent, no notch. The uneven
+    spans are the cost and the right one to pay: 103 mm between screws is a
+    stiffness argument about a lid with 2.5 mm walls, and what the
+    alternative bought was three interacting fudges around a part that has
+    to come off a printer.
+
+    A base printed before this needs reprinting. The bosses
+    are shared geometry, so the base and the 2.8" lid moved with the 3.5"
+    one, and the middle pair of holes will not line up. All four STLs are
+    regenerated.
+
+  * Both full-screen alerts place mark-plus-text as one block rather than
+    centring the 200 px mark and letting four lines of text fall off the
+    bottom of it. Two thirds of the leftover height above, one third below,
+    so the block sits low and deliberate -- 133 px and 67 on the 3.5",
+    against 110 and 90.
+
+    Derived rather than nudged, because the obvious fixed offset does not
+    survive the other panel: the block is 280 px tall, the 3.5" has 200 px
+    of slack to place it in and the 2.8" has 40. A constant tuned on one
+    runs off the bottom of the other, silently, on the panel nobody has
+    booted.
+
+    tools/render_screens.py replays these coordinates and carries the same
+    arithmetic, each side naming the other. Two copies of one number, which
+    is the shape of most of this repository's worst bugs -- the renderer
+    exists precisely so it does not include the firmware's headers, and a
+    check comparing the two is worth having the next time this moves.
+
+## No functional change
+
+Nothing in the radio paths, the parsers or the settings moved in this
+release. The firmware differs from 0.4.5 only in where two alert screens
+draw their contents.
+
+
 0.4.5 - 2026-09-21
 ------------------
 
