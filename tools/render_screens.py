@@ -477,7 +477,9 @@ def render_dwell(t, huntable):
     and no advice."""
     mw = mh = 200
     x = (W - mw) // 2
-    y = (H - mh) // 2 - 30
+    # The firmware positions mark-plus-text as one block, two thirds of the
+    # slack above and one third below. Same arithmetic as dwellAlert().
+    y = (H - (mh + 80)) * 2 // 3
     cx = W // 2
 
     t.fill_screen(BLACK)
@@ -534,7 +536,8 @@ def render_drone_alert(t, have_operator):
     actually been received."""
     mw = mh = 200
     x = (W - mw) // 2
-    y = (H - mh) // 2 - 30
+    # Same block placement as droneAlert().
+    y = (H - (mh + 80)) * 2 // 3
     cx = W // 2
 
     t.fill_screen(BLACK)

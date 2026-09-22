@@ -764,7 +764,24 @@ uint16_t blend565(uint16_t a, uint16_t b, uint8_t t) {
 void dwellAlert(const Hit& h) {
   const int mw = 200, mh = 200;
   const int x = (PUEO_SCREEN_W - mw) / 2;
-  const int y = (PUEO_SCREEN_H - mh) / 2 - 30;
+  /* Where the whole block sits, rather than where the mark sits.
+   *
+   * It used to centre the mark and let the four text lines fall below it,
+   * which left the bottom of the screen empty and read as a screen that had
+   * run out of things to say. This positions mark-plus-text together and
+   * gives two thirds of the leftover height to the top margin and one third
+   * to the bottom, so the block sits low and deliberate.
+   *
+   * Derived rather than nudged, because a fixed offset that looks right on
+   * the 3.5" runs off the bottom of the 2.8": the block is 280 px tall and
+   * that panel is 320, so it has 40 px of slack in total against the 3.5"'s
+   * 200. The ratio degrades to a sensible place on both.
+   *
+   * tools/render_screens.py replays these coordinates and carries the same
+   * arithmetic. Change one and the pictures on the website stop matching the
+   * screen. */
+  const int kBlockH = mh + 80;   /* mark, then four lines of font 2 */
+  const int y = (PUEO_SCREEN_H - kBlockH) * 2 / 3;
 
   tft.fillScreen(TFT_BLACK);
   tft.setTextFont(2);
