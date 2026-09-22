@@ -11,6 +11,83 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.5 - 2026-09-21
+------------------
+
+The drone detector gets a mark of its own and an alert when something turns
+up, and everything added over the last three releases has now been raised on
+a board rather than argued for.
+
+  * The drone detector opened on Hunt's owl, and had since 0.3.9. A borrowed
+    mark on a feature that is not Hunt: nothing would ever fail on it, and it
+    told anyone looking at the screen the wrong thing about what they had
+    opened. It has its own now -- an owl holding position with its
+    sight-lines down on a quadcopter, which is what the feature does. Remote
+    ID is a broadcast the aircraft is already making, so the owl is not
+    hunting it.
+
+    The rotors are open rings rather than filled discs. A filled circle at
+    200 px and one bit per pixel is a blob, and four blobs are not a
+    quadcopter.
+
+  * An alert when an aircraft appears, built from the same parts as
+    Surveillance's dwell alert: full-screen mark, two rising notes, then a
+    fade rather than a cut, because drawBitmap paints only the set bits and
+    redrawing the mark in a dimmer colour walks it out without touching
+    anything else. Shown once and gone -- a banner that stayed would cover
+    the list it is announcing.
+
+    Edge-triggered on the table going from empty to occupied and re-armed
+    when it empties, rather than once per aircraft. A busy sky would strobe,
+    and the thing worth interrupting somebody for is that there is anything
+    up there at all.
+
+    Fired after the queue drain rather than inside ingest(), because a pack
+    often carries Basic ID and Location in the same transmission and
+    alerting mid-drain would report "ID not broadcast yet" for an aircraft
+    whose ID was in the very next message.
+
+    Height and speed, never distance. Remote ID says where the aircraft is,
+    not how far away it is, and this device has no position of its own to
+    subtract. The last line is gated the way the dwell alert gates its Hunt
+    suggestion: the System message carries the operator's own position, so
+    that is claimed when it has been received and denied when it has not,
+    rather than left as a gap that reads as "no".
+
+  * tools/render_screens.py draws the mark and both alert states, and reads
+    the beacon's BeaconArt.h beside icon.h rather than carrying a copy of
+    either mark.
+
+## Raised on hardware, not on paper
+
+Everything added since 0.4.2 has now run on a board:
+
+  the dwell alarm, with its Hunt suggestion gated correctly
+  Stealth Mode -- every transmitter refused and named itself, every
+    listener carried on
+  the settings round trip -- "none saved yet" becoming "loaded from SD"
+    across a power cycle, on a path that had never once completed since
+    the fork began
+  per-feature SD logging, writing to a card
+  the drone alert, against the beacon transmitting Remote ID
+
+The stealth result is a check of the gates rather than of the radios: it
+says the firmware declines to call its transmit paths, not that anything
+watched the antenna go quiet. The gates are enumerated by a host check, so
+the list cannot shrink without failing it.
+
+## Still not
+
+The SD slot in the 3.5" lid has not been printed. Both numbers placing it
+come off QDtech's outline drawing and the opening was checked in the STL
+rather than by eye, but nobody has held the part.
+
+The 2.8" image has still never been booted -- and it is now the panel that
+several of this release's predecessors were designed around without being
+seen on: the scrolling settings list, the six screens that were drawing to
+its height on the taller panel, and the visible-row count derived from it.
+
+
 0.4.4 - 2026-09-21
 ------------------
 
