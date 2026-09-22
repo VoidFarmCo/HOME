@@ -11,6 +11,74 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.7 - 2026-09-21
+------------------
+
+Text you can read on the 3.5" panel, and two checks that would have caught
+the ways this went wrong.
+
+  * The list screens use font 2 on the 3.5". That panel is the denser of the
+    two, not the looser: 577 px across a 3.5 inch diagonal is 165 ppi
+    against the 2.8"'s 143, so the same glyph in the same pixels comes out
+    13% SMALLER on the bigger screen. Font 1 at size 1 was a 1.23 mm cap
+    height there -- about three and a half point.
+
+    What the extra pixels had bought was rows rather than legibility.
+    Surveillance showed thirteen on the 3.5" against eight on the 2.8", all
+    of it text you cannot read at arm's length. It shows eight now, at
+    2.47 mm, which is what the other panel shows anyway.
+
+    Surveillance, Hunt and Fast Pair follow PUEO_BODY_FONT, PUEO_BODY_LINE,
+    PUEO_BODY_GAP and PUEO_BODY_SIZE in shared.h -- the same
+    panel-conditional shape PUEO_TILE_ICON and PUEO_STATUS_TALL already had.
+    The drone detector deliberately does not: four lines per aircraft at
+    this size takes it from ten rows to five against a six-aircraft table,
+    and there the count is the information.
+
+  * That change broke three screens on its way in, and all three were the
+    same mistake: a bigger font with the old line pitch left under it.
+    Fast Pair's confirmation page, its result page and Hunt's gauge readout
+    all drew 16 px glyphs at an 11 px advance, or left one line at size 1
+    beside a picker at font 2.
+
+    They were found one at a time, by three different means -- reading the
+    file, reading further, and somebody looking at the board. The last one
+    is the reason the fix is now every hard-coded advance in FastPairScan.cpp
+    rather than the lines that were reported.
+
+  * tools/check_render_sync.py. render_screens.py replays the firmware's
+    drawing calls at the firmware's own coordinates, which is what makes the
+    screenshots on the website evidence rather than illustration -- and it
+    cannot include the firmware's headers, so it carries a copy. Nothing
+    said when the copy drifted. 21 numbers compared across both panels;
+    ten mutants, half of them mutating the renderer rather than the
+    firmware, because drift has two directions.
+
+  * check_menu_tables.py measures grid labels against their tiles. TFT_eSPI
+    does not clip, so a label wider than its tile draws over its neighbour,
+    and nothing was checking. "Drone Detector" is 95 px in the 2.8" panel's
+    100 px tile: one character of headroom on a panel nobody has booted.
+
+    Measured against TFT_eSPI's own font table rather than an average
+    character width, which mattered immediately -- at 8 px/char the same two
+    labels measured 112 and 96 px and both looked like overflows. Both fit.
+    An estimate would have had somebody shortening labels that were fine.
+
+  * make_release.sh --publish-only. Every release until now was built twice,
+    once to verify and once with --force to publish, and because the script
+    is inside its own archive the second zip has a different digest from the
+    one that was verified. The verification then described a file nobody
+    would download, and had to be redone by hand against the published one.
+
+  * Two back rows were naming the wrong destination. RFID and GPS both read
+    "Back to Main Menu" and both return to More, one level up. The wording
+    looked inconsistent; the destination was wrong.
+
+  * The skimmer detector's mode line shouts two of its eight modes. WIFI and
+    ZIGBEE were cased as their enum names beside Bluetooth and Video. The
+    WiGLE exporter's "WIFI" is left alone -- that one is the file format.
+
+
 0.4.6 - 2026-09-21
 ------------------
 
