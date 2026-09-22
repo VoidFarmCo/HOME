@@ -11,6 +11,139 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.3 - 2026-09-21
+------------------
+
+Settings that survive a reboot, which they have not since the fork, and two
+switches that change what the device does with its radios and its card.
+
+  * settingsLoad() was never called on this board. setup() had it inside
+    `#if BOARD_HAS_ESP32S3`; a CYD takes the #else, which applied touch
+    defaults and printed "settings defaults (v1, SD deferred)". Nothing else
+    in the tree called it. Deferred meant never: brightness, theme, accent
+    and auto scan were written by Save and read back by nobody, on every
+    boot since 0.1.0.
+
+    It was deferred for a real reason -- a boot-time SD.begin() right after
+    tft.init() was rebooting the device -- and the cause of that,
+    gpio_reset_pin() on the shared SPI pins, is compiled out on this board
+    now. The load sits where the S3 branch has always had it, with board
+    touch defaults applied first, so a card that will not mount leaves the
+    device exactly where it used to be.
+
+    The boot line says which of four things happened: loaded, none saved
+    yet, unreadable, or no card. It said "loaded from SD" for a card with no
+    settings.json on it, which is the reassuring half of a message that had
+    read nothing.
+
+  * Stealth Mode. Receive only. Nineteen features whose job is to transmit
+    refuse to start, name themselves and say where the switch is; everything
+    that listens keeps listening.
+
+    The part worth reading is what counts as listening. A WiFi scan is ACTIVE
+    unless its third argument says otherwise, and all eight calls in this
+    tree left it false -- so "scan for networks" was putting a probe request
+    carrying this device's MAC on every channel, the wardriver and the
+    background scanner included. A BLE scan is active by default too, and
+    four calls asked for it; an active scan answers every advertiser it
+    hears. Those are made passive under stealth rather than blocked. The
+    wardriver's WiGLE upload, which joins an access point, is refused on its
+    own while the log keeps being written.
+
+    RFID is one gate for the whole menu: a PN532 reads a card by energising
+    a 13.56 MHz field and waiting for an answer, so "read" transmits exactly
+    as much as "clone".
+
+    It is not a hardware interlock. The stacks stay up because the receivers
+    need them, and an initialised stack is one call from transmitting. The
+    claim is worth the list in tools/check_stealth.py, whose last rule is
+    the one that keeps it honest: every esp_wifi_80211_tx() in the tree has
+    to sit in a namespace whose setup is gated.
+
+  * Log to SD, per feature. Settings > SD Logging holds a master and one
+    switch each for Surveillance, the Jam Detector, the Packet Monitor, the
+    ESB Sniffer and the Wardriver. A feature logs when both say yes, and
+    each says so in its own language when it cannot -- REC reports "log off"
+    rather than "no SD" at a card sitting in the slot.
+
+    It does not cover files asked for by name: a saved .sub, a DuckyScript,
+    settings.json itself. Those are the point of pressing the button rather
+    than a side effect of running the app.
+
+  * A boot password, in Settings > Boot Lock. Asked for before the menu.
+    Salted SHA-256, stretched 20000 rounds, in NVS rather than on the card
+    -- the card comes out, and the card was not being read at boot anyway.
+
+    It stops someone who picks the device up, and nothing else. The firmware
+    reflashes in twenty seconds and esptool reads the flash out without
+    asking this code anything; a CYD has no secure boot and no flash
+    encryption. BootLock.h says so in the same words.
+
+  * The dwell alarm, which 0.4.2's duration column implied and did not do.
+    The first row to pass ten minutes brings up a full-screen mark, the
+    device and how long, and two rising notes. Shown once and faded, not
+    held: this is a passive monitoring screen and a banner that stayed would
+    cover the list.
+
+    The Hunt suggestion is gated to BLE trackers, because Hunt lists nothing
+    else and offering it for a plate reader is sending somebody to an empty
+    picker. "May be travelling with you" is the strongest claim the hardware
+    supports: Pueo has no position of its own and cannot tell a tracker
+    moving with you from a beacon you have been sitting beside.
+
+    The 3.5" can make the noise -- GPIO 26 into the onboard amplifier, GPIO
+    4 to enable it, active low. Two things keep it quiet and neither is a
+    fault: the 2.8" has no pin free for it, and the 3.5" ships with no
+    speaker fitted. Upstream's BUZZER_PIN guard was `#ifdef`, which is true
+    of the -1 "no buzzer" sentinel, so every board has been calling
+    ledcAttachPin(-1, 7).
+
+  * The BLE scan was starving the WiFi one. Surveillance and Drones both
+    listen on two radios and there is one radio; a BLE scan whose window
+    equals its interval asks for it continuously. Measured with the bench
+    beacon, which counts what it sends: 495 ALPR probe requests transmitted,
+    first one heard after about five minutes. Now immediate.
+
+  * Six more screens were drawing to a 320 px height on a 480 px panel. Two
+    Bluetooth log views showed 26 lines where 40 fit; wifi.cpp's content
+    bottom fell back to 320, clipping every screen without a touch nav bar.
+    The sweep that fixed SCREEN_WIDTH had missed SCREEN_HEIGHT on adjacent
+    lines, because its checks named one and not the other.
+
+  * The Drones list came back blank on re-entry. setup() cleared the craft
+    table and the screen and never told the line cache, so every line matched
+    what the cache believed was already drawn. forgetDrawn() was written for
+    it and never called.
+
+  * The settings screen scrolls, so the row count is no longer capped by the
+    shorter panel, and the NeoPixel switch is gone -- it saved, reloaded and
+    controlled nothing, on any board, because there is no NeoPixel driver in
+    the tree.
+
+  * The lid has a slot for the SD card. Fitting one meant four screws and
+    lifting the screen out. Its position came off the outline drawing and a
+    photograph rather than calipers, so the opening is cut oversize and the
+    two numbers that place it are one line each -- see the header of
+    docs/pueo/pueo-enclosure.scad. The published STL is unchanged until they
+    are measured.
+
+  * tools/build.sh upload compiles first. It uploaded whatever was last in
+    the build directory, which twice in one session was a build from before
+    the edit being tested: four verified hashes and a board running the old
+    firmware.
+
+  * Three check scripts were missing from the source archive -- written,
+    relied on, and left out of every release from 0.3.x to 0.4.2, so those
+    archives ship a tree that cannot run its own checks. The cut now fails
+    when a tools/check_*.py is not in the include list.
+
+  * Correction to 0.4.0. That entry says uiShowLine() in utils.h "is now the
+    only copy" of the cached-line painter. It was not: Surveillance had its
+    own, and Hunt still has a centred variant of it. Surveillance was
+    converted in this release; Hunt's remains, documented as a variant
+    rather than a duplicate. Two copies, not four, and not one.
+
+
 0.4.2 - 2026-09-21
 ------------------
 
