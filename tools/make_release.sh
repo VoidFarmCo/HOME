@@ -4,6 +4,7 @@
 #   tools/make_release.sh            -> dist/pueo-<version>-src.zip
 #   tools/make_release.sh --with-bin -> also dist/pueo-<version>-merged.bin
 #   tools/make_release.sh --force    -> re-cut a version already in dist/
+#   tools/make_release.sh --publish-only -> publish what is already in dist/
 #   tools/make_release.sh --no-publish -> cut into dist/ and copy nowhere
 #
 # The repo tracks 9 MB, down from 254. What is left is the firmware, the
@@ -40,6 +41,18 @@ cd "$REPO"
 
 WITH_BIN=0
 FORCE=0
+# Publish what dist/ already holds, without re-staging or rebuilding.
+#
+# Every release until this one was built twice: once to verify, once with
+# --force to publish. That is not merely slow. This script is inside its own
+# archive, so re-staging produces a zip with a different digest from the one
+# that was verified -- the second cut is a different artefact wearing the
+# same version number, and the verification then applies to a file nobody
+# will download. It has to be redone against the published zip every time,
+# and forgetting is silent.
+#
+# With this, the cut happens once and publishing moves those exact bytes.
+PUBLISH_ONLY=0
 # Cutting and publishing are two acts. .publish.local exists so that
 # publishing does not need a path typed at it; this exists so that cutting
 # does not need the file moved out of the way.
@@ -48,6 +61,7 @@ for arg in "$@"; do
   case "$arg" in
     --with-bin) WITH_BIN=1 ;;
     --force)    FORCE=1 ;;
+    --publish-only) PUBLISH_ONLY=1 ;;
     --no-publish) NO_PUBLISH=1 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
@@ -95,6 +109,7 @@ INCLUDE=(
   "tools/check_nav_labels.py"
   "tools/check_settings.py"
   "tools/check_stealth.py"
+  "tools/check_render_sync.py"
   "tools/trace_logo.py"
   "tools/inline_logo.py"
   "tools/check_logo_scale.py"
@@ -127,6 +142,23 @@ HISTORY=(
   "tools/tidy_scoped_constants.py"
 )
 
+# Publishing on its own: everything between here and the publish step is
+# what makes a release. Skip it, having first checked that there is one.
+if [ "$PUBLISH_ONLY" = "1" ]; then
+  missing=0
+  for f in "$OUT/${NAME}.zip" "$OUT/pueo-${VERSION}.sha256"; do
+    [ -f "$f" ] || { echo "no $f -- cut it first" >&2; missing=1; }
+  done
+  [ "$missing" = "0" ] || exit 1
+  # The digests are the point of the exercise, so they are checked against
+  # the files here rather than assumed to still match them.
+  ( cd "$OUT" && sha256sum -c "pueo-${VERSION}.sha256" >/dev/null ) || {
+    echo "dist/ no longer matches pueo-${VERSION}.sha256 -- re-cut it" >&2
+    exit 1
+  }
+  echo "publishing ${VERSION} from $OUT, not rebuilding it"
+fi
+
 # Refuse to quietly re-cut a version that has already been made.
 #
 # Rebuilding an existing version does not reproduce it once the tree has moved
@@ -136,7 +168,8 @@ HISTORY=(
 # checksum.
 #
 # Bump PUEO_VERSION, or pass --force when the release has not gone anywhere.
-if [ -f "$OUT/pueo-${VERSION}.sha256" ] && [ "$FORCE" != "1" ]; then
+if [ -f "$OUT/pueo-${VERSION}.sha256" ] && [ "$FORCE" != "1" ] \
+   && [ "$PUBLISH_ONLY" != "1" ]; then
   echo "dist/ already holds $VERSION. Bump PUEO_VERSION in ESP32-DIV/Branding.h," >&2
   echo "or pass --force if that release has not been published anywhere." >&2
   exit 1
@@ -159,6 +192,8 @@ for f in tools/check_*.py; do
   esac
 done
 [ -z "${MISSING_CHECKS:-}" ] || exit 1
+
+if [ "$PUBLISH_ONLY" != "1" ]; then
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/tools/history"
@@ -281,6 +316,9 @@ if [ "$WITH_BIN" = "1" ]; then
 fi
 
 ( cd "$OUT" && sha256sum pueo-${VERSION}-* > "pueo-${VERSION}.sha256" )
+
+fi   # PUBLISH_ONLY
+
 echo
 cat "$OUT/pueo-${VERSION}.sha256"
 
