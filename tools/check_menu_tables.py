@@ -80,6 +80,49 @@ def main():
         mark = "ok " if got == want else "BAD"
         print("  %s %-26s %-28s %2d/%-2d" % (mark, name, dim, got, want))
 
+    # ── and the labels have to fit the tiles they are drawn in ──────────
+    #
+    # The grid menus centre a label in a fixed tile and TFT_eSPI does not
+    # clip: a label wider than its tile is drawn over whatever is beside it.
+    # The 2.8" tile is 100 px and "Drone Detector" measures 95, so there is
+    # one character of headroom on a panel nobody has booted -- which is
+    # exactly the kind of margin that gets spent without anyone noticing.
+    #
+    # Measured against TFT_eSPI's own font table rather than an average
+    # character width. An 8 px/char estimate made these look 17 px wider
+    # than they are and would have had somebody shortening labels that fit.
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import render_screens
+        fw, _ = render_screens.load_font16()
+    except Exception as e:                      # no toolchain, no font table
+        print()
+        print("  skipped the label-width check: %s" % e)
+        fw = None
+
+    if fw is not None:
+        def f2_width(t):
+            return sum(fw[ord(c) - 32] for c in t if 32 <= ord(c) < 128)
+
+        print()
+        print("grid labels against their tile:")
+        GRIDS = [("other_submenu_items", {"3.5\"": 145, "2.8\"": 100})]
+        for table, tiles in GRIDS:
+            m = re.search(table + r"\[[^\]]*\]\s*=\s*\{(.*?)\};", src, re.S)
+            if not m:
+                bad.append("%s: not found" % table)
+                continue
+            for label in re.findall(r'"([^"]+)"', m.group(1)):
+                w = f2_width(label)
+                worst = min(tiles.values())
+                panel = [k for k, v in tiles.items() if v == worst][0]
+                fits = w <= worst
+                print("  %s %-16s %3d px   %s tile %d" %
+                      ("ok " if fits else "BAD", label, w, panel, worst))
+                if not fits:
+                    bad.append("%r is %d px in a %d px tile on the %s panel"
+                               % (label, w, worst, panel))
+
     print()
     if bad:
         print("FAILED:", file=sys.stderr)

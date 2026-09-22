@@ -5749,11 +5749,11 @@ void printModeChange(OperationMode mode) {
   switch (mode) {
     case BLE_MODULE:          modeText += "BLE";       break;
     case Bluetooth_MODULE:    modeText += "Bluetooth"; break;
-    case WiFi_MODULE:         modeText += "WIFI";      break;
+    case WiFi_MODULE:         modeText += "WiFi";      break;
     case USB_WIRELESS_MODULE: modeText += "USB";       break;
     case VIDEO_TX_MODULE:     modeText += "Video";     break;
     case RC_MODULE:           modeText += "RC";        break;
-    case ZIGBEE_MODULE:       modeText += "ZIGBEE";    break;
+    case ZIGBEE_MODULE:       modeText += "Zigbee";    break;
     case NRF24_MODULE:        modeText += "NRF24";     break;
     default: modeText                  += "Unknown";   break;
   }
