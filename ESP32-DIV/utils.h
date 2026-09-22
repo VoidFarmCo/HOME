@@ -51,6 +51,16 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate = false, bool bottomSe
  * there and that image rebuilds to the same bytes. */
 #include "UiLine.h"   // uiShowLine, shared with the beacon sketch
 
+/* A short tone, on boards that can make one.
+ *
+ * Blocking, because every caller is an alert: something worth a noise is
+ * worth 150 ms. On a board with no amplifier this compiles to nothing.
+ *
+ * The enable is raised, given a moment to settle, and dropped again after.
+ * Leaving it high idles the amplifier on a rail the display is already
+ * using; keying it fast clicks. Both are in board_pueo.h's notes. */
+void uiBeep(uint16_t hz = 2200, uint16_t ms = 150);
+
 /* A feature's own mark, held for a beat as it opens.
  *
  * Upstream's features open on the skull animation. Pueo's own open on their

@@ -122,6 +122,33 @@
 
 #define PUEO_NRF24_MODULE_COUNT 1
 
+/* ── sound ──────────────────────────────────────────────────────────────────
+ * The 3.5" lcdwiki board carries an audio amplifier: GPIO 26 is its input
+ * and GPIO 4 is its enable. Neither is claimed here -- moving NRF24's chip
+ * select to 25 on this panel was partly to keep them, because keying an
+ * amplifier enable at chip-select rates clicks and draws off the display's
+ * rail.
+ *
+ * The 2.8" has neither. GPIO 4 is that board's RGB red and is this pin map's
+ * NRF24 CSN, so driving it as an amplifier enable would key a radio. Sound
+ * is 3.5"-only and the guards below say so rather than relying on nobody
+ * calling it.
+ *
+ * The enable is ACTIVE LOW. lcdwiki's page for this board is explicit --
+ * "Audio enable signal, low level enable, high level disable" -- and the
+ * first version of this drove it high to enable, which is the one state
+ * that guarantees silence. Worth the emphasis: the obvious polarity was
+ * the wrong one.
+ *
+ * No speaker is fitted. The board brings the amplifier out to a 1.25 mm
+ * 2-pin connector and you attach your own, so a board straight out of the
+ * bag is silent however correct this code is. */
+#if PUEO_PANEL_35
+#define BUZZER_PIN       26   /* amplifier input (also DAC2) */
+#define AMP_ENABLE_PIN    4   /* amplifier enable */
+#define AMP_ENABLE_LEVEL  LOW /* active low -- see above */
+#endif
+
 /* ── PN532 V3 (SPI mode: DIP CH1=OFF, CH2=ON) ───────────────────────────────
  * Stock CYD default is SS 25, which is the XPT2046 touch clock. Moved to 17. */
 #define PN532_SS 17

@@ -550,6 +550,38 @@ static int statusBarTempBand(float t) {
 static constexpr int kStatusIconsWidth = 110;
 
 
+void uiBeep(uint16_t hz, uint16_t ms) {
+#if PUEO_HAS_BUZZER
+  constexpr uint8_t kBeepCh = 6;   /* 0 is the backlight, 7 is subghz's */
+
+#ifdef AMP_ENABLE_PIN
+  pinMode(AMP_ENABLE_PIN, OUTPUT);
+  digitalWrite(AMP_ENABLE_PIN, AMP_ENABLE_LEVEL);
+  delay(8);                        /* settle, or the first cycle is a pop */
+#endif
+
+  ledcSetup(kBeepCh, 4000, 8);
+  ledcAttachPin(BUZZER_PIN, kBeepCh);
+  ledcWriteTone(kBeepCh, hz);
+  delay(ms);
+  ledcWriteTone(kBeepCh, 0);
+  ledcDetachPin(BUZZER_PIN);
+
+  /* Park the pin low rather than leaving it floating at whatever the last
+   * PWM level was, which the amplifier would hold as a DC offset. */
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+
+#ifdef AMP_ENABLE_PIN
+  delay(4);
+  digitalWrite(AMP_ENABLE_PIN, !AMP_ENABLE_LEVEL);
+#endif
+#else
+  (void)hz;
+  (void)ms;
+#endif
+}
+
 void showFeatureMark(const unsigned char* bitmap, const char* caption,
                      int holdMs) {
   tft.fillScreen(UI_BG);

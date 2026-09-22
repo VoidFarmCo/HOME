@@ -328,11 +328,16 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define BTN_SELECT   6
 #endif
 
-/* Buzzer */
+/* Buzzer, or on the 3.5" CYD the onboard amplifier -- see board_pueo.h.
+ *
+ * -1 is the "no buzzer" sentinel, and every use of it was guarded with
+ * `#ifdef BUZZER_PIN`, which is true whatever the value is. So a board with
+ * no buzzer still ran the beep, and ledcAttachPin(-1, ...) with it. Test
+ * the value, not its existence. */
 #ifndef BUZZER_PIN
-// User hardware: buzzer on IO2
 #define BUZZER_PIN -1
 #endif
+#define PUEO_HAS_BUZZER (BUZZER_PIN >= 0)
 
 /* Backlight / PWM */
 #ifndef BACKLIGHT_PIN

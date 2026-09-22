@@ -679,11 +679,13 @@ static uint16_t lastDetectAlertFreq = 0xFFFF;
 static uint32_t notifHideAtMs = 0;
 static bool notifActive = false;
 
+#if PUEO_HAS_BUZZER
 static constexpr uint8_t BUZZER_LEDC_CH = 7;
 static bool buzzerArmed = false;
 static uint32_t buzzerOffAtMs = 0;
+#endif
 static void replayBeep(uint16_t hz = 2200, uint16_t ms = 60) {
-  #ifdef BUZZER_PIN
+  #if PUEO_HAS_BUZZER
   ledcSetup(BUZZER_LEDC_CH, 4000, 8);
   ledcAttachPin(BUZZER_PIN, BUZZER_LEDC_CH);
   ledcWriteTone(BUZZER_LEDC_CH, hz);
@@ -693,7 +695,7 @@ static void replayBeep(uint16_t hz = 2200, uint16_t ms = 60) {
 }
 
 static void replayBeepPoll() {
-  #ifdef BUZZER_PIN
+  #if PUEO_HAS_BUZZER
   if (!buzzerArmed) return;
   if ((int32_t)(millis() - buzzerOffAtMs) < 0) return;
   ledcWriteTone(BUZZER_LEDC_CH, 0);
