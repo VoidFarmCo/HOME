@@ -33,6 +33,10 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 ICON_H = os.path.join(REPO, "ESP32-DIV", "icon.h")
+# The beacon is a separate sketch and keeps its own mark. Reading both here
+# rather than copying the array is the same rule Emit.cpp follows for the
+# signatures: one definition, two readers.
+BEACON_ART = os.path.join(REPO, "PueoBeacon", "BeaconArt.h")
 FONTS = os.path.join(REPO, ".arduino", "user", "libraries", "TFT_eSPI", "Fonts")
 
 # The panel these are drawn for. main() sets it from --panel; the default
@@ -162,12 +166,16 @@ def load_branding():
 
 # ── the firmware's bitmaps ─────────────────────────────────────────────────
 def load_bitmaps():
-    src = _strip_comments(open(ICON_H, encoding="utf-8", newline="").read())
     out = {}
-    for m in re.finditer(
-            r"\b(bitmap_\w+)\s*\[\]\s*PROGMEM\s*=\s*\{(.*?)\};", src, re.S):
-        vals = [int(v, 16) for v in re.findall(r"0x([0-9a-fA-F]{2})", m.group(2))]
-        out[m.group(1)] = vals
+    for path in (ICON_H, BEACON_ART):
+        if not os.path.isfile(path):
+            continue
+        src = _strip_comments(open(path, encoding="utf-8", newline="").read())
+        for m in re.finditer(
+                r"\b(bitmap_\w+)\s*\[\]\s*PROGMEM\s*=\s*\{(.*?)\};", src, re.S):
+            vals = [int(v, 16)
+                    for v in re.findall(r"0x([0-9a-fA-F]{2})", m.group(2))]
+            out[m.group(1)] = vals
     return out
 
 
@@ -490,6 +498,94 @@ def render_dwell(t, huntable):
     centred(hint1, y + mh + 46, UI_DIM_TEXT)
     if hint2 is not None:
         centred(hint2, y + mh + 64, UI_WARN)
+
+
+# PueoBeacon.ino's own palette, which is not the detector's: it never loads
+# a theme, so these are literals in that file rather than UI.* lookups.
+BCN_BG   = (0, 0, 0)
+BCN_TEXT = (255, 255, 255)
+BCN_DIM  = rgb(0x8410)
+BCN_LIVE = rgb(0x07E0)
+BCN_WARN = rgb(0xFBE0)
+BCN_STOP = rgb(0xF800)
+
+# Emit::name() and Emit::detectedBy(), in enum order.
+BEACON_SIGNALS = [
+    ("Remote ID / WiFi", "Drones"),
+    ("Remote ID / BLE",  "Drones"),
+    ("ALPR probe",       "Spotter"),
+    ("Bodycam beacon",   "Spotter"),
+    ("Smart glasses",    "Spotter"),
+    ("Vehicle module",   "Spotter"),
+    ("Find My tracker",  "Hunt / AirTag Sniffer"),
+    ("Fast Pair",        "Fast Pair"),
+]
+
+
+def render_beacon_splash(t, brand):
+    """drawSplash() in PueoBeacon.ino, at the last second of the countdown.
+
+    The splash is the only moment before the board starts transmitting, which
+    is why it counts down rather than sitting there: a detector was once
+    overwritten with this firmware because nothing on screen said which was
+    which."""
+    mw = mh = 200
+    x = (W - mw) // 2
+    y0 = (H - mh) // 2 - 40
+    cx = W // 2
+
+    t.fill_screen(BCN_BG)
+    t.draw_bitmap(x, y0, "bitmap_pueo_beacon", mw, mh, BCN_WARN)
+
+    def centred_f2(text, yy, colour):
+        t.print_f2(cx - t.text_width(text) // 2, yy, text, colour, BCN_BG)
+
+    def centred_f1(text, yy, colour):
+        t.print_f1(cx - 6 * len(text) // 2, yy, text, colour, BCN_BG)
+
+    y = y0 + mh + 12
+    centred_f2("BEACON", y, BCN_WARN)
+    y += 22
+    centred_f1("bench transmitter", y, BCN_TEXT)
+    y += 14
+    centred_f1(brand["PUEO_VERSION"], y, BCN_DIM)
+
+    centred_f1("THIS BOARD TRANSMITS", H - 54, BCN_STOP)
+    centred_f1("WiFi + BLE, lowest power, 10 min", H - 40, BCN_DIM)
+    centred_f1("broadcasting in 1...", H - 22, BCN_WARN)
+
+
+def render_beacon_running(t, brand):
+    """drawFrame() + drawBody(), mid-session with BLE on the tracker decoy.
+
+    Counts are what the screen is for. "Nothing detected" on the other board
+    is either a dead receiver or a dead transmitter, and these numbers are
+    the only thing that tells the two apart."""
+    t.fill_screen(BCN_BG)
+    t.print_f2(8, 6, "PUEO BEACON", BCN_WARN, BCN_BG)
+    t.print_f1(8, 28, "bench transmitter - " + brand["PUEO_VERSION"],
+               BCN_DIM, BCN_BG)
+    t.draw_fast_hline(0, 42, W, BCN_DIM)
+
+    y = 50
+    t.print_f1(8, y, "TRANSMITTING - stops in 11:38", BCN_LIVE, BCN_BG)
+    y += 16
+
+    # BLE advertising is a state rather than an event, so exactly one BLE
+    # signal is live at a time and the scheduler rotates them. Find My is up.
+    live = 6
+    counts = [214, 96, 495, 188, 61, 44, 33, 51]
+
+    for i, (nm, by) in enumerate(BEACON_SIGNALS):
+        is_live = (i == live)
+        colour = BCN_LIVE if is_live else (BCN_TEXT if counts[i] else BCN_DIM)
+        t.print_f1(8, y, ("> " if is_live else "  ") + nm, colour, BCN_BG)
+        cnt = str(counts[i])
+        t.print_f1(W - 44, y, cnt, BCN_DIM, BCN_BG)
+        t.print_f1(20, y + 10, by, BCN_DIM, BCN_BG)
+        y += 24
+
+    t.print_f1(8, H - 14, "all payloads say PUEO-TEST", BCN_DIM, BCN_BG)
 
 
 MENU = [
@@ -905,7 +1001,11 @@ def main():
                      ("spotter-mark",
                       lambda t: render_mark(t, "bitmap_pueo_spotter", "Surveillance")),
                      ("dwell-tracker", lambda t: render_dwell(t, True)),
-                     ("dwell-other", lambda t: render_dwell(t, False))):
+                     ("dwell-other", lambda t: render_dwell(t, False)),
+                     ("beacon-splash",
+                      lambda t: render_beacon_splash(t, brand)),
+                     ("beacon-running",
+                      lambda t: render_beacon_running(t, brand))):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)

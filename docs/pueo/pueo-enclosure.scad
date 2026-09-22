@@ -354,29 +354,38 @@ SCREEN_LED_D   =  3.2;    // a light pipe, or just a hole
  * screws and lifting the screen out -- reported from a printed case, not
  * predicted. A card is not a thing you fit once: it comes out to be read.
  *
- * The socket sits hard against one long edge of the PCB and ejects sideways,
- * so this is a slot through the lid's side wall rather than a hole in the
- * face. It is cut oversize on purpose. The card is 11 mm wide and 1 mm
- * thick; the opening is 16 x 4, which swallows a couple of millimetres of
- * error in either direction and still leaves wall on both sides. Getting a
- * finger and a fingernail in matters more than a close fit.
+ * The socket sits hard against one long edge of the PCB -- about 3 mm in --
+ * and ejects sideways, so this is a slot through the lid's side wall rather
+ * than a hole in the face. It is still cut oversize: the card is 11 mm wide
+ * and 1 mm thick and the opening is 16 x 4, which leaves room for print
+ * tolerance and for a fingernail, and the socket itself is 16 mm along the
+ * board so nothing is gained by matching the card instead.
  *
- * TWO NUMBERS TO CHECK BEFORE PRINTING, both on the board itself:
+ * Both numbers come off lcdwiki's own outline drawing, E32R35T_Size.pdf,
+ * rather than off a photograph or a ruler.
  *
- *   SD_SIDE  which long edge the slot mouth is on, looking at the SCREEN.
- *            -1 is the left edge, +1 the right. Read off the back and
- *            remember it mirrors: a socket on the right of the back view is
- *            on the LEFT of the front.
- *   SD_Y     the socket mouth's centre, measured from the middle of the
- *            board along its length, positive toward the ESP32 module end.
+ * SD_Y, from the chain of dimensions down the right of its Back view. The
+ * leader from the socket runs to the top of 17.87, which chains through
+ * 14.54 at the UART header and 25.48 at the BAT header to the bottom edge
+ * of the PCB:
  *
- * Both below came off the lcdwiki outline drawing and a photograph of the
- * back, not off calipers, which puts them in the same class as SCREEN_LED_X
- * -- close enough to print, worth measuring if yours misses. The slot is
- * generous enough that a small error still opens onto the socket.       */
+ *     17.87 + 14.54 + 25.48 = 57.89 mm from the socket to the bottom edge
+ *     101.50 - 57.89        = 43.61 mm from the TOP edge
+ *     101.50/2 - 43.61      =  7.14 mm above the board's centre
+ *
+ * SD_SIDE, from which side of that same view the socket sits on. It is the
+ * right-hand side there, with the UART and BAT headers -- and a Back view
+ * mirrors, so it is the LEFT edge looking at the screen, which is negative
+ * X here. The I2C, SPI and SPEAKER headers are on the other side in both
+ * the drawing and a photograph of the board, which is the check that the
+ * two views agree about handedness.
+ *
+ * Measuring the drawing's own pixels puts the socket centre at 42.6 mm from
+ * the top against the 43.61 the dimension chain gives, and its mouth about
+ * 3 mm in from the edge. The dimensioned number is the one used.       */
 SD_SLOT   = (PANEL == "3.5");
-SD_SIDE   = -1;       // -1 = left edge viewed from the front   [VERIFY]
-SD_Y      = 6.7;      // mm above the board centre              [VERIFY]
+SD_SIDE   = -1;       // left edge viewed from the front, per the Back view
+SD_Y      = 7.14;     // mm above the board centre, from the dimension chain
 SD_W      = 16;       // opening along the board's length
 SD_HT     = 4;        // opening through the wall's height
 
