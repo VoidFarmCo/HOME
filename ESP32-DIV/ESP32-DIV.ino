@@ -4654,8 +4654,11 @@ void setup() {
    * The defaults are still applied first, so a card that will not mount --
    * or is not there -- leaves the device exactly where it used to be. */
   settingsApplyBoardTouchDefaults();
-  Serial.printf("[boot] settings %s\n",
-                settingsLoad() ? "loaded from SD" : "not loaded, using defaults");
+  settingsLoad();
+  /* Says which of the four it was. "loaded from SD" used to print for a card
+   * with no settings.json on it, which is the reassuring half of a message
+   * that had not read anything. */
+  Serial.printf("[boot] settings: %s\n", settingsLastLoadText());
 #endif
   applyThemeToPalette(settings().theme);
   setBrightness(settings().brightness);

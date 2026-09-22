@@ -23,6 +23,20 @@ const LogAppEntry kLogApps[(int)LogApp::kCount] = {
   {"Wardriver",      &AppSettings::logWardrive},
 };
 
+static SettingsLoadResult g_lastLoad = SettingsLoadResult::NotAttempted;
+
+SettingsLoadResult settingsLastLoad() { return g_lastLoad; }
+
+const char* settingsLastLoadText() {
+  switch (g_lastLoad) {
+    case SettingsLoadResult::Loaded:     return "loaded from SD";
+    case SettingsLoadResult::NoFile:     return "none saved yet, using defaults";
+    case SettingsLoadResult::Unreadable: return "unreadable, using defaults";
+    case SettingsLoadResult::NoCard:     return "no SD card, using defaults";
+    default:                             return "not attempted";
+  }
+}
+
 bool sdLoggingAllowed(LogApp app) {
   if (!g_settings.logToSd) return false;
   const int i = (int)app;
@@ -111,16 +125,30 @@ static bool ensureDir(const char* dirPath) {
 bool settingsLoad() {
   settingsApplyBoardTouchDefaults();
   sdRetryMount();
-  if (!mountSD()) return false;
-  if (!SD.exists(SETTINGS_PATH)) return true;
+  if (!mountSD()) {
+    g_lastLoad = SettingsLoadResult::NoCard;
+    return false;
+  }
+  if (!SD.exists(SETTINGS_PATH)) {
+    /* Not a failure. It is what a card looks like before anything has been
+     * saved, and the caller has every right to carry on with defaults. */
+    g_lastLoad = SettingsLoadResult::NoFile;
+    return true;
+  }
 
   File f = SD.open(SETTINGS_PATH, FILE_READ);
-  if (!f) return false;
+  if (!f) {
+    g_lastLoad = SettingsLoadResult::Unreadable;
+    return false;
+  }
 
   StaticJsonDocument<kSettingsJsonSize> doc;
   DeserializationError err = deserializeJson(doc, f);
   f.close();
-  if (err) return false;
+  if (err) {
+    g_lastLoad = SettingsLoadResult::Unreadable;
+    return false;
+  }
 
   auto& s = g_settings;
   s.brightness      = doc["brightness"]      | s.brightness;
@@ -153,6 +181,7 @@ bool settingsLoad() {
     settingsApplyBoardTouchDefaults();
   }
 
+  g_lastLoad = SettingsLoadResult::Loaded;
   return true;
 }
 

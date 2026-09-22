@@ -142,6 +142,19 @@ def main():
             if all(stack):
                 cyd_calls += 1
     ok("something calls settingsLoad()", calls > 0)
+    # And every way out of it has to record which way it was. The bool says
+    # "nothing went wrong", which is true both when a file was read and when
+    # a card simply had none on it -- so the boot line printed "loaded from
+    # SD" for a card it had read nothing from.
+    body = func_body(store_c, "bool settingsLoad()")
+    returns = len(re.findall(r"\breturn (?:true|false);", body))
+    marks = body.count("g_lastLoad =")
+    ok("  and every exit from it records what happened", marks >= returns,
+       "%d returns, %d recorded -- one path reports the previous load"
+       % (returns, marks))
+    ok("  and the boot line prints that, not the bool",
+       "settingsLastLoadText()" in ino,
+       "a bool cannot tell 'read a file' from 'card had none'")
     ok("  and the CYD reaches one of them", cyd_calls > 0,
        "settingsLoad() is only called under BOARD_HAS_ESP32S3 -- this board "
        "boots on defaults every time, however well it saves them")

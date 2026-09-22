@@ -93,5 +93,29 @@ const char* accentPresetName(uint8_t preset);
 
 const char* settingsBoardProfileId();
 void settingsApplyBoardTouchDefaults();
+/* What the last settingsLoad() actually did.
+ *
+ * settingsLoad() returns bool, and returns true both when it read a file and
+ * when it mounted a card that has no file on it yet. Those are the same
+ * answer to "did anything go wrong" and different answers to "are my
+ * settings in effect" -- and the boot line was reporting the first while
+ * looking like it reported the second. A card with no settings.json printed
+ * "settings loaded from SD".
+ *
+ * Kept as a separate query rather than a changed return type so every
+ * existing caller keeps compiling and keeps meaning what it meant. */
+enum class SettingsLoadResult : uint8_t {
+  NotAttempted = 0,
+  NoCard,        // nothing mounted; defaults, and nothing was written either
+  NoFile,        // card mounted, no settings.json yet -- normal on a new card
+  Unreadable,    // a file is there and could not be opened or parsed
+  Loaded,        // read and applied
+};
+
+SettingsLoadResult settingsLastLoad();
+
+/* One line for the serial log, naming which of the five it was. */
+const char* settingsLastLoadText();
+
 bool settingsLoad();
 bool settingsSave();
