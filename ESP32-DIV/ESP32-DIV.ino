@@ -167,13 +167,13 @@ const char *rfid_submenu_items[rfid_NUM_SUBMENU_ITEMS] = {
     "Jam Reader",
     "Tag Disrupt",
     "Disrupt Emulate",
-    "Back to Main Menu"};
+    "Back to More"};
 
 const int gps_NUM_SUBMENU_ITEMS = 3;
 const char *gps_submenu_items[gps_NUM_SUBMENU_ITEMS] = {
     "Wardriver",
     "Satellite Scanner",
-    "Back to Main Menu"};
+    "Back to More"};
 
 const int about_NUM_SUBMENU_ITEMS = 1;
 const char *about_submenu_items[about_NUM_SUBMENU_ITEMS] = {
