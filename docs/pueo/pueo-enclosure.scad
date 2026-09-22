@@ -132,12 +132,44 @@ module shell() {
     }
 }
 
-BOSS_POS = [[-36.5,-79],[36.5,-79],[-36.5,5],[36.5,5],[-36.5,70],[36.5,70]];
+/* Six lid screws, as [x, y, radius].
+ *
+ * The middle pair carried the radius the others do and sat at y = 5, which
+ * put the left one squarely across the SD card's path. Not across the board
+ * or the socket -- it is outboard of both -- but across the 15 mm of gap the
+ * card has to cross between the wall and the socket mouth. Reported from a
+ * printed lid with a card that would not go in.
+ *
+ * It moves down rather than up, and this is the part worth arguing. Up, to
+ * y = 24, clears everything by 5 mm and leaves 103 mm between screws on the
+ * edge that now has a 16 mm hole in it -- the longest unsupported span on
+ * the weakest edge. Down keeps a screw beside the slot, where it stiffens
+ * what the hole took away, and the spans come out 77.5 and 71.5, the most
+ * even this lid has had.
+ *
+ * Down is tight on both sides, which is why the middle pair is also
+ * narrower: at BOSS_R it would have clung to the battery pocket with half a
+ * millimetre to spare, and half a millimetre is not a clearance in a printed
+ * part -- elephant's foot alone eats it. BOSS_MID_R leaves a millimetre to
+ * the pocket and 1.6 to the card, and still puts 1.8 mm of wall around an M3
+ * clearance hole.
+ *
+ * And it sits half a millimetre further out than the others, which is not a
+ * style choice. A boss merges into the wall by overlapping it; at BOSS_R and
+ * x = 36.5 that overlap is 0.5 mm, and narrowing the radius to BOSS_MID_R
+ * without moving x left the cylinder exactly TANGENT to the wall face.
+ * Tangent is coincident, coincident is not a 2-manifold, and CGAL says so on
+ * the way out to STL. Moving it out by the same half millimetre the radius
+ * lost puts the overlap back. */
+BOSS_MID_R = 3.5;
+BOSS_POS = [[-36.5,-79,BOSS_R],  [36.5,-79,BOSS_R],
+            [-37.0,-1.5,BOSS_MID_R], [37.0,-1.5,BOSS_MID_R],
+            [-36.5, 70,BOSS_R],  [36.5, 70,BOSS_R]];
 module bosses() {
     for (p = BOSS_POS)
         translate([p[0], p[1], 0])
             difference() {
-                cylinder(h=H, r=BOSS_R);
+                cylinder(h=H, r=p[2]);
                 translate([0,0,FLOOR-1]) cylinder(h=H, r=BOSS_HOLE);
             }
 }
@@ -1004,7 +1036,7 @@ module lid() {
             }
             // screw pillars matching the base bosses
             for (p = BOSS_POS)
-                translate([p[0], p[1], 0]) cylinder(h=LID_H, r=BOSS_R);
+                translate([p[0], p[1], 0]) cylinder(h=LID_H, r=p[2]);
             // 3.5" screen posts, hanging off the plate down to the PCB's
             // top face. Height falls out of the stack: the module's front
             // bears on the lip, so the PCB sits SCREEN_STACK below it.
