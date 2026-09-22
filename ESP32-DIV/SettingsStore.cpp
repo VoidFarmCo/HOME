@@ -10,12 +10,27 @@
  * the device boots on defaults with a card full of perfectly good settings
  * on it. Sized with headroom for that reason, and named once so the three
  * uses cannot drift apart. */
-static constexpr size_t kSettingsJsonSize = 768;
+static constexpr size_t kSettingsJsonSize = 1024;
 
 static AppSettings g_settings;
 AppSettings& settings() { return g_settings; }
 
-bool sdLoggingAllowed() { return g_settings.logToSd; }
+const LogAppEntry kLogApps[(int)LogApp::kCount] = {
+  {"Surveillance",   &AppSettings::logSpotter},
+  {"Jam Detector",   &AppSettings::logJamDet},
+  {"Packet Monitor", &AppSettings::logPcap},
+  {"ESB Sniffer",    &AppSettings::logEsb},
+  {"Wardriver",      &AppSettings::logWardrive},
+};
+
+bool sdLoggingAllowed(LogApp app) {
+  if (!g_settings.logToSd) return false;
+  const int i = (int)app;
+  /* Not reachable from the enum, and cheap. A bad index here would read a
+   * bool out of the middle of some other setting and call it permission. */
+  if (i < 0 || i >= (int)LogApp::kCount) return false;
+  return g_settings.*(kLogApps[i].field);
+}
 
 static const AccentOption kAccentPresets[] = {
   {"Orange", 0xFBE4},
@@ -115,6 +130,11 @@ bool settingsLoad() {
   s.autoWifiScan    = doc["autoWifiScan"]    | s.autoWifiScan;
   s.autoBleScan     = doc["autoBleScan"]     | s.autoBleScan;
   s.logToSd         = doc["logToSd"]         | s.logToSd;
+  s.logSpotter      = doc["logSpotter"]      | s.logSpotter;
+  s.logJamDet       = doc["logJamDet"]       | s.logJamDet;
+  s.logPcap         = doc["logPcap"]         | s.logPcap;
+  s.logEsb          = doc["logEsb"]          | s.logEsb;
+  s.logWardrive     = doc["logWardrive"]     | s.logWardrive;
 
   if (s.autoWifiScan != s.autoBleScan) {
     bool en = (s.autoWifiScan || s.autoBleScan);
@@ -161,6 +181,11 @@ bool settingsSave() {
   doc["autoWifiScan"]    = s.autoWifiScan;
   doc["autoBleScan"]     = s.autoBleScan;
   doc["logToSd"]         = s.logToSd;
+  doc["logSpotter"]      = s.logSpotter;
+  doc["logJamDet"]       = s.logJamDet;
+  doc["logPcap"]         = s.logPcap;
+  doc["logEsb"]          = s.logEsb;
+  doc["logWardrive"]     = s.logWardrive;
 
   JsonObject t = doc.createNestedObject("touch");
   t["xMin"] = s.touchXMin;

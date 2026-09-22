@@ -1779,66 +1779,122 @@ static int  sel = 0;
 static bool dirtySettings = false;
 static bool uiDirty = false;
 
-/* The first three rows each have their own widget -- a slider, a pair of
- * words, a swatch. Everything after them is the same switch with a different
- * label and a different field, so it is a table rather than another sel== arm
- * in each of the four places that used to enumerate the rows: drawAll,
- * redrawIfChanged, handleTouch, and the left/right key handler. Adding a
- * setting was four edits and nothing told you when you had made three. */
+/* Two pages, because one list could not hold this.
+ *
+ * The first three rows of the main page each have their own widget -- a
+ * slider, a pair of words, a swatch. Everything else on either page is the
+ * same switch with a different label and a different field, so switches are
+ * a table rather than another sel== arm in each of the four places that
+ * enumerate rows: drawAll, redrawIfChanged, handleTouch, and the left/right
+ * key handler. Adding a setting used to be four edits, and nothing told you
+ * when you had made three.
+ *
+ * SD logging is a page of its own because it is six rows on its own and the
+ * main page had room for one. It is also the better place for it: the
+ * question is "what is this device writing to my card", which is a question
+ * about the device, not about whichever feature you happen to have open. */
+enum class Page : uint8_t { Main, Logging };
+static Page page = Page::Main;
+
 struct SwitchRow {
   const char* label;
   bool AppSettings::*a;
   bool AppSettings::*b;   /* moves with `a`, or nullptr for a single field */
 };
 
-static const SwitchRow kSwitchRows[] = {
+static const SwitchRow kMainSwitches[] = {
   /* Wi-Fi and BLE background scanning have always been one switch on this
    * screen and two fields in the file. Kept as two so an existing
    * settings.json still loads, and settingsLoad() still forces them equal
    * if something ever writes them apart. */
   {"Auto Scan", &AppSettings::autoWifiScan, &AppSettings::autoBleScan},
-  {"Log to SD", &AppSettings::logToSd, nullptr},
 };
 
 static const char* const kFixedRows[] = {"Brightness", "Theme", "Accent"};
-static const int kFirstSwitch = sizeof(kFixedRows)/sizeof(kFixedRows[0]);
-static const int kSwitchCount = sizeof(kSwitchRows)/sizeof(kSwitchRows[0]);
-static const int N = kFirstSwitch + kSwitchCount;
+static const int kFirstSwitch     = sizeof(kFixedRows)/sizeof(kFixedRows[0]);
+static const int kMainSwitchCount = sizeof(kMainSwitches)/sizeof(kMainSwitches[0]);
+static const int kLinkRow         = kFirstSwitch + kMainSwitchCount;   /* SD Logging */
+static const int kMainRows        = kLinkRow + 1;
+
+/* Master switch, then one row per LogApp. The per-app rows are generated
+ * from kLogApps, so a feature added to that table appears here without this
+ * file being touched -- and, more to the point, cannot fail to. */
+static const int kLogRows = 1 + (int)LogApp::kCount;
+static const int kMaxRows = (kMainRows > kLogRows) ? kMainRows : kLogRows;
+
+static int rowCount() { return (page == Page::Main) ? kMainRows : kLogRows; }
 
 static const char* rowLabel(int i) {
-  return (i < kFirstSwitch) ? kFixedRows[i] : kSwitchRows[i - kFirstSwitch].label;
+  if (page == Page::Logging) {
+    return (i == 0) ? "Log to SD" : kLogApps[i - 1].label;
+  }
+  if (i < kFirstSwitch) return kFixedRows[i];
+  if (i < kLinkRow)     return kMainSwitches[i - kFirstSwitch].label;
+  return "SD Logging";
+}
+
+static bool rowIsSwitch(int i) {
+  return (page == Page::Logging) || (i >= kFirstSwitch && i < kLinkRow);
+}
+
+static SwitchRow rowSwitch(int i) {
+  if (page == Page::Logging) {
+    if (i == 0) return SwitchRow{"Log to SD", &AppSettings::logToSd, nullptr};
+    return SwitchRow{kLogApps[i - 1].label, kLogApps[i - 1].field, nullptr};
+  }
+  return kMainSwitches[i - kFirstSwitch];
 }
 
 /* Read and write a switch row's field(s). A two-field row reads as on when
  * either is on, which is what the old Auto Scan arm did, and writes both. */
-static bool switchValue(const AppSettings& s, int k) {
-  const SwitchRow& r = kSwitchRows[k];
+static bool switchValue(const AppSettings& s, int i) {
+  const SwitchRow r = rowSwitch(i);
   return (s.*(r.a)) || (r.b != nullptr && (s.*(r.b)));
 }
-static bool switchSettled(const AppSettings& s, int k, bool en) {
-  const SwitchRow& r = kSwitchRows[k];
+static bool switchSettled(const AppSettings& s, int i, bool en) {
+  const SwitchRow r = rowSwitch(i);
   return (s.*(r.a)) == en && (r.b == nullptr || (s.*(r.b)) == en);
+}
+
+/* What the SD Logging row reads on the main page: the whole state of the
+ * other page in one cell, so it is answerable without opening it. */
+static void loggingSummary(char* out, size_t outSz) {
+  const AppSettings& s = settings();
+  if (!s.logToSd) { snprintf(out, outSz, "off"); return; }
+  int on = 0;
+  for (int i = 0; i < (int)LogApp::kCount; i++) {
+    if (s.*(kLogApps[i].field)) on++;
+  }
+  if (on == (int)LogApp::kCount) snprintf(out, outSz, "on");
+  else snprintf(out, outSz, "%d of %d", on, (int)LogApp::kCount);
 }
 
 /* The list has to stop above the footer, and nothing on screen says when it
  * stops doing so -- the last row simply draws under the Back and Save
  * buttons, and on a board you are not holding, not at all.
  *
- * The 2.8" is the binding panel: six rows clear the toast line by ten
- * pixels and seven do not, so with NeoPixel gone there is room for one
- * more. The 3.5" has room for about ten. The row after that needs paging or
- * scrolling, which is what this says when it fires -- and it does fire; a
- * seventh row was added to check that it does. Not a smaller ROW_H: these
- * rows are already a 32 px touch target. */
+ * The 2.8" is the binding panel: six rows clear the toast line by ten pixels
+ * and seven do not. The logging page is exactly at six, which is why SD
+ * logging is a page and not five more rows on the main one. The 3.5" has
+ * room for about ten. Both pages are checked, because a page that fits on
+ * the panel you are holding proves nothing about the other one, and it does
+ * fire -- a seventh row was added to confirm that. Not a smaller ROW_H:
+ * these rows are already a 32 px touch target. */
 static const int kFooterTop = PUEO_SCREEN_H - 24 - 8;   /* backRect() y */
 static const int kToastTop  = kFooterTop - 18;          /* footerToast() y */
-static_assert(TITLE_Y + TITLE_H + 6 + (N - 1) * (ROW_H + GAP_Y) + ROW_H <= kToastTop,
-              "settings rows run under the footer -- add paging, not another row");
+static constexpr int rowsFit(int n) {
+  return TITLE_Y + TITLE_H + 6 + (n - 1) * (ROW_H + GAP_Y) + ROW_H;
+}
+static_assert(rowsFit(kMainRows) <= kToastTop,
+              "Settings rows run under the footer -- add a page, not another row");
+static_assert(rowsFit(kLogRows) <= kToastTop,
+              "SD Logging rows run under the footer -- it is already a page");
 
 static uint8_t  last_brightness;
 static Theme    last_theme;
 static uint8_t  last_accent;
-static bool     last_switch[kSwitchCount];
+static bool     last_switch[kMaxRows];
+static char     last_link[16];
 static int      last_sel;
 
 static bool dragging = false;
@@ -1854,7 +1910,16 @@ static void drawTitle() {
   setTitleFont();
   tft.setTextColor(textStrong, UI.bg);
   tft.setCursor(PAD_X, TITLE_Y);
-  tft.print("Settings");
+  if (page == Page::Main) {
+    tft.print("Settings");
+  } else if (settings().logToSd) {
+    tft.print("SD Logging");
+  } else {
+    /* The per-app rows below keep showing their own stored values while the
+     * master is off, so that you can set them up before switching it on.
+     * Without this the page reads as five features that are logging. */
+    tft.print("SD Logging - master off");
+  }
 }
 
 static void drawCardStatic(int i, bool selected) {
@@ -2073,6 +2138,52 @@ static void drawSwitchRow(bool on, bool selected, int row) {
   drawSwitchWidgetRow(on, selected, row);
 }
 
+/* A row that opens a page instead of holding a value: the summary of what is
+ * behind it, and a chevron saying there is a behind it. */
+static void drawLinkWidget(int row) {
+  Rect r = rowRect(row);
+  tft.startWrite();
+  tft.fillRect(r.x + LABEL_W, r.y + 2, r.w - LABEL_W - 6, r.h - 4, UI_BG);
+
+  char sum[16];
+  loggingSummary(sum, sizeof(sum));
+
+  setLabelFont();
+  const int ty    = r.y + (r.h / 2 - 6);
+  const int right = r.x + r.w - 6;
+  const int wChev = (int)tft.textWidth(">");
+  const int wSum  = (int)tft.textWidth(sum);
+
+  tft.setTextColor(textStrong, UI_BG);
+  tft.setCursor(right - wChev, ty);
+  tft.print(">");
+  tft.setCursor(right - wChev - 8 - wSum, ty);
+  tft.print(sum);
+
+  tft.endWrite();
+  snprintf(last_link, sizeof(last_link), "%s", sum);
+}
+static void drawLinkRow(int row, bool selected) {
+  drawCardStatic(row, selected);
+  drawLinkWidget(row);
+}
+
+/* One row, whichever kind it is. The four enumerating sites call this rather
+ * than each deciding for themselves what row 3 is. */
+static void drawRow(int i, bool selected) {
+  const AppSettings& s = settings();
+  if (page == Page::Logging || rowIsSwitch(i)) {
+    drawSwitchRow(switchValue(s, i), selected, i);
+    return;
+  }
+  switch (i) {
+    case 0: drawBrightness(s.brightness, selected); break;
+    case 1: drawTheme(s.theme, selected); break;
+    case 2: drawAccent(s.accentColor, selected); break;
+    default: drawLinkRow(i, selected); break;
+  }
+}
+
 
 static Rect backRect(){
   int h = tft.height();
@@ -2127,12 +2238,7 @@ static void drawAll() {
   drawTitle();
 
   auto& s = settings();
-  drawBrightness(s.brightness, sel==0);
-  drawTheme(s.theme, sel==1);
-  drawAccent(s.accentColor, sel==2);
-  for (int k = 0; k < kSwitchCount; k++) {
-    drawSwitchRow(switchValue(s, k), sel == kFirstSwitch + k, kFirstSwitch + k);
-  }
+  for (int i = 0; i < rowCount(); i++) drawRow(i, sel == i);
 
   drawFooter(false, false);
 
@@ -2140,7 +2246,9 @@ static void drawAll() {
   last_brightness = s.brightness;
   last_theme      = s.theme;
   last_accent     = s.accentColor;
-  for (int k = 0; k < kSwitchCount; k++) last_switch[k] = switchValue(s, k);
+  for (int i = 0; i < rowCount(); i++) {
+    if (rowIsSwitch(i)) last_switch[i] = switchValue(s, i);
+  }
   uiDirty = false;
 }
 
@@ -2155,34 +2263,48 @@ static void redrawIfChanged() {
   }
 
   if (sel != last_sel) {
-    drawCardStatic(0, sel==0);  drawBrightnessWidget(s.brightness, sel==0);
-    drawCardStatic(1, sel==1);  drawThemeWidget(s.theme, sel==1);
-    drawCardStatic(2, sel==2);  drawAccentWidget(s.accentColor, sel==2);
-    for (int k = 0; k < kSwitchCount; k++) {
-      const int row = kFirstSwitch + k;
-      drawCardStatic(row, sel==row);
-      drawSwitchWidgetRow(switchValue(s, k), sel==row, row);
-    }
+    for (int i = 0; i < rowCount(); i++) drawRow(i, sel == i);
     last_sel = sel;
   } else {
-    if (s.brightness != last_brightness) {
+    if (page == Page::Main && s.brightness != last_brightness) {
       drawBrightnessWidget(s.brightness, sel==0);
       last_brightness = s.brightness;
     }
-    for (int k = 0; k < kSwitchCount; k++) {
-      const bool v = switchValue(s, k);
-      if (v != last_switch[k]) {
-        drawSwitchWidgetRow(v, sel == kFirstSwitch + k, kFirstSwitch + k);
-        last_switch[k] = v;
+    for (int i = 0; i < rowCount(); i++) {
+      if (!rowIsSwitch(i)) continue;
+      const bool v = switchValue(s, i);
+      if (v != last_switch[i]) {
+        drawSwitchWidgetRow(v, sel==i, i);
+        last_switch[i] = v;
       }
     }
-    if (s.theme != last_theme) {
-      drawThemeWidget(s.theme, sel==1);
-      last_theme = s.theme;
+    if (page == Page::Main) {
+      /* The link row summarises the other page, so it goes stale from
+       * changes made over there and has to be compared, not assumed. */
+      char sum[16];
+      loggingSummary(sum, sizeof(sum));
+      if (strncmp(sum, last_link, sizeof(last_link) - 1) != 0) {
+        drawLinkWidget(kLinkRow);
+      }
+      if (s.theme != last_theme) {
+        drawThemeWidget(s.theme, sel==1);
+        last_theme = s.theme;
+      }
     }
   }
 
   uiDirty = false;
+}
+
+/* Moving between pages is a full repaint and a reset of the row cursor.
+ * Nothing is saved or discarded on the way: Save is still Save, and the
+ * setting you changed on the other page is still dirty when you get back. */
+static void goToPage(Page to) {
+  if (page == to) return;
+  page = to;
+  sel = 0;
+  last_link[0] = '\0';
+  drawAll();
 }
 
 static bool applyBrightness(int v){
@@ -2227,10 +2349,10 @@ static bool applyAccent(uint8_t preset){
   lastChangeMs = millis();
   return true;
 }
-static bool applySwitch(int k, bool en){
+static bool applySwitch(int i, bool en){
   auto& s = settings();
-  if (switchSettled(s, k, en)) return false;
-  const SwitchRow& r = kSwitchRows[k];
+  if (switchSettled(s, i, en)) return false;
+  const SwitchRow r = rowSwitch(i);
   s.*(r.a) = en;
   if (r.b != nullptr) s.*(r.b) = en;
   dirtySettings = true;
@@ -2256,6 +2378,15 @@ static void handleTouch() {
     delay(25);
     drawFooter(false, false);
 
+    /* One step at a time. Back out of SD Logging lands on Settings, with
+     * the row you came in through still selected; Back from Settings leaves
+     * the feature, as it always has. */
+    if (page == Page::Logging) {
+      goToPage(Page::Main);
+      sel = kLinkRow;
+      drawAll();
+      return;
+    }
     feature_exit_requested = true;
     return;
   }
@@ -2281,14 +2412,34 @@ static void handleTouch() {
     return;
   }
 
-  for (int i=0;i<N;++i){
+  for (int i=0;i<rowCount();++i){
     Rect rr = rowRect(i);
     if (ty >= rr.y && ty <= rr.y+rr.h) { sel = i; break; }
   }
 
   auto& s = settings();
 
-  if (sel == 0) {
+  if (rowIsSwitch(sel)) {
+    Rect tr = rSwitchTrack(sel);
+    if (tx >= tr.x && tx <= tr.x+tr.w && ty >= tr.y-10 && ty <= tr.y+tr.h+10) {
+      uint32_t now = millis();
+      if (now - lastToggleMs > 120) {
+        applySwitch(sel, !switchValue(s, sel));
+        lastToggleMs = now;
+      }
+    }
+  } else if (sel == kLinkRow) {
+    /* The whole right-hand half opens it. A chevron is a small target and
+     * this row has nothing else on that side to hit by mistake. */
+    Rect rr = rowRect(sel);
+    if (tx >= rr.x + LABEL_W) {
+      uint32_t now = millis();
+      if (now - lastToggleMs > 250) {
+        lastToggleMs = now;
+        goToPage(Page::Logging);
+      }
+    }
+  } else if (sel == 0) {
     Rect tr = rBrightTrack();
     Rect kb = rBrightKnob(s.brightness);
 
@@ -2333,16 +2484,6 @@ static void handleTouch() {
     } else {
       accentArmed = true;
     }
-  } else if (sel >= kFirstSwitch) {
-    const int k = sel - kFirstSwitch;
-    Rect tr = rSwitchTrack(sel);
-    if (tx >= tr.x && tx <= tr.x+tr.w && ty >= tr.y-10 && ty <= tr.y+tr.h+10) {
-      uint32_t now = millis();
-      if (now - lastToggleMs > 120) {
-        applySwitch(k, !switchValue(s, k));
-        lastToggleMs = now;
-      }
-    }
   }
 }
 
@@ -2351,7 +2492,11 @@ void setup(){
   applyThemeToPalette(settings().theme);
   buildPalette();
   ::setBrightness(settings().brightness);
+  /* Entering Settings always lands on Settings. The page is a static and
+   * would otherwise remember where the last visit ended up. */
+  page = Page::Main;
   sel = 0; dirtySettings = false; uiDirty = false; dragging = false;
+  last_link[0] = '\0';
   drawAll();
 }
 
@@ -2377,35 +2522,44 @@ void loop(){
   bool selectNow = isButtonPressed(BTN_SELECT);
 
   if (selectNow && !selectWasDown && (now - lastActionMs > ACTION_DEBOUNCE_MS)) {
-    feature_exit_requested = true;
     lastActionMs = now;
+    /* Same one-step-at-a-time rule as the Back button, so the two agree. */
+    if (page == Page::Logging) {
+      goToPage(Page::Main);
+      sel = kLinkRow;
+      drawAll();
+      return;
+    }
+    feature_exit_requested = true;
     return;
   }
 
+  const int n = rowCount();
   if (upNow && !upWasDown && (now - lastNavMs > NAV_DEBOUNCE_MS)) {
-    sel=(sel+N-1)%N; changedByButtons=true;
+    sel=(sel+n-1)%n; changedByButtons=true;
     lastNavMs = now;
   }
   if (downNow && !downWasDown && (now - lastNavMs > NAV_DEBOUNCE_MS)) {
-    sel=(sel+1)%N;   changedByButtons=true;
+    sel=(sel+1)%n;   changedByButtons=true;
     lastNavMs = now;
   }
 
   if (leftNow && !leftWasDown && (now - lastActionMs > ACTION_DEBOUNCE_MS)){
     auto& s=settings();
-    if (sel==0 && s.brightness>0)      { applyBrightness(s.brightness>8? s.brightness-8:0); }
+    if (rowIsSwitch(sel))              { applySwitch(sel, false); }
+    else if (sel==0 && s.brightness>0) { applyBrightness(s.brightness>8? s.brightness-8:0); }
     else if (sel==1)                   { applyTheme(Theme::Dark); }
     else if (sel==2)                   { applyAccent((s.accentColor + ACCENT_PRESET_COUNT - 1) % ACCENT_PRESET_COUNT); }
-    else if (sel>=kFirstSwitch)        { applySwitch(sel-kFirstSwitch, false); }
     changedByButtons=true;
     lastActionMs = now;
   }
   if ((rightNow && !rightWasDown) && (now - lastActionMs > ACTION_DEBOUNCE_MS)){
     auto& s=settings();
-    if (sel==0 && s.brightness<255)    { applyBrightness(s.brightness+8); }
+    if (rowIsSwitch(sel))              { applySwitch(sel, true); }
+    else if (sel==0 && s.brightness<255) { applyBrightness(s.brightness+8); }
     else if (sel==1)                   { applyTheme(Theme::Light); }
     else if (sel==2)                   { applyAccent((s.accentColor + 1) % ACCENT_PRESET_COUNT); }
-    else if (sel>=kFirstSwitch)        { applySwitch(sel-kFirstSwitch, true); }
+    else if (sel==kLinkRow)            { lastActionMs = now; goToPage(Page::Logging); return; }
     changedByButtons=true;
     lastActionMs = now;
   }

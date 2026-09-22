@@ -275,7 +275,7 @@ static void pcapStart() {
 
   /* Leaves pcapPath empty, which is the same state as "no card" and is
    * already what the caller checks before it claims to be recording. */
-  if (!sdLoggingAllowed()) return;
+  if (!sdLoggingAllowed(LogApp::PacketMonitor)) return;
 
   if (!pcapEnsureDir(CAPTURE_DIR)) return;
   if (!pcapMakeNextPath(pcapPath)) return;

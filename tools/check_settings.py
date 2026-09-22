@@ -107,7 +107,7 @@ def main():
     ui = utils[utils.index("namespace AppSettingsUI {"):]
     ui = ui[:ui.index("\nnamespace SdFileManager")]
 
-    table = ui[ui.index("kSwitchRows[] = {"):]
+    table = ui[ui.index("kMainSwitches[] = {"):]
     table = table[:table.index("\n};")]
     rows = re.findall(r'\{"([^"]+)",\s*&AppSettings::(\w+)\s*,\s*'
                       r'(?:&AppSettings::(\w+)|nullptr)\s*\}', table)
@@ -141,22 +141,68 @@ def main():
     ok("no sel== arm names a switch row", not stray,
        "found sel==%s -- switch rows go through the table" % stray)
 
-    ok("the row list is bounded at compile time",
-       "static_assert" in ui and "kToastTop" in ui,
-       "nothing stops the next row drawing under the footer")
+    ok("both pages are bounded at compile time",
+       ui.count("static_assert") >= 2 and "rowsFit(kMainRows)" in ui
+       and "rowsFit(kLogRows)" in ui,
+       "a page that fits the panel you are holding proves nothing about the "
+       "other one")
+    ok("there is a row that opens the logging page",
+       "kLinkRow" in ui and "goToPage(Page::Logging)" in ui)
+    ok("leaving the logging page lands on Settings",
+       ui.count("goToPage(Page::Main)") >= 2,
+       "Back and Select should agree; one of them exits the feature instead")
+    ok("entering Settings always lands on Settings",
+       re.search(r"page\s*=\s*Page::Main;", ui[ui.index("void setup()"):])
+       is not None,
+       "the page is a static and would remember the last visit")
+
+    print("\nthe SD Logging page is generated from the LogApp table:")
+    # `Surveillance = 0,` has a space before the `=`, and a greedy \w+
+    # followed by a bare [,=] does not match it -- which silently drops the
+    # first enumerator and makes the count off by one. Allow the space.
+    # Bounded relative to the enum, not by the first "kCount" in the whole
+    # header: the comment above the enum mentions kCount, so an absolute
+    # index landed BEFORE the enum and sliced an empty string -- which read
+    # as "no enumerators" rather than as a broken check.
+    blk = store_h[store_h.index("enum class LogApp"):]
+    blk = blk[:blk.index("};")]
+    enums = [e for e in re.findall(r"^\s*(\w+)\s*[,=]", blk, re.M)
+             if e not in ("LogApp", "kCount")]
+    ok("found the LogApp list", len(enums) >= 5, str(enums))
+    entries = re.findall(r'\{"([^"]+)",\s*&AppSettings::(\w+)\}', store_c)
+    ok("kLogApps has an entry per LogApp", len(entries) == len(enums),
+       "%d entries for %d features: %s" % (len(entries), len(enums), entries))
+    for _label, fld in entries:
+        ok("  kLogApps -> AppSettings::%s" % fld, fld in field_names,
+           "no such field")
+    ok("the page sizes itself from the table",
+       "kLogRows = 1 + (int)LogApp::kCount" in ui,
+       "a hand-counted row list drops the feature you just added")
+    ok("and reads its rows from it",
+       "kLogApps[i - 1].label" in ui and "kLogApps[i - 1].field" in ui)
 
     print("\nevery log-open site asks before it writes:")
     sites = [
-        ("Spotter.cpp",   "bool captureStart()",      "Surveillance capture"),
-        ("subghz.cpp",    "static void logEvent(",    "Jamming Detector log"),
-        ("wifi.cpp",      "static void pcapStart()",  "Packet Monitor pcap"),
-        ("bluetooth.cpp", "static bool esbOpenLogFile()", "ESB Sniffer log"),
+        ("Spotter.cpp",   "bool captureStart()",      "Surveillance capture",
+         "Surveillance"),
+        ("subghz.cpp",    "static void logEvent(",    "Jamming Detector log",
+         "JamDetector"),
+        ("wifi.cpp",      "static void pcapStart()",  "Packet Monitor pcap",
+         "PacketMonitor"),
+        ("bluetooth.cpp", "static bool esbOpenLogFile()", "ESB Sniffer log",
+         "EsbSniffer"),
     ]
-    for fname, sig, what in sites:
+    for fname, sig, what, app in sites:
         body = func_body(read(fname), sig)
         ok("%s (%s)" % (what, fname), bool(body) and "sdLoggingAllowed" in body,
            "no body found for %r" % sig if not body
            else "opens a log without calling sdLoggingAllowed()")
+        # Naming the wrong feature is the quiet version of not asking at all:
+        # the site obeys a switch, just not its own, and the screen and the
+        # behaviour disagree in a way nothing else would show.
+        ok("  and names LogApp::%s" % app,
+           bool(body) and ("LogApp::%s" % app) in body,
+           "asks on behalf of some other feature")
 
     # Wardriving has two of them -- a background task and a foreground
     # session -- and they are not separable by function name, so they are
@@ -172,13 +218,18 @@ def main():
         end = gps.find("if (!logf)", at)
         ok("  wardrive site %d is bounded" % (i + 1), end > at)
         window = gps[at:end] if end > at else ""
-        ok("  wardrive site %d asks" % (i + 1), "sdLoggingAllowed" in window,
-           "opens /wd_*.csv without calling sdLoggingAllowed()")
+        ok("  wardrive site %d asks" % (i + 1),
+           "sdLoggingAllowed(LogApp::Wardriver)" in window,
+           "opens /wd_*.csv without asking on its own behalf")
 
-    ok("the accessor exists and reads the setting",
-       "bool sdLoggingAllowed()" in store_h
-       and re.search(r"bool sdLoggingAllowed\(\)\s*\{\s*return\s+\w+\.logToSd;",
-                     store_c) is not None)
+    ok("the accessor takes a feature", "bool sdLoggingAllowed(LogApp app)" in store_h)
+    acc = func_body(store_c, "bool sdLoggingAllowed(LogApp app)")
+    ok("  and requires the master switch", "logToSd" in acc,
+       "per-feature switches with no master is not what the screen says")
+    ok("  and the feature\'s own switch", "kLogApps[i].field" in acc)
+    ok("  and bounds the index", "LogApp::kCount" in acc and "i < 0" in acc,
+       "a bad index reads a bool out of some other setting and calls it "
+       "permission")
 
     print()
     if FAILED:

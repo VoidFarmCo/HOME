@@ -4,6 +4,7 @@
 #   tools/make_release.sh            -> dist/pueo-<version>-src.zip
 #   tools/make_release.sh --with-bin -> also dist/pueo-<version>-merged.bin
 #   tools/make_release.sh --force    -> re-cut a version already in dist/
+#   tools/make_release.sh --no-publish -> cut into dist/ and copy nowhere
 #
 # The repo tracks 9 MB, down from 254. What is left is the firmware, the
 # docs, the art, and the three files in Libraries/ that setup consumes.
@@ -39,10 +40,15 @@ cd "$REPO"
 
 WITH_BIN=0
 FORCE=0
+# Cutting and publishing are two acts. .publish.local exists so that
+# publishing does not need a path typed at it; this exists so that cutting
+# does not need the file moved out of the way.
+NO_PUBLISH=0
 for arg in "$@"; do
   case "$arg" in
     --with-bin) WITH_BIN=1 ;;
     --force)    FORCE=1 ;;
+    --no-publish) NO_PUBLISH=1 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
@@ -84,6 +90,10 @@ INCLUDE=(
   "tools/check_fastpair.py"
   "tools/check_fastpair_probe.py"
   "tools/check_ble_adv.py"
+  "tools/check_screen_dims.py"
+  "tools/check_menu_dispatch.py"
+  "tools/check_nav_labels.py"
+  "tools/check_settings.py"
   "tools/trace_logo.py"
   "tools/inline_logo.py"
   "tools/check_logo_scale.py"
@@ -130,6 +140,24 @@ if [ -f "$OUT/pueo-${VERSION}.sha256" ] && [ "$FORCE" != "1" ]; then
   echo "or pass --force if that release has not been published anywhere." >&2
   exit 1
 fi
+
+# The include list is the record of what belongs to this fork, which only
+# works while it is complete. It was not: check_screen_dims.py,
+# check_menu_dispatch.py and check_nav_labels.py were written, used, relied
+# on, and left out of every archive from 0.3.x to 0.4.2, so those releases
+# ship a tree that cannot run its own checks.
+#
+# An explicit list is still right -- "everything except" is how the .scad
+# files would have escaped -- but a list nobody diffs against reality is a
+# list that drifts. This diffs it.
+for f in tools/check_*.py; do
+  case " ${INCLUDE[*]} " in
+    *" $f "*) ;;
+    *) echo "refusing to cut: $f is not in the archive include list" >&2
+       MISSING_CHECKS=1 ;;
+  esac
+done
+[ -z "${MISSING_CHECKS:-}" ] || exit 1
 
 rm -rf "$STAGE"
 mkdir -p "$STAGE/tools/history"
@@ -263,7 +291,11 @@ cat "$OUT/pueo-${VERSION}.sha256"
 #   echo 'PUEO_PUBLISH_DIR=/path/to/site' > .publish.local
 #
 # An explicit PUEO_PUBLISH_DIR in the environment still wins.
-if [ -z "${PUEO_PUBLISH_DIR:-}" ] && [ -f "$REPO/.publish.local" ]; then
+if [ "$NO_PUBLISH" = "1" ]; then
+  PUEO_PUBLISH_DIR=""
+  echo
+  echo "cut only; nothing published (--no-publish)"
+elif [ -z "${PUEO_PUBLISH_DIR:-}" ] && [ -f "$REPO/.publish.local" ]; then
   # Only KEY=value lines, and only the one key. Sourcing a file to get a
   # string is how a stray command in it gets run.
   PUEO_PUBLISH_DIR=$(

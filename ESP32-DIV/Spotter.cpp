@@ -330,7 +330,7 @@ bool captureStart() {
   /* Asked before the card is even looked at, so pressing REC with logging
    * switched off says so rather than saying "no SD" at a card that is
    * sitting right there. */
-  if (!sdLoggingAllowed()) {
+  if (!sdLoggingAllowed(LogApp::Surveillance)) {
     s_logBlocked = true;
     return false;
   }

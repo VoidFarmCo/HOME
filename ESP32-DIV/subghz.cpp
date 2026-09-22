@@ -3888,7 +3888,7 @@ static void logEvent(uint32_t whenMs, uint32_t durMs, int peakDbm, int dutyPct) 
   /* Both, and not just the toggle. The toggle cannot be turned on while
    * Settings says no, so this is redundant -- and it is the line that
    * actually keeps the promise, so it is the line worth being sure of. */
-  if (!logEnabled || !sdLoggingAllowed()) return;
+  if (!logEnabled || !sdLoggingAllowed(LogApp::JamDetector)) return;
 
   restoreSdAfterSharedSpi();
   if (jdMountSD()) {
@@ -4003,7 +4003,7 @@ static void jdRunUI() {
           /* Settings holds the master switch; this one only chooses within
            * it. Pressing it while logging is off leaves the cell reading
            * "n/a", which is the answer to why nothing happened. */
-          if (sdLoggingAllowed()) {
+          if (sdLoggingAllowed(LogApp::JamDetector)) {
             logEnabled = !logEnabled;
             s_disp.logOn = !logEnabled;
           }
@@ -4177,7 +4177,7 @@ static void jdUpdateInfo(int rssiNow, int dutyPct) {
   }
 
   if (full || s_disp.logOn != logEnabled) {
-    const bool allowed = sdLoggingAllowed();
+    const bool allowed = sdLoggingAllowed(LogApp::JamDetector);
     jdDrawValueCell(kJdCol2ValueX, kJdInfoRow2Y, kJdCol2ValueW,
                     !allowed ? "n/a" : (logEnabled ? "on" : "off"),
                     (allowed && logEnabled) ? UI_OK : UI_DIM_TEXT);
@@ -4299,7 +4299,7 @@ static void handleInput() {
     jdResetStats();
   }
   if (edge(BTN_DOWN, prevDown) || navLog) {
-    if (sdLoggingAllowed()) {
+    if (sdLoggingAllowed(LogApp::JamDetector)) {
       logEnabled = !logEnabled;
       s_disp.logOn = !logEnabled;
     }
