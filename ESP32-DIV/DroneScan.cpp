@@ -445,6 +445,16 @@ void setup() {
   s_lastHop = millis();
   s_lastDraw = 0;
 
+  /* The wipe below clears the panel; this clears what the code believes is
+   * still on it. uiShowLine skips a line whose text it already drew, so
+   * without this, re-entering the screen leaves the list blank until each
+   * line happens to change -- an aircraft still being tracked, on a screen
+   * that shows nothing.
+   *
+   * forgetDrawn() was written for this and never called. -Wunused-function
+   * is what noticed. */
+  forgetDrawn();
+
   tft.fillScreen(TFT_BLACK);
   setStatusBarHeight(PUEO_STATUS_SHORT);
   drawStatusBar(readBatteryVoltage(), true);
