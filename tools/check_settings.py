@@ -103,6 +103,49 @@ def main():
     for name in [n for _t, n in fields if n.startswith("touch")]:
         ok("  %s is persisted" % name, name in load and name in save)
 
+    # And somebody has to call the loader.
+    #
+    # This is the rule the whole section was missing. Every field was checked
+    # into settingsLoad() and settingsLoad() was never reached on the board
+    # this firmware runs on: setup() had it inside `#if BOARD_HAS_ESP32S3`,
+    # the CYD takes the #else, and nothing else in the tree called it. Save
+    # wrote a perfectly good file that nothing ever read, on every boot since
+    # the fork, and every check above passed the whole time.
+    ino = (SKETCH / "ESP32-DIV.ino").read_text(encoding="utf-8", errors="replace")
+    calls, cyd_calls = 0, 0
+    # A line-by-line walk of the #if stack with BOARD_HAS_ESP32S3 = 0, which
+    # is what a CYD compiles as. Counting #ifs and subtracting, which is what
+    # this did first, gets the answer right for the file it was written
+    # against and wrong the moment a branch moves -- it passed a mutant that
+    # deleted the only call the CYD reaches.
+    stack = []          # True where this board takes the branch
+    for line in ino.splitlines():
+        t = line.strip()
+        if t.startswith("#if "):
+            cond = t[4:].strip()
+            if cond == "BOARD_HAS_ESP32S3":
+                stack.append(False)
+            elif cond == "!BOARD_HAS_ESP32S3":
+                stack.append(True)
+            else:
+                stack.append(True)          # unrelated condition, assume taken
+        elif t.startswith("#ifdef ") or t.startswith("#ifndef "):
+            stack.append(True)
+        elif t.startswith("#else"):
+            if stack:
+                stack[-1] = not stack[-1]
+        elif t.startswith("#endif"):
+            if stack:
+                stack.pop()
+        elif "settingsLoad()" in t and not t.startswith("*") and "//" not in t[:t.index("settingsLoad()")]:
+            calls += 1
+            if all(stack):
+                cyd_calls += 1
+    ok("something calls settingsLoad()", calls > 0)
+    ok("  and the CYD reaches one of them", cyd_calls > 0,
+       "settingsLoad() is only called under BOARD_HAS_ESP32S3 -- this board "
+       "boots on defaults every time, however well it saves them")
+
     print("\nthe settings screen declares its rows once:")
     ui = utils[utils.index("namespace AppSettingsUI {"):]
     ui = ui[:ui.index("\nnamespace SdFileManager")]

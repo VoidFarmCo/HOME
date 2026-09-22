@@ -4026,7 +4026,7 @@ void handleOtherSubmenuButtons() {
                 current_submenu_index = 0;
                 updateActiveSubmenu();
                 submenu_initialized = false;
-                displaySubmenu();
+                displaySubmenu();
             } else if (current_submenu_index == 2) {
                 feature_active = true;
                 feature_exit_requested = false;
@@ -4044,7 +4044,7 @@ void handleOtherSubmenuButtons() {
                 last_other_menu_index = -1;
                 submenu_initialized = false;
                 displaySubmenu();
-                delay(200);
+                delay(200);
             } else if (current_submenu_index == 3) {
                 feature_active = true;
                 feature_exit_requested = false;
@@ -4167,7 +4167,7 @@ void handleOtherSubmenuButtons() {
                 current_submenu_index = 0;
                 updateActiveSubmenu();
                 submenu_initialized = false;
-                displaySubmenu();
+                displaySubmenu();
             } else if (current_submenu_index == 2) {
                 feature_active = true;
                 feature_exit_requested = false;
@@ -4185,7 +4185,7 @@ void handleOtherSubmenuButtons() {
                 last_other_menu_index = -1;
                 submenu_initialized = false;
                 displaySubmenu();
-                delay(200);
+                delay(200);
             } else if (current_submenu_index == 3) {
                 feature_active = true;
                 feature_exit_requested = false;
@@ -4636,9 +4636,26 @@ void setup() {
 #if BOARD_HAS_ESP32S3
   settingsLoad();
 #else
-  // Avoid SD mount via settingsLoad on v1 (same crash as step 3).
+  /* Settings, at last.
+   *
+   * This branch applied board touch defaults, printed "settings defaults
+   * (v1, SD deferred)", and called nothing. Deferred turned out to mean
+   * never: nothing anywhere else called settingsLoad(), so every setting
+   * this firmware has offered was written to the card by Save and read back
+   * by no one, on every boot since the fork. Brightness, theme, accent, auto
+   * scan -- all of them reset, with a perfectly correct file sitting on the
+   * card.
+   *
+   * It was deferred for a real reason: a boot-time SD.begin() right after
+   * tft.init() was rebooting the device. The specific cause of that,
+   * gpio_reset_pin() on the shared SPI pins, is compiled out on this board
+   * now, and every SD feature since has mounted through this same path.
+   *
+   * The defaults are still applied first, so a card that will not mount --
+   * or is not there -- leaves the device exactly where it used to be. */
   settingsApplyBoardTouchDefaults();
-  Serial.println("[boot] settings defaults (v1, SD deferred)");
+  Serial.printf("[boot] settings %s\n",
+                settingsLoad() ? "loaded from SD" : "not loaded, using defaults");
 #endif
   applyThemeToPalette(settings().theme);
   setBrightness(settings().brightness);
@@ -4677,6 +4694,7 @@ void setup() {
    * screen is a keyboard and a keyboard you cannot touch is a device you
    * cannot get into. Nothing else here needed it early. */
   setupTouchscreen();
+
 
   /* Blocks until the password is right, and returns immediately when none
    * is set. Everything above this point has already run: this hides the

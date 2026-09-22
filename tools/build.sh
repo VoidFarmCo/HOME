@@ -342,6 +342,16 @@ upload() {
   # board, and nothing in the output said which of the two was being sent.
   # The upload succeeded and reported success, because it was a successful
   # upload of the wrong thing.
+  # Compile first, always.
+  #
+  # This uploaded whatever was last left in the build directory. Twice in one
+  # session that was a build from before the edit being tested: the flash
+  # reported four verified hashes, the board booted the old firmware, and the
+  # symptom was a change that "did not take" -- which sends you debugging the
+  # change rather than the flash. arduino-cli skips unchanged translation
+  # units, so this costs seconds when there is nothing to do.
+  compile
+
   echo "== uploading $PUEO_ROLE firmware, $PUEO_PANEL\" panel, to $port =="
   if [ "$PUEO_ROLE" = "beacon" ]; then
     echo "   (this is the bench TRANSMITTER, not Pueo)"
