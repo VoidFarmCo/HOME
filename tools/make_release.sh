@@ -261,6 +261,23 @@ if [ "$WITH_BIN" = "1" ]; then
     cp "$(PUEO_PANEL="$panel" bash tools/build.sh path)/pueo-merged.bin" "$out"
     echo "$out  ($(( $(du -b "$out" | cut -f1) / 1024 )) KB)  $label panel"
   done
+
+  # The bench beacon, 3.5" only.
+  #
+  # It is a transmitter, and everything else built here is a receiver, so it
+  # carries the role in its name rather than only a panel: "beacon" has to be
+  # in the filename of anything somebody might flash by reaching for the
+  # wrong line. The detector images keep the names they have had since 0.1.0.
+  #
+  # 3.5" only because that is the panel the second board is. A 2.8" beacon
+  # would compile and reproduce and nobody would have booted it, and an
+  # unbooted transmitter is a worse thing to publish than an unbooted
+  # receiver -- the receiver fails by finding nothing.
+  bout="$OUT/pueo-${VERSION}-beacon-35-merged.bin"
+  PUEO_ROLE=beacon PUEO_PANEL=35 bash tools/build.sh >/dev/null
+  PUEO_ROLE=beacon PUEO_PANEL=35 bash tools/build.sh merge >/dev/null
+  cp "$(PUEO_ROLE=beacon PUEO_PANEL=35 bash tools/build.sh path)/pueo-merged.bin" "$bout"
+  echo "$bout  ($(( $(du -b "$bout" | cut -f1) / 1024 )) KB)  bench TRANSMITTER, 3.5\" panel"
 fi
 
 ( cd "$OUT" && sha256sum pueo-${VERSION}-* > "pueo-${VERSION}.sha256" )
@@ -315,7 +332,8 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
   cp "$OUT/${NAME}.zip" "$DEST/"
   # Both panel images, each only if it was built -- a run without --with-bin
   # publishes the archive and the digests alone, as it always has.
-  for img in "pueo-${VERSION}-merged.bin" "pueo-${VERSION}-35-merged.bin"; do
+  for img in "pueo-${VERSION}-merged.bin" "pueo-${VERSION}-35-merged.bin" \
+             "pueo-${VERSION}-beacon-35-merged.bin"; do
     [ -f "$OUT/$img" ] && cp "$OUT/$img" "$DEST/"
   done
   cp "$OUT/pueo-${VERSION}.sha256" "$DEST/"

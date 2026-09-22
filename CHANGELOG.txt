@@ -11,6 +11,70 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.4 - 2026-09-21
+------------------
+
+The bench beacon is a download now, and one number on the enclosure stopped
+being a guess.
+
+  * pueo-0.4.4-beacon-35-merged.bin. Every release until this one built the
+    detector only, so the beacon shipped as source and building it meant the
+    1 GB toolchain -- which is the same reason the detector's merged image
+    is offered at all.
+
+    It carries the role in its name rather than only a panel, because it is
+    the one artefact here that transmits and "beacon" has to be in the
+    filename of anything somebody might flash by reaching for the wrong
+    line. 3.5" only: that is the panel the second board is, and an unbooted
+    transmitter is a worse thing to publish than an unbooted receiver, which
+    fails by finding nothing.
+
+    None of the restraint in it depends on reading anything first. Every
+    identifier says PUEO-TEST, every address carries DEAD in its device
+    half, transmit power sits at the floor, the splash counts down five
+    seconds under THIS BOARD TRANSMITS in red, and it stops itself after
+    fifteen minutes.
+
+    The deploy's prune learned the new filename in the same change. A
+    pattern it does not know is an artefact that accumulates on the server
+    forever, unlinked and still reachable by direct URL -- and of all the
+    files here, a stale transmitter is the wrong one to leave lying about.
+    Its check pins the pattern count on purpose, so adding one fails the
+    check and sends you to redo the arithmetic by hand; it did.
+
+  * The SD slot in the 3.5" lid is dimensioned rather than estimated.
+    0.4.3 placed it off a photograph. QDtech's own outline sheet dimensions
+    the back, in the chain style the rest of that file already trusts:
+
+        17.87 + 14.54 + 25.48 = 57.89   socket to the bottom edge of the PCB
+        101.50 - 57.89        = 43.61   from the top edge
+        101.50/2 - 43.61      =  7.14   above the board centre
+
+    against the 6.7 that came off the photo. Both land inside the opening,
+    which is what cutting it oversize buys, but one of them is sourced.
+
+    The side is the part that inverts, and worth stating for that reason:
+    the socket is on the right of a Back view, and a back view mirrors, so
+    it is the left edge looking at the screen. The I2C, SPI and SPEAKER
+    headers sit on the other side in both the drawing and a photograph,
+    which is the check that the two views agree about handedness rather
+    than one of them being flipped.
+
+    Verified in the STL rather than by eye: the opening lands 16 x 4 on the
+    -X wall, centred on the socket and on the PCB's back face. The
+    published lid is regenerated.
+
+  * The beacon's two screens are drawn by tools/render_screens.py, which
+    reads BeaconArt.h beside icon.h rather than carrying a copy of the mark
+    -- the rule Emit.cpp already follows for the signatures.
+
+  * tools/deploy-pueo.sh says when --prune suppressed the push. It always
+    has: pruning is never part of a push, so that a prune cannot ride along
+    with a routine deploy. But `--live --prune` then ends with "done" having
+    transferred nothing, and the digest verify passes, because it checks
+    files that are on the server and cannot see the ones that never left.
+
+
 0.4.3 - 2026-09-21
 ------------------
 
