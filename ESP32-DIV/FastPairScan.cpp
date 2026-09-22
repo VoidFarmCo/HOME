@@ -392,7 +392,7 @@ void drawResult() {
            s_target[3], s_target[4], s_target[5]);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.drawString(line, 8, y);
-  y += 16;
+  y += PUEO_BODY_GAP;
 
   uint16_t c = TFT_LIGHTGREY;
   if (s_report.outcome == FastPairProbe::Outcome::Responded) {
@@ -402,10 +402,10 @@ void drawResult() {
   }
   tft.setTextColor(c, TFT_BLACK);
   tft.drawString(FastPairProbe::outcomeText(s_report.outcome), 8, y);
-  y += 12;
+  y += PUEO_BODY_LINE;
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   tft.drawString(s_report.detail, 8, y);
-  y += 16;
+  y += PUEO_BODY_GAP;
 
   /* What the result does and does not establish. On screen rather than
    * only in a doc, because this is where somebody decides what to believe. */
@@ -421,7 +421,7 @@ void drawResult() {
     };
     for (size_t i = 0; i < sizeof(txt) / sizeof(txt[0]); i++) {
       tft.drawString(txt[i], 8, y);
-      y += 11;
+      y += PUEO_BODY_LINE;
     }
   } else if (s_report.outcome == FastPairProbe::Outcome::NoResponse) {
     const char* txt[] = {
@@ -434,7 +434,7 @@ void drawResult() {
     };
     for (size_t i = 0; i < sizeof(txt) / sizeof(txt[0]); i++) {
       tft.drawString(txt[i], 8, y);
-      y += 11;
+      y += PUEO_BODY_LINE;
     }
   }
   y += 6;
@@ -442,13 +442,13 @@ void drawResult() {
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   snprintf(line, sizeof(line), "%u ms", (unsigned)s_report.elapsedMs);
   tft.drawString(line, 8, y);
-  y += 12;
+  y += PUEO_BODY_LINE;
 
   /* The bytes, so the screen is not the only record of what happened. */
   if (s_report.notifiedLen > 0) {
     tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
     tft.drawString("notified:", 8, y);
-    y += 11;
+    y += PUEO_BODY_LINE;
     char hex[40];
     int n = 0;
     /* 11 bytes at 3 chars each is 33, which fits the 38 a row holds from
@@ -457,7 +457,7 @@ void drawResult() {
       n += snprintf(hex + n, sizeof(hex) - n, "%02X ", s_report.notified[i]);
       if ((i % 11) == 10 || i == s_report.notifiedLen - 1 || i == 15) {
         tft.drawString(hex, 8, y);
-        y += 11;
+        y += PUEO_BODY_LINE;
         n = 0;
         hex[0] = '\0';
       }
