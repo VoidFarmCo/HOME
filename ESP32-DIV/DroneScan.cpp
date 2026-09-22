@@ -76,6 +76,111 @@ void forgetDrawn() {
   memset(s_shownHdr, 0, sizeof(s_shownHdr));
 }
 
+/* ── the detection alert ──────────────────────────────────────────────────
+ *
+ * The same shape as Surveillance's dwell alert, deliberately: full-screen
+ * mark, two rising notes, then a fade rather than a cut. drawBitmap paints
+ * only the set bits, so redrawing the same mark in a colour blended toward
+ * the background walks it out without touching anything else.
+ *
+ * Shown once and gone. This is a monitoring screen and a banner that stayed
+ * would be covering the list it is announcing.
+ *
+ * Edge-triggered on the table going from empty to occupied, and re-armed
+ * when it empties again. Not once per aircraft: a busy sky would otherwise
+ * strobe, and the thing worth interrupting you for is that there is
+ * something up there at all. */
+constexpr uint32_t kAlertHoldMs = 2200;
+constexpr uint16_t kBeepMs      = 140;
+constexpr uint16_t kBeepGapMs   = 70;
+constexpr int      kAlertSteps  = 6;
+constexpr uint32_t kAlertStepMs = 90;
+
+bool s_alerted = false;
+
+/* RGB565 blend, t = 0 keeps `a`, t = 255 reaches `b`. */
+uint16_t blend565(uint16_t a, uint16_t b, uint8_t t) {
+  const int ar = (a >> 11) & 0x1F, ag = (a >> 5) & 0x3F, ab = a & 0x1F;
+  const int br = (b >> 11) & 0x1F, bg = (b >> 5) & 0x3F, bb = b & 0x1F;
+  const int r = ar + ((br - ar) * t) / 255;
+  const int g = ag + ((bg - ag) * t) / 255;
+  const int bl = ab + ((bb - ab) * t) / 255;
+  return (uint16_t)((r << 11) | (g << 5) | bl);
+}
+
+void droneAlert(const Craft& c) {
+  const int mw = 200, mh = 200;
+  const int x = (PUEO_SCREEN_W - mw) / 2;
+  const int y = (PUEO_SCREEN_H - mh) / 2 - 30;
+  const int cx = PUEO_SCREEN_W / 2;
+
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextFont(2);
+  tft.setTextDatum(TC_DATUM);
+
+  /* The ID, or the fact that there is not one yet. A Basic ID message may
+   * not have arrived: the aircraft is there either way and saying "unknown"
+   * is more use than leaving the line blank. */
+  char who[40];
+  if (c.rep.uasId[0] != '\0') {
+    snprintf(who, sizeof(who), "%s", c.rep.uasId);
+  } else {
+    snprintf(who, sizeof(who), "ID not broadcast yet");
+  }
+
+  /* Height and speed if a Location message has been decoded. Neither is a
+   * distance from here -- Remote ID says where the aircraft is, not how far
+   * away it is, and this device has no position of its own to subtract. */
+  char where[48];
+  if (c.rep.haveLocation) {
+    snprintf(where, sizeof(where), "%d m up  %d m/s",
+             (int)c.rep.height, (int)c.rep.speedHorizontal);
+  } else {
+    snprintf(where, sizeof(where), "position not decoded yet");
+  }
+
+  /* The line worth gating. Remote ID's System message carries the operator's
+   * own position, which is the part that makes this different from watching
+   * an aircraft -- so it is said when it has actually been received and
+   * withheld when it has not, rather than implying the broadcast said
+   * something it did not. */
+  const bool haveOp = c.rep.haveOperator;
+  const char* hint = haveOp ? "operator location broadcast"
+                            : "no operator location yet";
+
+  for (int step = 0; step <= kAlertSteps; step++) {
+    const uint8_t t = (uint8_t)((255 * step) / kAlertSteps);
+    const uint16_t markC = blend565(UI_WARN, TFT_BLACK, t);
+    const uint16_t textC = blend565(TFT_WHITE, TFT_BLACK, t);
+    const uint16_t dimC  = blend565(UI_DIM_TEXT, TFT_BLACK, t);
+
+    tft.drawBitmap(x, y, bitmap_pueo_drone, mw, mh, markC);
+    tft.setTextColor(markC, TFT_BLACK);
+    tft.drawString(c.viaBle ? "DRONE  BLE" : "DRONE  WiFi", cx, y + mh + 6);
+    tft.setTextColor(textC, TFT_BLACK);
+    tft.drawString(who, cx, y + mh + 26);
+    tft.setTextColor(dimC, TFT_BLACK);
+    tft.drawString(where, cx, y + mh + 46);
+    tft.setTextColor(haveOp ? markC : dimC, TFT_BLACK);
+    tft.drawString(hint, cx, y + mh + 64);
+
+    if (step == 0) {
+      /* Inside the hold rather than added to it, so the alert lasts the same
+       * time whether or not the board can make a sound. */
+      uiBeep(1800, kBeepMs);
+      delay(kBeepGapMs);
+      uiBeep(2600, kBeepMs);
+      const uint32_t spent = 2u * kBeepMs + kBeepGapMs;
+      if (kAlertHoldMs > spent) delay(kAlertHoldMs - spent);
+    } else {
+      delay(kAlertStepMs);
+    }
+  }
+
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(1);
+}
+
 int contentBottom() {
   return featureHasTouchNavBar() ? (int)touchNavContentBottomY() : PUEO_SCREEN_H;
 }
@@ -390,10 +495,11 @@ void drawList() {
 }  // namespace
 
 void setup() {
-  showFeatureMark(bitmap_pueo_hunt, "Drone Detector");
+  showFeatureMark(bitmap_pueo_drone, "Drone Detector");
 
   memset(s_craft, 0, sizeof(s_craft));
   s_craftCount = 0;
+  s_alerted = false;
   s_chan = kChanFirst;
   s_frames = 0;
   s_qHead = s_qTail = 0;
@@ -481,6 +587,26 @@ void loop() {
     Slot& s = s_queue[s_qTail];
     ingest(s.bytes, s.len, s.mac, s.rssi, false);
     s_qTail = (uint8_t)((s_qTail + 1) % kQueueSlots);
+  }
+
+  /* Announce the first aircraft, once, and re-arm when the sky is empty
+   * again. After the drain rather than inside ingest(), so the report has
+   * whatever this pass could give it -- a pack often carries Basic ID and
+   * Location together, and alerting mid-drain would show "ID not broadcast
+   * yet" for something that was in the very next message. */
+  if (s_craftCount > 0 && !s_alerted) {
+    s_alerted = true;
+    droneAlert(s_craft[0]);
+    forgetDrawn();            // the alert painted over the list
+    tft.fillScreen(TFT_BLACK);
+    drawStatusBar(readBatteryVoltage(), true);
+    drawHeader();
+    drawList();
+    redrawTouchButtonBar();
+    s_lastDraw = millis();
+    s_dirty = false;
+  } else if (s_craftCount == 0) {
+    s_alerted = false;
   }
 
   if (s_dirty && (uint32_t)(now - s_lastDraw) >= kRedrawMs) {

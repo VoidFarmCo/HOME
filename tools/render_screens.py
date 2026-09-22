@@ -522,6 +522,40 @@ BEACON_SIGNALS = [
 ]
 
 
+def render_drone_alert(t, have_operator):
+    """droneAlert() in DroneScan.cpp, at step 0 -- before the fade.
+
+    Same machinery as the dwell alert: the mark is redrawn in a colour
+    blended toward the background, so every later frame is this one dimmer.
+
+    `have_operator` is the gate on the last line. Remote ID's System message
+    carries the operator's own position, which is the part that makes this
+    different from watching an aircraft, so it is claimed only when it has
+    actually been received."""
+    mw = mh = 200
+    x = (W - mw) // 2
+    y = (H - mh) // 2 - 30
+    cx = W // 2
+
+    t.fill_screen(BLACK)
+    t.draw_bitmap(x, y, "bitmap_pueo_drone", mw, mh, UI_WARN)
+
+    def centred(text, yy, colour):
+        t.print_f2(cx - t.text_width(text) // 2, yy, text, colour, BLACK)
+
+    if have_operator:
+        who, where = "1596F3F2A1B4C5D6E7F8", "94 m up  12 m/s"
+        hint, hint_colour = "operator location broadcast", UI_WARN
+    else:
+        who, where = "ID not broadcast yet", "position not decoded yet"
+        hint, hint_colour = "no operator location yet", UI_DIM_TEXT
+
+    centred("DRONE  BLE" if have_operator else "DRONE  WiFi", y + mh + 6, UI_WARN)
+    centred(who, y + mh + 26, WHITE)
+    centred(where, y + mh + 46, UI_DIM_TEXT)
+    centred(hint, y + mh + 64, hint_colour)
+
+
 def render_beacon_splash(t, brand):
     """drawSplash() in PueoBeacon.ino, at the last second of the countdown.
 
@@ -1005,7 +1039,13 @@ def main():
                      ("beacon-splash",
                       lambda t: render_beacon_splash(t, brand)),
                      ("beacon-running",
-                      lambda t: render_beacon_running(t, brand))):
+                      lambda t: render_beacon_running(t, brand)),
+                     ("drone-alert", lambda t: render_drone_alert(t, True)),
+                     ("drone-alert-partial",
+                      lambda t: render_drone_alert(t, False)),
+                     ("drone-mark",
+                      lambda t: render_mark(t, "bitmap_pueo_drone",
+                                            "Drone Detector"))):
         t = Tft(glcd, fw, fg, bitmaps)
         fn(t)
         p1 = os.path.join(args.out, "pueo-screen-%s.png" % name)
