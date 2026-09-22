@@ -421,9 +421,17 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
     if printf '%s\n' $keep | grep -qx -- "$v"; then
       continue
     fi
+    # The beacon image belongs on this list too. It was added to the
+    # deploy's prune patterns and not to this one, so the server dropped
+    # 0.4.4 and 0.4.5's transmitters while the local tree kept them -- and
+    # the next deploy offered to upload them straight back. A prune that the
+    # other half of the pipeline undoes is not a prune, and nothing said so:
+    # both halves reported success. Found by a dry run reporting two "new
+    # local files" that were four releases old.
     rm -f "$DEST/pueo-$v-src.zip" \
           "$DEST/pueo-$v-merged.bin" \
           "$DEST/pueo-$v-35-merged.bin" \
+          "$DEST/pueo-$v-beacon-35-merged.bin" \
           "$DEST/pueo-$v.sha256"
     echo "pruned $v"
     pruned=$((pruned + 1))
