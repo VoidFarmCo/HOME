@@ -49,7 +49,17 @@ constexpr uint32_t kTrendWindowMs = 1200;
 constexpr float kTrendDeadband = 2.0f;
 
 constexpr uint32_t kRedrawMs = 60;
+/* Two lines to a picker row. The 2.8" numbers are the originals and are
+ * kept exactly; that panel has never been booted. */
+#if PUEO_PANEL_35
+constexpr int      kRowH     = 40;
+constexpr int      kRowLine2 = 20;
+constexpr int      kRowRight = 6;
+#else
 constexpr int      kRowH     = 22;
+constexpr int      kRowLine2 = 12;
+constexpr int      kRowRight = 6;
+#endif
 
 /* ── State ───────────────────────────────────────────────────────────────── */
 
@@ -277,7 +287,7 @@ void drawPicker() {
   const int rows   = (bottom - top - 18) / kRowH;
 
   tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -315,13 +325,13 @@ void drawPicker() {
     snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
              t.mac[0], t.mac[1], t.mac[2], t.mac[3], t.mac[4], t.mac[5]);
     tft.setTextColor(sel ? ORANGE : TFT_DARKGREY, sel ? 0x2124 : TFT_BLACK);
-    tft.drawString(mac, 8, y + 12);
+    tft.drawString(mac, 8, y + kRowLine2);
 
     char right[24];
     snprintf(right, sizeof(right), "%4d dBm  %2lus",
              (int)t.rssi, (unsigned long)((now - t.lastSeen) / 1000));
     tft.setTextColor(sel ? ORANGE : TFT_WHITE, sel ? 0x2124 : TFT_BLACK);
-    tft.drawString(right, PUEO_SCREEN_W - 96, y + 6);
+    tft.drawString(right, PUEO_SCREEN_W - 96, y + kRowRight);
 
     y += kRowH;
   }

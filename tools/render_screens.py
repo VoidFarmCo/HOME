@@ -55,6 +55,7 @@ def set_panel(panel):
     global PANEL, W, H
     global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
     global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL, TILE_ICON
+    global BODY_FONT, BODY_LINE, BODY_ROW
     PANEL = panel
     W, H = (320, 480) if panel == 35 else (240, 320)
     if panel == 35:
@@ -73,6 +74,15 @@ def set_panel(panel):
     # PUEO_STATUS_TALL in shared.h: the menu grids get a taller bar on the
     # 3.5", whose Y_START is 44. The 2.8"'s is 30 and has no room.
     STATUS_TALL = 34 if panel == 35 else 20
+    # PUEO_BODY_FONT / PUEO_BODY_H in shared.h. The 3.5" is the denser
+    # panel, so identical pixels are smaller text on it; the list screens
+    # use font 2 there. The drone detector deliberately does not.
+    BODY_FONT = 2 if panel == 35 else 1
+    BODY_LINE = 18 if panel == 35 else 11
+    BODY_ROW = 54 if panel == 35 else 30
+    global HUNT_ROW_H, HUNT_ROW_LINE2
+    HUNT_ROW_H = 40 if panel == 35 else 22
+    HUNT_ROW_LINE2 = 20 if panel == 35 else 12
     # PUEO_TILE_ICON in shared.h. The 2.8" tile is 100x60 and has no room.
     TILE_ICON = 32 if panel == 35 else 16
 
@@ -625,6 +635,14 @@ def render_beacon_running(t, brand):
     t.print_f1(8, H - 14, "all payloads say PUEO-TEST", BCN_DIM, BCN_BG)
 
 
+def body(t, x, y, text, colour, bg):
+    """Draw a line in whichever font this panel uses for list bodies."""
+    if BODY_FONT == 2:
+        t.print_f2(x, y, text, colour, bg)
+    else:
+        t.print_f1(x, y, text, colour, bg)
+
+
 MENU = [
     ("WiFi", "bitmap_icon_wifi"), ("2.4GHz", "bitmap_icon_jammer"),
     ("More", "bitmap_icon_dots"), ("Settings", "bitmap_icon_setting"),
@@ -755,22 +773,25 @@ def render_spotter(t):
 
     # drawHeader()
     t.fill_rect(0, 20, W, 18, BLACK)
-    t.print_f1(8, 24, "ch  6  frames 18244  hits %d" % len(SPOTTER_HITS),
-               WHITE, BLACK)
-    t.print_f1(180, 24, "REC 41", RED, BLACK)        # s_logging, rows written
+    body(t, 8, 24, "ch  6  frames 18244  hits %d" % len(SPOTTER_HITS),
+         WHITE, BLACK)
+    # right-aligned, as drawHeader() does it
+    tag = "REC 41"
+    tw = t.text_width(tag) if BODY_FONT == 2 else 6 * len(tag)
+    body(t, W - 4 - tw, 24, tag, RED, BLACK)         # s_logging, rows written
 
     # drawList()
-    top, row_h = 42, 30
+    top, row_h = 42, BODY_ROW
     t.fill_rect(0, top, W, H - top, BLACK)
     for i, h in enumerate(SPOTTER_HITS):
         y = top + i * row_h
 
-        t.print_f1(8, y, "%-9s %s" % (h["kind"], h["label"]),
-                   CONF_COLOUR[h["conf"]], BLACK)
+        body(t, 8, y, "%-9s %s" % (h["kind"], h["label"]),
+             CONF_COLOUR[h["conf"]], BLACK)
 
-        t.print_f1(8, y + 11, "%s %s %ddBm x%u"
-                   % (h["mac"], h["via"], h["rssi"], h["hits"]),
-                   LIGHTGREY, BLACK)
+        body(t, 8, y + BODY_LINE, "%s %s %ddBm x%u"
+             % (h["mac"], h["via"], h["rssi"], h["hits"]),
+             LIGHTGREY, BLACK)
 
         third = ""
         if h["fp"]:
@@ -780,10 +801,10 @@ def render_spotter(t):
         if h["rot"]:
             third += "+%d " % h["rot"]
         third += h["age"]
-        t.print_f1(8, y + 21, third, DARKGREY, BLACK)
+        body(t, 8, y + 2 * BODY_LINE, third, DARKGREY, BLACK)
 
         if h["corrob"]:
-            t.print_f1(224, y, "**", RED, BLACK)
+            body(t, W - 32, y, "**", RED, BLACK)
 
 
 # ── Hunt ───────────────────────────────────────────────────────────────────
@@ -806,7 +827,7 @@ HUNT_TARGETS = [
      "rssi": -89, "age": 14},
 ]
 
-HUNT_ROW_H = 22
+HUNT_ROW_H = 22   # set_panel() overrides for the 3.5"
 HUNT_SEL_BG = rgb(0x2124)
 
 
@@ -821,7 +842,7 @@ def render_hunt_pick(t):
     sel_index = 0
 
     t.fill_rect(0, top, W, bottom - top, BLACK)
-    t.print_f1(8, top + 2, "trackers in range: %d" % len(HUNT_TARGETS),
+    body(t, 8, top + 2, "trackers in range: %d" % len(HUNT_TARGETS),
                WHITE, BLACK)
 
     y = top + 18
@@ -830,9 +851,9 @@ def render_hunt_pick(t):
         bg = HUNT_SEL_BG if sel else BLACK
         if sel:
             t.fill_rect(0, y, W, HUNT_ROW_H, HUNT_SEL_BG)
-        t.print_f1(8, y + 2, d["label"], UI_ICON if sel else WHITE, bg)
-        t.print_f1(8, y + 12, d["mac"], UI_ICON if sel else DARKGREY, bg)
-        t.print_f1(W - 96, y + 6, "%4d dBm  %2ds" % (d["rssi"], d["age"]),
+        body(t, 8, y + 2, d["label"], UI_ICON if sel else WHITE, bg)
+        body(t, 8, y + HUNT_ROW_LINE2, d["mac"], UI_ICON if sel else DARKGREY, bg)
+        body(t, W - 96, y + 6, "%4d dBm  %2ds" % (d["rssi"], d["age"]),
                    UI_ICON if sel else WHITE, bg)
         y += HUNT_ROW_H
 
@@ -979,10 +1000,10 @@ def render_fastpair(t):
     status_bar(t)
 
     t.fill_rect(0, 20, W, 18, BLACK)
-    t.print_f1(8, 24, "devices %d   adverts 1962" % len(FASTPAIR_DEVS),
+    body(t, 8, 24, "devices %d   adverts 1962" % len(FASTPAIR_DEVS),
                WHITE, BLACK)
 
-    top, row_h = 42, 30
+    top, row_h = 42, BODY_ROW
     rows = (H - top) // row_h
     t.fill_rect(0, top, W, H - top, BLACK)
 
@@ -991,10 +1012,10 @@ def render_fastpair(t):
         bg = FASTPAIR_SEL_BG if d["sel"] else BLACK
         if d["sel"]:
             t.fill_rect(0, y - 2, W, row_h - 2, FASTPAIR_SEL_BG)
-        t.print_f1(8, y, d["line1"], d["col"], bg)
-        t.print_f1(8, y + 11, "%s %s %ddBm"
+        body(t, 8, y, d["line1"], d["col"], bg)
+        body(t, 8, y + BODY_LINE, "%s %s %ddBm"
                    % (d["mac"], d["addr"], d["rssi"]), LIGHTGREY, bg)
-        t.print_f1(8, y + 21, d["line3"], DARKGREY, bg)
+        body(t, 8, y + 2 * BODY_LINE, d["line3"], DARKGREY, bg)
 
 
 def main():

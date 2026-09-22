@@ -750,6 +750,34 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  * 32 fills it. The 2.8" tile is 100x60 and a 32 px icon plus a 16 px label
  * leaves four pixels of tile, so that panel keeps 16 and its grid does not
  * move. The icons are 16x16 bitmaps either way; 32 is the 16 doubled. */
+/* Body text on the list screens.
+ *
+ * The 3.5" panel is the denser of the two, not the looser: 577 px across a
+ * 3.5 inch diagonal is 165 ppi against the 2.8"'s 143. So the same glyph in
+ * the same number of pixels comes out 13% SMALLER on the bigger screen --
+ * font 1 at size 1 is a 1.23 mm cap height there, about three and a half
+ * point.
+ *
+ * What the extra pixels bought instead was rows. Surveillance showed
+ * thirteen of them on the 3.5" against eight on the 2.8", all of it text you
+ * cannot read at arm's length. Eight rows you can read is the better trade,
+ * and eight is what the other panel shows anyway.
+ *
+ * Font 2 rather than font 1 at size 2: it is proportional, so it fits about
+ * 40% more characters on a line, and these screens are mostly MAC addresses
+ * and vendor names.
+ *
+ * The drone detector deliberately does NOT use this. Four lines per aircraft
+ * at this size takes it from ten rows to five against a six-aircraft table,
+ * and there the count is the information. */
+#if PUEO_PANEL_35
+#define PUEO_BODY_FONT 2
+#define PUEO_BODY_H    16
+#else
+#define PUEO_BODY_FONT 1
+#define PUEO_BODY_H    10
+#endif
+
 #if PUEO_PANEL_35
 #define PUEO_TILE_ICON 32
 #else

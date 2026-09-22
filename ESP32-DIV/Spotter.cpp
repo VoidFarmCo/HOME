@@ -21,7 +21,18 @@ constexpr uint8_t  kChanFirst    = 1;
 constexpr uint8_t  kChanLast     = 13;
 constexpr uint32_t kBleWindowMs  = 4000;  // BLE scan slice between WiFi hops
 constexpr uint32_t kRedrawMs     = 400;
+/* Three lines to a row. The 2.8" numbers are the originals, kept exactly:
+ * that panel has never been booted and this is not the change to start
+ * moving it with. */
+#if PUEO_PANEL_35
+constexpr int      kRowH         = 54;
+constexpr int      kLine2        = 18;   /* second line, from the row top */
+constexpr int      kLine3        = 36;
+#else
 constexpr int      kRowH         = 30;
+constexpr int      kLine2        = 11;
+constexpr int      kLine3        = 21;
+#endif
 
 /* ── dwell ────────────────────────────────────────────────────────────────
  *
@@ -856,7 +867,7 @@ void dwellAlert(const Hit& h) {
 }
 
 void drawHeader() {
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
   /* 42 was enough for the old line and one short of the dwell one --
@@ -875,26 +886,41 @@ void drawHeader() {
    * the recording tag, which is why the tag is repainted unconditionally
    * whenever the line above it changed. */
   const bool hdrChanged = strncmp(s_shownHdr, buf, sizeof(s_shownHdr) - 1) != 0;
-  uiShowLine(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18, TFT_WHITE, TFT_BLACK);
+  /* 18 on both panels: it is the band that gets cleared, and font 2 is
+   * 16 tall, so the one number covers the taller glyph without shrinking
+   * the strip the 2.8" has always wiped. */
+  uiShowLine(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18,
+             TFT_WHITE, TFT_BLACK);
 
   char tag[16] = "";
   uint16_t tagColour = TFT_RED;
-  int tagX = 180;
   if (s_logging) {
     snprintf(tag, sizeof(tag), "REC %lu", (unsigned long)s_logRows);
   } else if (s_logBlocked) {
     snprintf(tag, sizeof(tag), "log off");
     tagColour = ORANGE;
-    tagX = 180;
   } else if (s_logFailed) {
     snprintf(tag, sizeof(tag), "no SD");
     tagColour = ORANGE;
-    tagX = 196;
   }
   if (hdrChanged || strncmp(s_shownTag, tag, sizeof(s_shownTag) - 1) != 0) {
     if (tag[0] != '\0') {
+      /* Right-aligned rather than at a column chosen per tag.
+       *
+       * The three tags were at 180, 180 and 196, picked so each cleared the
+       * header in font 1. Font 2 is wider: the header runs to x = 244 at its
+       * longest, and "REC 41" at 180 was printed straight through the hit
+       * count. Numbers that were right for one font and three strings are
+       * three chances to be wrong for the next one.
+       *
+       * Right-aligning is not a complete fix and should not be read as one.
+       * A long header and a long tag can still meet in the middle -- on the
+       * 2.8" they already could, before any of this. It removes the
+       * per-tag guesswork and buys the widest gap the panel has. */
+      tft.setTextDatum(TR_DATUM);
       tft.setTextColor(tagColour, TFT_BLACK);
-      tft.drawString(tag, tagX, 24);
+      tft.drawString(tag, PUEO_SCREEN_W - 4, 24);
+      tft.setTextDatum(TL_DATUM);
     }
     snprintf(s_shownTag, sizeof(s_shownTag), "%s", tag);
   }
@@ -905,14 +931,14 @@ void drawList() {
   const int bottom = contentBottom();
   const int rows = (bottom - top) / kRowH;
 
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
   if (s_hitCount == 0) {
     uiShowLine(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
-           8, top + 6, 10, TFT_DARKGREY, TFT_BLACK);
+           8, top + 6, PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
     uiShowLine(s_shownRow[0][1], sizeof(s_shownRow[0][1]), "nothing matched yet",
-           8, top + 20, 10, TFT_DARKGREY, TFT_BLACK);
+           8, top + 6 + kLine2, PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
     return;
   }
 
@@ -940,13 +966,13 @@ void drawList() {
     char line[48];
     snprintf(line, sizeof(line), "%-9s %s", kindText(h.kind), h.label);
     uiShowLine(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line,
-               8, y, 10, confColour(h.conf), TFT_BLACK);
+               8, y, PUEO_BODY_H, confColour(h.conf), TFT_BLACK);
 
     snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X %s %ddBm x%u",
              h.mac[0], h.mac[1], h.mac[2], h.mac[3], h.mac[4], h.mac[5],
              h.viaBle ? "BLE" : "WiFi", (int)h.rssiBest, (unsigned)h.hits);
     uiShowLine(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line,
-           8, y + 11, 10, TFT_LIGHTGREY, TFT_BLACK);
+           8, y + kLine2, PUEO_BODY_H, TFT_LIGHTGREY, TFT_BLACK);
 
     /* Third line: what is true of the device rather than of its address.
      *
@@ -991,7 +1017,8 @@ void drawList() {
                (!h.viaBle && (h.mac[0] & 0x02)) ? "rnd " : "", rot,
                dwell ? "DWELL " : "", age);
       uiShowLine(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line,
-                 8, y + 21, 10, dwell ? UI_WARN : TFT_DARKGREY, TFT_BLACK);
+                 8, y + kLine3, PUEO_BODY_H,
+                 dwell ? UI_WARN : TFT_DARKGREY, TFT_BLACK);
     }
 
     /* Drawn after the first line, which clears the band it sits in. */

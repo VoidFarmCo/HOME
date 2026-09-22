@@ -14,7 +14,13 @@ namespace FastPairScan {
 namespace {
 
 constexpr int      kMaxDevices = 24;
+/* Three lines to a row, same shape as Surveillance. The 2.8" numbers are
+ * the originals and are kept exactly. */
+#if PUEO_PANEL_35
+constexpr int      kRowH       = 54;
+#else
 constexpr int      kRowH       = 30;
+#endif
 constexpr uint32_t kRedrawMs   = 400;
 constexpr uint16_t kProbeMs    = 4000;   // how long to wait for a notification
 
@@ -180,7 +186,7 @@ void forgetDrawn() {
 }
 
 void drawHeader() {
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
   char buf[40];
   snprintf(buf, sizeof(buf), "devices %d   adverts %lu",
@@ -194,7 +200,7 @@ void drawList() {
   const int bottom = contentBottom();
   const int rows = (bottom - top) / kRowH;
 
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
   if (s_devCount == 0) {
@@ -316,7 +322,7 @@ void drawList() {
 void drawConfirm() {
   tft.fillScreen(TFT_BLACK);
   drawStatusBar(readBatteryVoltage(), true);
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
   int y = 30;
@@ -361,7 +367,7 @@ void drawConfirm() {
 void drawRunning() {
   tft.fillScreen(TFT_BLACK);
   drawStatusBar(readBatteryVoltage(), true);
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
   tft.setTextColor(ORANGE, TFT_BLACK);
   tft.drawString("probing...", 8, 40);
@@ -376,7 +382,7 @@ void drawRunning() {
 void drawResult() {
   tft.fillScreen(TFT_BLACK);
   drawStatusBar(readBatteryVoltage(), true);
-  tft.setTextFont(1);
+  tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
   int y = 30;
