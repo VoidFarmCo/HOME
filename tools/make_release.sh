@@ -94,6 +94,7 @@ INCLUDE=(
   "tools/check_menu_dispatch.py"
   "tools/check_nav_labels.py"
   "tools/check_settings.py"
+  "tools/check_stealth.py"
   "tools/trace_logo.py"
   "tools/inline_logo.py"
   "tools/check_logo_scale.py"

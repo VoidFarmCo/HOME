@@ -1,3 +1,4 @@
+#include "Stealth.h"
 #include "SettingsStore.h"
 #include "Touchscreen.h"
 #include "config.h"
@@ -1179,6 +1180,8 @@ void runUI() {
 }
 
 void spooferSetup() {
+  if (Stealth::refuse("BLE Spoofer")) return;
+
   bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   setTouchButtonInputEnabled(true);
@@ -1454,6 +1457,8 @@ BLEAdvertisementData getOAdvertisementData() {
 }
 
 void sourappleSetup() {
+  if (Stealth::refuse("Sour Apple")) return;
+
   bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   setTouchButtonInputEnabled(true);
@@ -1994,6 +1999,8 @@ static void teardown() {
 }
 
 void airTagSetup() {
+  if (Stealth::refuse("AirTag Spoofer")) return;
+
   bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   pauseBackgroundRadioTasks();
@@ -3352,7 +3359,7 @@ static void startScan() {
   }
   s_scan->stop();
   s_scan->setAdvertisedDeviceCallbacks(&s_callbacks, true);
-  s_scan->setActiveScan(true);
+  s_scan->setActiveScan(!Stealth::on());
   s_scan->setInterval(100);
   s_scan->setWindow(50);
   s_scan->setDuplicateFilter(false);
@@ -3836,6 +3843,8 @@ void checkModeChange() {
 }
 
 void blejamSetup() {
+  if (Stealth::refuse("BLE Jammer")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   bleSetJammerNavLabels();
@@ -4034,7 +4043,7 @@ static void ensureBleInit() {
   if (!ensureBleStackReady()) return;
 
   bleScan = BLEDevice::getScan();
-  bleScan->setActiveScan(true);
+  bleScan->setActiveScan(!Stealth::on());
   bleInitDone = true;
 }
 
@@ -5786,6 +5795,8 @@ void checkModeChange() {
 }
 
 void prokillSetup() {
+  if (Stealth::refuse("Proto Kill")) return;
+
   setTouchButtonInputEnabled(true);
   bleSetJammerNavLabels();
   bleClearBody(TFT_BLACK);
@@ -7488,6 +7499,8 @@ void runUI() {
 }
 
 void esbReplaySetup() {
+  if (Stealth::refuse("ESB Replay")) return;
+
   setTouchButtonInputEnabled(true);
   bleSetEsbReplayNavLabels();
   bleClearBody(TFT_BLACK);
@@ -9236,6 +9249,8 @@ void runUI() {
 }
 
 void mouseJackInjectSetup() {
+  if (Stealth::refuse("MouseJack Inject")) return;
+
   setTouchButtonInputEnabled(true);
   bleSetMjInjectNavLabels();
   bleClearBody(TFT_BLACK);
@@ -9849,7 +9864,7 @@ public:
     pBLEScan = BLEDevice::getScan();
     bleDeviceCallbacks = new AdvertisedDeviceCallbacks(*this);
     pBLEScan->setAdvertisedDeviceCallbacks(bleDeviceCallbacks);
-    pBLEScan->setActiveScan(true);
+    pBLEScan->setActiveScan(!Stealth::on());
     scanning = true;
 
     addLine("Bluetooth Sniffer Ready", DARK_GRAY, true, MessageType::STATUS);

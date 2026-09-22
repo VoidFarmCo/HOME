@@ -15,6 +15,7 @@
 #include "SpiBus.h"
 #include "Branding.h"
 #include "BootLock.h"
+#include "Stealth.h"
 
 
 bool notificationVisible = false;
@@ -1749,7 +1750,9 @@ static const int PAD_X    = 12;
 static const int LABEL_W  = 92;
 static const int RADIUS   = 8;
 
-static inline int rowY(int i) { return TITLE_Y + TITLE_H + 6 + i * (ROW_H + GAP_Y); }
+/* Takes the slot on the screen, not the row in the list. With the list
+ * scrolled, row `i` is drawn in slot `i - scrollTop`. */
+static inline int slotY(int slot) { return TITLE_Y + TITLE_H + 6 + slot * (ROW_H + GAP_Y); }
 
 struct Rect { int x,y,w,h; };
 static inline Rect makeRect(int x,int y,int w,int h){ return {x,y,w,h}; }
@@ -1804,6 +1807,7 @@ struct SwitchRow {
 };
 
 static const SwitchRow kMainSwitches[] = {
+  {"Stealth Mode", &AppSettings::stealthMode, nullptr},
   /* Wi-Fi and BLE background scanning have always been one switch on this
    * screen and two fields in the file. Kept as two so an existing
    * settings.json still loads, and settingsLoad() still forces them equal
@@ -1872,26 +1876,41 @@ static void loggingSummary(char* out, size_t outSz) {
   else snprintf(out, outSz, "%d of %d", on, (int)LogApp::kCount);
 }
 
-/* The list has to stop above the footer, and nothing on screen says when it
- * stops doing so -- the last row simply draws under the Back and Save
- * buttons, and on a board you are not holding, not at all.
+/* The list scrolls, so the number of settings is no longer capped by the
+ * height of the shorter panel.
  *
- * The 2.8" is the binding panel: six rows clear the toast line by ten pixels
- * and seven do not. The logging page is exactly at six, which is why SD
- * logging is a page and not five more rows on the main one. The 3.5" has
- * room for about ten. Both pages are checked, because a page that fits on
- * the panel you are holding proves nothing about the other one, and it does
- * fire -- a seventh row was added to confirm that. Not a smaller ROW_H:
- * these rows are already a 32 px touch target. */
+ * It used to be. Two static_asserts held the line at six rows, which is what
+ * the 2.8" fits above the footer, and the answer to every new setting was to
+ * find somewhere else to put it -- SD logging became a page for that reason
+ * and the reason was never a good one. The 3.5" fits about ten and was being
+ * held to six by a board that has never been booted.
+ *
+ * kVisibleRows is derived from the panel rather than chosen, so the 3.5"
+ * simply shows more of the list at once and neither panel needs a number
+ * written down for it. */
 static const int kFooterTop = PUEO_SCREEN_H - 24 - 8;   /* backRect() y */
 static const int kToastTop  = kFooterTop - 18;          /* footerToast() y */
-static constexpr int rowsFit(int n) {
-  return TITLE_Y + TITLE_H + 6 + (n - 1) * (ROW_H + GAP_Y) + ROW_H;
+static const int kListTop   = TITLE_Y + TITLE_H + 6;
+static const int kVisibleRows = (kToastTop - kListTop + GAP_Y) / (ROW_H + GAP_Y);
+static_assert(kVisibleRows >= 4,
+              "the panel cannot show four settings rows -- the list geometry "
+              "no longer fits this display");
+
+/* First row drawn. Follows `sel` and never moves further than it has to. */
+static int scrollTop = 0;
+
+static bool rowVisible(int i) {
+  return i >= scrollTop && i < scrollTop + kVisibleRows;
 }
-static_assert(rowsFit(kMainRows) <= kToastTop,
-              "Settings rows run under the footer -- add a page, not another row");
-static_assert(rowsFit(kLogRows) <= kToastTop,
-              "SD Logging rows run under the footer -- it is already a page");
+
+/* Returns true when the window moved, which means everything repaints. */
+static bool scrollToShow(int i) {
+  const int was = scrollTop;
+  if (i < scrollTop) scrollTop = i;
+  else if (i >= scrollTop + kVisibleRows) scrollTop = i - kVisibleRows + 1;
+  if (scrollTop < 0) scrollTop = 0;
+  return scrollTop != was;
+}
 
 static uint8_t  last_brightness;
 static Theme    last_theme;
@@ -1905,7 +1924,24 @@ static bool dragging = false;
 
 static uint32_t lastChangeMs = 0;
 
-static Rect rowRect(int i) { return makeRect(PAD_X, rowY(i), SCREEN_W - PAD_X*2, ROW_H); }
+static Rect rowRect(int i) {
+  return makeRect(PAD_X, slotY(i - scrollTop), SCREEN_W - PAD_X*2, ROW_H);
+}
+
+/* A mark in the right margin saying the list goes on. Two pixels wide and
+ * drawn in the accent, because the alternative is a list that silently has
+ * more in it -- which is how the sixth setting went unnoticed. */
+static void drawScrollHint(int total) {
+  const int x = SCREEN_W - 4;
+  const int top = kListTop;
+  const int h   = kVisibleRows * (ROW_H + GAP_Y) - GAP_Y;
+  tft.fillRect(x, top, 2, h, UI_BG);
+  if (total <= kVisibleRows) return;
+  int barH = (h * kVisibleRows) / total;
+  if (barH < 8) barH = 8;
+  int barY = top + (h - barH) * scrollTop / (total - kVisibleRows);
+  tft.fillRect(x, barY, 2, barH, UI.accent);
+}
 
 static void setTitleFont() { tft.setTextFont(2); }
 static void setLabelFont() { tft.setTextFont(2); }
@@ -2274,7 +2310,11 @@ static void drawAll() {
   drawTitle();
 
   auto& s = settings();
-  for (int i = 0; i < rowCount(); i++) drawRow(i, sel == i);
+  scrollToShow(sel);
+  for (int i = 0; i < rowCount(); i++) {
+    if (rowVisible(i)) drawRow(i, sel == i);
+  }
+  drawScrollHint(rowCount());
 
   drawFooter(false, false);
 
@@ -2299,10 +2339,19 @@ static void redrawIfChanged() {
   }
 
   if (sel != last_sel) {
-    for (int i = 0; i < rowCount(); i++) drawRow(i, sel == i);
+    if (scrollToShow(sel)) {
+      /* The window moved, so every slot now holds a different row. Nothing
+       * on screen is still correct; repaint rather than trying to work out
+       * which parts survived. */
+      drawAll();
+      return;
+    }
+    for (int i = 0; i < rowCount(); i++) {
+      if (rowVisible(i)) drawRow(i, sel == i);
+    }
     last_sel = sel;
   } else {
-    if (page == Page::Main && s.brightness != last_brightness) {
+    if (page == Page::Main && rowVisible(0) && s.brightness != last_brightness) {
       drawBrightnessWidget(s.brightness, sel==0);
       last_brightness = s.brightness;
     }
@@ -2310,7 +2359,10 @@ static void redrawIfChanged() {
       if (!rowIsSwitch(i)) continue;
       const bool v = switchValue(s, i);
       if (v != last_switch[i]) {
-        drawSwitchWidgetRow(v, sel==i, i);
+        /* The value still has to be recorded when the row is off-screen, or
+         * it redraws as "changed" the moment it scrolls back into view --
+         * into whatever slot it now occupies. */
+        if (rowVisible(i)) drawSwitchWidgetRow(v, sel==i, i);
         last_switch[i] = v;
       }
     }
@@ -2319,14 +2371,16 @@ static void redrawIfChanged() {
        * changes made over there and has to be compared, not assumed. */
       char sum[16];
       loggingSummary(sum, sizeof(sum));
-      if (strncmp(sum, last_link, sizeof(last_link) - 1) != 0) {
+      if (rowVisible(kLinkRow)
+          && strncmp(sum, last_link, sizeof(last_link) - 1) != 0) {
         drawLinkWidget(kLinkRow);
       }
       const char* bootState = BootLock::isSet() ? "on" : "off";
-      if (strncmp(bootState, last_boot, sizeof(last_boot) - 1) != 0) {
+      if (rowVisible(kBootRow)
+          && strncmp(bootState, last_boot, sizeof(last_boot) - 1) != 0) {
         drawBootWidget(kBootRow);
       }
-      if (s.theme != last_theme) {
+      if (rowVisible(1) && s.theme != last_theme) {
         drawThemeWidget(s.theme, sel==1);
         last_theme = s.theme;
       }
@@ -2343,6 +2397,7 @@ static void goToPage(Page to) {
   if (page == to) return;
   page = to;
   sel = 0;
+  scrollTop = 0;
   last_link[0] = '\0';
   last_boot[0] = '\0';
   drawAll();
@@ -2454,6 +2509,7 @@ static void handleTouch() {
   }
 
   for (int i=0;i<rowCount();++i){
+    if (!rowVisible(i)) continue;
     Rect rr = rowRect(i);
     if (ty >= rr.y && ty <= rr.y+rr.h) { sel = i; break; }
   }
@@ -2543,7 +2599,7 @@ void setup(){
   /* Entering Settings always lands on Settings. The page is a static and
    * would otherwise remember where the last visit ended up. */
   page = Page::Main;
-  sel = 0; dirtySettings = false; uiDirty = false; dragging = false;
+  sel = 0; scrollTop = 0; dirtySettings = false; uiDirty = false; dragging = false;
   last_link[0] = '\0';
   last_boot[0] = '\0';
   drawAll();

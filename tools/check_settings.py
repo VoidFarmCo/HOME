@@ -141,11 +141,30 @@ def main():
     ok("no sel== arm names a switch row", not stray,
        "found sel==%s -- switch rows go through the table" % stray)
 
-    ok("both pages are bounded at compile time",
-       ui.count("static_assert") >= 2 and "rowsFit(kMainRows)" in ui
-       and "rowsFit(kLogRows)" in ui,
-       "a page that fits the panel you are holding proves nothing about the "
-       "other one")
+    # This used to check two static_asserts that capped each page at what the
+    # 2.8" fits. The list scrolls now, so the cap is gone and the thing worth
+    # checking is that the window is derived from the panel rather than
+    # written down -- a hard-coded visible count is the same bug with an
+    # extra step, and it is the 3.5" that pays for it.
+    ok("the list scrolls",
+       "kVisibleRows" in ui and "scrollTop" in ui and "scrollToShow" in ui,
+       "without scrolling the row count is capped by the shorter panel")
+    ok("  and sizes its window from the panel",
+       re.search(r"kVisibleRows\s*=\s*\(kToastTop - kListTop", ui) is not None,
+       "a hard-coded visible count shows the 3.5\" fewer rows than it fits")
+    # A count of rowVisible() calls is not a rule -- drop one and there are
+    # still plenty. The loop that turns a touch into a row is the one that
+    # has to skip, because rowRect() maps through the scroll window: without
+    # the skip, a tap lands on whatever row now occupies that slot and the
+    # one it names is somewhere off the screen.
+    hit = re.search(r"for \(int i=0;i<rowCount\(\);\+\+i\)\{(.{0,240}?)\n  \}",
+                    ui, re.S)
+    ok("  and touch only reaches rows that are on screen",
+       hit is not None and "rowVisible" in hit.group(1),
+       "a tap selects whatever row now sits in that slot")
+    ok("  and incremental redraws skip scrolled-away rows",
+       ui.count("rowVisible(") >= 5,
+       "a row drawn by index lands in whatever slot holds that number")
     ok("there is a row that opens the logging page",
        "kLinkRow" in ui and "goToPage(Page::Logging)" in ui)
     ok("leaving the logging page lands on Settings",

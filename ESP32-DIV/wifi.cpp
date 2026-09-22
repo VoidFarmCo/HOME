@@ -1,3 +1,4 @@
+#include "Stealth.h"
 #include "Eapol.h"
 #include "KeyboardUI.h"
 #include "SettingsStore.h"
@@ -1509,6 +1510,8 @@ void runUI() {
 }
 
 void beaconSpamSetup() {
+  if (Stealth::refuse("Beacon Spammer")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   spam = false;
@@ -1873,7 +1876,7 @@ static void deauthStepScan() {
 
   if (!s_asyncScanActive) {
     const uint32_t dwell = wifiStaScanMsPerChannel();
-    const int ret = WiFi.scanNetworks(true, true, false, dwell);
+    const int ret = WiFi.scanNetworks(true, true, Stealth::on(), dwell);
     if (ret == WIFI_SCAN_RUNNING) {
       s_asyncScanActive = true;
       return;
@@ -2167,7 +2170,7 @@ static void bgWifiScanTask(void* ) {
         WiFi.disconnect();
         WiFi.scanDelete();
         const uint32_t dwell = wifiStaScanMsPerChannel();
-        int ret = WiFi.scanNetworks(true, true, false, dwell);
+        int ret = WiFi.scanNetworks(true, true, Stealth::on(), dwell);
 
         bgScanRunning = (ret == WIFI_SCAN_RUNNING);
         if (ret >= 0) {
@@ -2243,7 +2246,7 @@ int staWifiScanSync() {
   delay(50);
   const uint32_t dwell = wifiStaScanMsPerChannel();
   fgWifiScanInProgress = true;
-  const int n = WiFi.scanNetworks(false, true, false, dwell);
+  const int n = WiFi.scanNetworks(false, true, Stealth::on(), dwell);
   fgWifiScanInProgress = false;
   if (n >= 0) {
     bgHasResults = true;
@@ -2484,7 +2487,7 @@ void startWiFiScan() {
   delay(50);
   const uint32_t dwell = wifiStaScanMsPerChannel();
   fgWifiScanInProgress = true;
-  int numNetworks = WiFi.scanNetworks(true, true, false, dwell);
+  int numNetworks = WiFi.scanNetworks(true, true, Stealth::on(), dwell);
   if (numNetworks == WIFI_SCAN_RUNNING) {
     while (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
       if (feature_exit_requested || featureExitButtonPressed()) {
@@ -3660,7 +3663,7 @@ static bool cpCloneScanAndSelect(String& outSsid, uint8_t& outChannel, uint8_t o
     WiFi.disconnect();
     delay(50);
     const uint32_t dwell = wifiStaScanMsPerChannel();
-    int n = WiFi.scanNetworks(false, true, false, dwell);
+    int n = WiFi.scanNetworks(false, true, Stealth::on(), dwell);
     if (n <= 0) {
       cpCloneDrawEmpty();
       cpDrawCloneFooter(false, false, false);
@@ -4276,6 +4279,8 @@ static void cportalHandleCredNavButtons() {
 }
 
 void cportalSetup() {
+  if (Stealth::refuse("Captive Portal")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   cportalUpdateNavLabels();
@@ -4885,6 +4890,8 @@ void runUI() {
 }
 
 void deautherSetup() {
+  if (Stealth::refuse("WiFi Deauther")) return;
+
     pauseBackgroundRadioTasks();
     setTouchButtonInputEnabled(true);
     deautherUpdateNavLabels(false);
@@ -5574,6 +5581,8 @@ void runUI() {
 }
 
 void probeRequestFloodSetup() {
+  if (Stealth::refuse("Probe Request Flood")) return;
+
     pauseBackgroundRadioTasks();
     setTouchButtonInputEnabled(true);
     probeUpdateNavLabels(false);
@@ -6713,6 +6722,8 @@ static void teardown() {
 }
 
 void hiddenSsidSetup() {
+  if (Stealth::refuse("Hidden SSID Revealer")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   updateNavLabels(false);
@@ -7050,7 +7061,7 @@ static void runScan() {
   WiFi.scanDelete();
 
   const uint32_t dwell = wifiStaScanMsPerChannel();
-  const int n = WiFi.scanNetworks(false, true, false, dwell);
+  const int n = WiFi.scanNetworks(false, true, Stealth::on(), dwell);
 
   if (n > 0) {
     uint16_t apNum = (uint16_t)n;
@@ -7229,6 +7240,8 @@ static void teardown() {
 }
 
 void wpsScannerSetup() {
+  if (Stealth::refuse("WPS Scanner")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   featureClearContent(TFT_BLACK);
@@ -7645,7 +7658,7 @@ static void scanAccessPoints() {
   WiFi.scanDelete();
 
   const uint32_t dwell = wifiStaScanMsPerChannel();
-  const int n = WiFi.scanNetworks(false, true, false, dwell);
+  const int n = WiFi.scanNetworks(false, true, Stealth::on(), dwell);
   if (n > 0) {
     for (int i = 0; i < n && s_apCount < MAX_APS; i++) {
       ApEntry& e = s_aps[s_apCount];
@@ -8110,6 +8123,8 @@ static void teardown() {
 }
 
 void arpScannerSetup() {
+  if (Stealth::refuse("ARP Scanner")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   featureClearContent(TFT_BLACK);
@@ -9253,6 +9268,8 @@ static void teardown() {
 }
 
 void karmaSetup() {
+  if (Stealth::refuse("Karma Attack")) return;
+
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   featureClearContent(TFT_BLACK);

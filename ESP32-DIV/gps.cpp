@@ -1,3 +1,4 @@
+#include "Stealth.h"
 #include <Arduino.h>
 #include <HardwareSerial.h>
 #include "SettingsStore.h"
@@ -3183,6 +3184,17 @@ static void wardPerformWigleUpload(const char* srcCsvPath, File* liveLog) {
   char staSsid[80];
   char staPass[80];
   bool useStoredWifi = false;
+
+  /* The only thing in the wardriver that transmits. Everything else here is
+   * a receiver -- and stays running -- so this is refused on its own rather
+   * than by blocking the feature. */
+  if (Stealth::on()) {
+    wardNotify("WiGLE", "Stealth Mode is on. Uploading joins an access point, "
+                        "which transmits. The log is still being written; "
+                        "upload it with Stealth Mode off.");
+    return;
+  }
+
   if (!wardReadWigleConfig(apiUser, sizeof(apiUser), apiTok, sizeof(apiTok), staSsid, sizeof(staSsid), staPass,
                            sizeof(staPass), &useStoredWifi)) {
     wardNotify("WiGLE", "SD:/config/wigle.txt — line1: WiGLE API name, line2: token. If this ESP32 already "
@@ -3326,7 +3338,7 @@ static void wardPrintCsvGpsPrefix(File& logf, uint32_t now) {
 
 static void wardDoWifiScanLog(File& logf, uint32_t now, uint32_t* linesWr, uint32_t* scanCt) {
   WiFi.scanDelete();
-  const int n = WiFi.scanNetworks(false, true);
+  const int n = WiFi.scanNetworks(false, true, Stealth::on(), 300);
   (*scanCt)++;
   if (n <= 0) {
     wardLogPush("WiFi: 0 AP");
@@ -3377,7 +3389,7 @@ static void wardEnsureBleScan() {
   if (!s) {
     return;
   }
-  s->setActiveScan(true);
+  s->setActiveScan(!Stealth::on());
   s->setInterval(134);
   s->setWindow(99);
   s_wardBleScanReady = true;

@@ -1,3 +1,4 @@
+#include "Stealth.h"
 #include <algorithm>
 #include <vector>
 #include "KeyboardUI.h"
@@ -1407,6 +1408,8 @@ void runUI() {
 }
 
 void ReplayAttackSetup() {
+  if (Stealth::refuse("Replay Attack")) return;
+
   if (!cc1101Ready("Replay Attack")) return;
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
@@ -2297,6 +2300,8 @@ void runUI() {
 }
 
 void saveSetup() {
+  if (Stealth::refuse("Saved Profile")) return;
+
   if (!cc1101Ready("Saved Profiles")) return;
     Serial.begin(115200);
     setTouchButtonInputEnabled(true);
@@ -2824,6 +2829,8 @@ void runUI() {
 }
 
 void subjammerSetup() {
+  if (Stealth::refuse("SubGHz Jammer")) return;
+
   if (!cc1101Ready("Sub-GHz Jammer")) return;
     Serial.begin(115200);
     setTouchButtonInputEnabled(true);
@@ -3669,6 +3676,8 @@ void runUI() {
 }
 
 void subBruteSetup() {
+  if (Stealth::refuse("De Bruijn / Brute")) return;
+
   if (!cc1101Ready("Sub-GHz Brute")) return;
   Serial.begin(115200);
   setTouchButtonInputEnabled(true);

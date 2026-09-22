@@ -16,6 +16,13 @@ struct AppSettings {
   bool     autoWifiScan    = true;
   bool     autoBleScan     = true;
 
+  /* Receive only: every tool whose job is to transmit refuses to start, and
+   * the scans that transmit while looking like receivers are made passive.
+   * Off by default -- this is a mode you choose, not a default that quietly
+   * disables half the menu. See Stealth.h for what it does and does not
+   * cover. */
+  bool     stealthMode    = false;
+
   /* Whether features may write their own log files.
    *
    * logToSd is the master: off means the card is left alone by every one of

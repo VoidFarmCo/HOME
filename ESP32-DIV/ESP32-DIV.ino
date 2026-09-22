@@ -3,6 +3,7 @@
 #include <TFT_eSPI.h>
 #include <Wire.h>
 #include "BootLock.h"
+#include "Stealth.h"
 #include "SettingsStore.h"
 #include "Touchscreen.h"
 #include "config.h"
@@ -3842,6 +3843,11 @@ static void otherRfidReturnGuard() {
 
 static void otherRfidPlaceholderAction(int idx) {
     feature_active = true;
+    /* All of RFID/NFC, not one entry of it. A PN532 reads a card by
+     * energising a 13.56 MHz field and waiting for the card to answer, so
+     * "read" transmits exactly as much as "clone" does. Gated here because
+     * every entry in that menu comes through this one function. */
+    if (Stealth::refuse("RFID/NFC")) { feature_active = false; return; }
     if (!RfidNfc::begin()) {
         showNotification("RFID/NFC", "PN532 not found. Check SPI wiring/pins.");
         otherDismissPlaceholder();
