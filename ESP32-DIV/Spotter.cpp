@@ -724,11 +724,118 @@ int dwellCount() {
   return n;
 }
 
+/* ── the dwell alert ──────────────────────────────────────────────────────
+ *
+ * Shown once, when the first row crosses the threshold, and then gone. Not
+ * a banner that stays: this is a passive monitoring screen and the thing
+ * covering the list would be the thing you wanted to read.
+ *
+ * It fades rather than cutting, which costs almost nothing -- drawBitmap
+ * paints only the set bits, so redrawing the same mark in a dimmer colour
+ * walks it down to the background without touching anything else. */
+constexpr uint32_t kAlertHoldMs = 2200;
+constexpr uint16_t kBeepMs      = 140;
+constexpr uint16_t kBeepGapMs   = 70;
+constexpr int      kAlertSteps  = 6;
+constexpr uint32_t kAlertStepMs = 90;
+
+bool s_dwellAlerted = false;
+
+/* RGB565 blend, t = 0 keeps `a`, t = 255 reaches `b`. */
+uint16_t blend565(uint16_t a, uint16_t b, uint8_t t) {
+  const int ar = (a >> 11) & 0x1F, ag = (a >> 5) & 0x3F, ab = a & 0x1F;
+  const int br = (b >> 11) & 0x1F, bg = (b >> 5) & 0x3F, bb = b & 0x1F;
+  const int r = ar + ((br - ar) * t) / 255;
+  const int g = ag + ((bg - ag) * t) / 255;
+  const int bl = ab + ((bb - ab) * t) / 255;
+  return (uint16_t)((r << 11) | (g << 5) | bl);
+}
+
+void dwellAlert(const Hit& h) {
+  const int mw = 200, mh = 200;
+  const int x = (PUEO_SCREEN_W - mw) / 2;
+  const int y = (PUEO_SCREEN_H - mh) / 2 - 30;
+
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextFont(2);
+  tft.setTextDatum(TC_DATUM);
+  const int cx = PUEO_SCREEN_W / 2;
+
+  char sub[48];
+  const uint32_t mins = (h.lastMs - h.firstMs) / 60000u;
+  snprintf(sub, sizeof(sub), "%s  %lu min", h.label ? h.label : "device",
+           (unsigned long)mins);
+
+  /* Hunt only lists BLE trackers -- Find My and the tracker service UUIDs.
+   * A dwelling plate reader or body camera will not appear in its picker,
+   * so sending someone there for one would be sending them to an empty
+   * screen and calling it advice. The suggestion is shown when it is
+   * actionable and withheld when it is not.
+   *
+   * "may be" is doing real work in that line. This firmware has no position
+   * of its own: it cannot tell a tracker moving with you from a beacon you
+   * have been sitting next to. It reports duration and offers the tool that
+   * would settle it. It does not decide. */
+  const bool huntable = (h.viaBle && h.kind == Kind::Tracker);
+  const char* hint1 = huntable ? "may be travelling with you"
+                               : "in range this whole time";
+  const char* hint2 = huntable ? "Hunt can walk you to it" : nullptr;
+
+  for (int step = 0; step <= kAlertSteps; step++) {
+    const uint8_t t = (uint8_t)((255 * step) / kAlertSteps);
+    const uint16_t markC = blend565(UI_WARN, TFT_BLACK, t);
+    const uint16_t textC = blend565(TFT_WHITE, TFT_BLACK, t);
+    const uint16_t dimC  = blend565(UI_DIM_TEXT, TFT_BLACK, t);
+
+    tft.drawBitmap(x, y, bitmap_pueo_dwell, mw, mh, markC);
+    tft.setTextColor(markC, TFT_BLACK);
+    tft.drawString("DWELL", cx, y + mh + 6);
+    tft.setTextColor(textC, TFT_BLACK);
+    tft.drawString(sub, cx, y + mh + 26);
+    tft.setTextColor(dimC, TFT_BLACK);
+    tft.drawString(hint1, cx, y + mh + 46);
+    if (hint2 != nullptr) {
+      tft.setTextColor(huntable ? markC : dimC, TFT_BLACK);
+      tft.drawString(hint2, cx, y + mh + 64);
+    }
+
+    if (step == 0) {
+      /* Two rising notes, while the mark is up rather than before it.
+       *
+       * This is the alert you are specifically not looking at the screen
+       * for -- the device is in a bag or face down on a table, and a
+       * silent alarm on a passive monitor is no alarm at all. Silent on
+       * the 2.8", which has no amplifier, and silent on a 3.5" with
+       * nothing plugged into its speaker connector, which is how they
+       * ship. uiBeep compiles to nothing on the former and does nothing
+       * audible on the latter.
+       *
+       * The beeps are inside the hold rather than added to it, so the
+       * alert still takes kAlertHoldMs whether or not it makes a sound. */
+      uiBeep(1800, kBeepMs);
+      delay(kBeepGapMs);
+      uiBeep(2600, kBeepMs);
+      const uint32_t spent = 2u * kBeepMs + kBeepGapMs;
+      if (kAlertHoldMs > spent) {
+        delay(kAlertHoldMs - spent);
+      }
+    } else {
+      delay(kAlertStepMs);
+    }
+  }
+
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextFont(1);
+}
+
 void drawHeader() {
   tft.setTextFont(1);
   tft.setTextSize(1);
 
-  char buf[42];
+  /* 42 was enough for the old line and one short of the dwell one --
+   * gcc's -Wformat-truncation caught it, not the screen, because every
+   * real value here is two or three digits wide. */
+  char buf[72];
   const int dwell = dwellCount();
   if (dwell > 0) {
     snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d  dwell %d",
@@ -915,6 +1022,7 @@ void spotterSetup() {
 
   s_logging = false;
   s_logFailed = false;
+  s_dwellAlerted = false;
   s_logRows = 0;
   s_capHead = 0;
   s_capTail = 0;
@@ -1013,6 +1121,24 @@ void spotterLoop() {
   }
 
   captureFlush();
+
+  /* Fire once on the edge, not every pass. Re-arms when the last dwelling
+   * row goes quiet, so a device that leaves and comes back alerts again --
+   * which is the case worth hearing about twice. */
+  {
+    const Hit* first = nullptr;
+    for (int i = 0; i < s_hitCount && first == nullptr; i++) {
+      if (dwelling(s_hits[i])) first = &s_hits[i];
+    }
+    if (first != nullptr && !s_dwellAlerted) {
+      s_dwellAlerted = true;
+      dwellAlert(*first);
+      redraw(true);          // the alert painted over the list
+      s_lastDraw = millis();
+    } else if (first == nullptr) {
+      s_dwellAlerted = false;
+    }
+  }
 
   if (s_dirty && (uint32_t)(now - s_lastDraw) >= kRedrawMs) {
     s_lastDraw = now;
