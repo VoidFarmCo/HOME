@@ -107,9 +107,19 @@ def main():
     ui = utils[utils.index("namespace AppSettingsUI {"):]
     ui = ui[:ui.index("\nnamespace SdFileManager")]
 
+    table = ui[ui.index("kSwitchRows[] = {"):]
+    table = table[:table.index("\n};")]
     rows = re.findall(r'\{"([^"]+)",\s*&AppSettings::(\w+)\s*,\s*'
-                      r'(?:&AppSettings::(\w+)|nullptr)\s*\}', ui)
-    ok("found the switch table", len(rows) >= 3, str(rows))
+                      r'(?:&AppSettings::(\w+)|nullptr)\s*\}', table)
+    # Against the braces in the table rather than a minimum count. A minimum
+    # is a guess that goes stale the moment a row is removed -- it was 3, and
+    # dropping the inert NeoPixel row failed this line rather than any real
+    # rule. Counting entries catches the failure that matters: the regex
+    # parsing some of the table and the rest of the checks running on a
+    # partial list while reporting green.
+    declared = len(re.findall(r'^\s*\{"', table, re.M))
+    ok("found the switch table", rows and len(rows) == declared,
+       "parsed %d of %d entries: %s" % (len(rows), declared, rows))
     field_names = {n for _t, n in fields}
     for label, a, b in rows:
         ok("  %s -> AppSettings::%s" % (label, a), a in field_names,

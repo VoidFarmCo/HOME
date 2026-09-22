@@ -13,8 +13,6 @@ struct AppSettings {
   Theme    theme      = Theme::Dark;
   uint8_t  accentColor = 0;
 
-  bool     neopixelEnabled = false;
-
   bool     autoWifiScan    = true;
   bool     autoBleScan     = true;
 

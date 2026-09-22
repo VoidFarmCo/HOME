@@ -1792,7 +1792,6 @@ struct SwitchRow {
 };
 
 static const SwitchRow kSwitchRows[] = {
-  {"NeoPixel",  &AppSettings::neopixelEnabled, nullptr},
   /* Wi-Fi and BLE background scanning have always been one switch on this
    * screen and two fields in the file. Kept as two so an existing
    * settings.json still loads, and settingsLoad() still forces them equal
@@ -1825,12 +1824,12 @@ static bool switchSettled(const AppSettings& s, int k, bool en) {
  * stops doing so -- the last row simply draws under the Back and Save
  * buttons, and on a board you are not holding, not at all.
  *
- * The 2.8" is the binding panel and Log to SD was the last row that fits on
- * it: six rows clear the toast line by ten pixels, seven do not. The 3.5"
- * has room for about ten. So the next setting added here needs paging or
- * scrolling first, which is what this says when it fires -- and it does
- * fire; a seventh row was added to check that it does. Not a smaller ROW_H:
- * these rows are already a 32 px touch target. */
+ * The 2.8" is the binding panel: six rows clear the toast line by ten
+ * pixels and seven do not, so with NeoPixel gone there is room for one
+ * more. The 3.5" has room for about ten. The row after that needs paging or
+ * scrolling, which is what this says when it fires -- and it does fire; a
+ * seventh row was added to check that it does. Not a smaller ROW_H: these
+ * rows are already a 32 px touch target. */
 static const int kFooterTop = PUEO_SCREEN_H - 24 - 8;   /* backRect() y */
 static const int kToastTop  = kFooterTop - 18;          /* footerToast() y */
 static_assert(TITLE_Y + TITLE_H + 6 + (N - 1) * (ROW_H + GAP_Y) + ROW_H <= kToastTop,

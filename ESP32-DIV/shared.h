@@ -890,9 +890,6 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 /*──────────────────── Settings / Themes ────────────────────*/
 enum class Theme : uint8_t { Dark = 0, Light = 1 };
 
-#ifndef NEOPIXEL_BRIGHT_MAX
-#define NEOPIXEL_BRIGHT_MAX 64
-#endif
 #ifndef SETTINGS_PATH
 #define SETTINGS_PATH "/config/settings.json"
 #endif

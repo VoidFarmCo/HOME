@@ -111,7 +111,6 @@ bool settingsLoad() {
   s.brightness      = doc["brightness"]      | s.brightness;
   s.theme           = (Theme)(uint8_t)(doc["theme"] | (uint8_t)s.theme);
   s.accentColor     = accentPresetClamp(doc["accentColor"] | s.accentColor);
-  s.neopixelEnabled = doc["neopixelEnabled"] | s.neopixelEnabled;
 
   s.autoWifiScan    = doc["autoWifiScan"]    | s.autoWifiScan;
   s.autoBleScan     = doc["autoBleScan"]     | s.autoBleScan;
@@ -158,7 +157,6 @@ bool settingsSave() {
   doc["brightness"]      = s.brightness;
   doc["theme"]           = (uint8_t)s.theme;
   doc["accentColor"]     = s.accentColor;
-  doc["neopixelEnabled"] = s.neopixelEnabled;
 
   doc["autoWifiScan"]    = s.autoWifiScan;
   doc["autoBleScan"]     = s.autoBleScan;
