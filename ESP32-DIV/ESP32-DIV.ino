@@ -2,6 +2,7 @@
 #include <PCF8574.h>
 #include <TFT_eSPI.h>
 #include <Wire.h>
+#include "BootLock.h"
 #include "SettingsStore.h"
 #include "Touchscreen.h"
 #include "config.h"
@@ -4665,10 +4666,19 @@ void setup() {
 
   menu_initialized = false;
   currentBatteryVoltage = readBatteryVoltage();
+
+  /* Touch comes up before the lock rather than after it, because the lock
+   * screen is a keyboard and a keyboard you cannot touch is a device you
+   * cannot get into. Nothing else here needed it early. */
+  setupTouchscreen();
+
+  /* Blocks until the password is right, and returns immediately when none
+   * is set. Everything above this point has already run: this hides the
+   * menu, not the boot. See BootLock.h for what that is worth. */
+  BootLock::require();
+
   displayMenu();
   drawStatusBar(currentBatteryVoltage, false);
-
-  setupTouchscreen();
 
   last_interaction_time = millis();
   Serial.println("[boot] ready");

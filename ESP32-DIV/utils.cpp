@@ -14,6 +14,7 @@
 #include "utils.h"
 #include "SpiBus.h"
 #include "Branding.h"
+#include "BootLock.h"
 
 
 bool notificationVisible = false;
@@ -1814,7 +1815,8 @@ static const char* const kFixedRows[] = {"Brightness", "Theme", "Accent"};
 static const int kFirstSwitch     = sizeof(kFixedRows)/sizeof(kFixedRows[0]);
 static const int kMainSwitchCount = sizeof(kMainSwitches)/sizeof(kMainSwitches[0]);
 static const int kLinkRow         = kFirstSwitch + kMainSwitchCount;   /* SD Logging */
-static const int kMainRows        = kLinkRow + 1;
+static const int kBootRow         = kLinkRow + 1;                     /* Boot Lock  */
+static const int kMainRows        = kBootRow + 1;
 
 /* Master switch, then one row per LogApp. The per-app rows are generated
  * from kLogApps, so a feature added to that table appears here without this
@@ -1830,7 +1832,8 @@ static const char* rowLabel(int i) {
   }
   if (i < kFirstSwitch) return kFixedRows[i];
   if (i < kLinkRow)     return kMainSwitches[i - kFirstSwitch].label;
-  return "SD Logging";
+  if (i == kLinkRow)    return "SD Logging";
+  return "Boot Lock";
 }
 
 static bool rowIsSwitch(int i) {
@@ -1895,6 +1898,7 @@ static Theme    last_theme;
 static uint8_t  last_accent;
 static bool     last_switch[kMaxRows];
 static char     last_link[16];
+static char     last_boot[8];
 static int      last_sel;
 
 static bool dragging = false;
@@ -2168,6 +2172,37 @@ static void drawLinkRow(int row, bool selected) {
   drawLinkWidget(row);
 }
 
+/* Boot Lock reads its state from NVS rather than from AppSettings, and takes
+ * effect the moment it is set rather than when Save is pressed -- a password
+ * you believed you had set and had not is the wrong way round. So this row
+ * has no switch: the whole thing happens behind it. */
+static void drawBootWidget(int row) {
+  Rect r = rowRect(row);
+  tft.startWrite();
+  tft.fillRect(r.x + LABEL_W, r.y + 2, r.w - LABEL_W - 6, r.h - 4, UI_BG);
+
+  const char* state = BootLock::isSet() ? "on" : "off";
+
+  setLabelFont();
+  const int ty    = r.y + (r.h / 2 - 6);
+  const int right = r.x + r.w - 6;
+  const int wChev = (int)tft.textWidth(">");
+  const int wSt   = (int)tft.textWidth(state);
+
+  tft.setTextColor(textStrong, UI_BG);
+  tft.setCursor(right - wChev, ty);
+  tft.print(">");
+  tft.setCursor(right - wChev - 8 - wSt, ty);
+  tft.print(state);
+
+  tft.endWrite();
+  snprintf(last_boot, sizeof(last_boot), "%s", state);
+}
+static void drawBootRow(int row, bool selected) {
+  drawCardStatic(row, selected);
+  drawBootWidget(row);
+}
+
 /* One row, whichever kind it is. The four enumerating sites call this rather
  * than each deciding for themselves what row 3 is. */
 static void drawRow(int i, bool selected) {
@@ -2176,11 +2211,12 @@ static void drawRow(int i, bool selected) {
     drawSwitchRow(switchValue(s, i), selected, i);
     return;
   }
+  if (i == kLinkRow) { drawLinkRow(i, selected); return; }
+  if (i == kBootRow) { drawBootRow(i, selected); return; }
   switch (i) {
     case 0: drawBrightness(s.brightness, selected); break;
     case 1: drawTheme(s.theme, selected); break;
-    case 2: drawAccent(s.accentColor, selected); break;
-    default: drawLinkRow(i, selected); break;
+    default: drawAccent(s.accentColor, selected); break;
   }
 }
 
@@ -2286,6 +2322,10 @@ static void redrawIfChanged() {
       if (strncmp(sum, last_link, sizeof(last_link) - 1) != 0) {
         drawLinkWidget(kLinkRow);
       }
+      const char* bootState = BootLock::isSet() ? "on" : "off";
+      if (strncmp(bootState, last_boot, sizeof(last_boot) - 1) != 0) {
+        drawBootWidget(kBootRow);
+      }
       if (s.theme != last_theme) {
         drawThemeWidget(s.theme, sel==1);
         last_theme = s.theme;
@@ -2304,6 +2344,7 @@ static void goToPage(Page to) {
   page = to;
   sel = 0;
   last_link[0] = '\0';
+  last_boot[0] = '\0';
   drawAll();
 }
 
@@ -2428,15 +2469,22 @@ static void handleTouch() {
         lastToggleMs = now;
       }
     }
-  } else if (sel == kLinkRow) {
+  } else if (sel == kLinkRow || sel == kBootRow) {
     /* The whole right-hand half opens it. A chevron is a small target and
-     * this row has nothing else on that side to hit by mistake. */
+     * these rows have nothing else on that side to hit by mistake. */
     Rect rr = rowRect(sel);
     if (tx >= rr.x + LABEL_W) {
       uint32_t now = millis();
       if (now - lastToggleMs > 250) {
         lastToggleMs = now;
-        goToPage(Page::Logging);
+        if (sel == kLinkRow) {
+          goToPage(Page::Logging);
+        } else {
+          /* Takes over the screen and hands it back in whatever state the
+           * keyboard left it, so this repaints rather than trusting it. */
+          BootLock::manage();
+          drawAll();
+        }
       }
     }
   } else if (sel == 0) {
@@ -2497,6 +2545,7 @@ void setup(){
   page = Page::Main;
   sel = 0; dirtySettings = false; uiDirty = false; dragging = false;
   last_link[0] = '\0';
+  last_boot[0] = '\0';
   drawAll();
 }
 
@@ -2560,6 +2609,7 @@ void loop(){
     else if (sel==1)                   { applyTheme(Theme::Light); }
     else if (sel==2)                   { applyAccent((s.accentColor + 1) % ACCENT_PRESET_COUNT); }
     else if (sel==kLinkRow)            { lastActionMs = now; goToPage(Page::Logging); return; }
+    else if (sel==kBootRow)            { lastActionMs = now; BootLock::manage(); drawAll(); return; }
     changedByButtons=true;
     lastActionMs = now;
   }

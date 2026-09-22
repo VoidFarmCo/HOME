@@ -142,7 +142,14 @@ static String kbInputVisibleText(const String& value, bool cursorOn, int maxPixe
   return tail;
 }
 
-void drawInputField(const String& value, bool cursorOn) {
+void drawInputField(const String& value, bool cursorOn, bool mask = false) {
+  String shown = value;
+  if (mask) {
+    /* Length still shows, which is the usual trade: it is what lets you see
+     * that a keypress registered. */
+    for (size_t i = 0; i < shown.length(); i++) shown.setCharAt(i, '*');
+    return drawInputField(shown, cursorOn, false);
+  }
   constexpr int padX = 5;
   constexpr int padY = 5;
   const int innerW = INPUT_W - padX * 2;
@@ -284,7 +291,7 @@ OnScreenKeyboardResult showOnScreenKeyboard(const OnScreenKeyboardConfig& cfg,
   unsigned long lastBlink = millis();
 
   drawTitles(cfg);
-  drawInputField(res.text, cursorOn);
+  drawInputField(res.text, cursorOn, cfg.maskInput);
   drawKeyboardKeys(activeRows, activeRowCount, upperCase, symbolMode);
   drawButtons(cfg);
 
@@ -295,7 +302,7 @@ OnScreenKeyboardResult showOnScreenKeyboard(const OnScreenKeyboardConfig& cfg,
     unsigned long now = millis();
     if (now - lastBlink >= CURSOR_BLINK_MS) {
       cursorOn = !cursorOn;
-      drawInputField(res.text, cursorOn);
+      drawInputField(res.text, cursorOn, cfg.maskInput);
       lastBlink = now;
     }
 
@@ -346,7 +353,7 @@ OnScreenKeyboardResult showOnScreenKeyboard(const OnScreenKeyboardConfig& cfg,
           }
 
           drawKeyboardKeys(activeRows, activeRowCount, upperCase, symbolMode);
-          drawInputField(res.text, cursorOn);
+          drawInputField(res.text, cursorOn, cfg.maskInput);
           hitSomething = true;
           break;
         }
@@ -372,11 +379,11 @@ OnScreenKeyboardResult showOnScreenKeyboard(const OnScreenKeyboardConfig& cfg,
       if (cfg.enableShuffle && cfg.shuffleNames && cfg.shuffleCount > 0) {
         res.text = cfg.shuffleNames[shuffleIndex];
         shuffleIndex = (shuffleIndex + 1) % cfg.shuffleCount;
-        drawInputField(res.text, cursorOn);
+        drawInputField(res.text, cursorOn, cfg.maskInput);
       } else {
         if (res.text.length() > 0) {
           res.text.remove(res.text.length() - 1);
-          drawInputField(res.text, cursorOn);
+          drawInputField(res.text, cursorOn, cfg.maskInput);
         }
       }
       continue;

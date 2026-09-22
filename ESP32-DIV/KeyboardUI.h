@@ -30,6 +30,13 @@ struct OnScreenKeyboardConfig {
   bool enableShuffle;
   bool requireNonEmpty;
   const char* emptyErrorMsg;
+
+  /* Show dots instead of the characters. Has an initialiser because every
+   * caller in the tree declares `OnScreenKeyboardConfig cfg;` and then
+   * assigns each field by name -- a new field with no default would be
+   * indeterminate in all of them, and this one decides whether a password
+   * is drawn on the screen. */
+  bool maskInput = false;
 };
 
 struct OnScreenKeyboardResult {
