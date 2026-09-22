@@ -328,7 +328,7 @@ void drawConfirm() {
   int y = 30;
   tft.setTextColor(ORANGE, TFT_BLACK);
   tft.drawString("PROBE -- THIS TRANSMITS", 8, y);
-  y += 16;
+  y += PUEO_BODY_LINE;
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   char line[40];
@@ -336,7 +336,7 @@ void drawConfirm() {
            s_target[0], s_target[1], s_target[2],
            s_target[3], s_target[4], s_target[5]);
   tft.drawString(line, 8, y);
-  y += 18;
+  y += PUEO_BODY_LINE;
 
   tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
   const char* what[] = {
@@ -356,7 +356,7 @@ void drawConfirm() {
   };
   for (size_t i = 0; i < sizeof(what) / sizeof(what[0]); i++) {
     tft.drawString(what[i], 8, y);
-    y += 11;
+    y += PUEO_BODY_LINE;
   }
 
   y += 6;
@@ -376,7 +376,7 @@ void drawRunning() {
   snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X",
            s_target[0], s_target[1], s_target[2],
            s_target[3], s_target[4], s_target[5]);
-  tft.drawString(line, 8, 56);
+  tft.drawString(line, 8, 40 + PUEO_BODY_LINE);
 }
 
 void drawResult() {

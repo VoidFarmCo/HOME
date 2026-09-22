@@ -773,9 +773,13 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #if PUEO_PANEL_35
 #define PUEO_BODY_FONT 2
 #define PUEO_BODY_H    16
+#define PUEO_BODY_LINE 18   /* pitch between consecutive lines */
+#define PUEO_BODY_SIZE 2    /* for drawString's size argument, font 1 */
 #else
 #define PUEO_BODY_FONT 1
 #define PUEO_BODY_H    10
+#define PUEO_BODY_LINE 11
+#define PUEO_BODY_SIZE 1
 #endif
 
 #if PUEO_PANEL_35

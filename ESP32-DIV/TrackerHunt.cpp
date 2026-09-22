@@ -508,9 +508,10 @@ void drawGauge() {
     showLine(s_shownTrend, sizeof(s_shownTrend), "LOST",
              d.cx, ty, 3, TFT_DARKGREY, crossed);
     showLine(s_shownBand, sizeof(s_shownBand), "moved off, shielded, or",
-             d.cx, ty + 30, 1, TFT_DARKGREY, crossed);
+             d.cx, ty + 30, PUEO_BODY_SIZE, TFT_DARKGREY, crossed);
     showLine(s_shownNums, sizeof(s_shownNums),
-             "changed address -- Exit and re-pick", d.cx, ty + 42, 1,
+             "changed address -- Exit and re-pick",
+             d.cx, ty + 30 + 12 * PUEO_BODY_SIZE, PUEO_BODY_SIZE,
              TFT_DARKGREY, crossed);
     return;
   }
@@ -586,7 +587,7 @@ void drawGauge() {
   snprintf(line, sizeof(line), "%d dBm    best %d    %lu seen",
            sm, (int)s_peak, (unsigned long)s_lockHits);
   showLine(s_shownNums, sizeof(s_shownNums), line,
-           d.cx, by + 18, 1, TFT_DARKGREY, crossed);
+           d.cx, by + 18, PUEO_BODY_SIZE, TFT_DARKGREY, crossed);
 }
 
 void enterGauge() {
