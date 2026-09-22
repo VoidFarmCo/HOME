@@ -4,8 +4,18 @@
 #include "utils.h"
 
 
+/* Deserialising copies every key into the document, so the load side needs
+ * more room than the save side for the same settings. Overflow does not
+ * throw: deserializeJson returns NoMemory, settingsLoad returns false, and
+ * the device boots on defaults with a card full of perfectly good settings
+ * on it. Sized with headroom for that reason, and named once so the three
+ * uses cannot drift apart. */
+static constexpr size_t kSettingsJsonSize = 768;
+
 static AppSettings g_settings;
 AppSettings& settings() { return g_settings; }
+
+bool sdLoggingAllowed() { return g_settings.logToSd; }
 
 static const AccentOption kAccentPresets[] = {
   {"Orange", 0xFBE4},
@@ -42,7 +52,7 @@ void settingsApplyBoardTouchDefaults() {
   s.touchYMax = TOUCH_Y_MAX;
 }
 
-static bool settingsTouchSavedForBoard(const StaticJsonDocument<512>& doc) {
+static bool settingsTouchSavedForBoard(const StaticJsonDocument<kSettingsJsonSize>& doc) {
   JsonObjectConst touch = doc["touch"];
   if (touch.isNull()) {
     return false;
@@ -92,7 +102,7 @@ bool settingsLoad() {
   File f = SD.open(SETTINGS_PATH, FILE_READ);
   if (!f) return false;
 
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<kSettingsJsonSize> doc;
   DeserializationError err = deserializeJson(doc, f);
   f.close();
   if (err) return false;
@@ -105,6 +115,7 @@ bool settingsLoad() {
 
   s.autoWifiScan    = doc["autoWifiScan"]    | s.autoWifiScan;
   s.autoBleScan     = doc["autoBleScan"]     | s.autoBleScan;
+  s.logToSd         = doc["logToSd"]         | s.logToSd;
 
   if (s.autoWifiScan != s.autoBleScan) {
     bool en = (s.autoWifiScan || s.autoBleScan);
@@ -142,7 +153,7 @@ bool settingsSave() {
   }
 
   auto& s = g_settings;
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<kSettingsJsonSize> doc;
   doc["board"]           = TOUCH_PROFILE_ID;
   doc["brightness"]      = s.brightness;
   doc["theme"]           = (uint8_t)s.theme;
@@ -151,6 +162,7 @@ bool settingsSave() {
 
   doc["autoWifiScan"]    = s.autoWifiScan;
   doc["autoBleScan"]     = s.autoBleScan;
+  doc["logToSd"]         = s.logToSd;
 
   JsonObject t = doc.createNestedObject("touch");
   t["xMin"] = s.touchXMin;

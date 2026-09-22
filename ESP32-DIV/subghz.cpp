@@ -4,6 +4,7 @@
 #include "Touchscreen.h"
 #include "config.h"
 #include "icon.h"
+#include "SettingsStore.h"
 #include "shared.h"
 #include "SpiBus.h"
 
@@ -3884,7 +3885,10 @@ static bool jdMountSD() {
 }
 
 static void logEvent(uint32_t whenMs, uint32_t durMs, int peakDbm, int dutyPct) {
-  if (!logEnabled) return;
+  /* Both, and not just the toggle. The toggle cannot be turned on while
+   * Settings says no, so this is redundant -- and it is the line that
+   * actually keeps the promise, so it is the line worth being sure of. */
+  if (!logEnabled || !sdLoggingAllowed()) return;
 
   restoreSdAfterSharedSpi();
   if (jdMountSD()) {
@@ -3996,8 +4000,13 @@ static void jdRunUI() {
           s_disp.freqIdx = 255;
           break;
         case 1:
-          logEnabled = !logEnabled;
-          s_disp.logOn = !logEnabled;
+          /* Settings holds the master switch; this one only chooses within
+           * it. Pressing it while logging is off leaves the cell reading
+           * "n/a", which is the answer to why nothing happened. */
+          if (sdLoggingAllowed()) {
+            logEnabled = !logEnabled;
+            s_disp.logOn = !logEnabled;
+          }
           break;
         case 2:
           jdResetStats();
@@ -4168,8 +4177,10 @@ static void jdUpdateInfo(int rssiNow, int dutyPct) {
   }
 
   if (full || s_disp.logOn != logEnabled) {
+    const bool allowed = sdLoggingAllowed();
     jdDrawValueCell(kJdCol2ValueX, kJdInfoRow2Y, kJdCol2ValueW,
-                    logEnabled ? "on" : "off", logEnabled ? UI_OK : UI_DIM_TEXT);
+                    !allowed ? "n/a" : (logEnabled ? "on" : "off"),
+                    (allowed && logEnabled) ? UI_OK : UI_DIM_TEXT);
     s_disp.logOn = logEnabled;
   }
 
@@ -4288,8 +4299,10 @@ static void handleInput() {
     jdResetStats();
   }
   if (edge(BTN_DOWN, prevDown) || navLog) {
-    logEnabled = !logEnabled;
-    s_disp.logOn = !logEnabled;
+    if (sdLoggingAllowed()) {
+      logEnabled = !logEnabled;
+      s_disp.logOn = !logEnabled;
+    }
   }
 }
 

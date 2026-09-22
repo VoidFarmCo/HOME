@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include "SettingsStore.h"
 #include <TFT_eSPI.h>
 #include <math.h>
 #include <stdint.h>
@@ -3511,7 +3512,11 @@ static void wardBgTask(void* /*param*/) {
   snprintf(path, sizeof(path), "/wd_%lu.csv", (unsigned long)millis());
   strncpy(s_bgPath, path, sizeof(s_bgPath));
 
-  File logf = SD.open(path, FILE_WRITE);
+  /* A wardrive is a log; there is nothing left of it with the log removed.
+   * Background sessions end here the same way they end with no card in the
+   * slot -- quietly, which is this path's existing manner and not something
+   * this switch introduced. The foreground session below says why. */
+  File logf = sdLoggingAllowed() ? SD.open(path, FILE_WRITE) : File();
   if (!logf) {
     s_bgPath[0] = '\0';
     gpsPortClose();
@@ -3718,9 +3723,12 @@ void session() {
     delay(80);
 
     snprintf(path, sizeof(path), "/wd_%lu.csv", (unsigned long)millis());
-    logf = SD.open(path, FILE_WRITE);
+    logf = sdLoggingAllowed() ? SD.open(path, FILE_WRITE) : File();
     if (!logf) {
-      if (wardWaitStartupFailureDismiss("Wardriver", "Could not create log file on SD.")) {
+      if (wardWaitStartupFailureDismiss(
+              "Wardriver",
+              sdLoggingAllowed() ? "Could not create log file on SD."
+                                 : "SD logging is off in Settings.")) {
         s_wardRetrySession = true;
       }
       gpsPortClose();

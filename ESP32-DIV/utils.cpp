@@ -1779,14 +1779,67 @@ static int  sel = 0;
 static bool dirtySettings = false;
 static bool uiDirty = false;
 
-static const char* items[] = {"Brightness", "Theme", "Accent", "NeoPixel", "Auto Scan"};
-static const int N = sizeof(items)/sizeof(items[0]);
+/* The first three rows each have their own widget -- a slider, a pair of
+ * words, a swatch. Everything after them is the same switch with a different
+ * label and a different field, so it is a table rather than another sel== arm
+ * in each of the four places that used to enumerate the rows: drawAll,
+ * redrawIfChanged, handleTouch, and the left/right key handler. Adding a
+ * setting was four edits and nothing told you when you had made three. */
+struct SwitchRow {
+  const char* label;
+  bool AppSettings::*a;
+  bool AppSettings::*b;   /* moves with `a`, or nullptr for a single field */
+};
+
+static const SwitchRow kSwitchRows[] = {
+  {"NeoPixel",  &AppSettings::neopixelEnabled, nullptr},
+  /* Wi-Fi and BLE background scanning have always been one switch on this
+   * screen and two fields in the file. Kept as two so an existing
+   * settings.json still loads, and settingsLoad() still forces them equal
+   * if something ever writes them apart. */
+  {"Auto Scan", &AppSettings::autoWifiScan, &AppSettings::autoBleScan},
+  {"Log to SD", &AppSettings::logToSd, nullptr},
+};
+
+static const char* const kFixedRows[] = {"Brightness", "Theme", "Accent"};
+static const int kFirstSwitch = sizeof(kFixedRows)/sizeof(kFixedRows[0]);
+static const int kSwitchCount = sizeof(kSwitchRows)/sizeof(kSwitchRows[0]);
+static const int N = kFirstSwitch + kSwitchCount;
+
+static const char* rowLabel(int i) {
+  return (i < kFirstSwitch) ? kFixedRows[i] : kSwitchRows[i - kFirstSwitch].label;
+}
+
+/* Read and write a switch row's field(s). A two-field row reads as on when
+ * either is on, which is what the old Auto Scan arm did, and writes both. */
+static bool switchValue(const AppSettings& s, int k) {
+  const SwitchRow& r = kSwitchRows[k];
+  return (s.*(r.a)) || (r.b != nullptr && (s.*(r.b)));
+}
+static bool switchSettled(const AppSettings& s, int k, bool en) {
+  const SwitchRow& r = kSwitchRows[k];
+  return (s.*(r.a)) == en && (r.b == nullptr || (s.*(r.b)) == en);
+}
+
+/* The list has to stop above the footer, and nothing on screen says when it
+ * stops doing so -- the last row simply draws under the Back and Save
+ * buttons, and on a board you are not holding, not at all.
+ *
+ * The 2.8" is the binding panel and Log to SD was the last row that fits on
+ * it: six rows clear the toast line by ten pixels, seven do not. The 3.5"
+ * has room for about ten. So the next setting added here needs paging or
+ * scrolling first, which is what this says when it fires -- and it does
+ * fire; a seventh row was added to check that it does. Not a smaller ROW_H:
+ * these rows are already a 32 px touch target. */
+static const int kFooterTop = PUEO_SCREEN_H - 24 - 8;   /* backRect() y */
+static const int kToastTop  = kFooterTop - 18;          /* footerToast() y */
+static_assert(TITLE_Y + TITLE_H + 6 + (N - 1) * (ROW_H + GAP_Y) + ROW_H <= kToastTop,
+              "settings rows run under the footer -- add paging, not another row");
 
 static uint8_t  last_brightness;
 static Theme    last_theme;
 static uint8_t  last_accent;
-static bool     last_neopixel;
-static bool     last_autoScan;
+static bool     last_switch[kSwitchCount];
 static int      last_sel;
 
 static bool dragging = false;
@@ -1818,7 +1871,7 @@ static void drawCardStatic(int i, bool selected) {
   tft.setTextColor(textDim, UI_BG);
   int ty = r.y + (r.h/2 - 6);
   tft.setCursor(r.x, ty);
-  tft.print(items[i]);
+  tft.print(rowLabel(i));
 
   tft.drawLine(PAD_X, r.y + r.h - 1, SCREEN_W - PAD_X, r.y + r.h - 1, UI_LINE);
 }
@@ -2021,8 +2074,6 @@ static void drawSwitchRow(bool on, bool selected, int row) {
   drawSwitchWidgetRow(on, selected, row);
 }
 
-static void drawNeoPixel(bool on, bool selected) { drawSwitchRow(on, selected, 3); }
-static void drawAutoScan(bool on, bool selected) { drawSwitchRow(on, selected, 4); }
 
 static Rect backRect(){
   int h = tft.height();
@@ -2080,9 +2131,9 @@ static void drawAll() {
   drawBrightness(s.brightness, sel==0);
   drawTheme(s.theme, sel==1);
   drawAccent(s.accentColor, sel==2);
-  drawNeoPixel(s.neopixelEnabled, sel==3);
-  bool autoScan = (s.autoWifiScan || s.autoBleScan);
-  drawAutoScan(autoScan, sel==4);
+  for (int k = 0; k < kSwitchCount; k++) {
+    drawSwitchRow(switchValue(s, k), sel == kFirstSwitch + k, kFirstSwitch + k);
+  }
 
   drawFooter(false, false);
 
@@ -2090,8 +2141,7 @@ static void drawAll() {
   last_brightness = s.brightness;
   last_theme      = s.theme;
   last_accent     = s.accentColor;
-  last_neopixel   = s.neopixelEnabled;
-  last_autoScan     = autoScan;
+  for (int k = 0; k < kSwitchCount; k++) last_switch[k] = switchValue(s, k);
   uiDirty = false;
 }
 
@@ -2109,23 +2159,23 @@ static void redrawIfChanged() {
     drawCardStatic(0, sel==0);  drawBrightnessWidget(s.brightness, sel==0);
     drawCardStatic(1, sel==1);  drawThemeWidget(s.theme, sel==1);
     drawCardStatic(2, sel==2);  drawAccentWidget(s.accentColor, sel==2);
-    drawCardStatic(3, sel==3);  drawSwitchWidgetRow(s.neopixelEnabled, sel==3, 3);
-    bool autoScan = (s.autoWifiScan || s.autoBleScan);
-    drawCardStatic(4, sel==4);  drawSwitchWidgetRow(autoScan, sel==4, 4);
+    for (int k = 0; k < kSwitchCount; k++) {
+      const int row = kFirstSwitch + k;
+      drawCardStatic(row, sel==row);
+      drawSwitchWidgetRow(switchValue(s, k), sel==row, row);
+    }
     last_sel = sel;
   } else {
     if (s.brightness != last_brightness) {
       drawBrightnessWidget(s.brightness, sel==0);
       last_brightness = s.brightness;
     }
-    if (s.neopixelEnabled != last_neopixel) {
-      drawSwitchWidgetRow(s.neopixelEnabled, sel==3, 3);
-      last_neopixel = s.neopixelEnabled;
-    }
-    bool autoScan = (s.autoWifiScan || s.autoBleScan);
-    if (autoScan != last_autoScan) {
-      drawSwitchWidgetRow(autoScan, sel==4, 4);
-      last_autoScan = autoScan;
+    for (int k = 0; k < kSwitchCount; k++) {
+      const bool v = switchValue(s, k);
+      if (v != last_switch[k]) {
+        drawSwitchWidgetRow(v, sel == kFirstSwitch + k, kFirstSwitch + k);
+        last_switch[k] = v;
+      }
     }
     if (s.theme != last_theme) {
       drawThemeWidget(s.theme, sel==1);
@@ -2178,21 +2228,12 @@ static bool applyAccent(uint8_t preset){
   lastChangeMs = millis();
   return true;
 }
-static bool applyNeoPixel(bool en){
+static bool applySwitch(int k, bool en){
   auto& s = settings();
-  if (s.neopixelEnabled == en) return false;
-  s.neopixelEnabled = en;
-  dirtySettings = true;
-  uiDirty = true;
-  lastChangeMs = millis();
-  return true;
-}
-
-static bool applyAutoScan(bool en){
-  auto& s = settings();
-  if (s.autoWifiScan == en && s.autoBleScan == en) return false;
-  s.autoWifiScan = en;
-  s.autoBleScan  = en;
+  if (switchSettled(s, k, en)) return false;
+  const SwitchRow& r = kSwitchRows[k];
+  s.*(r.a) = en;
+  if (r.b != nullptr) s.*(r.b) = en;
   dirtySettings = true;
   uiDirty = true;
   lastChangeMs = millis();
@@ -2293,22 +2334,13 @@ static void handleTouch() {
     } else {
       accentArmed = true;
     }
-  } else if (sel == 3) {
-    Rect tr = rSwitchTrack(3);
+  } else if (sel >= kFirstSwitch) {
+    const int k = sel - kFirstSwitch;
+    Rect tr = rSwitchTrack(sel);
     if (tx >= tr.x && tx <= tr.x+tr.w && ty >= tr.y-10 && ty <= tr.y+tr.h+10) {
       uint32_t now = millis();
       if (now - lastToggleMs > 120) {
-        applyNeoPixel(!s.neopixelEnabled);
-        lastToggleMs = now;
-      }
-    }
-  } else if (sel == 4) {
-    Rect tr = rSwitchTrack(4);
-    if (tx >= tr.x && tx <= tr.x+tr.w && ty >= tr.y-10 && ty <= tr.y+tr.h+10) {
-      uint32_t now = millis();
-      if (now - lastToggleMs > 120) {
-        bool autoScan = (s.autoWifiScan || s.autoBleScan);
-        applyAutoScan(!autoScan);
+        applySwitch(k, !switchValue(s, k));
         lastToggleMs = now;
       }
     }
@@ -2365,8 +2397,7 @@ void loop(){
     if (sel==0 && s.brightness>0)      { applyBrightness(s.brightness>8? s.brightness-8:0); }
     else if (sel==1)                   { applyTheme(Theme::Dark); }
     else if (sel==2)                   { applyAccent((s.accentColor + ACCENT_PRESET_COUNT - 1) % ACCENT_PRESET_COUNT); }
-    else if (sel==3)                   { applyNeoPixel(false); }
-    else if (sel==4)                   { applyAutoScan(false); }
+    else if (sel>=kFirstSwitch)        { applySwitch(sel-kFirstSwitch, false); }
     changedByButtons=true;
     lastActionMs = now;
   }
@@ -2375,8 +2406,7 @@ void loop(){
     if (sel==0 && s.brightness<255)    { applyBrightness(s.brightness+8); }
     else if (sel==1)                   { applyTheme(Theme::Light); }
     else if (sel==2)                   { applyAccent((s.accentColor + 1) % ACCENT_PRESET_COUNT); }
-    else if (sel==3)                   { applyNeoPixel(true); }
-    else if (sel==4)                   { applyAutoScan(true); }
+    else if (sel>=kFirstSwitch)        { applySwitch(sel-kFirstSwitch, true); }
     changedByButtons=true;
     lastActionMs = now;
   }

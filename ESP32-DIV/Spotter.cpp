@@ -101,6 +101,7 @@ uint32_t s_capSeen[kCapSeen];
 
 bool     s_logging   = false;
 bool     s_logFailed = false;
+bool     s_logBlocked = false;   // refused by Settings, not by the card
 uint32_t s_logRows   = 0;
 File     s_logFile;
 
@@ -324,6 +325,15 @@ namespace {
 
 bool captureStart() {
   s_logFailed = false;
+  s_logBlocked = false;
+
+  /* Asked before the card is even looked at, so pressing REC with logging
+   * switched off says so rather than saying "no SD" at a card that is
+   * sitting right there. */
+  if (!sdLoggingAllowed()) {
+    s_logBlocked = true;
+    return false;
+  }
 
   if (!isSDCardAvailable()) {
     s_logFailed = true;
@@ -855,6 +865,10 @@ void drawHeader() {
   int tagX = 180;
   if (s_logging) {
     snprintf(tag, sizeof(tag), "REC %lu", (unsigned long)s_logRows);
+  } else if (s_logBlocked) {
+    snprintf(tag, sizeof(tag), "log off");
+    tagColour = ORANGE;
+    tagX = 180;
   } else if (s_logFailed) {
     snprintf(tag, sizeof(tag), "no SD");
     tagColour = ORANGE;
@@ -1022,6 +1036,7 @@ void spotterSetup() {
 
   s_logging = false;
   s_logFailed = false;
+  s_logBlocked = false;
   s_dwellAlerted = false;
   s_logRows = 0;
   s_capHead = 0;

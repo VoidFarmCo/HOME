@@ -6133,6 +6133,9 @@ static bool esbOpenLogFile() {
   if (s_logFileOpen) {
     return true;
   }
+  if (!sdLoggingAllowed()) {
+    return false;
+  }
   if (!esbEnsureDir()) {
     return false;
   }
@@ -6496,7 +6499,9 @@ static void esbToggleLog() {
     s_sdReady = esbOpenLogFile();
     if (!s_sdReady) {
       s_logEnabled = false;
-      esbAppendLogLine("[!] SD open failed", UI_WARN);
+      esbAppendLogLine(sdLoggingAllowed() ? "[!] SD open failed"
+                                          : "[!] SD logging off in Settings",
+                       UI_WARN);
     } else {
       esbAppendLogLine("[+] SD logging on", UI_OK);
     }
