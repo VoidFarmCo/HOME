@@ -565,7 +565,6 @@ namespace replayat {
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 #define SCREENHEIGHT PUEO_SCREEN_H
-constexpr int SCREEN_HEIGHT = 320;
 
 static bool uiDrawn = false;
 
@@ -1702,7 +1701,6 @@ static bool uiDrawn = false;
 #define MAX_NAME_LENGTH    16
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
-constexpr int SCREEN_HEIGHT = 320;
 
 RCSwitch mySwitch = RCSwitch();
 struct __attribute__((packed)) Profile {
@@ -2412,7 +2410,6 @@ static unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 200;
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
-constexpr int SCREEN_HEIGHT = 64;
 
 static constexpr uint8_t JAM_BTN_LEFT  = 4;
 static constexpr uint8_t JAM_BTN_RIGHT = 5;

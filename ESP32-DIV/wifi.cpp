@@ -4335,7 +4335,6 @@ void cportalLoop() {
 namespace Deauther {
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
-constexpr int SCREEN_HEIGHT = 320;
 
 static unsigned long deautherLastButtonPress = 0;
 static const unsigned long deautherDebounceTime = 200;
@@ -4991,7 +4990,6 @@ void deautherLoop() {
 namespace ProbeRequestFlood {
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
-constexpr int SCREEN_HEIGHT = 320;
 
 // Larger row height = easier touch selection.
 static constexpr int LIST_HEADER_Y = 50;
@@ -5681,7 +5679,6 @@ void probeRequestFloodLoop() {
 namespace HiddenSsidReveal {
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
-constexpr int SCREEN_HEIGHT = 320;
 #undef STATUS_BAR_Y_OFFSET
 constexpr int STATUS_BAR_Y_OFFSET = 20;
 constexpr int STATUS_BAR_HEIGHT = 16;
@@ -9347,7 +9344,7 @@ namespace FirmwareUpdate {
 const char* host = "esp32";
 
 constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
-constexpr int SCREEN_HEIGHT = 320;
+constexpr int SCREEN_HEIGHT = PUEO_SCREEN_H;
 
 #define BUTTON_WIDTH 230
 #define BUTTON_HEIGHT 20

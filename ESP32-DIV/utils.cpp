@@ -1699,7 +1699,14 @@ void terminalLoop() {
 
 namespace AppSettingsUI {
 
-static const int SCREEN_W = 240;
+/* The panel, not a 240 px memory of one. This settings screen drew its rows
+ * 240 wide on a 320 wide display -- 80 px of dead space on the right, and row
+ * clears that only wiped two thirds of the row.
+ *
+ * It survived the panel sweep twice over: the check looks for SCREEN_WIDTH
+ * and this is SCREEN_W, and it looks for #define and constexpr and this is
+ * static const int. Both halves of the name and both halves of the form. */
+static const int SCREEN_W = PUEO_SCREEN_W;
 static const int BAR_H    = 22;
 static const int TITLE_Y  = BAR_H + 4;
 static const int TITLE_H  = 16;

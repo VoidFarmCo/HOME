@@ -305,7 +305,7 @@ static void bleSetSpooferNavLabels() {
 
 namespace BleSpoofer {
 
-constexpr int SCREEN_HEIGHT = 250;
+constexpr int SCREEN_HEIGHT = PUEO_SCREEN_H - 70;   /* body, not panel */
 constexpr int LINE_HEIGHT = 12;
 constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
@@ -3659,7 +3659,7 @@ void hopStep(const byte* channels, size_t count) {
 }
 
 
-constexpr int SCREEN_HEIGHT = 320;
+constexpr int SCREEN_HEIGHT = PUEO_SCREEN_H;
 constexpr int LINE_HEIGHT = 12;
 constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
@@ -4608,7 +4608,7 @@ static constexpr int kScannerLogBoxTop = kScannerStatusY + kScannerStatusBoxH + 
 static constexpr int kScannerLogStartY = kScannerLogBoxTop + kScannerBoxHeaderH;
 static constexpr int kScannerLogEndY = kScannerLogBoxTop + kScannerLogBoxH - 2;
 
-constexpr int SCREEN_HEIGHT = 180;
+constexpr int SCREEN_HEIGHT = PUEO_SCREEN_H - 140;  /* body, not panel */
 constexpr int LINE_HEIGHT = 12;
 constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 
@@ -5583,7 +5583,7 @@ void hopStep(const byte* channels, size_t count) {
 }
 
 
-constexpr int SCREEN_HEIGHT = 320;
+constexpr int SCREEN_HEIGHT = PUEO_SCREEN_H;
 constexpr int LINE_HEIGHT = 12;
 constexpr int MAX_LINES = (SCREEN_HEIGHT / LINE_HEIGHT);
 

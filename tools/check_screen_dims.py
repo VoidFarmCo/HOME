@@ -45,6 +45,13 @@ BARE = [
     (re.compile(r"#\s*define\s+MAX_Y\s+\d"), "#define MAX_Y <literal>"),
     (re.compile(r"constexpr\s+int\s+SCREEN_WIDTH\s*=\s*\d"),
      "constexpr int SCREEN_WIDTH = <literal>"),
+    # A settings screen carried `static const int SCREEN_W = 240` past two
+    # sweeps: the patterns above name SCREEN_WIDTH and this is SCREEN_W, and
+    # they name #define and constexpr and this is static const int. Both
+    # halves of the name and both halves of the form. Match the shape.
+    (re.compile(r"(?:static\s+)?(?:const|constexpr)\s+int\s+"
+                r"SCREEN_(?:WIDTH|HEIGHT|W|H)\b\s*=\s*\d"),
+     "SCREEN_W/H/WIDTH/HEIGHT declared as a literal"),
 ]
 
 # A status-bar icon row anchored to a fixed x instead of to the right edge.
