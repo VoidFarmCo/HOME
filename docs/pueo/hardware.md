@@ -40,15 +40,25 @@ Sunton's larger outline, and it puts the RGB LED's red channel on GPIO 22
 and an audio amplifier's enable on GPIO 4. Nothing here has been built for
 it, and the 2.8" image would drive that amplifier as a chip select.
 
-**The two boards do not agree about GPIO 4.** On the 2.8" ESP32-2432S028R it
-is the RGB LED's red channel. On the 3.5" ESP32-3248S035R -- lcdwiki's E32R35T,
-55.50 x 101.50 x 5.80 mm -- it is the **audio amplifier's enable**, and the RGB
-LED's red channel moves to GPIO 22.
+**Both Sunton boards agree about GPIO 4: it is the RGB LED's red channel.**
+That was measured on 2026-09-23, by driving each candidate low in turn -- the
+LED is common anode, so a pin sinks its own channel -- and watching which
+colour came up. GPIO 4 red, 16 blue, 17 green, and 22 nothing at all.
 
-Spending an LED is the trade this pin map already makes. Keying an amplifier
-enable at chip-select rates is not: it clicks, and it draws current off a rail
-already carrying the display. So NRF24 CSN follows the panel, 4 on the 2.8" and
-**25 on the 3.5"**. 25 is free there for the same reason it is not free on the
+Until then this section said GPIO 4 was an **audio amplifier's enable** on the
+3.5" with RGB red moved to 22. That is true of lcdwiki's E32R35T and of
+nothing in this build. The pin map had been following a datasheet for a board
+nobody here owns.
+
+It cost less than it might have. NRF24 CSN follows the panel, 4 on the 2.8"
+and **25 on the 3.5"**, and the reason given for the split -- that keying an
+amplifier enable at chip-select rates clicks and draws off the display's rail
+-- was about a hazard that is not there. CSN stays on 25 anyway: it is free on
+that panel, the split is published and built against, and the case for
+reverting rests on one measurement of one board, which is the same weight of
+evidence that put the amplifier there to begin with.
+
+25 is free there for the same reason it is not free on the
 2.8": that panel puts touch on its own bus at 25/32/39, while the 3.5" hangs its
 XPT2046 off the display's SPI behind TOUCH_CS. The pin that collides on one
 board is the spare on the other.

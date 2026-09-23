@@ -77,8 +77,8 @@ NRF24's chip select lands on an audio amplifier.
 |---|---|---|---|---|
 | Size | 2.8" | 3.5" | 2.8" | 3.5" |
 | Driver | ILI9341 | ST7796 | ILI9341V | ST7796 |
-| RGB LED | **4** / 16 / 17 | [verify] | **22** / 16 / 17 | **22** / 16 / 17 |
-| GPIO 4 is | the LED's red | [verify] | **amp enable** | **amp enable** |
+| RGB LED | **4** / 16 / 17 | **4** / 16 / 17 | **22** / 16 / 17 | **22** / 16 / 17 |
+| GPIO 4 is | the LED's red | the LED's red | **amp enable** | **amp enable** |
 | Backlight | 21 | **27** | 21 | 27 |
 | Breakouts | P3, CN1, P5 | **P3, CN1**, serial | 1.25 mm JST | SPI / I2C / UART JSTs |
 | Outline | ~56 × 92.5 mm | — | 50.00 × 86.00 | 55.50 × 101.50 |
@@ -90,17 +90,22 @@ wrong was this guide's description of its *connectors*: it has the same two
 breakouts as Sunton's 2.8" — P3 and CN1 — and none of lcdwiki's `SPI` /
 `I2C` / `UART` JSTs, which the table below used to promise.
 
-It has a `SPEAK` connector, so there is an amplifier on it. Which pin enables
-that, and whether GPIO 4 is the LED's red here as it is on the 2.8", has not
-been metered. Pueo puts `NRF24 CSN` on 25 rather than 4 on this panel
-regardless, so nothing depends on the answer yet.
+It has a `SPEAK` connector, so there is a speaker output on it, driven from
+GPIO 26 as Sunton's 2.8" drives its own. [verify] nothing has metered what
+sits between GPIO 26 and that connector here.
 
-**Pueo's 2.8" build targets the Sunton board**, where GPIO 4 is the LED's
-red channel and spending it is the trade this pin map makes. On any lcdwiki
-E32 board that pin is an amplifier's enable, and the 2.8" image would key it
-at chip-select rates. The 3.5" image already moves CSN to GPIO 25 for
-exactly that reason; the 2.8" image does not, because the board it is for
-does not need it to.
+**GPIO 4 on it is the RGB LED's red channel**, measured on 2026-09-23 by
+driving each candidate low in turn — the LED is common anode, so a pin sinks
+its own channel. GPIO 4 red, 16 blue, 17 green, 22 nothing. Both Sunton
+boards agree, and the "two vendors disagree about GPIO 4" warning above is
+about lcdwiki's parts rather than about the two panels this tree builds for.
+
+**Pueo's builds target Sunton boards**, where GPIO 4 is the LED's red channel
+and spending it is the trade this pin map makes. On any lcdwiki E32 board that
+pin is an amplifier's enable, and either image would key it at chip-select
+rates. The 3.5" image puts `NRF24 CSN` on GPIO 25 rather than 4, which was
+done to dodge an amplifier that is not on this board; 25 is free there and it
+stays, but the reason in the commit is not the reason in the hardware.
 
 **The lcdwiki 4.0" E32R40T should run the 3.5" image unchanged.** Every pin
 lcdwiki lists for it is the same as the E32R35T's -- display SPI on
@@ -113,6 +118,14 @@ ST7796U, and TFT_eSPI drives the family with one `ST7796_DRIVER`.
 So the firmware needs nothing: flash `pueo-<version>-35-merged.bin`. The
 name is then wrong about the diagonal and right about everything it
 actually selects.
+
+One exception, as of 2026-09-23: **sound would not work on it.** The 3.5"
+image used to assert GPIO 4 as an audio amplifier's enable, which is exactly
+right for an lcdwiki board and was doing nothing but blinking an LED on the
+Sunton one it is actually built for. That assert is gone. On an E32R40T the
+amplifier would now never be enabled — a one-line fix for anyone who has one,
+and a good illustration of why the pin map should not be carrying a second
+board's datasheet in the first place.
 
 What does not carry over is the enclosure. The 4.0" is 60.88 x 111.11 x
 5.65 mm against the 3.5"'s 55.50 x 101.50 x 5.80, and there is no outline
@@ -136,8 +149,8 @@ Both are sold as a "cheap yellow display" and they are not the same board.
 | Display | ILI9341, 240×320 | ST7796, 320×480 |
 | Touch | XPT2046 on its own bus, 25/32/39 | XPT2046 on the display's SPI, CS 33 |
 | Backlight | GPIO 21 | GPIO 27 |
-| RGB LED | 4 / 16 / 17 | **22** / 16 / 17 |
-| GPIO 4 is | the LED's red channel | **the audio amplifier's enable** |
+| RGB LED | 4 / 16 / 17 | 4 / 16 / 17 |
+| GPIO 4 is | the LED's red channel | the LED's red channel |
 | GPIO 34 is | an LDR | the battery divider |
 | Flash image | `pueo-<ver>-merged.bin` | `pueo-<ver>-35-merged.bin` |
 
@@ -255,9 +268,12 @@ three joints on a card slot did not kill the card slot.
 from +3V3_RF. Then the jamming detector: activity on screen is enough to say
 the bus and the chip select both work.
 
-**[verify] On a 3.5" board, CSN is GPIO 25, not GPIO 4.** GPIO 4 is the
-audio amplifier's enable on that panel and driving it as a chip select clicks
-the speaker. The firmware already picks 25 there; what this guide cannot do is
+**On a 3.5" board, CSN is GPIO 25, not GPIO 4.** Not because GPIO 4 is
+dangerous there — it is the RGB LED's red channel on this board, same as the
+2.8", and that was measured rather than read off a datasheet. The split came
+from believing 4 was an audio amplifier's enable, which is true of lcdwiki's
+E32R35T and not of this one. It stays on 25 because 25 is free there and the
+map is published. The firmware already picks 25; what this guide cannot do is
 solder the wire to the right pad for you. 25 is not on a header -- it is one of
 the pins the 2.8" uses for its separate touch bus, so on the 3.5" it is free but
 still needs finding on the silkscreen.
