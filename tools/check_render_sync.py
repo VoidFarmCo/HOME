@@ -93,7 +93,11 @@ def c_panel_consts(src, names, defines=None):
         m = re.match(r"(?:static\s+)?(?:const|constexpr)\s+u?int\w*\s+(\w+)"
                      r"\s*=\s*(-?\d+)\s*;", t)
         if not m:
-            m = re.match(r"#define\s+(\w+)\s+(-?\w+)\s*$", t)
+            # The trailing comment is not optional decoration to skip over:
+            # requiring end-of-line here made PUEO_BODY_LINE, _GAP and _SIZE
+            # invisible on the 3.5" arm, which is the only arm that carries
+            # the note explaining them.
+            m = re.match(r"#define\s+(\w+)\s+(-?\w+)\s*(?://|/\*|$)", t)
         if m and m.group(1) in out:
             v = m.group(2)
             if not v.lstrip("-").isdigit():
@@ -112,6 +116,19 @@ def c_plain_defines(src, names):
         if m:
             out[n] = int(m.group(1))
     return out
+
+
+def py_ternary(src, name):
+    """`NAME = 18 if panel == 35 else 11` -> (18, 11).
+
+    set_panel() writes a constant two ways: in the `if panel == 35:` arms
+    when several are set together, and as a one-line conditional when one
+    stands alone. py_panel_consts() reads the first and cannot see the
+    second, which is where the body metrics live.
+    """
+    m = re.search(r"^\s*%s\s*=\s*(-?\d+)\s+if\s+panel\s*==\s*35\s+else\s+"
+                  r"(-?\d+)\s*$" % name, src, re.M)
+    return (int(m.group(1)), int(m.group(2))) if m else None
 
 
 def py_panel_consts(src, names):
@@ -144,6 +161,8 @@ def main():
     shared = read(SKETCH / "shared.h")
     utils = read(SKETCH / "utils.cpp")
     spotter = read(SKETCH / "Spotter.cpp")
+    fastpair = read(SKETCH / "FastPairScan.cpp")
+    hunt = read(SKETCH / "TrackerHunt.cpp")
     drone = read(SKETCH / "DroneScan.cpp")
     rend = read(RENDER)
 
@@ -163,12 +182,102 @@ def main():
                         c_plain_defines(shared, ["PUEO_STATUS_SHORT"]))
     for cname, pname in (("PUEO_STATUS_TALL", "STATUS_TALL"),
                          ("PUEO_TILE_ICON", "TILE_ICON")):
-        m = re.search(r"%s\s*=\s*(\d+)\s+if\s+panel\s*==\s*35\s+else\s+(\d+)"
-                      % pname, rend)
-        got = (int(m.group(1)), int(m.group(2))) if m else None
+        got = py_ternary(rend, pname)
         ok('  %-18s 3.5" %s   2.8" %s' % (cname, c2[cname][0], c2[cname][1]),
            got is not None and got == c2[cname],
            "firmware %s, renderer %s" % (c2[cname], got))
+
+    print("\nthe body text on the list screens, per panel:")
+    # The 3.5" is the denser panel, so the same pixels are smaller text on
+    # it and the lists draw in font 2 there. Everything under it -- the line
+    # pitch, the band a redraw clears, the size a centred line is scaled to
+    # -- has to move with the font, on both sides of the fence.
+    body = c_panel_consts(shared, ["PUEO_BODY_FONT", "PUEO_BODY_H",
+                                   "PUEO_BODY_LINE", "PUEO_BODY_GAP",
+                                   "PUEO_BODY_SIZE"])
+    for cname, pname in (("PUEO_BODY_FONT", "BODY_FONT"),
+                         ("PUEO_BODY_LINE", "BODY_LINE"),
+                         ("PUEO_BODY_SIZE", "BODY_SIZE")):
+        got = py_ternary(rend, pname)
+        ok('  %-16s 3.5" %s   2.8" %s' % (cname, body[cname][0],
+                                          body[cname][1]),
+           got is not None and got == body[cname] and None not in body[cname],
+           "firmware %s, renderer %s" % (body[cname], got))
+
+    # PUEO_BODY_H and PUEO_BODY_GAP have no counterpart -- the renderer does
+    # not redraw in place and does not draw the prose screens -- so they are
+    # checked against the font instead. A band shorter than the glyph leaves
+    # the bottom of the old text on screen, and that is the defect that took
+    # four screens.
+    fh = {2: 16, 1: 8}
+    missing = sorted(n for n, v in body.items() if None in v)
+    ok("  every body constant was found on both arms", not missing,
+       "not resolved: %s" % ", ".join(missing))
+    for i, panel in ((0, '3.5"'), (1, '2.8"')):
+        if missing:
+            break
+        f, h, line, gap = (body["PUEO_BODY_FONT"][i], body["PUEO_BODY_H"][i],
+                           body["PUEO_BODY_LINE"][i], body["PUEO_BODY_GAP"][i])
+        ok("  %s PUEO_BODY_H %s covers a font-%s glyph" % (panel, h, f),
+           f in fh and h >= fh[f], "font %s is %s px tall" % (f, fh.get(f)))
+        ok("  %s the line pitch %s clears the band %s" % (panel, line, h),
+           line >= h, "lines would overlap")
+        ok("  %s the block gap %s is wider than the line pitch" % (panel, gap),
+           gap > line)
+
+    print("\nthe rows on each list screen, per panel:")
+    # Surveillance and Fast Pair draw the same three-line row; Hunt's picker
+    # draws two. The renderer replays all three.
+    rows = [
+        ("Spotter.cpp", spotter, [("kRowH", "BODY_ROW"),
+                                  ("kLine2", "BODY_LINE"),
+                                  ("kLine3", "BODY_LINE3")]),
+        ("FastPairScan.cpp", fastpair, [("kRowH", "BODY_ROW"),
+                                        ("kLine2", "BODY_LINE"),
+                                        ("kLine3", "BODY_LINE3")]),
+        ("TrackerHunt.cpp", hunt, [("kRowH", "HUNT_ROW_H"),
+                                   ("kRowLine2", "HUNT_ROW_LINE2")]),
+    ]
+    for fname, src, pairs in rows:
+        c3 = c_panel_consts(src, [c for c, _ in pairs])
+        for cname, pname in pairs:
+            got = py_ternary(rend, pname)
+            ok('  %-17s %-10s 3.5" %s   2.8" %s'
+               % (fname, cname, c3[cname][0], c3[cname][1]),
+               got is not None and got == c3[cname] and None not in c3[cname],
+               "firmware %s, renderer %s" % (c3[cname], got))
+
+    # Surveillance and Fast Pair are the same row by intent -- the comment in
+    # FastPairScan.cpp says so. It said so while they disagreed.
+    sp = c_panel_consts(spotter, ["kRowH", "kLine2", "kLine3"])
+    fp = c_panel_consts(fastpair, ["kRowH", "kLine2", "kLine3"])
+    ok("  Surveillance and Fast Pair draw the same row", sp == fp,
+       "Spotter %s, Fast Pair %s" % (sp, fp))
+
+    # Three lines have to fit the row they are in, or the last one lands on
+    # the next device's first.
+    #
+    # It is the glyph that has to fit, not the band. PUEO_BODY_H is the glyph
+    # plus its leading -- 10 for an 8 px font-1 glyph, 16 for font 2, which
+    # has none -- and the leading is allowed to reach into the top of the
+    # next row, because that row's own first line clears it again on the way
+    # past. The 2.8" has always relied on that: 21 + 10 is 31 in a 30 px row,
+    # and the text stops at 29.
+    for fname, src in (("Spotter.cpp", spotter),
+                       ("FastPairScan.cpp", fastpair)):
+        c3 = c_panel_consts(src, ["kRowH", "kLine3"])
+        for i, panel in ((0, '3.5"'), (1, '2.8"')):
+            glyph = fh.get(body["PUEO_BODY_FONT"][i])
+            rowh, lead = c3["kRowH"][i], body["PUEO_BODY_H"][i] - glyph
+            ok("  %s %s: the third line ends at %d in a %d px row"
+               % (fname, panel, c3["kLine3"][i] + glyph, rowh),
+               c3["kLine3"][i] + glyph <= rowh,
+               "it runs %d px into the next row's text"
+               % (c3["kLine3"][i] + glyph - rowh))
+            ok("  %s %s: and clears no further than %d px past it"
+               % (fname, panel, lead),
+               c3["kLine3"][i] + body["PUEO_BODY_H"][i] <= rowh + lead,
+               "the band would erase part of the next row")
 
     print("\nthe panel itself:")
     m = re.search(r"W,\s*H\s*=\s*\(320,\s*480\)\s*if\s*panel\s*==\s*35"

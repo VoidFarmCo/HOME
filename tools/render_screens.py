@@ -55,7 +55,7 @@ def set_panel(panel):
     global PANEL, W, H
     global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
     global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL, TILE_ICON
-    global BODY_FONT, BODY_LINE, BODY_ROW
+    global BODY_FONT, BODY_LINE, BODY_LINE3, BODY_ROW, BODY_SIZE
     PANEL = panel
     W, H = (320, 480) if panel == 35 else (240, 320)
     if panel == 35:
@@ -79,7 +79,14 @@ def set_panel(panel):
     # use font 2 there. The drone detector deliberately does not.
     BODY_FONT = 2 if panel == 35 else 1
     BODY_LINE = 18 if panel == 35 else 11
+    # kLine3 in Spotter.cpp and FastPairScan.cpp, not 2 * BODY_LINE: the
+    # 2.8" row is 30 px and two 11 px pitches under a 10 px glyph would
+    # spill into the next one, so its third line is compressed by a pixel.
+    BODY_LINE3 = 36 if panel == 35 else 21
     BODY_ROW = 54 if panel == 35 else 30
+    # PUEO_BODY_SIZE: font 1 scaled, for the places that draw centred text
+    # rather than a line. The gauge's distance readout is one of them.
+    BODY_SIZE = 2 if panel == 35 else 1
     global HUNT_ROW_H, HUNT_ROW_LINE2
     HUNT_ROW_H = 40 if panel == 35 else 22
     HUNT_ROW_LINE2 = 20 if panel == 35 else 12
@@ -801,7 +808,7 @@ def render_spotter(t):
         if h["rot"]:
             third += "+%d " % h["rot"]
         third += h["age"]
-        body(t, 8, y + 2 * BODY_LINE, third, DARKGREY, BLACK)
+        body(t, 8, y + BODY_LINE3, third, DARKGREY, BLACK)
 
         if h["corrob"]:
             body(t, W - 32, y, "**", RED, BLACK)
@@ -955,7 +962,7 @@ def render_hunt_gauge(t):
     t.draw_fast_vline(max(bx, min(bx + bw, ppx)), by - 3, 16, GREEN)
 
     t.centre_f1("%d dBm    best %d    %d seen" % (sm, peak, seen),
-                cx, by + 18, DARKGREY, BLACK, 1)
+                cx, by + 18, DARKGREY, BLACK, BODY_SIZE)
 
 
 # ── Fast Pair ──────────────────────────────────────────────────────────────
@@ -1015,7 +1022,7 @@ def render_fastpair(t):
         body(t, 8, y, d["line1"], d["col"], bg)
         body(t, 8, y + BODY_LINE, "%s %s %ddBm"
                    % (d["mac"], d["addr"], d["rssi"]), LIGHTGREY, bg)
-        body(t, 8, y + 2 * BODY_LINE, d["line3"], DARKGREY, bg)
+        body(t, 8, y + BODY_LINE3, d["line3"], DARKGREY, bg)
 
 
 def main():
