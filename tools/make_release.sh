@@ -111,6 +111,7 @@ INCLUDE=(
   "tools/check_stealth.py"
   "tools/check_render_sync.py"
   "tools/check_text_pitch.py"
+  "tools/check_text_fits.py"
   "tools/trace_logo.py"
   "tools/inline_logo.py"
   "tools/check_logo_scale.py"

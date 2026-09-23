@@ -91,6 +91,8 @@ int      s_prevAngle = -1;
 char     s_shownTrend[12] = {0};
 char     s_shownBand[16]  = {0};
 char     s_shownNums[56]  = {0};
+char     s_shownNums2[40] = {0};   /* the readout needs a third line at
+                                    * PUEO_BODY_SIZE; one will not fit */
 int      s_shownFill      = -1;
 int      s_shownPeakPx    = -1;
 int8_t   s_shownLost      = -1;   // -1 = nothing drawn yet
@@ -501,6 +503,7 @@ void drawGauge() {
   if (crossed) {
     tft.fillRect(0, ty, PUEO_SCREEN_W, contentBottom() - ty, TFT_BLACK);
     s_shownTrend[0] = s_shownBand[0] = s_shownNums[0] = '\0';
+    s_shownNums2[0] = '\0';
     s_shownFill = s_shownPeakPx = -1;
     s_shownLost = lost ? 1 : 0;
   }
@@ -508,11 +511,13 @@ void drawGauge() {
   if (lost) {
     showLine(s_shownTrend, sizeof(s_shownTrend), "LOST",
              d.cx, ty, 3, TFT_DARKGREY, crossed);
-    showLine(s_shownBand, sizeof(s_shownBand), "moved off, shielded, or",
+    showLine(s_shownBand, sizeof(s_shownBand), "moved off, shielded,",
              d.cx, ty + 30, PUEO_BODY_SIZE, TFT_DARKGREY, crossed);
-    showLine(s_shownNums, sizeof(s_shownNums),
-             "changed address -- Exit and re-pick",
+    showLine(s_shownNums, sizeof(s_shownNums), "or changed address",
              d.cx, ty + 30 + 12 * PUEO_BODY_SIZE, PUEO_BODY_SIZE,
+             TFT_DARKGREY, crossed);
+    showLine(s_shownNums2, sizeof(s_shownNums2), "Exit and re-pick",
+             d.cx, ty + 30 + 24 * PUEO_BODY_SIZE, PUEO_BODY_SIZE,
              TFT_DARKGREY, crossed);
     return;
   }
@@ -584,11 +589,17 @@ void drawGauge() {
     s_shownPeakPx = px;
   }
 
+  /* Two lines, because one does not fit. At PUEO_BODY_SIZE on the 3.5" a
+   * font-1 glyph advances 12 px, so 320 px holds 26 characters and the old
+   * single line was 31 of them -- it ran off both edges of the panel. */
   char line[52];
-  snprintf(line, sizeof(line), "%d dBm    best %d    %lu seen",
-           sm, (int)s_peak, (unsigned long)s_lockHits);
+  snprintf(line, sizeof(line), "%d dBm    best %d", sm, (int)s_peak);
   showLine(s_shownNums, sizeof(s_shownNums), line,
            d.cx, by + 18, PUEO_BODY_SIZE, TFT_DARKGREY, crossed);
+  snprintf(line, sizeof(line), "%lu seen", (unsigned long)s_lockHits);
+  showLine(s_shownNums2, sizeof(s_shownNums2), line,
+           d.cx, by + 18 + 12 * PUEO_BODY_SIZE, PUEO_BODY_SIZE,
+           TFT_DARKGREY, crossed);
 }
 
 void enterGauge() {

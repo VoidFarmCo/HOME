@@ -38,6 +38,17 @@ The screen Fast Pair is for, and the two checks that found it.
     "listening..." and the list of tracker families were 14 px apart under a
     16 px font, so they touched.
 
+  * Hunt's gauge was reading "7 dBm    best -45    143 se". TFT_eSPI does not
+    clip and does not wrap: a line wider than the panel is drawn anyway, off
+    both edges, and what survives is the middle. That line is 31 characters
+    and 0.4.7 doubled its glyphs, which made it 372 px on a 320 px screen.
+    The LOST screen had it worse -- "changed address -- Exit and re-pick" is
+    34 characters, 408 px.
+
+    Both are rewrapped onto lines that fit. It took making the renderer
+    honest to see either of them: the firmware was perfectly happy, and the
+    screenshot on this site was drawn at the old size and looked right.
+
   * tools/check_text_pitch.py. Inside a function that sets PUEO_BODY_FONT, a
     vertical measurement cannot be a literal -- no literal is right for both
     a 16 px font and an 8 px one. It flags y += N, a trailing + N in a
@@ -53,6 +64,19 @@ The screen Fast Pair is for, and the two checks that found it.
     that hid one of the ten. And every place the font is set has to land
     inside a function the scanner recognised, or a whole screen has left its
     scope and it reports green over nothing.
+
+  * tools/check_text_fits.py. Font 1 advances 6 px per character whatever the
+    glyph, so a centred line's width is 6 * size * length and the only work
+    is knowing the length -- half of these are snprintf'd, so the format is
+    what exists in the source and the widest thing it can produce is what has
+    to fit. The assumed widths for %d and the rest are printed with any
+    failure, because a check whose assumptions are invisible is one nobody
+    can argue with on the day it is wrong.
+
+    It is deliberately not bounding %d by the type. A plain int is eleven
+    characters and nothing on these screens is ever eleven characters; the
+    grid-label check already learned once that measuring with the wrong
+    assumption sends somebody off to shorten text that fits.
 
   * check_render_sync.py now covers the list screens, which its own commit
     message said it did not. Two drifts, immediately.

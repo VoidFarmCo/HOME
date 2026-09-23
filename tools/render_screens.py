@@ -961,8 +961,10 @@ def render_hunt_gauge(t):
                    float(HUNT_RSSI_NEAR - HUNT_RSSI_FAR) * bw)
     t.draw_fast_vline(max(bx, min(bx + bw, ppx)), by - 3, 16, GREEN)
 
-    t.centre_f1("%d dBm    best %d    %d seen" % (sm, peak, seen),
+    t.centre_f1("%d dBm    best %d" % (sm, peak),
                 cx, by + 18, DARKGREY, BLACK, BODY_SIZE)
+    t.centre_f1("%d seen" % seen,
+                cx, by + 18 + 12 * BODY_SIZE, DARKGREY, BLACK, BODY_SIZE)
 
 
 # ── Fast Pair ──────────────────────────────────────────────────────────────
