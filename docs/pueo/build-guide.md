@@ -166,7 +166,9 @@ one is a dark screen rather than an error message.
 
 A fine-tipped iron and thin solder; 30 AWG silicone wire for the pad joints;
 tweezers; a multimeter with a continuity beep; and magnification. Six of the
-ten joints land on pads smaller than the wire you are used to.
+ten joints land on the ESP32 module's castellations, at 1.27 mm pitch with
+pads either side you must not bridge. The continuity beep is not optional --
+it is how you tell which pad you are on.
 
 ## The ten signals
 
@@ -181,21 +183,59 @@ table before you trust either column.
 | CC1101 GDO0 (TX) | 22 | P3, header | **P3**, `IO22` |
 | CC1101 GDO2 (RX) | 35 | P3, header | **P3**, `IO35` |
 | GPS TX → ESP32 | 1 | **P5** JST, `TX` | serial JST, `TX` |
-| VSPI SCK | 18 | microSD pin, **solder** | microSD pin, **solder** |
-| VSPI MOSI | 23 | microSD pin, **solder** | microSD pin, **solder** |
-| VSPI MISO | 19 | microSD pin, **solder** | microSD pin, **solder** |
-| NRF24 CSN | 4 / 25 | RGB LED pad, **solder** | **solder** |
-| NRF24 CE | 16 | RGB LED pad, **solder** | RGB LED pad, **solder** |
-| PN532 SS | 17 | RGB LED pad, **solder** | RGB LED pad, **solder** |
+| VSPI SCK | 18 | module pad 9R, **solder** | module pad 9R, **solder** |
+| VSPI MOSI | 23 | module pad 2R, **solder** | module pad 2R, **solder** |
+| VSPI MISO | 19 | module pad 8R, **solder** | module pad 8R, **solder** |
+| NRF24 CSN | 4 / 25 | module pad 13R, **solder** | module pad 10L, **solder** |
+| NRF24 CE | 16 | module pad 12R, **solder** | module pad 12R, **solder** |
+| PN532 SS | 17 | module pad 11R, **solder** | module pad 11R, **solder** |
 
 Not connected, deliberately: **NRF24 IRQ** (nothing in the tree reads it; the
 driver polls) and **GPS RX** (the module only ever talks).
 
-**The SPI bus is not brought out on either board.** SCK, MOSI and MISO come
-off the microSD slot's own pins, which means those three joints have to be
-good enough that the card slot still works afterwards — Spotter's capture log
-and the wardriver both write to it. That is the whole difficulty of the build,
-on both panels.
+**The SPI bus is not brought out on either board, but do not solder to the
+microSD slot.** Earlier versions of this guide sent you to the card slot's own
+pins for SCK, MOSI and MISO, and called those three joints the whole
+difficulty of the build, because the slot still has to work afterwards —
+Spotter's capture log and the wardriver both write to it.
+
+They reach the slot *through the ESP32*, so the module's own castellated pads
+are the same three nets with none of that risk. They are 1.27 mm pitch with
+the board pad extending clear of the module body, against eight spring-contact
+terminations hard up against a grounded shell. A bad joint on a module pad
+costs you a retry; a bad joint on the slot costs you the slot.
+
+Five of the six land on the module's right-hand edge. Only NRF24 CSN is on the
+other side, and on the 3.5" that is GPIO 25, pin 10 down the left.
+
+### Finding the pad
+
+Counting castellations is how you break something. The right-hand edge, from
+the top with the antenna up:
+
+```
+   1 GND       6 IO21      11 IO17  <- PN532 SS       16 IO15
+   2 IO23 <-   7 NC        12 IO16  <- NRF24 CE       17 SD1   !!
+   3 IO22      8 IO19 <-   13 IO4                     18 SD0   !!
+   4 TXD0      9 IO18 <-   14 IO0    !!               19 CLK   !!
+   5 RXD0     10 IO5   !!  15 IO2
+```
+
+Three ways to lose a board there. **IO5 sits directly between IO18 and IO17**
+and is the SD chip select -- bridge it and you have broken the card slot from
+the one direction you were trying to avoid. **SD1, SD0 and CLK** at the bottom
+are the module's internal flash; bridge those and it will not boot. **IO0** is
+the boot strap.
+
+So identify by continuity, not by position. SCK, MOSI and MISO share a net
+with the microSD slot, so beep from a candidate module pad to the slot pin:
+the right pad beeps and the wrong one does not. You use the slot to *find* the
+pad without soldering to it. IO16 and IO17 are the RGB LED's blue and green
+channels on these boards, so beep those to the LED's cathodes.
+
+If you would rather not probe blind, drive the pin low from firmware and sweep
+the edge with a meter on DC volts -- the pad reading 0 V is the one. That is
+how GPIO 4/16/17/22 were identified in the first place.
 
 **What the 3.5" does give you is all three CC1101 lines on one connector.**
 P3 carries `GND IO35 IO22 IO21`, which is chip select, GDO0 and GDO2 with a
@@ -257,12 +297,18 @@ dark, that is the first thing to check -- it is what the wrong image looks
 like, and it is not a soldering fault because you have not soldered anything
 yet.
 
-**3. The three bus lines, then the SD card.** On the 2.8", solder SCK, MOSI
-and MISO to the microSD slot pins; on the 3.5", plug into the `SPI` header
-instead. Either way, insert a card and confirm it still mounts. Testing the
-bus with the one device that was already wired to it isolates your work from
-everything that follows, and on the 2.8" it is specifically testing that
-three joints on a card slot did not kill the card slot.
+**3. The three bus lines, then the SD card.** Solder SCK, MOSI and MISO to
+the ESP32 module's pads -- 9R, 2R and 8R -- identifying each by beeping it
+against the matching microSD slot pin first. Then insert a card and confirm it
+still mounts.
+
+Testing the bus with the one device already wired to it isolates your work
+from everything that follows. The card is also the check on the joints
+themselves: it shares all three nets, so if it still mounts, all three are
+sound, and if it does not, you have three suspects and no other variable.
+Nothing here touches the slot, so a card that stopped mounting means a bridge
+on the module -- look at IO5 first, which is the SD chip select and sits
+between two of the pads you just worked on.
 
 **4. CC1101.** Four wires, three of them to headers, plus power and ground
 from +3V3_RF. Then the jamming detector: activity on screen is enough to say
