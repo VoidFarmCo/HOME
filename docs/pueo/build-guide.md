@@ -17,6 +17,13 @@ the timings as untested.
 panel. Every place that matters is marked below; if you are building on a
 3.5", read those before you cut anything.
 
+**The 3.5" connector table was rewritten on 2026-09-23** against a photograph
+of the actual board, which is Sunton's and has Sunton's two breakout headers
+rather than the four JSTs this guide had been promising off an lcdwiki
+render. It went from three solder joints to six. The same look found the
+backlight sitting on GPIO 27 while the sketch had been driving 21 — which is
+why the Brightness setting had never worked on that panel, and is fixed.
+
 There is no PCB. [pcb-design.md](pcb-design.md) is design input for one, and
 it deliberately comes *after* this: a board freezes a pin map that bring-up
 can still move.
@@ -66,14 +73,27 @@ SMA is a module you replace.
 Two vendors, and they do not agree about GPIO 4. Get this wrong and the
 NRF24's chip select lands on an audio amplifier.
 
-| | Sunton **ESP32-2432S028R** | lcdwiki **E32R28T** | lcdwiki **E32R35T** |
-|---|---|---|---|
-| Size | 2.8" | 2.8" | 3.5" |
-| Driver | ILI9341 | ILI9341V | ST7796 |
-| RGB LED | **4** / 16 / 17 | **22** / 16 / 17 | **22** / 16 / 17 |
-| GPIO 4 is | the LED's red | **amp enable** | **amp enable** |
-| Outline | ~56 × 92.5 mm | 50.00 × 86.00 | 55.50 × 101.50 |
-| Serial hdr | P5 | 1.25 mm JST | UART JST |
+| | Sunton **ESP32-2432S028R** | Sunton **ESP32-3248S035R** | lcdwiki **E32R28T** | lcdwiki **E32R35T** |
+|---|---|---|---|---|
+| Size | 2.8" | 3.5" | 2.8" | 3.5" |
+| Driver | ILI9341 | ST7796 | ILI9341V | ST7796 |
+| RGB LED | **4** / 16 / 17 | [verify] | **22** / 16 / 17 | **22** / 16 / 17 |
+| GPIO 4 is | the LED's red | [verify] | **amp enable** | **amp enable** |
+| Backlight | 21 | **27** | 21 | 27 |
+| Breakouts | P3, CN1, P5 | **P3, CN1**, serial | 1.25 mm JST | SPI / I2C / UART JSTs |
+| Outline | ~56 × 92.5 mm | — | 50.00 × 86.00 | 55.50 × 101.50 |
+
+**The 3.5" board this was built against is Sunton's, silkscreened
+`ESP32-035`** — the short form of `ESP32-3248S035R`, which is the part the
+code has named all along. The panel identification was never wrong. What was
+wrong was this guide's description of its *connectors*: it has the same two
+breakouts as Sunton's 2.8" — P3 and CN1 — and none of lcdwiki's `SPI` /
+`I2C` / `UART` JSTs, which the table below used to promise.
+
+It has a `SPEAK` connector, so there is an amplifier on it. Which pin enables
+that, and whether GPIO 4 is the LED's red here as it is on the 2.8", has not
+been metered. Pueo puts `NRF24 CSN` on 25 rather than 4 on this panel
+regardless, so nothing depends on the answer yet.
 
 **Pueo's 2.8" build targets the Sunton board**, where GPIO 4 is the LED's
 red channel and spending it is the trade this pin map makes. On any lcdwiki
@@ -137,51 +157,69 @@ ten joints land on pads smaller than the wire you are used to.
 
 ## The ten signals
 
-**How many of them you have to solder depends on which board you have**, and
-the difference is large: three joints on the 3.5", six on the 2.8".
+**Six joints, on the board this was built against.** An earlier version of
+this table said three, because the 3.5" column described lcdwiki's E32R35T
+and the board in hand is Sunton's `ESP32-035`. Read the section under the
+table before you trust either column.
 
-| Signal | GPIO | 2.8" ESP32-2432S028R | 3.5" ESP32-3248S035R |
+| Signal | GPIO | 2.8" ESP32-2432S028R | 3.5" Sunton `ESP32-035` |
 |---|---|---|---|
-| CC1101 CS | 27 / 21 | CN1, header | **SPI** JST, `IO21(CS)` |
-| CC1101 GDO2 (RX) | 35 | P3, header | **IO35/IO39** JST |
-| GPS TX → ESP32 | 1 | **P5** JST, `TX` | **UART** JST, `TXD` |
-| VSPI SCK | 18 | microSD pin, **solder** | **SPI** JST, `IO18(SCK)` |
-| VSPI MOSI | 23 | microSD pin, **solder** | **SPI** JST, `IO23(MOSI)` |
-| VSPI MISO | 19 | microSD pin, **solder** | **SPI** JST, `IO19(MISO)` |
-| NRF24 CSN | 4 / 25 | RGB LED pad, **solder** | **I2C** JST, `IO25(SCL)` |
-| CC1101 GDO0 (TX) | 22 | P3, header | RGB LED pad, **solder** |
+| CC1101 CS | 27 / 21 | see below | **P3**, `IO21` |
+| CC1101 GDO0 (TX) | 22 | P3, header | **P3**, `IO22` |
+| CC1101 GDO2 (RX) | 35 | P3, header | **P3**, `IO35` |
+| GPS TX → ESP32 | 1 | **P5** JST, `TX` | serial JST, `TX` |
+| VSPI SCK | 18 | microSD pin, **solder** | microSD pin, **solder** |
+| VSPI MOSI | 23 | microSD pin, **solder** | microSD pin, **solder** |
+| VSPI MISO | 19 | microSD pin, **solder** | microSD pin, **solder** |
+| NRF24 CSN | 4 / 25 | RGB LED pad, **solder** | **solder** |
 | NRF24 CE | 16 | RGB LED pad, **solder** | RGB LED pad, **solder** |
 | PN532 SS | 17 | RGB LED pad, **solder** | RGB LED pad, **solder** |
 
 Not connected, deliberately: **NRF24 IRQ** (nothing in the tree reads it; the
 driver polls) and **GPS RX** (the module only ever talks).
 
-**On the 2.8", the SPI bus is not brought out anywhere.** SCK, MOSI and MISO
-come off the microSD slot's own pins, which means those three joints have to
-be good enough that the card slot still works afterwards — Spotter's capture
-log and the wardriver both write to it. That is the whole difficulty of the
-build on that board.
+**The SPI bus is not brought out on either board.** SCK, MOSI and MISO come
+off the microSD slot's own pins, which means those three joints have to be
+good enough that the card slot still works afterwards — Spotter's capture log
+and the wardriver both write to it. That is the whole difficulty of the build,
+on both panels.
 
-**On the 3.5" it is brought out, on a four-pin JST.** The silkscreen labels
-it `SPI` and lists `IO23(MOSI) IO19(MISO) IO18(SCK) IO21(CS)` — which is the
-whole VSPI bus plus CC1101's chip select, on a connector. The `I2C` header
-next to it carries `3V3 IO32(SDA) IO25(SCL) GND`, and IO25 is where NRF24's
-chip select goes on this panel, so that comes off a connector too, with 3.3 V
-and ground beside it.
+**What the 3.5" does give you is all three CC1101 lines on one connector.**
+P3 carries `GND IO35 IO22 IO21`, which is chip select, GDO0 and GDO2 with a
+ground beside them. That is the pay-off from putting `CC1101_CS` on 21 on
+this panel, and it is the reason the guide's older 3.5" column had GDO0 on a
+solder pad: it was describing a different board.
 
-What is left to solder on the 3.5" is the three RGB LED pads: GDO0, CE and
-the PN532's select. The LED is gone either way — that is what those pins were
-spent on — so the joints land on pads nothing else wants.
+`CN1` is a second four-pin connector, `GND IO22 IO21 3.3V`. It duplicates two
+of P3's signals and adds 3.3 V, which makes it useful for powering something
+small rather than for a new signal.
 
-**[verify] Read your own silkscreen before you cut a wire.** Neither column
-above came from a board under a meter -- the 3.5" is off lcdwiki's render and
-the 2.8" is off a product photo -- and CYD revisions differ. The silkscreen is
-the authority and it is printed next to each connector.
+**The 3.5" board also has an audio amplifier** — there is a two-pin `SPEAK`
+connector on it. Nothing in the pin map touches the amp, and `NRF24 CSN` is
+25 on this panel rather than 4 for exactly that kind of reason, but it is
+worth knowing it is there before you go looking for spare pins.
 
-The 2.8"'s serial connector is **P5** -- a four-pin JST carrying
-`GND TX RX VIN`. This guide called it P1 until someone read it off a board.
-The same board shows no SPI breakout anywhere, which is the claim above
-about the microSD pins holding up rather than being an assumption.
+### [verify] Read your own silkscreen before you cut a wire
+
+The 3.5" column was read off a photograph of the actual board, connector by
+connector. The 2.8" column was not, and one entry in it is now suspect:
+
+**`CC1101 CS` on the 2.8" is listed as reaching CN1, and on the board in hand
+CN1 carries `GND IO22 IO21 3.3V` with no IO27 on it.** If the two panels
+share Sunton's CN1 pinout — and they share P3's — then 27 is not on a
+connector there either and that build needs a seventh joint. Nobody has had a
+2.8" under a meter, so this is flagged rather than corrected.
+
+Two lessons in the same table. The first is that "cheap yellow display" names
+at least four boards and a render of one is not a description of another. The
+second is that this guide and [hardware.md](hardware.md) disagreed about
+where GDO0 lands on the 3.5" — hardware.md had P3 and was right — and neither
+of them noticed, because prose does not get checked the way the pin map does.
+
+The 2.8"'s serial connector is **P5**, a four-pin JST carrying `GND TX RX
+VIN`. This guide called it P1 until someone read it off a board. The 3.5"'s
+is the same four signals in the other order, `5V RX TX GND`, beside the
+USB-C socket.
 
 ## Order of work
 

@@ -3,6 +3,11 @@
 CYD ESP32-2432S028R with four external peripherals, in a custom 85 x 170 x 20
 enclosure. The pin map below is fixed; the case is already printed around it.
 
+The reference build is the 3.5" Sunton ESP32-3248S035R, silkscreened
+`ESP32-035`. Its breakout is P3 (`GND IO35 IO22 IO21`) and CN1
+(`GND IO22 IO21 3.3V`) -- the same two headers Sunton's 2.8" has, read off
+the board itself rather than a render.
+
 For the order to wire it in, and which six of the ten signals need soldering
 rather than a header, see [build-guide.md](build-guide.md).
 
@@ -79,6 +84,23 @@ header, so the count of soldered joints is the same either way.
 `tools/check_pinmap.py` reads the backlight pin out of `User_Setup cyd.h`
 rather than assuming it, so putting the select on the wrong one fails the
 build.
+
+That was only half the job, and the other half went missing for the whole
+life of the 3.5" port. `User_Setup cyd.h` branches `TFT_BL` per panel, 21
+and 27, and TFT_eSPI drives it HIGH at `begin()`. But `shared.h` also has
+`BACKLIGHT_PIN`, which the sketch attaches a PWM channel to for the
+Brightness setting, and it kept the `BOARD_CYD` default of 21 on both
+panels. `board_pueo.h` argued in a comment that 27 was the backlight on the
+3.5" -- and moved `CC1101_CS` onto 21 on that basis -- without ever saying
+it in code.
+
+So on the 3.5" build, `BACKLIGHT_PIN` and `CC1101_CS` were both GPIO 21, and
+this script printed "no collisions" because it read `TFT_BL` and never
+compared it to the pin the sketch drives. Neither half failed loudly:
+TFT_eSPI lit the real pin so the screen worked, and nothing was soldered to
+CC1101 so its select never toggled. The only symptom was Brightness doing
+nothing, which is what PWM into an unconnected pad looks like. It now checks
+`BACKLIGHT_PIN == TFT_BL` for each panel.
 
 ## Why GPIO 1 for GPS
 
