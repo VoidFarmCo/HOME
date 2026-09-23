@@ -297,8 +297,9 @@ void drawPicker() {
 
   if (s_count == 0) {
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString("listening...", 8, top + 24);
-    tft.drawString("Find My, Tile, SmartTag, Eddystone", 8, top + 38);
+    tft.drawString("listening...", 8, top + 2 + PUEO_BODY_LINE);
+    tft.drawString("Find My, Tile, SmartTag, Eddystone",
+                   8, top + 2 + 2 * PUEO_BODY_LINE);
     return;
   }
 

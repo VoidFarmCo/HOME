@@ -18,8 +18,12 @@ constexpr int      kMaxDevices = 24;
  * the originals and are kept exactly. */
 #if PUEO_PANEL_35
 constexpr int      kRowH       = 54;
+constexpr int      kLine2      = 18;   /* second line, from the row top */
+constexpr int      kLine3      = 36;
 #else
 constexpr int      kRowH       = 30;
+constexpr int      kLine2      = 11;
+constexpr int      kLine3      = 21;   /* 22 would not fit a 30 px row */
 #endif
 constexpr uint32_t kRedrawMs   = 400;
 constexpr uint16_t kProbeMs    = 4000;   // how long to wait for a notification
@@ -205,10 +209,10 @@ void drawList() {
 
   if (s_devCount == 0) {
     uiShowLine(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
-               8, top + 6, 11, TFT_DARKGREY, TFT_BLACK);
+               8, top + 6, PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
     uiShowLine(s_shownRow[0][1], sizeof(s_shownRow[0][1]),
-               "no Fast Pair advertisements yet", 8, top + 20, 11,
-               TFT_DARKGREY, TFT_BLACK);
+               "no Fast Pair advertisements yet", 8, top + 6 + kLine2,
+               PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
     return;
   }
 
@@ -267,15 +271,15 @@ void drawList() {
     } else {
       snprintf(line, sizeof(line), "paired   no account keys");
     }
-    uiShowLine(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line, 8, y, 11,
-               frameColour(d.frame), bg);
+    uiShowLine(s_shownRow[i][0], sizeof(s_shownRow[i][0]), line, 8, y,
+               PUEO_BODY_H, frameColour(d.frame), bg);
 
     /* Line 2: the address, which is all the identity there is. */
     snprintf(line, sizeof(line), "%02X:%02X:%02X:%02X:%02X:%02X %s %ddBm",
              d.mac[0], d.mac[1], d.mac[2], d.mac[3], d.mac[4], d.mac[5],
              d.addrPublic ? "pub" : "rnd", (int)d.rssiLast);
-    uiShowLine(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line, 8, y + 11,
-               11, TFT_LIGHTGREY, bg);
+    uiShowLine(s_shownRow[i][1], sizeof(s_shownRow[i][1]), line,
+               8, y + kLine2, PUEO_BODY_H, TFT_LIGHTGREY, bg);
 
     /* Line 3: battery, if offered, then how long it has been around. */
     {
@@ -305,8 +309,8 @@ void drawList() {
         snprintf(age, sizeof(age), "%luh", (unsigned long)(secs / 3600u));
       }
       snprintf(line, sizeof(line), "%sx%u %s", batt, (unsigned)d.seen, age);
-      uiShowLine(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line, 8, y + 21,
-                 11, TFT_DARKGREY, bg);
+      uiShowLine(s_shownRow[i][2], sizeof(s_shownRow[i][2]), line,
+                 8, y + kLine3, PUEO_BODY_H, TFT_DARKGREY, bg);
     }
   }
 
