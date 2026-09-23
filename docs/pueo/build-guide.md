@@ -164,11 +164,58 @@ one is a dark screen rather than an error message.
 
 ## Tools
 
-A fine-tipped iron and thin solder; 30 AWG silicone wire for the pad joints;
-tweezers; a multimeter with a continuity beep; and magnification. Six of the
-ten joints land on the ESP32 module's castellations, at 1.27 mm pitch with
-pads either side you must not bridge. The continuity beep is not optional --
-it is how you tell which pad you are on.
+An iron with a small **chisel** tip, 1.0-1.6 mm; gel flux; thin solder, leaded
+63/37 if you have it; 30 AWG stranded silicone wire; kapton tape; tweezers; a
+multimeter with a continuity beep; solder wick; and magnification with light
+on it. Six of the ten joints land on the ESP32 module's castellations, at
+1.27 mm pitch with pads either side you must not bridge. The continuity beep
+is not optional -- it is how you tell which pad you are on.
+
+Stranded silicone rather than solid Kynar wire-wrap wire. Kynar places more
+easily because it stays where you put it, and solid wire work-hardens and
+cracks at the joint under vibration. This is a handheld that gets carried.
+
+## Soldering to a castellation
+
+Six joints at 1.27 mm is not difficult work, but almost none of what makes it
+go well is dexterity.
+
+**Flux is the whole game.** Gel flux, no-clean, on the pad before the iron
+goes near it. Most of "I cannot solder things this small" is really "I
+soldered without flux" -- the rosin core in the solder is not enough for a
+joint you are reflowing rather than making from scratch.
+
+**Tin the wire off the board.** Strip about 1.5 mm, tin it, then trim the
+tinned end back to roughly 1 mm. A short stiff pre-tinned stub; a long one
+levers the joint every time the wire moves. Now the joint itself is a
+one-second touch instead of a three-handed juggle.
+
+**Use the solder that is already there.** These castellations were reflowed
+at the factory and carry a fillet. Flux, the tinned wire laid into it, one
+second of heat -- usually with no added solder at all. Feeding solder off the
+roll while making the joint is exactly how the blob that bridges to IO5
+happens.
+
+**A small chisel tip beats a needle point.** The instinct is to reach for the
+finest tip in the drawer, then no heat gets into the joint, so you dwell, and
+dwell time is what lifts pads. Contact area is what you want.
+
+**330-350 C, in and out.** Hot and quick is gentler on the board than warm and
+slow. Leaded 63/37 is far more forgiving here than lead-free.
+
+**Tape the wire down before soldering it.** Kapton, a few millimetres back.
+Both hands free and the wire cannot spring away mid-joint. This matters more
+than any tool on the list above.
+
+**Strain relief, or the joint fails later.** 30 AWG on a castellation is a
+cantilever. Anchor the wire to the board within about 5 mm of the joint --
+hot glue, UV resin, more kapton. The joint that survives the bench is the one
+that fails in a bag.
+
+**Beep after every joint, not at the end.** Specifically, after IO18 and after
+IO17, check each against IO5 between them. A bridge found immediately tells
+you which joint made it. A bridge found five joints later has you reworking
+blind, next to your own work, on the pads with the worst neighbours.
 
 ## The ten signals
 
