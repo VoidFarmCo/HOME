@@ -67,15 +67,38 @@ def read_user_setup(panel):
 # spent LED on a board where it is the audio amplifier's enable.
 #
 #   2.8" ESP32-2432S028R   RGB 4/16/17, LDR 34, speaker 26
-#   3.5" ESP32-3248S035R   RGB 22/16/17, amp enable 4, amp DAC 26,
-#                          battery ADC 34, touch IRQ 36
-#                          (lcdwiki E32R35T, 55.50 x 101.50 x 5.80 mm)
+#   3.5" ESP32-3248S035R   RGB 4/16/17, speaker 26, battery ADC 34,
+#                          touch IRQ 36
+#
+# The 3.5" row was lcdwiki's E32R35T for most of this port's life: RGB on
+# 22/16/17 with GPIO 4 as an audio amplifier's enable. The reference board
+# is Sunton's and does not agree with any of that.
+#
+# Measured on 2026-09-23 by driving each candidate LOW in turn -- the LED is
+# common anode, so a pin sinks its own channel -- and watching which colour
+# came up:
+#
+#   GPIO 4   red      so it is an LED channel here, not an amp enable
+#   GPIO 16  blue     the old table said green
+#   GPIO 17  green    the old table said blue
+#   GPIO 22  nothing  not an LED pin on this board at all
+#
+# Which colour sits on 16 and which on 17 changes nothing -- both are given
+# up whole -- but 4 and 22 matter. GPIO 4 being an LED rather than an
+# amplifier is the reason this board could spend it; GPIO 22 being ordinary
+# free GPIO is what makes CC1101 GDO0 uncontroversial there.
+#
+# [verify] 26, 34 and 36 on the 3.5" have NOT been metered. They are carried
+# over on the assumption that this board follows Sunton's 2.8" elsewhere too,
+# which is now the demonstrated pattern rather than a guess, but it is still
+# an assumption. It has a SPEAK connector and a BAT1 connector, so something
+# is on 26 and 34.
 BOARD_FIXED = {
     28: {4: "RGB LED red", 16: "RGB LED green", 17: "RGB LED blue",
          34: "LDR", 26: "speaker"},
-    35: {22: "RGB LED red", 16: "RGB LED green", 17: "RGB LED blue",
-         4: "audio amp enable", 26: "audio amp DAC", 34: "battery ADC",
-         36: "touch IRQ"},
+    35: {4: "RGB LED red", 16: "RGB LED blue", 17: "RGB LED green",
+         26: "speaker [verify]", 34: "battery ADC [verify]",
+         36: "touch IRQ [verify]"},
 }
 
 def reserved_for(panel):
@@ -95,13 +118,18 @@ def reserved_for(panel):
 #
 # The 2.8" gives up its RGB LED, its speaker and its LDR -- an LED, a buzzer
 # and a light sensor, none of which this tool uses. The 3.5" gives up its RGB
-# LED and nothing else: GPIO 4 and 26 are an audio amplifier's enable and its
-# DAC, 34 is the battery divider, 36 is the touch IRQ. Keying an amplifier at
-# chip-select rates is not the same kind of trade as losing an LED, which is
-# why CSN moved off 4 on that panel rather than this set growing to cover it.
+# LED and nothing else; 26, 34 and 36 stay reserved because nothing has
+# metered them and a SPEAK and a BAT1 connector say something is there.
+#
+# GPIO 4 is in the 3.5" set now that it has been shown to be an LED channel
+# on this board rather than an amplifier's enable. Nothing uses it there --
+# NRF24 CSN is 25 on that panel -- and the reason it moved off 4 in the first
+# place was the belief that it keyed an amp. That belief was about a
+# different board, but leaving CSN on 25 costs nothing and one fewer pin
+# read off a datasheet is worth more than the pin.
 REPURPOSABLE = {
     28: {4, 16, 17, 26, 34},
-    35: {22, 16, 17},
+    35: {4, 16, 17},
 }
 
 # Macros that actually drive a pad.

@@ -103,15 +103,21 @@
  * 25 (collides with the XPT2046 touch clock — a real bug on the stock CYD
  * profile, not just a Pueo problem).
  *
- * CSN follows the panel, because the two boards do not agree about GPIO 4.
+ * CSN follows the panel. The reason it was made to was a belief about GPIO 4
+ * that has since been measured and was wrong.
  *
  *   2.8" ESP32-2432S028R   GPIO 4 is the RGB LED's red channel
- *   3.5" ESP32-3248S035R   GPIO 4 is the audio amplifier's enable
- *                          (lcdwiki E32R35T; RGB red moves to 22)
+ *   3.5" ESP32-3248S035R   GPIO 4 is the RGB LED's red channel too,
+ *                          measured 2026-09-23. lcdwiki's E32R35T puts an
+ *                          audio amplifier's enable there and moves RGB red
+ *                          to 22; that is a different board, and this tree
+ *                          followed its datasheet for months.
  *
- * Spending the LED is the trade this board map already makes. Keying an
- * amplifier enable at chip-select rates is not the same trade: it clicks,
- * and it draws current off a rail already carrying the display.
+ * So 4 was never the hazard it is described as below, and CSN could sit on
+ * it here as it does on the 2.8". It stays on 25 anyway: 25 is free on this
+ * panel, the split is already published and built against, and the argument
+ * for moving it back rests on one measurement of one board. One fewer pin
+ * taken on a datasheet's word is worth more than the pin.
  *
  * 25 is free on the 3.5" for the reason the paragraph above says it is not
  * free on the 2.8" — that panel puts touch on its own bus at 25/32/39,
@@ -144,30 +150,32 @@
 #define PUEO_NRF24_MODULE_COUNT 1
 
 /* ── sound ──────────────────────────────────────────────────────────────────
- * The 3.5" lcdwiki board carries an audio amplifier: GPIO 26 is its input
- * and GPIO 4 is its enable. Neither is claimed here -- moving NRF24's chip
- * select to 25 on this panel was partly to keep them, because keying an
- * amplifier enable at chip-select rates clicks and draws off the display's
- * rail.
+ * Both boards bring a speaker out to a 2-pin connector, driven from GPIO 26,
+ * which is DAC2. Sound is 3.5"-only here and the guards below say so rather
+ * than relying on nobody calling it -- on the 2.8" GPIO 26 is free, but that
+ * panel's NRF24 CSN is GPIO 4 and the sound path used to assert 4 as an
+ * amplifier enable, which would have keyed a radio.
  *
- * The 2.8" has neither. GPIO 4 is that board's RGB red and is this pin map's
- * NRF24 CSN, so driving it as an amplifier enable would key a radio. Sound
- * is 3.5"-only and the guards below say so rather than relying on nobody
- * calling it.
+ * There is no enable pin on this board, and there was never meant to be one
+ * here. The whole amplifier-enable story came off lcdwiki's page for their
+ * E32R35T -- "Audio enable signal, low level enable, high level disable" --
+ * including a note about how the obvious polarity was the wrong one. The
+ * reference board is Sunton's, and GPIO 4 on it is the RGB LED's red
+ * channel, measured on 2026-09-23 by driving each candidate low and looking.
  *
- * The enable is ACTIVE LOW. lcdwiki's page for this board is explicit --
- * "Audio enable signal, low level enable, high level disable" -- and the
- * first version of this drove it high to enable, which is the one state
- * that guarantees silence. Worth the emphasis: the obvious polarity was
- * the wrong one.
+ * So what AMP_ENABLE_PIN actually did on this hardware was flash the red LED
+ * for the length of every beep. Asserting an enable that does not exist is
+ * harmless; it is still an output driven on a pad whose real function the
+ * tree had wrong, and the LED blinking on every beep was the tell nobody
+ * read as one.
  *
- * No speaker is fitted. The board brings the amplifier out to a 1.25 mm
- * 2-pin connector and you attach your own, so a board straight out of the
- * bag is silent however correct this code is. */
+ * BUZZER_PIN stays on 26. That is DAC2, and it is where Sunton's 2.8" drives
+ * its speaker -- the pattern this board has now been shown to follow. It has
+ * a 2-pin SPEAK connector and you attach your own speaker, so a board out of
+ * the bag is silent however correct this is. [verify] nothing has metered
+ * what is between GPIO 26 and that connector here. */
 #if PUEO_PANEL_35
-#define BUZZER_PIN       26   /* amplifier input (also DAC2) */
-#define AMP_ENABLE_PIN    4   /* amplifier enable */
-#define AMP_ENABLE_LEVEL  LOW /* active low -- see above */
+#define BUZZER_PIN       26   /* speaker drive, also DAC2 */
 #endif
 
 /* ── PN532 V3 (SPI mode: DIP CH1=OFF, CH2=ON) ───────────────────────────────
