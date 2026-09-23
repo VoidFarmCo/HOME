@@ -307,6 +307,34 @@ def check(panel):
             errors.append("GPIO %d (%s) is input-only and cannot drive this signal"
                           % (pin, label))
 
+    # The sketch's backlight pin against the display's.
+    #
+    # Two names for one pad: TFT_BL, which TFT_eSPI drives HIGH at begin(),
+    # and BACKLIGHT_PIN, which the sketch attaches a PWM channel to for the
+    # Brightness setting. User_Setup has branched per panel for as long as
+    # the 3.5" has been supported; shared.h kept the CYD default of 21 for
+    # both, and board_pueo.h argued in a comment that 27 was the backlight
+    # on the 3.5" without ever saying so in code.
+    #
+    # Neither half failed loudly. TFT_eSPI lit the real pin, so the screen
+    # worked; nothing was soldered to CC1101, so its chip select -- also 21
+    # on that build -- never toggled. The only symptom was a Brightness
+    # setting that did nothing, on a pad with nothing on the end of it.
+    bl = pre.resolve("BACKLIGHT_PIN")
+    # reserved is {pin: role}; the display's own backlight is in there under
+    # the label TFT_ROLES gives TFT_BL, read from User_Setup for this panel.
+    tft_bl = next((p for p, role in reserved.items()
+                   if role == TFT_ROLES["TFT_BL"]), None)
+    print("  %-8s %-20s %s" % ("", "backlight",
+                               "BACKLIGHT_PIN %s, TFT_BL %s" % (bl, tft_bl)))
+    if bl is None or tft_bl is None:
+        errors.append("could not resolve BACKLIGHT_PIN (%s) or TFT_BL (%s)"
+                      % (bl, tft_bl))
+    elif bl != tft_bl:
+        errors.append(
+            "BACKLIGHT_PIN is GPIO %d but the display's backlight is GPIO %d"
+            " -- the Brightness setting drives a pad nothing is on" % (bl, tft_bl))
+
     return errors
 
 

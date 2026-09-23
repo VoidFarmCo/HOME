@@ -76,6 +76,27 @@
 #define SUBGHZ_TX_PIN 22   /* -> CC1101 GDO0 */
 #define SUBGHZ_RX_PIN 35   /* <- CC1101 GDO2, input-only pin */
 
+/* ── Backlight ──────────────────────────────────────────────────────────────
+ * The other half of the swap above, which this header argued for and then
+ * never carried out. shared.h defaults BOARD_CYD to GPIO 21, that default
+ * was left standing, and on the 3.5" build CC1101_CS and BACKLIGHT_PIN were
+ * both 21 -- the exact conflict the comment above exists to avoid, on the
+ * pin it moved CS onto.
+ *
+ * It was invisible because neither half failed loudly. Nothing is soldered
+ * to CC1101 yet, so the chip select never toggles; and the backlight on
+ * this board sits on a pull-up and comes on by itself, so PWM into the
+ * wrong pin looks like a screen that works. What it actually cost was the
+ * Brightness setting, which has never done anything on this panel: it was
+ * driving a pad with nothing on the end of it.
+ *
+ * Confirmed on the board -- moving the slider changed nothing before this,
+ * which is what says 21 is not the backlight here.
+ */
+#if PUEO_PANEL_35
+#define BACKLIGHT_PIN 27
+#endif
+
 /* ── NRF24L01+PA+LNA ────────────────────────────────────────────────────────
  * One module, not three. Stock CYD defaults put CSN_PIN_1 on 17 (we need that
  * for the PN532), CSN_PIN_2 on 27 (collides with CC1101 CS) and CSN_PIN_3 on
