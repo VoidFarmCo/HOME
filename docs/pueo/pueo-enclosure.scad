@@ -396,9 +396,19 @@ LID_H     = 12;
  * 8.6 mm below the top edge and 8.0 mm above the bottom. Confirm with
  * calipers before printing a lid you intend to keep.
  *
- * Render with:  openscad -D PART=\"lid\" -D PANEL=\"3.5\" ...
+ * Default is 3.5 as of 2026-09-23: it is the reference board, the one the
+ * firmware and this case are built for, and the only one anything has run
+ * on. It was 2.8 until then, which meant every default render -- including
+ * the pictures on the site -- was the panel nobody has.
+ *
+ * It is not only the lid. BEZEL_Y shifts with the panel and the base's
+ * microSD slot opening is placed from it, so the BASE differs per panel
+ * too. A base built at one setting does not pair with a lid built at the
+ * other.
+ *
+ * Render with:  openscad -D PART=\"lid\" -D PANEL=\"2.8\" ...
  */
-PANEL     = "2.8";
+PANEL     = "3.5";
 
 /* 3.5" numbers are from QDtech's E32R35T outline drawing, V1.0 2024-08-14,
  * not from calipers. The PCB is 55.50 x 101.50 x 5.80 mm, corners R3.50,
