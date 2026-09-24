@@ -181,11 +181,19 @@ module shell() {
 //
 // The replacement is a single one up the middle, in the corridor between the
 // radios and above the GPS. One screw across the top instead of two.
-// y=54 rather than 60: at 60 it ran into the GPS antenna slot in the top
-// wall, which is a feature and not a module, so checking the bosses against
-// MODULES alone did not see it. OpenSCAD did -- as a non-manifold warning
-// on the base and nothing visibly wrong in the render.
-BOSS_POS = [[-28,-62],[28,-62],[-28,-2],[28,-2],[0,54]];
+// Four, one near each corner -- as near as this layout allows.
+//
+// The top two are at y=22, not up in the corners, and that is forced: the
+// radios run from y=27 to y=68 across x -30.5..-15.5 and 14..30, and the
+// inner half-width is 30. There is no room outboard of them and none above
+// them. y=22 is the highest either side gets, checked against every pocket
+// and against the GPS antenna slot in the top wall.
+//
+// So the top ~49 mm of the lid edge has no screw. That is the cost of the
+// narrower case, and it lands on a resistive panel that is pressed to be
+// used. If the bezel bows there, the fix is W=76 -- 8 mm wider buys bosses
+// at x=+/-32, clear of the radios, and true corners.
+BOSS_POS = [[-28,-62],[28,-62],[-28,22],[28,22]];
 module bosses() {
     for (p = BOSS_POS)
         translate([p[0], p[1], 0])
@@ -478,7 +486,7 @@ BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the fa
  * wall. That band runs -82.5 to -46.25, and the screw pillars either side
  * are at x +/-36.5, which a ~29 mm wide logo on the centreline never reaches.
  */
-LOGO       = true;   // false leaves the face blank
+LOGO       = false;  // true puts the owl back in the chin
 LOGO_H     = 30;     // artwork height in mm; see the note above before shrinking
 LOGO_DEPTH = 0.6;    // cut into a 2.5 mm skin, so 1.9 mm is left under it
 LOGO_Y     = (PANEL == "3.5") ? -65.5 : -64;   // centre of the chin band
