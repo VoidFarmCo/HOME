@@ -1,6 +1,7 @@
 // =====================================================
 //  PUEO enclosure - base and lid, both in this file
-//  68 x 142 x 20, zoned for RF/NFC/power separation
+//  78 x 142 x 20, or 85 x 170 with the external power stack
+//  zoned for RF/NFC/power separation
 //  every module below is editable - see MODULES list
 //
 //  THIS FILE CONTAINS BOTH PARTS. Which one renders is
@@ -24,16 +25,76 @@
 // =====================================================
 
 /* ---------- envelope ---------- */
-// 2026-09-23: was 85 x 170. The CYD carries an FM5324GA -- a single-chip
-// Li-ion charger AND synchronous 5 V boost, with the 2.2 uH inductor beside
-// it and BAT1 as its cell input. That is the TP4056 and the MT3608 both, on
-// the board already, so both came out of this case.
-//
-// They were what made it wide: side by side they spanned 79.1 mm of the
-// 79.1 mm of content, in a case whose next-widest zone is the radios at
-// 60.5. Everything else is now centred on x=0 and the radios set the width.
-W        = 68;      // outer width  -- radios at +/-30.5 plus walls
-L        = 142;     // outer length
+/* ---- does your CYD charge its own battery? ----------------------------
+ *
+ * EXT_POWER = false   the board does it. 78 x 142.
+ * EXT_POWER = true    it does not, so a TP4056 and an MT3608 ride inside
+ *                     and the case grows to 85 x 170.
+ *
+ * The reference board -- Sunton ESP32-3248S035R -- carries an FM5324GA
+ * beside its BAT1 connector, with a 2.2 uH inductor next to it. That part
+ * is a single-chip single-cell Li-ion charger AND synchronous 5 V boost,
+ * with automatic load detection and no-load shutdown. It is a TP4056 and
+ * an MT3608 in one package, already soldered down, already wired to a
+ * battery connector. Buying both again to sit in the case beside it is
+ * buying the same two functions twice.
+ *
+ * They are what made the case wide. Side by side the two modules spanned
+ * 79.1 mm of the 79.1 mm of content, in a case whose next widest zone is
+ * the radios at 60.5. Deleting them takes 85 x 170 to 78 x 142 -- 23% of
+ * the volume -- and fixes a height problem by deletion, because
+ * CARRIER_HEADROOM is 13.9 mm and the MT3608 is 14.
+ *
+ * [VERIFY] which boards have it. Confirmed on the 3.5" ESP32-3248S035R in
+ * hand, by reading the part number off the chip. Sunton's own connector
+ * list gives the 2.8" ESP32-2432S028R a battery connector too, so it very
+ * likely has the same arrangement -- but nobody here has looked at what is
+ * behind it. lcdwiki's boards are unknown. If yours has no BAT1, or has one
+ * with no charger behind it, set EXT_POWER = true.
+ *
+ * [VERIFY] with EXT_POWER = false the +3V3_RF buck has to take 5 V from
+ * somewhere, and the candidate is the 5V pin on P1. Nobody has confirmed
+ * that pin is an output when the board is running from BAT1 rather than
+ * from USB. Measure it before you rely on it.
+ *
+ * What does NOT become optional is the MP2307 buck. That is not about
+ * making 5 V, it is about keeping the PA radios' current steps off
+ * whatever feeds the display, and it is needed either way.
+ */
+EXT_POWER = false;
+
+/* Width is set by the corner bosses, not by the modules. The radios reach
+ * x = -30.5 and 30, so a boss clearing CC1101 must sit at or left of -34.5
+ * and one clearing NRF24 at or right of 34.0; symmetric that is +/-34.5,
+ * and containing a 4 mm radius needs 77.0 of outer width. 78 is the next
+ * even number -- at 76 the boss overhangs the shell by half a millimetre.
+ * The modules alone would fit in 68; the extra 10 mm buys a screw in each
+ * corner, which matters because the panel is resistive and gets pressed. */
+/* Width is set by the corner bosses, and they are set by the radios.
+ *
+ * The radios sit at x -23 (15 wide) and 22 (16 wide) and run y 27..68, so
+ * they occupy the top of the case across nearly its whole width. A boss
+ * clears them only outboard: at BOSS_R 4.5 that is x <= -35.0 on the left
+ * and x >= 34.5 on the right. BOSS_X 36 takes 1.0 mm of margin on the
+ * tighter side, and containing the radius with 1.5 mm of skin outside it
+ * needs 84 of width.
+ *
+ * BOSS_Y 66 rather than 64: at 64 the boss lands exactly on the inner face
+ * of the end wall and the tangency makes the base non-manifold. 66 pushes
+ * it 2 mm into the wall so the two merge, which is what you want anyway --
+ * a boss tied into a wall is stiffer than one standing next to it.
+ *
+ * Both numbers were swept against OpenSCAD rather than reasoned about. The
+ * arithmetic says 80 x 142 is enough and it is not: at 80 the boss stands
+ * 0.5 mm proud of the outside, which renders clean and prints as a bump.
+ *
+ * The modules alone would fit in 68. Corner screws and brass cost 16 mm of
+ * width -- most of the saving left is the length, 170 -> 142.
+ */
+BOSS_X   = 36;      // corner boss centres, small case
+BOSS_Y   = 66;
+W        = EXT_POWER ? 85 : 84;
+L        = EXT_POWER ? 170 : 142;
 H        = 20;      // outer height of the base
 WALL     = 2.5;
 FLOOR    = 4.0;     // general floor thickness
@@ -41,9 +102,37 @@ POCKET   = 2.0;     // how deep board recesses sit
 NFC_FLOOR = 1.4;    // thin window under the PN532 coil
 FILLET   = 3;       // outer corner radius
 
-/* ---------- fasteners ---------- */
-BOSS_R   = 4.0;
-BOSS_HOLE = 1.5;    // M3 self-tap pilot
+/* ---------- fasteners ----------
+ *
+ * INSERTS = true    brass heat-set inserts in the base's bosses, M3
+ *                   machine screws through the lid into them
+ * INSERTS = false   the screw cuts its own thread in the plastic
+ *
+ * Inserts are worth it here because this lid comes off. A thread cut
+ * straight into PLA survives a handful of cycles and then strips, and the
+ * first thing you do with a field tool is open it again to fix something.
+ *
+ * Only the base changes. The lid already has an M3 clearance hole (r=1.7,
+ * so 3.4) and a countersink, which is what you want either way.
+ *
+ * Sizing, for the common M3 insert -- about 4.6 mm across the knurl and
+ * 5.0 long:
+ *
+ *   hole    4.2 diameter. The knurl bites the last few tenths as the brass
+ *           melts in; 4.6 would spin, 3.8 would push a bulge out of the
+ *           boss wall.
+ *   boss    9.0 across, so 2.4 of plastic around the insert. At the old
+ *           8.0 it would have been 1.9, which splits in PLA often enough
+ *           to matter.
+ *   depth   the bore runs from FLOOR-1 to the top of the boss, about 17,
+ *           so insert length is not a constraint.
+ *
+ * [VERIFY] measure your own inserts. 4.6 x 5.0 is the usual cheap kit but
+ * they vary, and the hole wants to match the knurl, not the thread.
+ */
+INSERTS   = true;
+BOSS_R    = INSERTS ? 4.5 : 4.0;   // radius: 9.0 or 8.0 across
+BOSS_HOLE = INSERTS ? 2.1 : 1.5;   // radius: 4.2 for an insert, 3.0 for a screw
 BOSS_INSET = 6.0;
 
 /* ---------- wall penetrations ---------- */
@@ -71,9 +160,14 @@ echo(str("room above the carrier = ", CARRIER_HEADROOM, " mm"));
 // Charging is the CYD's own USB now that the TP4056 is gone, so this cutout
 // is for the board's socket rather than a charger module's. The CYD has both
 // micro-USB and USB-C on this revision; the opening is sized for the larger.
-USB_W     = 13;     // cutout width   (USB-C shell is ~9)
-USB_HT    = 7;      // cutout height  (shell is ~3.3)
-USB_Y     = 0;      // [VERIFY] set from where the socket lands in the lid
+// With EXT_POWER the jack is the TP4056's own micro-USB, on the board's
+// short end against the right wall. Without it, charging is through the
+// CYD's socket, and this opening is for that instead -- the reference board
+// has both micro-USB and USB-C, so it is sized for the larger.
+USB_W     = EXT_POWER ? 11 : 13;   // jack is ~8 micro, ~9 Type-C
+USB_HT    = EXT_POWER ? 6  : 7;
+USB_Y     = EXT_POWER ? -62 : 0;   // [VERIFY] the 0 wants setting from where
+                                   // the CYD's socket lands in the lid
 
 /* ---------- GPS antenna slot (top centre) ---------- */
 GPS_W     = 21;     // slot width
@@ -93,33 +187,40 @@ VENT_Z1  =  6;
    x,y = centre.  Origin is the middle of the case.
    Footprints taken from the original case pockets.
    ===================================================== */
-MODULES = [
-  // --- power zone, bottom ---
-  // One module, not three. The charger and the 5 V boost are on the CYD.
-  // What is left is the independent rail for the PA radios, which exists to
-  // keep their current steps off whatever is feeding the display -- that
-  // argument is unchanged by where the 5 V comes from.
-  [   0, -60,  20, 12, "MP2307 buck"    ],   // part is 17.9 x 12, pocket oversized
+// Two layouts, because the power zone is a different size in each. Pockets
+// are deliberately larger than the parts: CC1101 is 15 x 38 in a 15 x 40,
+// NRF24 is 15.5 x 41 in a 16 x 41, and pockets() adds 0.6 more.
+//
+// The radios sit 45 mm apart in both, x = -23 and 22. That separation is
+// what this whole zoned layout exists for and it is not a free variable.
 
-  // --- battery ---
-  // Centred now rather than pushed left, and its leads go to the CYD's own
-  // BAT1 rather than to a charger down here.
+MODULES_ONBOARD = [
+  // The charger and the 5 V boost are on the CYD. What is left down here is
+  // the independent rail for the PA radios.
+  [   0, -60,  20, 12, "MP2307 buck"    ],   // part is 17.9 x 12
+  // Centred, and its leads go to the CYD's own BAT1.
   [   0, -35,  45, 34, "LiPo pack"      ],
-
-  // --- NFC ---
   [   0,   4,  43, 41, "PN532 V3"       ],   // <-- gets the thin floor
-
-  // --- radios: vertical, board SMA against the top wall ---
-  // Pockets deliberately larger than the parts: CC1101 is 15 x 38 in a
-  // 15 x 40, NRF24 is 15.5 x 41 in a 16 x 41. pockets() adds 0.6 more.
-  // x unchanged: 45 mm apart is the RF separation this whole layout is for,
-  // and it is what now sets the case width.
   [ -23,  48,  15, 40, "HW-863 CC1101"  ],
   [  22,  47.5,16, 41, "NRF24 PA+LNA"   ],
-
-  // --- GPS, in the corridor between the radios ---
-  [   0,  40,  16, 13, "ATGM336H GPS"   ]
+  [   0,  40,  16, 13, "ATGM336H GPS"   ]    // corridor between the radios
 ];
+
+MODULES_EXTERNAL = [
+  // Three in the power zone, and they are what makes this case 85 wide.
+  [ -19, -65,  36, 17, "MT3608 boost"   ],
+  [  26.6, -62, 27, 17, "TP4056 charger" ],  // right edge flush to the wall
+  [ -29, -48,  20, 12, "MP2307 buck"    ],
+  [ -16, -23,  45, 34, "LiPo pack"      ],
+  [   0,  18,  43, 41, "PN532 V3"       ],
+  [ -23,  61.5,15, 40, "HW-863 CC1101"  ],
+  [  22,  61,  16, 41, "NRF24 PA+LNA"   ],
+  // Moved up from (24,-21): the antenna is on a 90 mm u.FL pigtail and
+  // could not reach the top-wall slot from down there.
+  [   0,  52,  16, 13, "ATGM336H GPS"   ]
+];
+
+MODULES = EXT_POWER ? MODULES_EXTERNAL : MODULES_ONBOARD;
 
 // Looked up by name so reordering MODULES cannot silently point the thin
 // floor at the wrong part.
@@ -181,19 +282,20 @@ module shell() {
 //
 // The replacement is a single one up the middle, in the corridor between the
 // radios and above the GPS. One screw across the top instead of two.
-// Four, one near each corner -- as near as this layout allows.
+// One in each corner on the small case. x=+/-34.5 is the nearest the radios
+// allow -- see the note on W -- and y=+/-64 puts them 7 mm inside the end
+// walls with a 4 mm radius, so they merge into the corner fillet.
 //
-// The top two are at y=22, not up in the corners, and that is forced: the
-// radios run from y=27 to y=68 across x -30.5..-15.5 and 14..30, and the
-// inner half-width is 30. There is no room outboard of them and none above
-// them. y=22 is the highest either side gets, checked against every pocket
-// and against the GPS antenna slot in the top wall.
+// Checked against every pocket AND against the GPS antenna slot, which is a
+// wall feature rather than a module. Checking MODULES alone is how an
+// earlier centre boss ended up inside that slot: OpenSCAD reported it as a
+// non-manifold base and the render looked fine.
 //
-// So the top ~49 mm of the lid edge has no screw. That is the cost of the
-// narrower case, and it lands on a resistive panel that is pressed to be
-// used. If the bezel bows there, the fix is W=76 -- 8 mm wider buys bosses
-// at x=+/-32, clear of the radios, and true corners.
-BOSS_POS = [[-28,-62],[28,-62],[-28,22],[28,22]];
+// The 85 x 170 case keeps its original six: it is long enough that four
+// would leave too much unsupported bezel in the middle.
+BOSS_POS = EXT_POWER
+  ? [[-36.5,-79],[36.5,-79],[-36.5,24],[36.5,24],[-36.5,70],[36.5,70]]
+  : [[-BOSS_X,-BOSS_Y],[BOSS_X,-BOSS_Y],[-BOSS_X,BOSS_Y],[BOSS_X,BOSS_Y]];
 module bosses() {
     for (p = BOSS_POS)
         translate([p[0], p[1], 0])
@@ -256,9 +358,11 @@ module penetrations() {
         cube([4*WALL, USB_W, USB_HT], center=true);
 
     // vents - bottom wall, clear of the USB cutout
-    for (x = [-15,-9,-3,3,9,15]) slot_Y(x, -L/2);
+    for (x = EXT_POWER ? [-34,-28,-22,-16,-10,-4] : [-15,-9,-3,3,9,15])
+        slot_Y(x, -L/2);
     // vents - left wall alongside the power zone
-    for (y = [-64,-58,-52,-46,-40]) slot_X(-W/2, y);
+    for (y = EXT_POWER ? [-76,-70,-64,-58,-52] : [-56,-50,-44,-38,-32])
+        slot_X(-W/2, y);
 }
 
 /* ---------- assembly ---------- */
