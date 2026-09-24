@@ -319,8 +319,13 @@ of them noticed, because prose does not get checked the way the pin map does.
 The 2.8"'s serial connector is **P5**, a four-pin JST carrying `GND TX RX
 VIN`. This guide called it P1 until someone read it off a board -- and then
 applied the correction to both panels, which was wrong. **The 3.5"'s really
-is P1**, carrying the same four signals in the other order, `5V RX TX GND`,
-beside the USB-C socket.
+is P1**, beside the USB-C socket, carrying `5V TX RX GND` with 5V nearest
+the corner mounting hole.
+
+Get that order off your own silkscreen before you crimp. The GPS's transmit
+line goes to the pin marked `TX` -- the ESP32's own UART0 transmit, GPIO 1 --
+and the reasoning for that is in [hardware.md](hardware.md). Reversed, it puts
+two push-pull drivers on one net.
 
 Every connector on the 3.5" is **1.25 mm pitch**: P3, CN1 and P1 with four
 pins, SPEAK1 and BAT1 with two. Buy pre-made pigtails rather than housings

@@ -17,7 +17,7 @@ Read off the board, connector by connector, on 2026-09-23.
 |---|---|---|
 | **P3** | 4 | `GND IO35 IO22 IO21` -- all three CC1101 control lines |
 | **CN1** | 4 | `GND IO22 IO21 3.3V` |
-| **P1** | 4 | `5V RX TX GND` -- serial, and the GPS's TX |
+| **P1** | 4 | `5V TX RX GND` -- serial, and the GPS's TX |
 | **SPEAK1** | 2 | speaker, GPIO 26 |
 | **BAT1** | 2 | battery, into the onboard charger |
 
@@ -32,6 +32,12 @@ battery connector at 1.25 as well.
 
 **The serial header is P1 on this panel.** The 2.8" calls the same thing P5,
 and this document said P5 for both after someone read that off a 2.8" board.
+
+Its pins run **5V, TX, RX, GND** with 5V nearest the corner mounting hole and
+GND furthest from it. That order matters more than the inventory does: the
+GPS's transmit line goes to the pin marked `TX`, which is the ESP32's own
+UART0 transmit, GPIO 1. Reversing it puts two push-pull drivers on one net.
+See "Why GPIO 1 for GPS" below for why that assignment is deliberate.
 
 There is no `SPI` and no `I2C` JST. Those belong to lcdwiki's E32R35T, which
 is where most of what this file used to say about the 3.5" came from.
@@ -54,7 +60,7 @@ the compiler will and cross-references them against the CYD's own wiring.
 | NRF24 CE | 16 | was RGB LED green |
 | NRF24 IRQ | not connected | see below |
 | PN532 SS | 17 | was RGB LED blue, SPI mode (DIP CH1=OFF, CH2=ON) |
-| GPS TX -> ESP32 | 1 | UART0 TX pin on the P5 JST, see below |
+| GPS TX -> ESP32 | 1 | UART0 TX, the `TX` pin on P1 (P5 on the 2.8") |
 | GPS RX | not connected | |
 
 **Which 2.8" board you have matters more than it should.** "Cheap yellow
@@ -91,8 +97,8 @@ board is the spare on the other.
 The 2.8" is left alone deliberately. A published pin map is a thing people have
 already soldered to.
 
-Two more differences on the 3.5", neither of which Pueo drives: GPIO 34 is the
-battery divider rather than an LDR, and GPIO 36 is the touch IRQ.
+Two more pins on the 3.5", neither of which Pueo drives: GPIO 34 is a CdS
+light sensor, as it is on the 2.8", and GPIO 36 is the touch IRQ.
 
 **The lcdwiki 4.0" E32R40T is pin-identical to the 3.5"** on every line
 lcdwiki publishes, at the same 320x480, differing only in the controller's
