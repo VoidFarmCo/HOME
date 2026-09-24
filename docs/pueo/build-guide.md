@@ -80,7 +80,7 @@ NRF24's chip select lands on an audio amplifier.
 | RGB LED | **4** / 16 / 17 | **4** / 16 / 17 | **22** / 16 / 17 | **22** / 16 / 17 |
 | GPIO 4 is | the LED's red | the LED's red | **amp enable** | **amp enable** |
 | Backlight | 21 | **27** | 21 | 27 |
-| Breakouts | P3, CN1, P5 | **P3, CN1**, serial | 1.25 mm JST | SPI / I2C / UART JSTs |
+| Breakouts | P3, CN1, P5 | **P3, CN1, P1** | 1.25 mm JST | SPI / I2C / UART JSTs |
 | Outline | ~56 × 92.5 mm | — | 50.00 × 86.00 | 55.50 × 101.50 |
 
 **The 3.5" board this was built against is Sunton's, silkscreened
@@ -90,9 +90,9 @@ wrong was this guide's description of its *connectors*: it has the same two
 breakouts as Sunton's 2.8" — P3 and CN1 — and none of lcdwiki's `SPI` /
 `I2C` / `UART` JSTs, which the table below used to promise.
 
-It has a `SPEAK` connector, so there is a speaker output on it, driven from
-GPIO 26 as Sunton's 2.8" drives its own. [verify] nothing has metered what
-sits between GPIO 26 and that connector here.
+It has a `SPEAK1` connector, a two-pin 1.25 mm JST for an 8 ohm speaker
+driven from GPIO 26 -- DAC2, the same pin Sunton's 2.8" uses. It also has
+`BAT1` for a battery, into a charger already on the board.
 
 **GPIO 4 on it is the RGB LED's red channel**, measured on 2026-09-23 by
 driving each candidate low in turn — the LED is common anode, so a pin sinks
@@ -151,7 +151,7 @@ Both are sold as a "cheap yellow display" and they are not the same board.
 | Backlight | GPIO 21 | GPIO 27 |
 | RGB LED | 4 / 16 / 17 | 4 / 16 / 17 |
 | GPIO 4 is | the LED's red channel | the LED's red channel |
-| GPIO 34 is | an LDR | the battery divider |
+| GPIO 34 is | a CdS light sensor | a CdS light sensor |
 | Flash image | `pueo-<ver>-merged.bin` | `pueo-<ver>-35-merged.bin` |
 
 The 3.5" figures are from lcdwiki's E32R35T page and QDtech's outline drawing
@@ -229,7 +229,7 @@ table before you trust either column.
 | CC1101 CS | 27 / 21 | see below | **P3**, `IO21` |
 | CC1101 GDO0 (TX) | 22 | P3, header | **P3**, `IO22` |
 | CC1101 GDO2 (RX) | 35 | P3, header | **P3**, `IO35` |
-| GPS TX → ESP32 | 1 | **P5** JST, `TX` | serial JST, `TX` |
+| GPS TX → ESP32 | 1 | **P5** JST, `TX` | **P1** JST, `TX` |
 | VSPI SCK | 18 | module pad 9R, **solder** | module pad 9R, **solder** |
 | VSPI MOSI | 23 | module pad 2R, **solder** | module pad 2R, **solder** |
 | VSPI MISO | 19 | module pad 8R, **solder** | module pad 8R, **solder** |
@@ -317,9 +317,20 @@ where GDO0 lands on the 3.5" — hardware.md had P3 and was right — and neithe
 of them noticed, because prose does not get checked the way the pin map does.
 
 The 2.8"'s serial connector is **P5**, a four-pin JST carrying `GND TX RX
-VIN`. This guide called it P1 until someone read it off a board. The 3.5"'s
-is the same four signals in the other order, `5V RX TX GND`, beside the
-USB-C socket.
+VIN`. This guide called it P1 until someone read it off a board -- and then
+applied the correction to both panels, which was wrong. **The 3.5"'s really
+is P1**, carrying the same four signals in the other order, `5V RX TX GND`,
+beside the USB-C socket.
+
+Every connector on the 3.5" is **1.25 mm pitch**: P3, CN1 and P1 with four
+pins, SPEAK1 and BAT1 with two. Buy pre-made pigtails rather than housings
+and crimps; crimping 1.25 mm needs the proper tool and a bad crimp is an
+intermittent you will chase for hours.
+
+CN1 was measured at 1.29 mm against a microSD card used as a scale bar --
+11.00 mm by specification. The 3% excess is parallax, because those pins sit
+on the connector's top face a few millimetres nearer the lens than the card;
+1.50 mm would have been 14% out, well outside a reading that repeatable.
 
 ## Order of work
 

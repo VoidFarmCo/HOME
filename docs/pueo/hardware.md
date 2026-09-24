@@ -4,12 +4,37 @@ CYD ESP32-2432S028R with four external peripherals, in a custom 85 x 170 x 20
 enclosure. The pin map below is fixed; the case is already printed around it.
 
 The reference build is the 3.5" Sunton ESP32-3248S035R, silkscreened
-`ESP32-035`. Its breakout is P3 (`GND IO35 IO22 IO21`) and CN1
-(`GND IO22 IO21 3.3V`) -- the same two headers Sunton's 2.8" has, read off
-the board itself rather than a render.
+`ESP32-035`, on a revision carrying **both micro-USB and USB-C**.
 
 For the order to wire it in, and which six of the ten signals need soldering
 rather than a header, see [build-guide.md](build-guide.md).
+
+## Connectors
+
+Read off the board, connector by connector, on 2026-09-23.
+
+| | Pins | Signals |
+|---|---|---|
+| **P3** | 4 | `GND IO35 IO22 IO21` -- all three CC1101 control lines |
+| **CN1** | 4 | `GND IO22 IO21 3.3V` |
+| **P1** | 4 | `5V RX TX GND` -- serial, and the GPS's TX |
+| **SPEAK1** | 2 | speaker, GPIO 26 |
+| **BAT1** | 2 | battery, into the onboard charger |
+
+All of them are **1.25 mm pitch**. CN1 was measured at 1.29 mm against a
+microSD card lying on the board as a scale bar -- 11.00 mm by specification,
+573 px across 20 agreeing rows, giving 52.09 px/mm against a pin spacing of
+67.17 px over seventeen readings. The 3% excess is parallax: those pins sit
+on the connector's top face, three or four millimetres nearer the lens than
+the card. 1.50 mm would have been 14% out, which is far outside a
+measurement that repeatable. Sunton's own documentation puts SPEAK and the
+battery connector at 1.25 as well.
+
+**The serial header is P1 on this panel.** The 2.8" calls the same thing P5,
+and this document said P5 for both after someone read that off a 2.8" board.
+
+There is no `SPI` and no `I2C` JST. Those belong to lcdwiki's E32R35T, which
+is where most of what this file used to say about the 3.5" came from.
 
 ## Pin map
 
