@@ -61,14 +61,14 @@ def read_user_setup(panel):
     return out
 
 
-# Soldered-down parts of the board that no config file describes.
-# Soldered-down parts no config file describes, per panel. The two boards do
-# not agree, and assuming the 2.8"'s map for both is how GPIO 4 read as a
-# spent LED on a board where it is the audio amplifier's enable.
+# Soldered-down parts of the board that no config file describes, per panel.
 #
-#   2.8" ESP32-2432S028R   RGB 4/16/17, LDR 34, speaker 26
-#   3.5" ESP32-3248S035R   RGB 4/16/17, speaker 26, battery ADC 34,
-#                          touch IRQ 36
+#   2.8" ESP32-2432S028R   RGB 4/16/17, CdS 34, speaker 26
+#   3.5" ESP32-3248S035R   RGB 4/16/17, CdS 34, speaker 26, touch IRQ 36
+#
+# They agree about more than this table used to claim. Every difference it
+# once listed for the 3.5" came from lcdwiki's E32R35T, which is a different
+# vendor's board.
 #
 # The 3.5" row was lcdwiki's E32R35T for most of this port's life: RGB on
 # 22/16/17 with GPIO 4 as an audio amplifier's enable. The reference board
@@ -88,17 +88,23 @@ def read_user_setup(panel):
 # amplifier is the reason this board could spend it; GPIO 22 being ordinary
 # free GPIO is what makes CC1101 GDO0 uncontroversial there.
 #
-# [verify] 26, 34 and 36 on the 3.5" have NOT been metered. They are carried
-# over on the assumption that this board follows Sunton's 2.8" elsewhere too,
-# which is now the demonstrated pattern rather than a guess, but it is still
-# an assumption. It has a SPEAK connector and a BAT1 connector, so something
-# is on 26 and 34.
+# 26, 34 and 36 on the 3.5" are from rzeldent/platformio-espressif32-sunton's
+# esp32-3248S035R.json, which is reverse-engineered from Sunton boards rather
+# than copied from a vendor page. It agrees with what was metered here -- the
+# backlight on 27, the LED on 4/16/17, the SD bus -- which is most of why it
+# is trusted for the three that were not.
+#
+# It also corrects one: GPIO 34 is the CdS photoresistor, the same light
+# sensor the 2.8" has, not a battery divider. That claim came from lcdwiki's
+# E32R35T along with everything else this board turned out not to be.
+#
+# Still a published source, and this board has now disagreed with four of
+# them. Nothing here depends on 26, 34 or 36.
 BOARD_FIXED = {
     28: {4: "RGB LED red", 16: "RGB LED green", 17: "RGB LED blue",
          34: "LDR", 26: "speaker"},
     35: {4: "RGB LED red", 16: "RGB LED blue", 17: "RGB LED green",
-         26: "speaker [verify]", 34: "battery ADC [verify]",
-         36: "touch IRQ [verify]"},
+         26: "speaker", 34: "CdS light sensor", 36: "touch IRQ"},
 }
 
 def reserved_for(panel):
@@ -118,8 +124,9 @@ def reserved_for(panel):
 #
 # The 2.8" gives up its RGB LED, its speaker and its LDR -- an LED, a buzzer
 # and a light sensor, none of which this tool uses. The 3.5" gives up its RGB
-# LED and nothing else; 26, 34 and 36 stay reserved because nothing has
-# metered them and a SPEAK and a BAT1 connector say something is there.
+# LED and nothing else; 26, 34 and 36 stay reserved because the board has
+# them and this tool has no use for a speaker, a light sensor or the touch
+# controller's interrupt.
 #
 # GPIO 4 is in the 3.5" set now that it has been shown to be an LED channel
 # on this board rather than an amplifier's enable. Nothing uses it there --

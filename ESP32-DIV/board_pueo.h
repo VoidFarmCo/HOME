@@ -124,6 +124,13 @@
  * while the 3.5" hangs its XPT2046 off the display's SPI behind TOUCH_CS.
  * The pin that collides on one board is the spare on the other.
  *
+ * [WARNING] free on the 3248S035**R**, which is the resistive-touch part.
+ * The 3248S035**C** is the same board with a GT911 capacitive controller
+ * on I2C, and GPIO 25 is one of the pins that goes to it. This image on a
+ * -C board would drive a chip select into the touch controller. The two
+ * are told apart by whether touch works at all: an XPT2046 behind
+ * TOUCH_CS, which this build drives, is silent on a -C board.
+ *
  * Not changed on the 2.8": anyone who followed the build guide has CSN
  * soldered to the GPIO 4 pad, and a published pin map is a thing people
  * have already acted on.
