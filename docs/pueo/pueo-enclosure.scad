@@ -1,6 +1,6 @@
 // =====================================================
 //  PUEO enclosure - base and lid, both in this file
-//  85 x 170 x 20, zoned for RF/NFC/power separation
+//  68 x 142 x 20, zoned for RF/NFC/power separation
 //  every module below is editable - see MODULES list
 //
 //  THIS FILE CONTAINS BOTH PARTS. Which one renders is
@@ -24,8 +24,16 @@
 // =====================================================
 
 /* ---------- envelope ---------- */
-W        = 85;      // outer width
-L        = 170;     // outer length
+// 2026-09-23: was 85 x 170. The CYD carries an FM5324GA -- a single-chip
+// Li-ion charger AND synchronous 5 V boost, with the 2.2 uH inductor beside
+// it and BAT1 as its cell input. That is the TP4056 and the MT3608 both, on
+// the board already, so both came out of this case.
+//
+// They were what made it wide: side by side they spanned 79.1 mm of the
+// 79.1 mm of content, in a case whose next-widest zone is the radios at
+// 60.5. Everything else is now centred on x=0 and the radios set the width.
+W        = 68;      // outer width  -- radios at +/-30.5 plus walls
+L        = 142;     // outer length
 H        = 20;      // outer height of the base
 WALL     = 2.5;
 FLOOR    = 4.0;     // general floor thickness
@@ -60,12 +68,12 @@ echo(str("SMA_Z = ", SMA_Z, " mm above the pocket floor"));
 CARRIER_HEADROOM = (H - (FLOOR - POCKET)) - STANDOFF_H - PCB_T;
 echo(str("room above the carrier = ", CARRIER_HEADROOM, " mm"));
 
-// The TP4056 in hand has a micro-USB jack, not Type-C. The receptacle is
-// about 8 x 3; the cutout has to clear the plug's metal shell with slack for
-// print tolerance, not the overmoulded boot, which stays outside the wall.
-USB_W     = 11;     // cutout width  (jack is ~8)
-USB_HT    = 6;      // cutout height (jack is ~3)
-USB_Y     = -62;    // RIGHT wall - the jack is on the board's short end
+// Charging is the CYD's own USB now that the TP4056 is gone, so this cutout
+// is for the board's socket rather than a charger module's. The CYD has both
+// micro-USB and USB-C on this revision; the opening is sized for the larger.
+USB_W     = 13;     // cutout width   (USB-C shell is ~9)
+USB_HT    = 7;      // cutout height  (shell is ~3.3)
+USB_Y     = 0;      // [VERIFY] set from where the socket lands in the lid
 
 /* ---------- GPS antenna slot (top centre) ---------- */
 GPS_W     = 21;     // slot width
@@ -87,27 +95,30 @@ VENT_Z1  =  6;
    ===================================================== */
 MODULES = [
   // --- power zone, bottom ---
-  [ -19, -65,  36, 17, "MT3608 boost"   ],
-  [  26.6, -62, 27, 17, "TP4056 charger" ],  // right edge flush to the right wall
-  [ -29, -48,  20, 12, "MP2307 buck"    ],   // independent rail for the PA radios
-                                             // part is 17.9 x 12, pocket left oversized
+  // One module, not three. The charger and the 5 V boost are on the CYD.
+  // What is left is the independent rail for the PA radios, which exists to
+  // keep their current steps off whatever is feeding the display -- that
+  // argument is unchanged by where the 5 V comes from.
+  [   0, -60,  20, 12, "MP2307 buck"    ],   // part is 17.9 x 12, pocket oversized
 
   // --- battery ---
-  [ -16, -23,  45, 34, "LiPo pack"      ],
+  // Centred now rather than pushed left, and its leads go to the CYD's own
+  // BAT1 rather than to a charger down here.
+  [   0, -35,  45, 34, "LiPo pack"      ],
 
   // --- NFC ---
-  [   0,  18,  43, 41, "PN532 V3"       ],   // <-- gets the thin floor
+  [   0,   4,  43, 41, "PN532 V3"       ],   // <-- gets the thin floor
 
   // --- radios: vertical, board SMA against the top wall ---
   // Pockets deliberately larger than the parts: CC1101 is 15 x 38 in a
   // 15 x 40, NRF24 is 15.5 x 41 in a 16 x 41. pockets() adds 0.6 more.
-  [ -23, 61.5, 15, 40, "HW-863 CC1101"  ],
-  [  22, 61,   16, 41, "NRF24 PA+LNA"   ],
+  // x unchanged: 45 mm apart is the RF separation this whole layout is for,
+  // and it is what now sets the case width.
+  [ -23,  48,  15, 40, "HW-863 CC1101"  ],
+  [  22,  47.5,16, 41, "NRF24 PA+LNA"   ],
 
   // --- GPS, in the corridor between the radios ---
-  // Moved up from (24,-21): the antenna is on a 90 mm u.FL pigtail and
-  // could not reach the top-wall slot from down there.
-  [   0,  52,  16, 13, "ATGM336H GPS"   ]
+  [   0,  40,  16, 13, "ATGM336H GPS"   ]
 ];
 
 // Looked up by name so reordering MODULES cannot silently point the thin
@@ -162,7 +173,19 @@ module shell() {
  * uneven spans are a real cost and the right one to pay: 103 mm between
  * screws is a stiffness argument, and the alternative was three interacting
  * fudges around a part that has to print. */
-BOSS_POS = [[-36.5,-79],[36.5,-79],[-36.5,24],[36.5,24],[-36.5,70],[36.5,70]];
+// Five, not six. At 85 mm wide there was room outboard of the radios for a
+// boss in each top corner; at 68 the radios reach x = -30.5 and 30 and there
+// is not. Both top bosses landed inside a radio pocket -- caught by checking
+// the placement against MODULES rather than by looking at the render, where
+// a boss cut away by a pocket still looks like a boss.
+//
+// The replacement is a single one up the middle, in the corridor between the
+// radios and above the GPS. One screw across the top instead of two.
+// y=54 rather than 60: at 60 it ran into the GPS antenna slot in the top
+// wall, which is a feature and not a module, so checking the bosses against
+// MODULES alone did not see it. OpenSCAD did -- as a non-manifold warning
+// on the base and nothing visibly wrong in the render.
+BOSS_POS = [[-28,-62],[28,-62],[-28,-2],[28,-2],[0,54]];
 module bosses() {
     for (p = BOSS_POS)
         translate([p[0], p[1], 0])
@@ -225,9 +248,9 @@ module penetrations() {
         cube([4*WALL, USB_W, USB_HT], center=true);
 
     // vents - bottom wall, clear of the USB cutout
-    for (x = [-34,-28,-22,-16,-10,-4]) slot_Y(x, -L/2);
+    for (x = [-15,-9,-3,3,9,15]) slot_Y(x, -L/2);
     // vents - left wall alongside the power zone
-    for (y = [-76,-70,-64,-58,-52]) slot_X(-W/2, y);
+    for (y = [-64,-58,-52,-46,-40]) slot_X(-W/2, y);
 }
 
 /* ---------- assembly ---------- */
