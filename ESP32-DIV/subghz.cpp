@@ -468,32 +468,79 @@ static void subghzSetBruteNavLabels() {
  * is every board, until the carrier exists. Opening the jamming detector on
  * a bare CYD is how this was found.
  *
- * This is the same handshake with a deadline. Drive CS low, give the chip a
- * few milliseconds to answer, and if it does not, say so and do not call
- * into the library at all.
+ * This asks the chip who it is. Drive CS low with a deadline, then read the
+ * PARTNUM and VERSION status registers over SPI and check the answer is one
+ * a CC1101 would give.
  *
- * A false here means "nothing answered", not "the chip is broken": a
- * mis-wired MISO looks identical. That is the right thing to put on screen
- * either way. */
-static bool cc1101Present() {
-  pinMode(CC1101_CS, OUTPUT);
-  pinMode(CC1101_MISO, INPUT);
-
-  digitalWrite(CC1101_CS, HIGH);
-  delayMicroseconds(50);
+ * It used to sample MISO and call a low read "present", which a floating
+ * input satisfies about as often as not. The board then went into
+ * ELECHOUSE_CC1101::Init(), whose first act is `while(digitalRead(MISO_PIN));`
+ * with no deadline, and locked up with the feature's screen already drawn.
+ * A guard with a timeout was protecting a driver without one.
+ *
+ * A false here means "nothing that answers like a CC1101", not "the chip is
+ * broken": a mis-wired MISO looks identical. That is the right thing to put
+ * on screen either way. */
+/* Read one CC1101 status register. Status registers need the burst bit set
+ * as well as the read bit, so the header byte is addr | 0xC0.
+ *
+ * Deliberately not ELECHOUSE_CC1101::SpiReadStatus(), which opens with the
+ * same unbounded `while(digitalRead(MISO_PIN));` as Init() and would hang in
+ * the probe instead of in the driver. */
+static uint8_t cc1101ReadStatusReg(uint8_t addr) {
   digitalWrite(CC1101_CS, LOW);
 
-  const uint32_t deadline = millis() + 10;   // the datasheet wants microseconds
-  bool ready = false;
-  while (millis() < deadline) {
-    if (digitalRead(CC1101_MISO) == LOW) {
-      ready = true;
-      break;
-    }
+  /* The chip pulls MISO low when its crystal is stable. Bounded, because
+   * that is the whole point of this file. */
+  const uint32_t deadline = millis() + 5;
+  while (digitalRead(CC1101_MISO) == HIGH && millis() < deadline) {
   }
 
+  SPI.transfer(addr | 0xC0);
+  const uint8_t value = SPI.transfer(0x00);
   digitalWrite(CC1101_CS, HIGH);
-  return ready;
+  return value;
+}
+
+static bool cc1101Present() {
+  /* Probing means driving the bus, so own it first. claim() re-points the
+   * GPIO matrix and applies the CC1101's clock, which is what makes a plain
+   * SPI.transfer() below correct. */
+  SpiBus::claim(SpiBus::Dev::Cc1101);
+
+  pinMode(CC1101_CS, OUTPUT);
+  pinMode(CC1101_MISO, INPUT);
+  digitalWrite(CC1101_CS, HIGH);
+  delayMicroseconds(50);
+
+  /* PARTNUM is 0x00 on every CC1101. VERSION is 0x04 or 0x14 on genuine
+   * parts and 0x07 or 0x17 on the clones these modules are usually built
+   * from, so it is checked for being a plausible value rather than against a
+   * list that would reject a working radio.
+   *
+   * Read twice. An absent chip leaves MISO floating, and a floating line can
+   * return 0x00, 0xFF, or noise that happens to look like a version once.
+   * Returning the same non-trivial value twice is what a real part does. */
+  const uint8_t part1 = cc1101ReadStatusReg(0x30);   // PARTNUM
+  const uint8_t ver1  = cc1101ReadStatusReg(0x31);   // VERSION
+  delayMicroseconds(200);
+  const uint8_t part2 = cc1101ReadStatusReg(0x30);
+  const uint8_t ver2  = cc1101ReadStatusReg(0x31);
+
+  const bool ok = (part1 == 0x00 && part2 == 0x00) &&
+                  (ver1 == ver2) &&
+                  (ver1 != 0x00 && ver1 != 0xFF);
+
+  if (!ok) {
+    /* Hand the bus back before the caller draws the "No CC1101" screen and
+     * waits for a tap on it. That modal reads the touch controller, which
+     * reads MISO on a different pad, so leaving the matrix pointed here
+     * would trade a hang in the driver for a hang in the message about it. */
+    if (SpiBus::touchSharesRadioBus()) {
+      SpiBus::claim(SpiBus::Dev::Touch);
+    }
+  }
+  return ok;
 }
 
 /* Probe, and if nothing answers say so and ask to leave. Returns false when
