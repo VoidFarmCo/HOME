@@ -160,14 +160,37 @@ echo(str("room above the carrier = ", CARRIER_HEADROOM, " mm"));
 // Charging is the CYD's own USB now that the TP4056 is gone, so this cutout
 // is for the board's socket rather than a charger module's. The CYD has both
 // micro-USB and USB-C on this revision; the opening is sized for the larger.
-// With EXT_POWER the jack is the TP4056's own micro-USB, on the board's
-// short end against the right wall. Without it, charging is through the
-// CYD's socket, and this opening is for that instead -- the reference board
-// has both micro-USB and USB-C, so it is sized for the larger.
-USB_W     = EXT_POWER ? 11 : 13;   // jack is ~8 micro, ~9 Type-C
-USB_HT    = EXT_POWER ? 6  : 7;
-USB_Y     = EXT_POWER ? -62 : 0;   // [VERIFY] the 0 wants setting from where
-                                   // the CYD's socket lands in the lid
+/* Two different sockets, on two different parts.
+ *
+ * With EXT_POWER the jack is the TP4056's own micro-USB. That module sits in
+ * the base, on its short end against the right wall, so the opening is a
+ * rectangle through the base's long side and these three numbers place it.
+ *
+ * Without EXT_POWER there is no TP4056 and charging goes through the CYD's
+ * own socket. The CYD is mounted in the LID, with its long axis down the
+ * length of the case, so its sockets are at the short END. USB_Y was a
+ * placeholder of 0 for this case and the opening it fed was on the base's
+ * long side: the wrong wall of the wrong part, which is why it never lined
+ * up with anything.
+ */
+USB_W     = 11;     // EXT_POWER only: the TP4056 jack is ~8 wide
+USB_HT    = 6;
+USB_Y     = -62;    // and where it sits along the base's right wall
+
+/* The lid opening, measured off a working print rather than derived.
+ *
+ * A 3MF with the cut as a negative cylinder gave lid extents of 84 x 142 x
+ * 12, which is W x L x LID_H exactly, so the transform that produced these
+ * is sound.
+ *
+ * USB_D is the hole that worked, not the socket. At 14 it is wider than the
+ * lid is thick, so it takes the full wall height and there is room to shrink
+ * it once somebody measures the socket itself. Left generous deliberately:
+ * a cable that will not seat is worse than an opening that shows daylight,
+ * and this is the end you plug into. */
+USB_LID_X = -0.5;   // very nearly centred on the width
+USB_LID_Z = 1.0;    // above the lid's mating face, near the board's underside
+USB_LID_D = 14.0;
 
 /* ---------- GPS antenna slot (top centre) ---------- */
 GPS_W     = 21;     // slot width
@@ -352,10 +375,15 @@ module penetrations() {
         translate([x, L/2, FLOOR - POCKET + SMA_Z])
             rotate([90,0,0]) cylinder(h=4*WALL, r=SMA_D/2, center=true);
 
-    // micro-USB, RIGHT wall. Z is anchored to the pocket floor, which is
-    // only right while the modules sit on the floor -- see CARRIER note.
-    translate([W/2, USB_Y, FLOOR - POCKET - 0.5 + USB_HT/2])
-        cube([4*WALL, USB_W, USB_HT], center=true);
+    // micro-USB, RIGHT wall, for the TP4056 that is only here with
+    // EXT_POWER. Z is anchored to the pocket floor, which is only right
+    // while the modules sit on the floor -- see CARRIER note.
+    //
+    // Without EXT_POWER the socket you plug into is the CYD's own, and that
+    // is in the lid at the far end. See USB_LID_* and lid().
+    if (EXT_POWER)
+        translate([W/2, USB_Y, FLOOR - POCKET - 0.5 + USB_HT/2])
+            cube([4*WALL, USB_W, USB_HT], center=true);
 
     // vents - bottom wall, clear of the USB cutout
     for (x = EXT_POWER ? [-34,-28,-22,-16,-10,-4] : [-15,-9,-3,3,9,15])
@@ -1228,6 +1256,14 @@ module lid() {
                         cylinder(h = SCREEN_STACK + SCREEN_LIP - 2.5,
                                  r = SCREEN_POST_R);
         }
+        /* The CYD's own USB socket, through the end wall opposite the GPS
+         * slot. Only when there is no TP4056 in the base to charge through
+         * instead. Measured off a working print; see USB_LID_*. */
+        if (!EXT_POWER)
+            translate([USB_LID_X, -L/2, USB_LID_Z])
+                rotate([90, 0, 0])
+                    cylinder(h = 4 * WALL, d = USB_LID_D, center = true);
+
         // The window. On the 2.8" this is still the board's outline; on the
         // 3.5" it is the screen's aperture, with the rebate cut below it.
         if (PANEL == "3.5") {
