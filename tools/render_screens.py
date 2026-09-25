@@ -37,6 +37,21 @@ ICON_H = os.path.join(REPO, "ESP32-DIV", "icon.h")
 # rather than copying the array is the same rule Emit.cpp follows for the
 # signatures: one definition, two readers.
 BEACON_ART = os.path.join(REPO, "PueoBeacon", "BeaconArt.h")
+BEACON_EMIT = os.path.join(REPO, "PueoBeacon", "Emit.h")
+
+
+def beacon_stop_min():
+    """The auto-stop, in minutes, out of the firmware's own constant.
+
+    This was typed as "10 min" on both sides while Emit.h said fifteen.
+    check_render_sync.py now compares all three."""
+    src = open(BEACON_EMIT, encoding="utf-8").read()
+    m = re.search(r"kAutoStopMs\s*=\s*(\d+)u?\s*\*\s*(\d+)u?"
+                  r"\s*\*\s*(\d+)u?", src)
+    if not m:
+        raise SystemExit("kAutoStopMs not found in Emit.h")
+    a, b, c = (int(g) for g in m.groups())
+    return a * b * c // 60000
 FONTS = os.path.join(REPO, ".arduino", "user", "libraries", "TFT_eSPI", "Fonts")
 
 # The panel these are drawn for. main() sets it from --panel; the default
@@ -605,7 +620,8 @@ def render_beacon_splash(t, brand):
     centred_f1(brand["PUEO_VERSION"], y, BCN_DIM)
 
     centred_f1("THIS BOARD TRANSMITS", H - 54, BCN_STOP)
-    centred_f1("WiFi + BLE, lowest power, 10 min", H - 40, BCN_DIM)
+    centred_f1("WiFi + BLE, lowest power, %d min" % beacon_stop_min(),
+               H - 40, BCN_DIM)
     centred_f1("broadcasting in 1...", H - 22, BCN_WARN)
 
 

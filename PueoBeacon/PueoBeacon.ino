@@ -24,7 +24,7 @@
  *
  * Everything it sends is built to be recognised as a decoy rather than to be
  * convincing: PUEO-TEST identifiers, DEAD in the device half of every
- * address, transmit power at the floor, and a ten-minute auto-stop. A test
+ * address, transmit power at the floor, and an auto-stop. A test
  * kit you cannot tell from the real article is a worse test kit, not a
  * better one.
  * ────────────────────────────────────────────────────────────────────────── */
@@ -122,8 +122,15 @@ void drawSplash() {
   /* The one thing worth reading before it starts. */
   tft.setTextColor(kStop, kBg);
   tft.drawString("THIS BOARD TRANSMITS", cx, PUEO_SCREEN_H - 54);
+  /* Built from kAutoStopMs rather than typed. It said 10 while the
+   * constant said 15, which on this screen is not a typo: this is the line
+   * somebody reads in the five seconds before the board starts
+   * transmitting, and it was promising to stop a third of the way in. */
+  char lim[40];
+  snprintf(lim, sizeof(lim), "WiFi + BLE, lowest power, %lu min",
+           (unsigned long)(Emit::kAutoStopMs / 60000u));
   tft.setTextColor(kDim, kBg);
-  tft.drawString("WiFi + BLE, lowest power, 10 min", cx, PUEO_SCREEN_H - 40);
+  tft.drawString(lim, cx, PUEO_SCREEN_H - 40);
 
   /* Counts down rather than waiting quietly, so the delay reads as a
    * deliberate hold and not as a slow boot. Only the line that changes is

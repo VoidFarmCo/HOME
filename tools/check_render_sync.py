@@ -328,6 +328,39 @@ def main():
     ok("  the renderer draws them at the same offsets",
        roffs == want * 2, str(roffs))
 
+    print("\nthe beacon's auto-stop, in all three places it is said:")
+    # Emit.h decides it. The splash prints it, the renderer draws the splash,
+    # and added.html describes it. All four said ten minutes for as long as
+    # the constant said fifteen -- and the splash is the screen somebody
+    # reads in the five seconds before the board starts transmitting, so it
+    # was promising to stop a third of the way into the transmit window.
+    #
+    # Three of the four now derive from the constant, so changing it carries
+    # them. The fourth is prose on added.html, in a different repository
+    # this script cannot reach: if you change kAutoStopMs, change the page.
+    # Said here because that is where somebody changing it will be looking.
+    emit = (REPO / "PueoBeacon" / "Emit.h").read_text(encoding="utf-8")
+    sketch = (REPO / "PueoBeacon" / "PueoBeacon.ino").read_text(encoding="utf-8")
+    rsrc = RENDER.read_text(encoding="utf-8")
+
+    m = re.search(r"kAutoStopMs\s*=\s*(\d+)u?\s*\*\s*(\d+)u?\s*\*\s*(\d+)u?",
+                  emit)
+    ok("  kAutoStopMs resolves", m is not None, "not found in Emit.h")
+    if m:
+        mins = (int(m.group(1)) * int(m.group(2)) * int(m.group(3))) // 60000
+        print("        Emit.h says %d minutes" % mins)
+        # Neither side may carry the number as a literal. A hard-coded
+        # "15 min" would pass a value comparison today and drift tomorrow,
+        # which is how this got here, so the check is that it is computed.
+        for who, src in (("the splash", sketch), ("the renderer", rsrc)):
+            lit = re.search(r"lowest power,\s*\d+\s*min", src)
+            ok("  %s does not hard-code the minutes" % who, lit is None,
+               "found %r" % (lit.group(0) if lit else ""))
+        ok("  the splash builds it from kAutoStopMs",
+           "kAutoStopMs / 60000" in sketch.replace("u)", ")"))
+        ok("  the renderer builds it from kAutoStopMs",
+           "beacon_stop_min()" in rsrc and "kAutoStopMs" in rsrc)
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS))
