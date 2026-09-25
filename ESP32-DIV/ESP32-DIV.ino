@@ -1446,8 +1446,8 @@ void handleWiFiSubmenuButtons() {
             feature_active = true;
             feature_exit_requested = false;
             CaptivePortal::cportalSetup();
-            while (current_submenu_index == 6 && !feature_exit_requested) {
-                current_submenu_index = 6;
+            while (current_submenu_index == 0 && !feature_exit_requested) {
+                current_submenu_index = 0;
                 in_sub_menu = true;
                 CaptivePortal::cportalLoop();
                 if (isButtonPressed(BTN_SELECT)) {
@@ -1479,8 +1479,8 @@ void handleWiFiSubmenuButtons() {
             feature_active = true;
             feature_exit_requested = false;
             HiddenSsidReveal::hiddenSsidSetup();
-            while (current_submenu_index == 7 && !feature_exit_requested) {
-                current_submenu_index = 7;
+            while (current_submenu_index == 1 && !feature_exit_requested) {
+                current_submenu_index = 1;
                 in_sub_menu = true;
                 HiddenSsidReveal::hiddenSsidLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -1874,8 +1874,8 @@ void handleWiFiSubmenuButtons() {
                     feature_active = true;
                     feature_exit_requested = false;
                     CaptivePortal::cportalSetup();
-                    while (current_submenu_index == 6 && !feature_exit_requested) {
-                        current_submenu_index = 6;
+                    while (current_submenu_index == 0 && !feature_exit_requested) {
+                        current_submenu_index = 0;
                         in_sub_menu = true;
                         CaptivePortal::cportalLoop();
                         if (isButtonPressed(BTN_SELECT)) {
@@ -1906,8 +1906,8 @@ void handleWiFiSubmenuButtons() {
                     feature_active = true;
                     feature_exit_requested = false;
                     HiddenSsidReveal::hiddenSsidSetup();
-                    while (current_submenu_index == 7 && !feature_exit_requested) {
-                        current_submenu_index = 7;
+                    while (current_submenu_index == 1 && !feature_exit_requested) {
+                        current_submenu_index = 1;
                         in_sub_menu = true;
                         HiddenSsidReveal::hiddenSsidLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {

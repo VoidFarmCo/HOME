@@ -132,9 +132,37 @@ def main():
                               % (i + 2, h.group(1), int(h.group(2)) + 1,
                                  h.group(3), p.group(1)))
 
+    # Some branches keep themselves running with a bare
+    # `while (current_submenu_index == N && ...)`, with no page in it. The
+    # first version of this check required `_submenu_page ==` in the header
+    # and so could not see those at all, which is how Hidden SSID Revealer
+    # kept a while loop testing 7 after moving to index 1 and never ran its
+    # own loop once.
+    bare = re.compile(r"^\s*while \(current_submenu_index == (\d+) &&")
+    branch_at = re.compile(r"^\s*(?:\}?\s*else\s+)?if \((\w+)_submenu_page == (\d+)"
+                           r" && current_submenu_index == (\d+)\)")
+    for i, ln in enumerate(src_lines):
+        b = bare.match(ln)
+        if not b:
+            continue
+        owner = None
+        for j in range(i - 1, max(-1, i - 60), -1):
+            o = branch_at.match(src_lines[j])
+            if o:
+                owner = o
+                break
+        if not owner:
+            continue
+        pinned += 1
+        if int(b.group(1)) != int(owner.group(3)):
+            mismatched.append("line %d: %s page %d branch %s loops on %s"
+                              % (i + 1, owner.group(1),
+                                 int(owner.group(2)) + 1, owner.group(3),
+                                 b.group(1)))
+
     checks += 1
     if mismatched:
-        print("  FAIL  a branch pins an index it is not for")
+        print("  FAIL  a branch pins or loops on an index it is not for")
         for m in mismatched[:8]:
             print("          " + m)
         failed += 1
