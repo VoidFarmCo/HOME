@@ -219,6 +219,12 @@ blind, next to your own work, on the pads with the worst neighbours.
 
 ## The ten signals
 
+All ten are drawn in [wiring.svg](wiring.svg): the board on the left with its
+solder pads and its two useful headers, the four modules on the right, green
+for what reaches a connector and orange for what has to be soldered. The three
+shared bus lines are one spine there rather than nine wires, which is what they
+are electrically.
+
 **Six joints, on the board this was built against.** An earlier version of
 this table said three, because the 3.5" column described lcdwiki's E32R35T
 and the board in hand is Sunton's `ESP32-035`. Read the section under the

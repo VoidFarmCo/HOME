@@ -1,0 +1,117 @@
+<svg viewBox="0 0 900 578" role="img" aria-labelledby="wire-t wire-d" font-family="JetBrains Mono, Consolas, monospace">
+<title id="wire-t">Wiring: what connects to what on the 3.5-inch build</title>
+<desc id="wire-d">The Sunton ESP32-3248S035R on the left, four peripheral modules on the right. Ten signals in total. Six are soldered to castellated pads on the ESP32-WROOM-32 module itself: SCK on pad 9R is GPIO 18, MOSI on 2R is GPIO 23, MISO on 8R is GPIO 19, the NRF24 chip select on 10L is GPIO 25, the NRF24 chip enable on 12R is GPIO 16, and the PN532 slave select on 11R is GPIO 17. The other four reach JST 1.25 millimetre connectors: the P3 header carries the CC1101's three control lines as IO21 chip select, IO22 GDO0 and IO35 GDO2, and the P1 header's pin marked TX is GPIO 1, which receives the GPS module's transmit line. The three SPI bus lines are shared by the CC1101, NRF24 and PN532 and are drawn as one spine rather than nine separate wires. NRF24 IRQ and GPS RX are deliberately not connected.</desc>
+
+<text x="20" y="20" fill="var(--text-dim)" font-size="13">Wiring: ten signals, six of them soldered</text>
+
+<!-- legend, on its own line so nothing lands in it -->
+<path d="M20 38 L48 38" stroke="var(--orange)" stroke-width="2.5" fill="none"/>
+<text x="54" y="42" fill="var(--orange)" font-size="11">solder to a module pad</text>
+<path d="M250 38 L278 38" stroke="var(--green)" stroke-width="2.5" fill="none"/>
+<text x="284" y="42" fill="var(--green)" font-size="11">JST 1.25 connector</text>
+<path d="M450 38 L478 38" stroke="var(--text-dim)" stroke-width="3" fill="none"/>
+<text x="484" y="42" fill="var(--text-dim)" font-size="11">shared VSPI bus</text>
+
+<!-- ============ the board ============ -->
+<rect x="20" y="60" width="252" height="470" rx="8" fill="var(--bg-card)" stroke="var(--border-hi)"/>
+<text x="146" y="82" fill="var(--text)" font-size="12" text-anchor="middle">Sunton ESP32-3248S035R</text>
+
+<!-- zone: module castellations -->
+<rect x="34" y="96" width="224" height="196" rx="6" fill="none" stroke="var(--orange)" stroke-dasharray="3 3"/>
+<text x="146" y="114" fill="var(--orange)" font-size="11" text-anchor="middle">ESP-WROOM-32 pads &#8212; solder</text>
+<text x="46" y="136" fill="var(--text-dim)" font-size="11">9R</text>
+<text x="90" y="136" fill="var(--text)" font-size="11">SCK</text>
+<text x="182" y="136" fill="var(--text-dim)" font-size="11">GPIO 18</text>
+<text x="46" y="156" fill="var(--text-dim)" font-size="11">2R</text>
+<text x="90" y="156" fill="var(--text)" font-size="11">MOSI</text>
+<text x="182" y="156" fill="var(--text-dim)" font-size="11">GPIO 23</text>
+<text x="46" y="176" fill="var(--text-dim)" font-size="11">8R</text>
+<text x="90" y="176" fill="var(--text)" font-size="11">MISO</text>
+<text x="182" y="176" fill="var(--text-dim)" font-size="11">GPIO 19</text>
+<text x="46" y="208" fill="var(--text-dim)" font-size="11">10L</text>
+<text x="90" y="208" fill="var(--text)" font-size="11">CSN</text>
+<text x="182" y="208" fill="var(--text-dim)" font-size="11">GPIO 25</text>
+<text x="46" y="232" fill="var(--text-dim)" font-size="11">12R</text>
+<text x="90" y="232" fill="var(--text)" font-size="11">CE</text>
+<text x="182" y="232" fill="var(--text-dim)" font-size="11">GPIO 16</text>
+<text x="46" y="256" fill="var(--text-dim)" font-size="11">11R</text>
+<text x="90" y="256" fill="var(--text)" font-size="11">SS</text>
+<text x="182" y="256" fill="var(--text-dim)" font-size="11">GPIO 17</text>
+<text x="146" y="280" fill="var(--text-dim)" font-size="10" text-anchor="middle">1.27 mm pitch &#183; not the microSD slot</text>
+
+<!-- zone: P3 -->
+<rect x="34" y="308" width="224" height="96" rx="6" fill="none" stroke="var(--green)" stroke-dasharray="3 3"/>
+<text x="146" y="326" fill="var(--green)" font-size="11" text-anchor="middle">P3 &#8212; Expand IO, 4 pin</text>
+<text x="46" y="348" fill="var(--text)" font-size="11">IO21</text>
+<text x="114" y="348" fill="var(--text-dim)" font-size="11">CC1101 CS</text>
+<text x="46" y="368" fill="var(--text)" font-size="11">IO22</text>
+<text x="114" y="368" fill="var(--text-dim)" font-size="11">GDO0  TX</text>
+<text x="46" y="388" fill="var(--text)" font-size="11">IO35</text>
+<text x="114" y="388" fill="var(--text-dim)" font-size="11">GDO2  RX</text>
+
+<!-- zone: P1 -->
+<rect x="34" y="420" width="224" height="76" rx="6" fill="none" stroke="var(--green)" stroke-dasharray="3 3"/>
+<text x="146" y="438" fill="var(--green)" font-size="11" text-anchor="middle">P1 &#8212; serial, 4 pin</text>
+<text x="46" y="460" fill="var(--text)" font-size="11">TX</text>
+<text x="114" y="460" fill="var(--text-dim)" font-size="11">GPIO 1, UART0</text>
+<text x="46" y="480" fill="var(--text)" font-size="11">5V</text>
+<text x="114" y="480" fill="var(--text-dim)" font-size="11">[verify] on battery</text>
+
+<!-- ============ the VSPI spine ============ -->
+<path d="M340 120 L340 372" fill="none" stroke="var(--text-dim)" stroke-width="3"/>
+<path d="M258 156 L340 156" fill="none" stroke="var(--text-dim)" stroke-width="3"/>
+<text x="348" y="150" fill="var(--text-dim)" font-size="10">VSPI</text>
+<text x="348" y="163" fill="var(--text-dim)" font-size="10">SCK 18</text>
+<text x="348" y="176" fill="var(--text-dim)" font-size="10">MOSI 23</text>
+<text x="348" y="189" fill="var(--text-dim)" font-size="10">MISO 19</text>
+<path d="M340 120 L560 120" fill="none" stroke="var(--text-dim)" stroke-width="3"/>
+<path d="M340 246 L560 246" fill="none" stroke="var(--text-dim)" stroke-width="3"/>
+<path d="M340 372 L560 372" fill="none" stroke="var(--text-dim)" stroke-width="3"/>
+<circle cx="340" cy="120" r="4" fill="var(--text-dim)"/>
+<circle cx="340" cy="246" r="4" fill="var(--text-dim)"/>
+<circle cx="340" cy="372" r="4" fill="var(--text-dim)"/>
+
+<!-- ============ individual signals ============ -->
+<path d="M258 356 L296 356 L296 92 L560 92" fill="none" stroke="var(--green)" stroke-width="2.5"/>
+<path d="M554 87 L562 92 L554 97 Z" fill="var(--green)"/>
+<text x="404" y="86" fill="var(--green)" font-size="10">CS &#183; GDO0 &#183; GDO2</text>
+
+<path d="M258 208 L308 208 L308 218 L560 218" fill="none" stroke="var(--orange)" stroke-width="2.5"/>
+<path d="M554 213 L562 218 L554 223 Z" fill="var(--orange)"/>
+<text x="430" y="213" fill="var(--orange)" font-size="10">CSN 25</text>
+
+<path d="M258 232 L320 232 L320 272 L560 272" fill="none" stroke="var(--orange)" stroke-width="2.5"/>
+<path d="M554 267 L562 272 L554 277 Z" fill="var(--orange)"/>
+<text x="430" y="267" fill="var(--orange)" font-size="10">CE 16</text>
+
+<path d="M258 256 L330 256 L330 344 L560 344" fill="none" stroke="var(--orange)" stroke-width="2.5"/>
+<path d="M554 339 L562 344 L554 349 Z" fill="var(--orange)"/>
+<text x="430" y="339" fill="var(--orange)" font-size="10">SS 17</text>
+
+<path d="M258 460 L560 460" fill="none" stroke="var(--green)" stroke-width="2.5"/>
+<path d="M554 455 L562 460 L554 465 Z" fill="var(--green)"/>
+<text x="386" y="454" fill="var(--green)" font-size="10">GPS TX &#8594; GPIO 1</text>
+
+<!-- ============ modules ============ -->
+<rect x="562" y="72" width="316" height="76" rx="6" fill="var(--bg-card)" stroke="var(--border-hi)"/>
+<text x="578" y="96" fill="var(--text)" font-size="12">CC1101  HW-863</text>
+<text x="578" y="115" fill="var(--text-dim)" font-size="10">all three control lines on P3 &#8212; no solder</text>
+<text x="578" y="132" fill="var(--text-dim)" font-size="10">SCK / MOSI / MISO from the bus</text>
+
+<rect x="562" y="198" width="316" height="76" rx="6" fill="var(--bg-card)" stroke="var(--border-hi)"/>
+<text x="578" y="222" fill="var(--text)" font-size="12">NRF24L01+ PA/LNA</text>
+<text x="578" y="241" fill="var(--text-dim)" font-size="10">CSN and CE soldered &#183; IRQ not connected</text>
+<text x="578" y="258" fill="var(--text-dim)" font-size="10">+3V3_RF, its own rail</text>
+
+<rect x="562" y="324" width="316" height="76" rx="6" fill="var(--bg-card)" stroke="var(--border-hi)"/>
+<text x="578" y="348" fill="var(--text)" font-size="12">PN532 V3</text>
+<text x="578" y="367" fill="var(--text-dim)" font-size="10">SS soldered &#183; SPI mode, DIP CH1 off CH2 on</text>
+<text x="578" y="384" fill="var(--text-dim)" font-size="10">SCK / MOSI / MISO from the bus</text>
+
+<rect x="562" y="426" width="316" height="70" rx="6" fill="var(--bg-card)" stroke="var(--border-hi)"/>
+<text x="578" y="450" fill="var(--text)" font-size="12">ATGM336H GPS</text>
+<text x="578" y="469" fill="var(--text-dim)" font-size="10">TX only &#183; its own RX is not connected</text>
+<text x="578" y="486" fill="var(--text-dim)" font-size="10">USB serial is dead while GPS is open</text>
+
+<text x="20" y="556" fill="var(--text-dim)" font-size="10">The XPT2046 touch controller is a fifth device on this bus. It reads MISO on GPIO 39, not 19, which is why the bus has an owner.</text>
+</svg>
