@@ -11,6 +11,104 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.11 - 2026-09-25
+-------------------
+
+The main menu loses More, and four features come out from behind it.
+
+  * More held two peripheral radios and two passive detectors, which is not
+    one category, under a label that says nothing. Surveillance and the
+    drone detector are what this fork is for and they were two taps in,
+    while Beacon Spammer was one.
+
+      WiFi     Bluetooth          WiFi     Bluetooth
+      NRF24    SubGHz       to    NRF24    SubGHz
+      More     Tools              Detect   RFID/NFC
+      Settings About              GPS      System
+
+  * The two slots come from Settings and About, now rows in System with the
+    old Tools menu. Both were whole tiles of an eight tile grid, at the same
+    visual weight as the radios, and nobody opens either mid-session.
+
+  * 2.4GHz is NRF24. It opens the Nordic module, and naming a tile after a
+    band that the two tiles above it also use sent people to the wrong
+    screen looking for the BLE jammer.
+
+  * The Detect handler goes from 304 lines to 142. It carried a grid mode
+    and a list mode, three copies of a back path and two copies of every
+    feature launch, all so one tile could hold two menus inside it.
+
+Things that were transmitting, or listening, when they should not have been.
+
+  * The SubGHz Jammer did not stop when you left it. jammingRunning was only
+    ever cleared by the stop button, so backing out left the CC1101 in TX
+    and, in continuous mode, TX_PIN high, with nothing on screen saying so.
+
+  * The deauther's scratch AP is hidden and open now. It brought up a
+    visible WPA2 network named ESP32-DIV accepting four clients, with a
+    passphrase hardcoded in the source, so its key was published to anyone
+    who read the repository. startListening() in the same file already did
+    the right thing and these two sites predated it.
+
+  * The BLE Spoofer and the SubGHz Jammer seeded random() from
+    analogRead(0). An unconnected ADC pin is not entropy: it can sit at a
+    stable value, and then the same sequence of fake device names comes out
+    on every boot, which is a fingerprint in a feature whose point is not
+    having one. Both seed from esp_random() now.
+
+Opening a sub-GHz feature with no radio fitted locked the board up.
+
+  * cc1101Present() drove CS low and called a LOW reading on MISO present. A
+    floating input satisfies that about as often as not, and what it handed
+    you to was ELECHOUSE_CC1101::Init(), whose first act is an unbounded
+    while(digitalRead(MISO_PIN)). A guard with a timeout was protecting a
+    driver without one.
+
+  * It reads PARTNUM and VERSION over SPI now and checks the answer is one a
+    CC1101 would give, twice, because a floating line can look like a
+    version once. Covers all seven call sites.
+
+NMEA sentences are checked before anything parses them.
+
+  * stripChecksum() truncated at the '*' and threw the two hex digits away.
+    A corrupted RMC is still a well formed RMC, with a plausible latitude
+    and timestamp, and the wardriver writes it to the card as a real fix.
+
+  * A sentence with no checksum is rejected rather than accepted, because
+    truncation is the corruption most likely here and a sentence cut before
+    its '*' would otherwise pass with its remaining fields intact and wrong.
+
+New:
+
+  * AP Tracker, on the WiFi menu. Pick an access point, park on its channel
+    and walk it down by signal. Beacons arrive about ten times a second; a
+    scan sweep samples once every 1.7 s at best and transmits to do it.
+
+  * SignalGauge, the needle extracted out of TrackerHunt so Hunt and AP
+    Tracker share one gauge rather than two copies of 261 lines.
+
+  * docs/pueo/wiring.svg. Ten signals were a pin map in one file, an
+    ordering in a second and a connector inventory in a third, and nowhere a
+    picture.
+
+Also:
+
+  * The satellite scanner asked heap_caps for its panel instead of probing
+    down blindly from the full height in steps of 18, and its floor drops
+    from 200 rows to 96. On the 3.5" that floor was 64,000 bytes of
+    contiguous heap, which after the radio stacks are up often is not there.
+
+  * A feature that is unavailable on this board can be dismissed again. The
+    notification was drawn and never hidden, so it sat over a live submenu
+    and taps went to rows that could no longer be seen.
+
+  * WiFi and Bluetooth pages rebalance from 8 + 3 to 6 + 6 and 6 + 5. That
+    shipped two bugs of its own, both fixed here: a branch renumbered
+    without its body still pinned the old index, so ARP Scanner exited into
+    Hidden SSID Revealer and WPS fell into Captive Portal.
+    check_menu_dispatch.py now checks that a branch agrees with itself.
+
+
 0.4.10 - 2026-09-23
 -------------------
 

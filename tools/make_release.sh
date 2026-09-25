@@ -116,6 +116,7 @@ INCLUDE=(
   "tools/inline_logo.py"
   "tools/check_logo_scale.py"
   "tools/check_menu_tables.py"
+  "tools/check_nmea_checksum.py"
   "tools/check_tracker_follow.py"
   "tools/check_spotter_oui.py"
   "tools/render_screens.py"
