@@ -538,7 +538,17 @@ SCREEN_SCREW_DEPTH = 4.0;
  * A printed lid puts the hole over the LED, so they are close enough to
  * keep. Still the softest numbers here: if yours misses, put a rule on the
  * board's top and left edges and set LED_X as the offset from the board's
- * centreline (negative is left) and LED_Y from its centre (positive up). */
+ * centreline (negative is left) and LED_Y from its centre (positive up).
+ *
+ * The hole stays although Pueo does not drive an RGB LED. Those pins are
+ * repurposed -- on the 3.5", GPIO 16 is NRF24 CE and 17 is PN532 SS -- so
+ * once the radios are wired this hole shows blue and green flickering on
+ * every SPI transaction. Kept on purpose as of 2026-09-24: it is a free
+ * activity light. It is not a stealth leak in the sense check_stealth.py
+ * means, which walks transmit paths, but it is light coming out of a case,
+ * so decide for yourself before printing a lid for a quiet room.
+ *
+ * Do not "fix" it as a stray hole over a dead LED. It was looked at. */
 SCREEN_LED_X   = -14.0;
 SCREEN_LED_Y   =  46.4;   // ~4.3 down from the top edge, mid-strip
 SCREEN_LED_D   =  3.2;    // a light pipe, or just a hole
