@@ -64,35 +64,74 @@ Run `python tools/check_pinmap.py` to print the map and check for collisions.
 
 Inherited from ESP32-DIV unless marked.
 
-| Wi-Fi | 2.4 GHz | Sub-GHz | BLE | Other |
-|---|---|---|---|---|
-| Packet Monitor | Scanner | Replay Attack | BLE Scanner | RFID/NFC read |
-| Wi-Fi Scanner | Proto Kill | SubGHz Jammer | BLE Jammer | Card clone / erase |
-| Beacon Spammer | ESB Sniffer | De Bruijn / Brute | BLE Spoofer | Tag disrupt |
-| Deauther | ESB Replay | Jamming Detector | Sour Apple | GPS wardriver |
-| Deauth Detector | MouseJack Scan | Saved Profiles | AirTag Spoofer | Satellite scanner |
-| Probe Req Flood | MouseJack Inject | | AirTag Sniffer | SD file manager |
-| Captive Portal | | | Skimmer Detect | Serial monitor |
-| Hidden SSID | | | **Spotter** *(new)* | BLE Ducky |
-| WPS / ARP scan | | | **Hunt** *(new)* | |
-| Karma Attack | | | | |
+| Wi-Fi | NRF24 | Sub-GHz | BLE | Detect | GPS / RFID / System |
+|---|---|---|---|---|---|
+| Packet Monitor | Scanner | Replay Attack | BLE Jammer | **Surveillance** *(new)* | Wardriver |
+| Beacon Spammer | Proto Kill | SubGHz Jammer | BLE Spoofer | **Drone Detector** *(new)* | Satellite Scanner |
+| Wi-Fi Deauther | ESB Sniffer | De Bruijn / Brute | Sour Apple | | Card read / clone / erase |
+| Probe Req Flood | ESB Replay | Jamming Detector | AirTag Spoofer | | Dump, Decode Access |
+| Deauth Detector | MouseJack Scan | Saved Profile | AirTag Sniffer | | Jam Reader, Tag Disrupt, Disrupt Emulate |
+| Wi-Fi Scanner | MouseJack Inject | | Sniffer | | Serial Monitor |
+| Captive Portal | | | BLE Scanner | | Update Firmware |
+| Hidden SSID | | | BLE Rubber Ducky | | Touch Calibrate |
+| WPS Scanner | | | Skimmer Detect | | SD File Manager |
+| ARP Scanner | | | **Hunt** *(new)* | | Settings, About |
+| Karma Attack | | | **Fast Pair** *(new)* | | |
+| **AP Tracker** *(new)* | | | | | |
 
-Two features are Pueo's own, and both only listen.
+### What Pueo adds
 
-**Spotter** is passive detection of surveillance and tracking hardware that
-announces itself — plate readers and their accessories, body cameras, fixed
-cameras and doorbells, smart glasses, item trackers, vehicle modules and
-pentest kit — matching Wi-Fi OUIs, network names, BLE device names and
-service UUIDs against a table of 99 signatures across eight kinds.
+Five features are Pueo's own. Four of them only listen.
 
-**Hunt** is for after Spotter says yes: pick a tracker — Find My, Tile,
-SmartTag, Eddystone — and a needle swings with signal strength so the thing
+**Surveillance** (called Spotter until 0.4.0) is passive detection of
+surveillance and tracking hardware that announces itself: plate readers and
+their accessories, body cameras, fixed cameras and doorbells, smart glasses,
+item trackers, vehicle modules and pentest kit. It matches Wi-Fi OUIs,
+network names, BLE device names and service UUIDs against 99 signatures
+across eight kinds, and grades what it finds rather than asserting it.
+
+**Drone Detector** reads ASTM F3411 Broadcast Remote ID on both the Wi-Fi
+and BLE paths: the UAS ID, position, altitude, speed, and the operator's own
+location, which is the field that makes it different from watching an
+aircraft. The parser is checked against opendroneid-core-c rather than
+against a reading of the standard.
+
+**Hunt** is for after Surveillance says yes. Pick a tracker, Find My, Tile,
+SmartTag or Eddystone, and a needle swings with signal strength so the thing
 can be walked down. It shows strength rather than distance, because RSSI is
 not distance; what it is good for is which way the needle moves when you do.
 
+**AP Tracker** is the same needle against a Wi-Fi access point. It parks on
+the AP's channel and reads its beacons, which arrive about ten times a
+second, where a scan sweep samples once every 1.7 s and transmits to do it.
+
+**Fast Pair** is a scanner for Google's side of the BLE world, which this
+device had never looked at, plus a probe for CVE-2025-36911. The probe is
+the one feature here that transmits at a single named target, and it sits
+behind a confirm screen that names the address.
+
+### Three settings the device did not have
+
+**Stealth Mode** makes it receive only across the whole device. Nineteen
+features that transmit refuse to start and say so; scans that were quietly
+active, and there were twelve, are made passive instead of blocked.
+
+**SD Logging** is a master switch plus one per feature, and a feature says
+in its own words when it cannot log rather than failing quietly.
+
+**Boot Lock** is a password before the menu, salted SHA-256 and stretched,
+stored in NVS and never on the card. It stops someone who picks the device
+up and nothing else, and it is documented that way in its own source.
+
+### A second firmware
+
+**PueoBeacon** is built with `PUEO_ROLE=beacon` and flashed to a second
+board. It emits every signal the detectors look for, so an empty list can be
+told apart from an empty room. It found four bugs on its first evening.
+
 **IR is gone.** There is no IR LED or receiver on this board, so its
 protocol tables could never run here. Removing them freed **139,752 bytes**
-of flash and 4,472 of RAM, taking the image from 93% to 85%.
+of flash and 4,472 of RAM.
 
 ## Building
 
