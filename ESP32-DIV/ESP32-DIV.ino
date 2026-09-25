@@ -2808,6 +2808,94 @@ void handleBluetoothSubmenuButtons() {
     }
 }
 
+/* One feature launch, for the menus whose entries all have the same shape.
+ *
+ * Eleven entries across the NRF24 and SubGHz menus ran the same ~28 lines,
+ * and each ran them twice -- once in the button chain and once in the touch
+ * chain -- so the shape existed 22 times. check_menu_dispatch.py could tell
+ * you both chains had a branch for an index; nothing could tell you the two
+ * branches agreed, and the bug this repo already shipped was two chains
+ * disagreeing. Now there is one copy and two callers.
+ *
+ * The two menus really did differ, in two ways, and both are parameters
+ * rather than smoothed away:
+ *
+ *   levelExit   NRF's entries also leave on isButtonPressed(BTN_SELECT),
+ *               which is level-triggered. That is why they drain it with a
+ *               spin afterwards: without the drain a finger still down from
+ *               selecting the item would re-trigger. SubGHz's entries use
+ *               the edge-detected check alone.
+ *
+ *   teardown    SubGHz features mostly have no exit function to call -- not
+ *               an oversight in the dispatch, there is nothing to call. The
+ *               jammer is the exception since it started stopping itself.
+ *               nullptr says so in a place somebody will read.
+ */
+static void runSubmenuFeature(int idx, void (*setup)(), void (*loop)(),
+                              void (*teardown)(), bool levelExit) {
+    current_submenu_index = idx;
+    in_sub_menu = true;
+    feature_active = true;
+    feature_exit_requested = false;
+    setup();
+    while (current_submenu_index == idx && !feature_exit_requested) {
+        current_submenu_index = idx;
+        in_sub_menu = true;
+        loop();
+        const bool leaving = levelExit
+            ? (isButtonPressed(BTN_SELECT) || featureExitButtonPressed())
+            : featureExitButtonPressed();
+        if (leaving) {
+            in_sub_menu = true;
+            is_main_menu = false;
+            submenu_initialized = false;
+            feature_active = false;
+            feature_exit_requested = false;
+            displaySubmenu();
+            delay(200);
+            while (isButtonPressed(BTN_SELECT)) {
+            }
+            break;
+        }
+    }
+    if (teardown) {
+        teardown();
+    }
+    if (feature_exit_requested) {
+        in_sub_menu = true;
+        is_main_menu = false;
+        submenu_initialized = false;
+        feature_active = false;
+        feature_exit_requested = false;
+        displaySubmenu();
+        delay(200);
+    }
+}
+
+static void launchNrfFeature(int idx) {
+    switch (idx) {
+        case 0: runSubmenuFeature(0, Scanner::scannerSetup, Scanner::scannerLoop, Scanner::exit, true); break;
+        case 1: runSubmenuFeature(1, ProtoKill::prokillSetup, ProtoKill::prokillLoop, ProtoKill::exit, true); break;
+        case 2: runSubmenuFeature(2, EsbSniffer::esbSnifferSetup, EsbSniffer::esbSnifferLoop, EsbSniffer::exit, true); break;
+        case 3: runSubmenuFeature(3, EsbReplay::esbReplaySetup, EsbReplay::esbReplayLoop, EsbReplay::exit, true); break;
+        case 4: runSubmenuFeature(4, MouseJack::mouseJackSetup, MouseJack::mouseJackLoop, MouseJack::exit, true); break;
+        case 5: runSubmenuFeature(5, MouseJackInject::mouseJackInjectSetup, MouseJackInject::mouseJackInjectLoop, MouseJackInject::exit, true); break;
+        default: break;
+    }
+}
+
+static void launchSubGhzFeature(int idx) {
+    switch (idx) {
+        case 0: runSubmenuFeature(0, replayat::ReplayAttackSetup, replayat::ReplayAttackLoop, nullptr, false); break;
+        case 1: runSubmenuFeature(1, subjammer::subjammerSetup, subjammer::subjammerLoop, subjammer::exit, false); break;
+        case 2: runSubmenuFeature(2, SubBrute::subBruteSetup, SubBrute::subBruteLoop, nullptr, false); break;
+        case 3: runSubmenuFeature(3, jammingdetector::Setup, jammingdetector::Loop, nullptr, false); break;
+        case 4: runSubmenuFeature(4, SavedProfile::saveSetup, SavedProfile::saveLoop, nullptr, false); break;
+        default: break;
+    }
+}
+
+
 void handleNRFSubmenuButtons() {
     if (isButtonPressed(BTN_UP)) {
         current_submenu_index = (current_submenu_index - 1 + active_submenu_size) % active_submenu_size;
@@ -2842,214 +2930,8 @@ void handleNRFSubmenuButtons() {
             is_main_menu = false;
         }
 
-        if (current_submenu_index == 0) {
-            current_submenu_index = 0;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            Scanner::scannerSetup();
-            while (current_submenu_index == 0 && !feature_exit_requested) {
-                current_submenu_index = 0;
-                in_sub_menu = true;
-                Scanner::scannerLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            Scanner::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 1) {
-            current_submenu_index = 1;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            ProtoKill::prokillSetup();
-            while (current_submenu_index == 1 && !feature_exit_requested) {
-                current_submenu_index = 1;
-                in_sub_menu = true;
-                ProtoKill::prokillLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            ProtoKill::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 2) {
-            current_submenu_index = 2;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            EsbSniffer::esbSnifferSetup();
-            while (current_submenu_index == 2 && !feature_exit_requested) {
-                current_submenu_index = 2;
-                in_sub_menu = true;
-                EsbSniffer::esbSnifferLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            EsbSniffer::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 3) {
-            current_submenu_index = 3;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            EsbReplay::esbReplaySetup();
-            while (current_submenu_index == 3 && !feature_exit_requested) {
-                current_submenu_index = 3;
-                in_sub_menu = true;
-                EsbReplay::esbReplayLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            EsbReplay::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 4) {
-            current_submenu_index = 4;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            MouseJack::mouseJackSetup();
-            while (current_submenu_index == 4 && !feature_exit_requested) {
-                current_submenu_index = 4;
-                in_sub_menu = true;
-                MouseJack::mouseJackLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            MouseJack::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 5) {
-            current_submenu_index = 5;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            MouseJackInject::mouseJackInjectSetup();
-            while (current_submenu_index == 5 && !feature_exit_requested) {
-                current_submenu_index = 5;
-                in_sub_menu = true;
-                MouseJackInject::mouseJackInjectLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            MouseJackInject::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
+        if (current_submenu_index != 6) {
+            launchNrfFeature(current_submenu_index);
         }
     }
 
@@ -3078,204 +2960,8 @@ void handleNRFSubmenuButtons() {
                     displayMenu();
                     handleButtons();
                     is_main_menu = false;
-                } else if (current_submenu_index == 0) {
-                    current_submenu_index = 0;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    Scanner::scannerSetup();
-                    while (current_submenu_index == 0 && !feature_exit_requested) {
-                        current_submenu_index = 0;
-                        in_sub_menu = true;
-                        Scanner::scannerLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    Scanner::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 1) {
-                    current_submenu_index = 1;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    ProtoKill::prokillSetup();
-                    while (current_submenu_index == 1 && !feature_exit_requested) {
-                        current_submenu_index = 1;
-                        in_sub_menu = true;
-                        ProtoKill::prokillLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    ProtoKill::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 2) {
-                    current_submenu_index = 2;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    EsbSniffer::esbSnifferSetup();
-                    while (current_submenu_index == 2 && !feature_exit_requested) {
-                        current_submenu_index = 2;
-                        in_sub_menu = true;
-                        EsbSniffer::esbSnifferLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    EsbSniffer::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 3) {
-                    current_submenu_index = 3;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    EsbReplay::esbReplaySetup();
-                    while (current_submenu_index == 3 && !feature_exit_requested) {
-                        current_submenu_index = 3;
-                        in_sub_menu = true;
-                        EsbReplay::esbReplayLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    EsbReplay::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 4) {
-                    current_submenu_index = 4;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    MouseJack::mouseJackSetup();
-                    while (current_submenu_index == 4 && !feature_exit_requested) {
-                        current_submenu_index = 4;
-                        in_sub_menu = true;
-                        MouseJack::mouseJackLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    MouseJack::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 5) {
-                    current_submenu_index = 5;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    MouseJackInject::mouseJackInjectSetup();
-                    while (current_submenu_index == 5 && !feature_exit_requested) {
-                        current_submenu_index = 5;
-                        in_sub_menu = true;
-                        MouseJackInject::mouseJackInjectLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    MouseJackInject::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
+                } else {
+                    launchNrfFeature(current_submenu_index);
                 }
                 break;
             }
@@ -3317,175 +3003,8 @@ void handleSubGHzSubmenuButtons() {
             is_main_menu = false;
         }
 
-        if (current_submenu_index == 0) {
-            current_submenu_index = 0;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            replayat::ReplayAttackSetup();
-            while (current_submenu_index == 0 && !feature_exit_requested) {
-                current_submenu_index = 0;
-                in_sub_menu = true;
-                replayat::ReplayAttackLoop();
-                if (featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 1) {
-            current_submenu_index = 1;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            subjammer::subjammerSetup();
-            while (current_submenu_index == 1 && !feature_exit_requested) {
-                current_submenu_index = 1;
-                in_sub_menu = true;
-                subjammer::subjammerLoop();
-                if (featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            subjammer::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 2) {
-            current_submenu_index = 2;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            SubBrute::subBruteSetup();
-            while (current_submenu_index == 2 && !feature_exit_requested) {
-                current_submenu_index = 2;
-                in_sub_menu = true;
-                SubBrute::subBruteLoop();
-                if (featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 3) {
-            current_submenu_index = 3;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            jammingdetector::Setup();
-            while (current_submenu_index == 3 && !feature_exit_requested) {
-                current_submenu_index = 3;
-                in_sub_menu = true;
-                jammingdetector::Loop();
-                if (featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
-        }
-
-        if (current_submenu_index == 4) {
-            current_submenu_index = 4;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            SavedProfile::saveSetup();
-            while (current_submenu_index == 4 && !feature_exit_requested) {
-                current_submenu_index = 4;
-                in_sub_menu = true;
-                SavedProfile::saveLoop();
-                if (featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
-                    break;
-                }
-            }
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
+        if (current_submenu_index != 5) {
+            launchSubGhzFeature(current_submenu_index);
         }
     }
 
@@ -3514,167 +3033,8 @@ void handleSubGHzSubmenuButtons() {
                     displayMenu();
                     handleButtons();
                     is_main_menu = false;
-                } else if (current_submenu_index == 0) {
-                    current_submenu_index = 0;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    replayat::ReplayAttackSetup();
-                    while (current_submenu_index == 0 && !feature_exit_requested) {
-                        current_submenu_index = 0;
-                        in_sub_menu = true;
-                        replayat::ReplayAttackLoop();
-                        if (featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 1) {
-                    current_submenu_index = 1;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    subjammer::subjammerSetup();
-                    while (current_submenu_index == 1 && !feature_exit_requested) {
-                        current_submenu_index = 1;
-                        in_sub_menu = true;
-                        subjammer::subjammerLoop();
-                        if (featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    subjammer::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 2) {
-                    current_submenu_index = 2;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    SubBrute::subBruteSetup();
-                    while (current_submenu_index == 2 && !feature_exit_requested) {
-                        current_submenu_index = 2;
-                        in_sub_menu = true;
-                        SubBrute::subBruteLoop();
-                        if (featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 3) {
-                    current_submenu_index = 3;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    jammingdetector::Setup();
-                    while (current_submenu_index == 3 && !feature_exit_requested) {
-                        current_submenu_index = 3;
-                        in_sub_menu = true;
-                        jammingdetector::Loop();
-                        if (featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
-                } else if (current_submenu_index == 4) {
-                    current_submenu_index = 4;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    SavedProfile::saveSetup();
-                    while (current_submenu_index == 4 && !feature_exit_requested) {
-                        current_submenu_index = 4;
-                        in_sub_menu = true;
-                        SavedProfile::saveLoop();
-                        if (featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
-                            break;
-                        }
-                    }
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
+                } else {
+                    launchSubGhzFeature(current_submenu_index);
                 }
                 break;
             }

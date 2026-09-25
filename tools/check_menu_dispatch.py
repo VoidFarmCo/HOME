@@ -97,6 +97,62 @@ def main():
         else:
             print(f"  ok    {var} page {page + 1}, {chain:<7} has no orphaned handler")
 
+    # ---- the menus that dispatch through one launch function ------------
+    #
+    # NRF24 and SubGHz used to repeat a ~28-line feature launch per entry,
+    # twice over, and this script could not see them at all: it matches on
+    # `<menu>_submenu_page ==`, which only the paged menus have. Six of the
+    # eight menus had no coverage here, including the two whose entries were
+    # copied the most.
+    #
+    # They now go through launchNrfFeature / launchSubGhzFeature, so what is
+    # worth checking changed shape. Not "do both chains have a branch" --
+    # there is one branch now -- but "does the switch cover every entry the
+    # table declares, and do both chains actually call it".
+    text = SKETCH.read_text(encoding="utf-8")
+    LAUNCH = {
+        "launchNrfFeature": ("nrf_NUM_SUBMENU_ITEMS", "handleNRFSubmenuButtons"),
+        "launchSubGhzFeature": ("subghz_NUM_SUBMENU_ITEMS",
+                                "handleSubGHzSubmenuButtons"),
+    }
+    for fn, (count_name, handler) in LAUNCH.items():
+        m = re.search(r"const int " + count_name + r" = (\d+);", text)
+        body = re.search(r"static void " + fn + r"\(int idx\) \{(.*?)\n\}",
+                         text, re.S)
+        checks += 1
+        if not m or not body:
+            print(f"  FAIL  {fn}  not found, or its item count is missing")
+            failed += 1
+            continue
+        # The last table entry is Back, which the caller handles rather than
+        # the switch.
+        want = set(range(int(m.group(1)) - 1))
+        have = {int(x) for x in re.findall(r"case (\d+):", body.group(1))}
+        if want == have:
+            print(f"  ok    {fn:<20} covers all {len(want)} entries")
+        else:
+            print(f"  FAIL  {fn:<20} missing {sorted(want - have)}, "
+                  f"stray {sorted(have - want)}")
+            failed += 1
+
+        # Both chains have to reach it. One caller would be the original bug
+        # wearing a new shape.
+        hbody = re.search(r"void " + handler + r"\(\) \{(.*?)\n\}", text, re.S)
+        inner = hbody.group(1) if hbody else ""
+        # Commented-out lines do not count. The first version counted raw
+        # text, so commenting a call out left this passing -- which is the
+        # edit somebody makes while debugging and forgets to undo.
+        live = [ln for ln in inner.split("\n")
+                if not ln.strip().startswith(("//", "/*", "*"))]
+        n_calls = len(re.findall(fn + r"\(current_submenu_index\)",
+                                 "\n".join(live)))
+        checks += 1
+        if n_calls == 2:
+            print(f"  ok    {fn:<20} called from both chains")
+        else:
+            print(f"  FAIL  {fn:<20} called {n_calls} time(s), expected 2")
+            failed += 1
+
     print()
     if failed:
         print(f"FAILED: {failed} of {checks}")
