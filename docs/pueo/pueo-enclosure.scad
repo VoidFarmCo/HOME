@@ -536,7 +536,13 @@ SCREEN_SCREW_DEPTH = 4.0;
  * were the only figures in this file that did not come from a source.
  *
  * A printed lid puts the hole over the LED, so they are close enough to
- * keep. Still the softest numbers here: if yours misses, put a rule on the
+ * keep -- that was a 3.5" lid printed 2026-09-20, the day these went in.
+ * Still true of the current one: the 84 x 142 rework shrank the case around
+ * the screen plate without moving it, and every input to this hole
+ * (LED_X/Y/D, BEZEL_Y, LID_H, SCREEN_LIP, and the translate itself) is
+ * unchanged since. Checked against db70919 rather than assumed.
+ *
+ * Still the softest numbers here: if yours misses, put a rule on the
  * board's top and left edges and set LED_X as the offset from the board's
  * centreline (negative is left) and LED_Y from its centre (positive up).
  *
