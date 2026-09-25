@@ -1,7 +1,8 @@
 # Pueo hardware
 
-CYD ESP32-2432S028R with four external peripherals, in a custom 85 x 170 x 20
-enclosure. The pin map below is fixed; the case is already printed around it.
+A CYD with four external peripherals, in a custom 84 x 142 x 20 enclosure --
+85 x 170 if your board has no onboard charger and the power stack has to ride
+inside. See [pueo-enclosure.scad](pueo-enclosure.scad).
 
 The reference build is the 3.5" Sunton ESP32-3248S035R, silkscreened
 `ESP32-035`, on a revision carrying **both micro-USB and USB-C**.
@@ -13,22 +14,80 @@ rather than a header, see [build-guide.md](build-guide.md).
 
 Read off the board, connector by connector, on 2026-09-23.
 
-| | Pins | Signals |
-|---|---|---|
-| **P3** | 4 | `GND IO35 IO22 IO21` -- all three CC1101 control lines |
-| **CN1** | 4 | `GND IO22 IO21 3.3V` |
-| **P1** | 4 | `5V TX RX GND` -- serial, and the GPS's TX |
-| **SPEAK1** | 2 | speaker, GPIO 26 |
-| **BAT1** | 2 | battery, into the onboard charger |
+| | Pins | Vendor's name for it | Signals |
+|---|---|---|---|
+| **P3** | 4 | Extended IO | `GND IO35 IO22 IO21` -- all three CC1101 control lines |
+| **CN1** | 4 | temperature/humidity (DHT11) | `GND IO22 IO21 3.3V` |
+| **P1** | 4 | "4P 1.25 Power supply base" | `5V TX RX GND` -- serial, and the GPS's TX |
+| **SPEAK1** | 2 | Speak | speaker, GPIO 26 |
+| **BAT1** | 2 | *(not in the datasheet)* | battery, into the onboard charger |
 
-All of them are **1.25 mm pitch**. CN1 was measured at 1.29 mm against a
-microSD card lying on the board as a scale bar -- 11.00 mm by specification,
-573 px across 20 agreeing rows, giving 52.09 px/mm against a pin spacing of
-67.17 px over seventeen readings. The 3% excess is parallax: those pins sit
-on the connector's top face, three or four millimetres nearer the lens than
-the card. 1.50 mm would have been 14% out, which is far outside a
-measurement that repeatable. Sunton's own documentation puts SPEAK and the
-battery connector at 1.25 as well.
+The middle column comes from Sunton's own datasheet -- *3.5 inch ESP32
+module ESP32-3248S035R/C*, Shenzhen Jingcai Intelligent, six pages, with a
+labelled render of the board on page 5. It explains CN1, which this file
+listed as four pins with no stated purpose: `GND IO22 IO21 3.3V` is a
+four-pin DHT11 header, which is why there is a 3.3 V pin on it at all.
+
+**The four-pin connectors are 1.25 mm pitch.** P1 carries the vendor's own
+"4P 1.25" label, and CN1 measured 1.29 mm against a microSD card used as a
+scale bar -- 11.00 mm by specification, 573 px across 20 agreeing rows,
+giving 52.09 px/mm against a pin spacing of 67.17 px over seventeen
+readings. The 3% excess is parallax: those pins sit on the connector's top
+face, three or four millimetres nearer the lens than the card. 1.50 mm would
+have been 14% out, far outside a reading that repeatable. Two independent
+sources, one of them the manufacturer.
+
+### BAT1 is not one of them
+
+This file used to say "all of them are 1.25 mm pitch" and close with *Sunton's
+own documentation puts SPEAK and the battery connector at 1.25 as well.*
+That sentence was wrong twice. The datasheet's render shows six connectors
+and **BAT1 is not among them** -- nor is the USB-C socket -- so it documents
+an earlier revision than the board in hand and says nothing about either.
+And the pitch was never measured on a two-pin connector at all.
+
+Measured on 2026-09-24 against P1 in the same frame, which needs no scale bar
+because it is a ratio: P1's four pins fall at y = 852 / 911 / 971 / 1031 for a
+pitch of 60.0 px against a known 1.25 mm, and BAT1's two pads at x = 442 / 507
+for 65.5 px, or 1.36 mm.
+
+That **excludes JST PH 2.0**, which would have measured 96 px, and that is the
+exclusion that matters in practice because PH is what most hobby cells ship
+with. It does not separate 1.25 (+9%) from 1.50 (-9%), and a 9% scale gradient
+across 500 px of a macro shot is ordinary perspective. Settle it by fit: if a
+2-pin MX1.25 housing seats, it is 1.25.
+
+**Buy MX1.25 or Molex PicoBlade, never JST GH.** Both are 1.25 mm pitch and
+they do not mate -- GH latches on the side, PicoBlade on top. GH is the
+Pixhawk standard, so listings aimed at drone builders are full of it, and
+several of them say "PicoBlade" and "for Pixhawk" in the same title.
+
+**BAT1's polarity is on the silkscreen, and only half of it.** `BAT1` sits to
+the left of the connector and `BAT-` to the right, so the pin nearer the
+corner mounting screw is negative and the other one is positive. Confirm it
+with a continuity beep to any ground before a cell goes anywhere near it --
+the FM5324GA has no reverse protection on its cell input, and a label three
+millimetres from the pin it refers to is exactly the kind of thing that reads
+one way in a photograph and the other way on the bench.
+
+### What else the datasheet is good for, and where it is not
+
+Two things in it are worth keeping. It gives the mounting holes as 94.5 x
+47.9, which is a second source for the `47.90 x 94.50` the enclosure's
+`SCREEN_HOLE_DX/DY` are built on. And its render has no I2C or SPI JST on it
+either, which is independent support for those having been lcdwiki's rather
+than this board's.
+
+Two things in it are not. It gives the module as 101.5 x 54.9 where the
+dimensioned drawing the enclosure uses says 55.50 wide; `BEZEL_W` is 56.0 and
+described as "board + 0.5 clearance", so if 54.9 is right the clearance is
+1.1 instead. Looser, not tighter, so nothing binds -- the comment is off, not
+the geometry.
+
+And page 3 says "The display resolution is 240x320" in prose and "320X480
+resolution" in the feature list four lines below it. It is the manufacturer,
+but it is not careful, and it is copy-pasted from the smaller panel's
+document. Weigh it accordingly.
 
 **The serial header is P1 on this panel.** The 2.8" calls the same thing P5,
 and this document said P5 for both after someone read that off a 2.8" board.

@@ -327,15 +327,32 @@ line goes to the pin marked `TX` -- the ESP32's own UART0 transmit, GPIO 1 --
 and the reasoning for that is in [hardware.md](hardware.md). Reversed, it puts
 two push-pull drivers on one net.
 
-Every connector on the 3.5" is **1.25 mm pitch**: P3, CN1 and P1 with four
-pins, SPEAK1 and BAT1 with two. Buy pre-made pigtails rather than housings
-and crimps; crimping 1.25 mm needs the proper tool and a bad crimp is an
-intermittent you will chase for hours.
+The four-pin connectors -- P3, CN1 and P1 -- are **1.25 mm pitch**. P1 carries
+that label on Sunton's own drawing, and CN1 measured 1.29 mm against a microSD
+card used as a scale bar, 11.00 mm by specification. The 3% excess is parallax,
+because those pins sit on the connector's top face a few millimetres nearer the
+lens than the card; 1.50 mm would have been 14% out, well outside a reading
+that repeatable.
 
-CN1 was measured at 1.29 mm against a microSD card used as a scale bar --
-11.00 mm by specification. The 3% excess is parallax, because those pins sit
-on the connector's top face a few millimetres nearer the lens than the card;
-1.50 mm would have been 14% out, well outside a reading that repeatable.
+**SPEAK1 and BAT1 are two-pin and were never measured.** BAT1 reads 1.36 mm
+against P1 in one frame, which rules out JST PH 2.0 -- the connector most
+hobby cells ship with -- but does not separate 1.25 from 1.50. See
+[hardware.md](hardware.md). Check by fit before you rely on it.
+
+**Ask for MX1.25 or Molex PicoBlade. Do not buy JST GH.** Both are 1.25 mm
+pitch and they will not mate: GH latches on the side, PicoBlade on top. GH is
+the [Pixhawk connector standard](https://github.com/pixhawk/Pixhawk-Standards),
+so it dominates listings aimed at drone builders, and plenty of those say
+"PicoBlade" and "for Pixhawk" in the same title. Searching `MX1.25 2P` and
+leaving "Pixhawk" out of the query drops the GH parts from the results.
+
+Do not crimp 1.25 mm yourself -- it needs the proper tool, and a bad crimp is
+an intermittent you will chase for hours. Either buy assembled pigtails, or
+buy a kit of **pre-crimped wires with loose housings**, which is better here:
+the terminals push in with tweezers, so you choose the polarity at assembly
+rather than discovering it afterwards. Push each one until it clicks and then
+tug the wire. A terminal seated on the lip instead of behind the barb backs
+out under vibration.
 
 ## Order of work
 
@@ -345,6 +362,12 @@ it at once. Build outward from the things that can be tested alone.
 **1. Power, with nothing else attached.** Bring up the 5 V bus and the
 +3V3_RF rail and meter both before anything is connected to them. Confirm
 common ground. A supply that is wrong here damages modules later.
+
+Identify BAT1's polarity here too, before a cell is anywhere near it. The
+silkscreen marks `BAT-` on one side and nothing on the other, so beep each
+pin against a known ground -- the one that conducts is negative. The
+FM5324GA has no reverse protection on its cell input, and the colours on a
+pre-crimped pigtail tell you about the pigtail.
 
 **2. Flash the stock firmware and boot the bare CYD.** Display, backlight and
 touch all work before you have introduced a single joint of your own. If the
