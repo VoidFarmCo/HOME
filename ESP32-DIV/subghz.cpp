@@ -2939,6 +2939,23 @@ void subjammerLoop() {
           }
       }
   }
+
+/* Leaving the jammer used to leave the radio in TX.
+ *
+ * Nothing in this namespace had an exit and the dispatch called none, so the
+ * only way to stop transmitting was to press stop before backing out:
+ * jammingRunning stayed true, the part stayed in TX, and in continuousMode
+ * TX_PIN stayed HIGH. Whether it was still emitting once the loop stopped
+ * refilling the FIFO wants an SDR to answer, and the answer does not change
+ * what this should do. An off switch you have to remember is not one.
+ *
+ * Same three lines subjammerToggleJam() runs when you press stop. */
+void exit() {
+  jammingRunning = false;
+  ELECHOUSE_cc1101.setSidle();
+  digitalWrite(TX_PIN, LOW);
+}
+
 }
 
 namespace SubBrute {

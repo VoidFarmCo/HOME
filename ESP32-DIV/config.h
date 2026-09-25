@@ -137,6 +137,7 @@ namespace SavedProfile {
 namespace subjammer {
   void subjammerSetup();
   void subjammerLoop();
+  void exit();   // stops transmitting; see subghz.cpp
 }
 namespace SubBrute {
   void subBruteSetup();
