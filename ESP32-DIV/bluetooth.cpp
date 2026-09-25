@@ -1195,7 +1195,15 @@ void spooferSetup() {
 
   tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
-  randomSeed(analogRead(0));
+  /* esp_random(), not analogRead(0). The PRNG behind random() is
+   * deterministic from its seed, and an unconnected ADC pin is not a
+   * source of entropy: it can sit at a stable value, and then the same
+   * sequence comes out on every boot. What that sequence feeds here is the
+   * fake device names, so identical names in an identical order after each
+   * power cycle is a fingerprint, in a feature whose whole point is not
+   * having one. esp_random() is the hardware generator, and it is a true
+   * one while the radio is up, which it is by this line. */
+  randomSeed(esp_random());
   setupTouchscreen();
 
   tft.setTextFont(1);

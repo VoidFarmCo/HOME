@@ -2897,7 +2897,10 @@ void subjammerSetup() {
     ELECHOUSE_cc1101.setMHZ(targetFrequency);
     ELECHOUSE_cc1101.SetTx();
 
-    randomSeed(analogRead(0));
+    /* esp_random(), not analogRead(0): an unconnected ADC pin can sit
+     * at a stable value, and the jammer's noise payload would then be the
+     * same sequence on every boot. Noise that repeats is a signature. */
+    randomSeed(esp_random());
 
 #if HAS_PCF8574_BUTTONS
     pcf.pinMode(BTN_LEFT, INPUT_PULLUP);
