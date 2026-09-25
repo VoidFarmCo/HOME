@@ -57,11 +57,18 @@ they do not mate -- GH latches on the side, PicoBlade on top. GH is the
 Pixhawk standard, so listings aimed at drone builders are full of it, and
 several of them say "PicoBlade" and "for Pixhawk" in the same title.
 
-**BAT1's polarity is on the silkscreen, and only half of it.** `BAT1` sits to
-the left of the connector and `BAT-` to the right, so the pin nearer the
-corner mounting screw is negative and the other one is positive. Confirm it
-with a continuity beep to any ground before a cell goes anywhere near it --
-the FM5324GA has no reverse protection on its cell input, and a label three
+**BAT1's polarity is on the silkscreen, and only half of it. The half that
+is there is right.** `BAT1` sits to the left of the connector and `BAT-` to
+the right, so the pin nearer the corner mounting screw is negative and the
+other one is positive.
+
+Measured on 2026-09-25 against CN1's GND pin with a continuity beep: the pin
+under the `BAT-` marking is the one that conducts. The silkscreen and the
+meter agree, which is worth saying because four other things this board was
+supposed to be turned out to describe somebody else's hardware.
+
+Check it on your own board anyway. The FM5324GA has no reverse protection on
+its cell input, so the cost of being wrong is the charger, and a label three
 millimetres from the pin it refers to is exactly the kind of thing that reads
 one way in a photograph and the other way on the bench.
 

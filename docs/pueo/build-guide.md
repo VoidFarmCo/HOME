@@ -368,9 +368,14 @@ common ground. A supply that is wrong here damages modules later.
 
 Identify BAT1's polarity here too, before a cell is anywhere near it. The
 silkscreen marks `BAT-` on one side and nothing on the other, so beep each
-pin against a known ground -- the one that conducts is negative. The
-FM5324GA has no reverse protection on its cell input, and the colours on a
-pre-crimped pigtail tell you about the pigtail.
+pin against a known ground: the one that conducts is negative. CN1's GND pin
+is a convenient reference and is right next to it.
+
+On the board this was written against the marked pin is the one that
+conducts, so the silkscreen is telling the truth. Confirm it on yours
+regardless. The FM5324GA has no reverse protection on its cell input, and
+the colours on a pre-crimped pigtail tell you about the pigtail rather than
+about the board.
 
 **2. Flash the stock firmware and boot the bare CYD.** Display, backlight and
 touch all work before you have introduced a single joint of your own. If the
