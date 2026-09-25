@@ -516,6 +516,12 @@ SCREEN_POST_PILOT = 1.25; // 2.50 dia
  * outer face -- four holes through the front of a lid whose whole point is
  * that only the screen shows.
  *
+ * 2026-09-24, on a printed lid: the hole pattern lines up and the screws do
+ * not come through. Both halves confirmed by fit, which is the only check
+ * either of them was ever going to get -- 47.90 x 94.50 came from a drawing
+ * of lcdwiki's board, and the vendor datasheet that agrees with it is the
+ * one claiming two different resolutions four lines apart.
+ *
  * Measured up from the PCB's top face, so the number is the thread
  * engagement rather than a coordinate. 4.0 leaves 1.2 mm of solid lid over
  * the hole, which is six layers at 0.2 and is the figure to raise if your
