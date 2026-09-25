@@ -10,6 +10,7 @@
 #include "FastPairScan.h"
 #include "DroneScan.h"
 #include "Spotter.h"
+#include "ApTracker.h"
 #include "TrackerHunt.h"
 #include "ducky.h"
 #include "Branding.h"
@@ -92,7 +93,7 @@ const char *submenu_items[NUM_SUBMENU_ITEMS] = {
 // WiFi submenu is split across two pages (features after Hidden SSID on page 2).
 // Bottom row: icon | Main Menu                 Next/Prev Page | icon
 static constexpr int WIFI_PAGE0_FEATURES = 6;
-static constexpr int WIFI_PAGE1_FEATURES = 5;
+static constexpr int WIFI_PAGE1_FEATURES = 6;
 static int wifi_submenu_page = 0;
 
 const char *wifi_page0_items[WIFI_PAGE0_FEATURES] = {
@@ -108,7 +109,8 @@ const char *wifi_page1_items[WIFI_PAGE1_FEATURES] = {
     "Hidden SSID Revealer",
     "WPS Scanner",
     "ARP Scanner",
-    "Karma Attack"};
+    "Karma Attack",
+    "AP Tracker"};
 
 // Bluetooth submenu uses the same paged footer layout as WiFi.
 static constexpr int BT_PAGE0_FEATURES = 6;
@@ -244,7 +246,8 @@ const unsigned char *wifi_page1_icons[WIFI_PAGE1_FEATURES] = {
     bitmap_icon_eye_blind,
     bitmap_icon_key,
     bitmap_icon_list,
-    bitmap_icon_devil
+    bitmap_icon_devil,
+    bitmap_icon_compass
 };
 
 const unsigned char *bluetooth_page0_icons[BT_PAGE0_FEATURES] = {
@@ -1602,6 +1605,24 @@ void handleWiFiSubmenuButtons() {
                 delay(200);
             }
         }
+        if (wifi_submenu_page == 1 && current_submenu_index == 5) {
+            feature_active = true;
+            feature_exit_requested = false;
+            ApTracker::setup();
+            while (wifi_submenu_page == 1 && current_submenu_index == 5 &&
+                   !feature_exit_requested) {
+                ApTracker::loop();
+                if (featureExitButtonPressed()) {
+                    break;
+                }
+            }
+            ApTracker::exit();
+            feature_active = false;
+            feature_exit_requested = false;
+            submenu_initialized = false;
+            displaySubmenu();
+            delay(200);
+        }
     }
 
     if (!feature_active) {
@@ -2007,6 +2028,23 @@ void handleWiFiSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
+                } else if (wifi_submenu_page == 1 && current_submenu_index == 5) {
+                    feature_active = true;
+                    feature_exit_requested = false;
+                    ApTracker::setup();
+                    while (wifi_submenu_page == 1 && current_submenu_index == 5 &&
+                           !feature_exit_requested) {
+                        ApTracker::loop();
+                        if (featureExitButtonPressed()) {
+                            break;
+                        }
+                    }
+                    ApTracker::exit();
+                    feature_active = false;
+                    feature_exit_requested = false;
+                    submenu_initialized = false;
+                    displaySubmenu();
+                    delay(200);
                 }
                 break;
             }
