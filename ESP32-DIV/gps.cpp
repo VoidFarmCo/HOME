@@ -3,6 +3,7 @@
 #include <HardwareSerial.h>
 #include "SettingsStore.h"
 #include <TFT_eSPI.h>
+#include <esp_heap_caps.h>
 #include <math.h>
 #include <stdint.h>
 #include <ctype.h>
@@ -102,7 +103,14 @@ static bool gScanPanelReady = false;
 static int gScanPanelAllocW = 0;
 static int gScanPanelAllocH = 0;
 
-static constexpr int kScanSpriteHMin = 200;
+/* 96 rows is still a readable sky view on either panel. The old floor was
+ * 200, which at 320 px wide is 64,000 bytes of contiguous heap, so it gave
+ * up while still asking for a lot. */
+static constexpr int kScanSpriteHMin = 96;
+
+/* Kept for the failure screen. USB serial is dead while a GPS feature holds
+ * GPIO 1, so the only place a diagnostic can go is the display. */
+static size_t gScanLargestBlock = 0;
 
 static bool ensureScanPanelSprite(int panelW, int panelH) {
   if (panelW <= 0 || panelH <= 32) {
@@ -119,16 +127,29 @@ static bool ensureScanPanelSprite(int panelW, int panelH) {
     gScanPanelAllocW = gScanPanelAllocH = 0;
   }
 
-  for (int h = panelH; h >= kScanSpriteHMin; h -= 18) {
-    for (uint8_t bpp : {8, 16}) {
-      gScanPanel.setColorDepth(bpp);
-      if (gScanPanel.createSprite(panelW, h)) {
-        gScanPanelReady = true;
-        gScanPanelAllocW = panelW;
-        gScanPanelAllocH = h;
-        return true;
-      }
-      delay(20);
+  /* Ask rather than probe. Descending blindly from the full height in steps
+   * of 18 meant about thirty failed allocations and 600 ms of delays before
+   * the message appeared, all to discover something the allocator knew. */
+  gScanLargestBlock = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+  const size_t headroom = 2048;         // sprite object, and room to breathe
+  int hFit = 0;
+  if (gScanLargestBlock > headroom) {
+    hFit = (int)((gScanLargestBlock - headroom) / (size_t)panelW);
+  }
+  if (hFit > panelH) {
+    hFit = panelH;
+  }
+
+  /* 8bpp only. Each height used to be tried at 8 and then at 16, and 16
+   * needs twice the memory, so the second attempt could never succeed after
+   * the first had just failed. */
+  gScanPanel.setColorDepth(8);
+  for (int h = hFit; h >= kScanSpriteHMin; h -= 18) {
+    if (gScanPanel.createSprite(panelW, h)) {
+      gScanPanelReady = true;
+      gScanPanelAllocW = panelW;
+      gScanPanelAllocH = h;
+      return true;
     }
   }
 
@@ -1272,8 +1293,22 @@ void redrawFeaturePanel(bool statusBarForceFull) {
   tft.setTextDatum(MC_DATUM);
   tft.setTextFont(1);
   tft.setTextColor(UI_WARN, FEATURE_BG);
-  tft.drawString("Display buffer failed", tft.width() / 2,
-                 kGfxTop + (tft.height() - kGfxTop) / 2);
+  const int cy = kGfxTop + (tft.height() - kGfxTop) / 2;
+  tft.drawString("Display buffer failed", tft.width() / 2, cy - 20);
+
+  /* The number is the point. Without it this screen says only that
+   * something did not work, and serial is unavailable here. */
+  char detail[56];
+  snprintf(detail, sizeof(detail), "largest free block %u B",
+           (unsigned)gScanLargestBlock);
+  tft.setTextColor(UI_DIM_TEXT, FEATURE_BG);
+  tft.drawString(detail, tft.width() / 2, cy + 2);
+  snprintf(detail, sizeof(detail), "needs %u B for %d rows",
+           (unsigned)(tft.width() * kScanSpriteHMin), kScanSpriteHMin);
+  tft.drawString(detail, tft.width() / 2, cy + 18);
+  tft.setTextColor(UI_ICON, FEATURE_BG);
+  tft.drawString("tap the bottom to go back", tft.width() / 2, cy + 40);
+
   tft.setTextFont(2);
   tft.setTextDatum(TL_DATUM);
 }
