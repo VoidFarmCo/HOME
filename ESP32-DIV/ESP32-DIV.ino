@@ -48,12 +48,12 @@ const int NUM_MENU_ITEMS = 8;
 const char *menu_items[NUM_MENU_ITEMS] = {
     "WiFi",
     "NRF24",
-    "More",
-    "Settings",
+    "Detect",
+    "GPS",
     "Bluetooth",
     "SubGHz",
-    "Tools",
-    "About"};
+    "RFID/NFC",
+    "System"};
 
 /* These names are upstream's and several no longer describe where they are
  * used: the NRF24 tile wears bitmap_icon_jammer, Bluetooth wears
@@ -64,12 +64,12 @@ const char *menu_items[NUM_MENU_ITEMS] = {
 const unsigned char *bitmap_icons[NUM_MENU_ITEMS] = {
     bitmap_icon_wifi,
     bitmap_icon_jammer,
-    bitmap_icon_dots,
-    bitmap_icon_setting,
+    bitmap_icon_eye,
+    bitmap_icon_satellite,
     bitmap_icon_spoofer,
     bitmap_icon_analyzer,
-    bitmap_icon_stat,
-    bitmap_icon_question};
+    bitmap_icon_rfid_chip,
+    bitmap_icon_setting};
 
 int current_menu_index = 0;
 bool is_main_menu = false;
@@ -152,23 +152,29 @@ const char *subghz_submenu_items[subghz_NUM_SUBMENU_ITEMS] = {
     "Saved Profile",
     "Back to Main Menu"};
 
-const int tools_NUM_SUBMENU_ITEMS = 5;
+/* System is the old Tools with Settings and About folded in. They were two
+ * whole tiles of an eight tile grid, both of them things nobody opens in the
+ * middle of a session, sitting at the same visual weight as the radios. The
+ * two slots they free are what RFID/NFC and GPS were promoted into. */
+const int tools_NUM_SUBMENU_ITEMS = 7;
 const char *tools_submenu_items[tools_NUM_SUBMENU_ITEMS] = {
     "Serial Monitor",
     "Update Firmware",
     "Touch Calibrate",
     "SD File Manager",
+    "Settings",
+    "About",
     "Back to Main Menu"};
 
-static constexpr uint8_t OTHER_LAYER_HOME = 0;
-static constexpr uint8_t OTHER_LAYER_RFID = 1;
-static constexpr uint8_t OTHER_LAYER_GPS  = 2;
-
-const int other_NUM_SUBMENU_ITEMS = 5;
+/* Detect was More until 0.4.11, and More held four things that were not one
+ * category: two peripheral radios and two passive detectors. RFID/NFC and
+ * GPS are now tiles of their own, which is what the old sub-layer machinery
+ * was standing in for, and what is left here is the pair that belong
+ * together. Surveillance and the drone detector are also what this fork is
+ * for, and they were two taps in behind a label that said nothing. */
+const int other_NUM_SUBMENU_ITEMS = 3;
 static constexpr int OTHER_GRID_COLS = 2;
 const char *other_submenu_items[other_NUM_SUBMENU_ITEMS] = {
-    "RFID/NFC",
-    "GPS",
     "Surveillance",
     "Drone Detector",
     "Main Menu"};
@@ -183,13 +189,13 @@ const char *rfid_submenu_items[rfid_NUM_SUBMENU_ITEMS] = {
     "Jam Reader",
     "Tag Disrupt",
     "Disrupt Emulate",
-    "Back to More"};
+    "Back to Main Menu"};
 
 const int gps_NUM_SUBMENU_ITEMS = 3;
 const char *gps_submenu_items[gps_NUM_SUBMENU_ITEMS] = {
     "Wardriver",
     "Satellite Scanner",
-    "Back to More"};
+    "Back to Main Menu"};
 
 const int about_NUM_SUBMENU_ITEMS = 1;
 const char *about_submenu_items[about_NUM_SUBMENU_ITEMS] = {
@@ -203,7 +209,6 @@ int current_submenu_index = 0;
 bool in_sub_menu = false;
 int last_submenu_index = -1;
 bool submenu_initialized = false;
-uint8_t other_layer = OTHER_LAYER_HOME;
 int last_other_menu_index = -1;
 bool other_menu_grid_initialized = false;
 
@@ -283,12 +288,12 @@ const unsigned char *tools_submenu_icons[tools_NUM_SUBMENU_ITEMS] = {
     bitmap_icon_follow,
     bitmap_icon_undo,
     bitmap_icon_sdcard,
+    bitmap_icon_setting,
+    bitmap_icon_question,
     bitmap_icon_go_back
 };
 
 const unsigned char *other_submenu_icons[other_NUM_SUBMENU_ITEMS] = {
-    bitmap_icon_rfid_chip,
-    bitmap_icon_satellite,
     bitmap_icon_eye,
     bitmap_icon_satellite,
     bitmap_icon_go_back
@@ -458,28 +463,14 @@ void updateActiveSubmenu() {
             active_submenu_icons = nrf_submenu_icons;
             break;
         case 2:
-            if (other_layer == OTHER_LAYER_HOME) {
-                active_submenu_items = other_submenu_items;
-                active_submenu_size = other_NUM_SUBMENU_ITEMS;
-                active_submenu_icons = other_submenu_icons;
-                        } else if (other_layer == OTHER_LAYER_RFID) {
-                active_submenu_items = rfid_submenu_items;
-                active_submenu_size = rfid_NUM_SUBMENU_ITEMS;
-                active_submenu_icons = rfid_submenu_icons;
-            } else if (other_layer == OTHER_LAYER_GPS) {
-                active_submenu_items = gps_submenu_items;
-                active_submenu_size = gps_NUM_SUBMENU_ITEMS;
-                active_submenu_icons = gps_submenu_icons;
-            } else {
-                active_submenu_items = other_submenu_items;
-                active_submenu_size = other_NUM_SUBMENU_ITEMS;
-                active_submenu_icons = other_submenu_icons;
-            }
+            active_submenu_items = other_submenu_items;
+            active_submenu_size = other_NUM_SUBMENU_ITEMS;
+            active_submenu_icons = other_submenu_icons;
             break;
         case 3:
-            active_submenu_items = nullptr;
-            active_submenu_size = 0;
-            active_submenu_icons = nullptr;
+            active_submenu_items = gps_submenu_items;
+            active_submenu_size = gps_NUM_SUBMENU_ITEMS;
+            active_submenu_icons = gps_submenu_icons;
             break;
         case 4:
             bluetooth_submenu_page = 0;
@@ -492,14 +483,14 @@ void updateActiveSubmenu() {
             active_submenu_icons = subghz_submenu_icons;
             break;
         case 6:
+            active_submenu_items = rfid_submenu_items;
+            active_submenu_size = rfid_NUM_SUBMENU_ITEMS;
+            active_submenu_icons = rfid_submenu_icons;
+            break;
+        case 7:
             active_submenu_items = tools_submenu_items;
             active_submenu_size = tools_NUM_SUBMENU_ITEMS;
             active_submenu_icons = tools_submenu_icons;
-            break;
-        case 7:
-            active_submenu_items = nullptr;
-            active_submenu_size = 0;
-            active_submenu_icons = nullptr;
             break;
 
         default:
@@ -879,7 +870,7 @@ static int submenuItemY(int index) {
 void displaySubmenu() {
     setTouchButtonInputEnabled(false);
 
-    if (current_menu_index == 2 && other_layer == OTHER_LAYER_HOME) {
+    if (current_menu_index == 2) {
         displayOtherMenuGrid();
         return;
     }
@@ -3046,8 +3037,9 @@ constexpr int TOOLS_IDX_TERMINAL = 0;
 constexpr int TOOLS_IDX_UPDATE   = 1;
 constexpr int TOOLS_IDX_TOUCH    = 2;
 constexpr int TOOLS_IDX_SD_FILES = 3;
-constexpr int TOOLS_IDX_SETTINGS = -1;
-constexpr int TOOLS_IDX_BACK     = 4;
+constexpr int TOOLS_IDX_SETTINGS = 4;
+constexpr int TOOLS_IDX_ABOUT    = 5;
+constexpr int TOOLS_IDX_BACK     = 6;
 
 static void runToolsFeatureExitCleanup() {
     in_sub_menu = true;
@@ -3088,6 +3080,19 @@ static void runToolsFeature(int idx, void (*setupFn)(), void (*loopFn)()) {
     runToolsFeatureExitCleanup();
 }
 
+/* Settings and About both end with displayMenu(), which was right when
+ * they were tiles reached from the main menu. As rows in System they have
+ * to put the submenu back instead. */
+static void reopenSystemSubmenu() {
+    in_sub_menu = true;
+    is_main_menu = false;
+    feature_active = false;
+    feature_exit_requested = false;
+    updateActiveSubmenu();
+    submenu_initialized = false;
+    displaySubmenu();
+}
+
 static void launchToolsFeature(int idx) {
     switch (idx) {
         case TOOLS_IDX_TERMINAL:
@@ -3102,12 +3107,26 @@ static void launchToolsFeature(int idx) {
         case TOOLS_IDX_SD_FILES:
             runToolsFeature(idx, SdFileManager::setup, SdFileManager::loop);
             break;
+        case TOOLS_IDX_SETTINGS:
+            handleSettingsSubmenuButtons();
+            reopenSystemSubmenu();
+            break;
+        case TOOLS_IDX_ABOUT:
+            handleAboutPage();
+            reopenSystemSubmenu();
+            break;
         default:
             break;
     }
 }
 
-void handleToolsSubmenuButtons() {
+static void launchGpsFeature(int idx)  { otherGpsPlaceholderAction(idx); }
+static void launchRfidFeature(int idx) { otherRfidPlaceholderAction(idx); }
+
+/* GPS, RFID/NFC and System are plain lists and differ only in what a row
+ * launches and which row is Back, so they share this rather than carrying
+ * three copies of the same scrolling and hit testing. */
+void handleListSubmenuButtons(void (*launch)(int), int backIdx) {
     if (isButtonPressed(BTN_UP)) {
         current_submenu_index = (current_submenu_index - 1 + active_submenu_size) % active_submenu_size;
         last_interaction_time = millis();
@@ -3126,7 +3145,7 @@ void handleToolsSubmenuButtons() {
         last_interaction_time = millis();
         delay(200);
 
-        if (current_submenu_index == TOOLS_IDX_BACK) {
+        if (current_submenu_index == backIdx) {
             in_sub_menu = false;
             feature_active = false;
             feature_exit_requested = false;
@@ -3136,7 +3155,7 @@ void handleToolsSubmenuButtons() {
             return;
         }
 
-        launchToolsFeature(current_submenu_index);
+        launch(current_submenu_index);
         return;
     }
 
@@ -3160,7 +3179,7 @@ void handleToolsSubmenuButtons() {
                 displaySubmenu();
                 delay(200);
 
-                if (current_submenu_index == TOOLS_IDX_BACK) {
+                if (current_submenu_index == backIdx) {
                     in_sub_menu = false;
                     feature_active = false;
                     feature_exit_requested = false;
@@ -3168,7 +3187,7 @@ void handleToolsSubmenuButtons() {
                     handleButtons();
                     is_main_menu = false;
                 } else {
-                    launchToolsFeature(current_submenu_index);
+                    launch(current_submenu_index);
                 }
                 break;
             }
@@ -3198,7 +3217,7 @@ static void otherDismissPlaceholder() {
     }
     if (in_sub_menu) {
         submenu_initialized = false;
-        if (current_menu_index == 2 && other_layer == OTHER_LAYER_HOME) {
+        if (current_menu_index == 2) {
             other_menu_grid_initialized = false;
             last_other_menu_index = -1;
         }
@@ -3308,167 +3327,109 @@ static void otherGpsPlaceholderAction(int idx) {
     feature_active = false;
 }
 
+/* Detect: Surveillance and the drone detector, in the grid More used.
+ *
+ * More held four entries behind two sub-layers, so this handler carried a
+ * grid mode and a list mode, three copies of a back path, and two copies
+ * of every feature launch. RFID/NFC and GPS are tiles of their own now.
+ */
+static void runDetectFeature(void (*setup)(), void (*loop)(),
+                             void (*teardown)()) {
+    feature_active = true;
+    feature_exit_requested = false;
+    setup();
+    while (!feature_exit_requested) {
+        loop();
+        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+            break;
+        }
+    }
+    teardown();
+    feature_active = false;
+    feature_exit_requested = false;
+    other_menu_grid_initialized = false;
+    last_other_menu_index = -1;
+    submenu_initialized = false;
+    displaySubmenu();
+    delay(200);
+}
+
+static void launchDetectFeature(int idx) {
+    if (idx == other_NUM_SUBMENU_ITEMS - 1) {
+        in_sub_menu = false;
+        feature_active = false;
+        feature_exit_requested = false;
+        displayMenu();
+        handleButtons();
+        is_main_menu = false;
+        return;
+    }
+    if (idx == 0) {
+        runDetectFeature(Spotter::spotterSetup, Spotter::spotterLoop,
+                         Spotter::exit);
+    } else if (idx == 1) {
+        runDetectFeature(DroneScan::setup, DroneScan::loop,
+                         DroneScan::exit);
+    }
+}
+
 void handleOtherSubmenuButtons() {
-    if (other_layer == OTHER_LAYER_HOME) {
-        const int og_rows =
-            (other_NUM_SUBMENU_ITEMS + OTHER_GRID_COLS - 1) / OTHER_GRID_COLS;
+    const int og_rows =
+        (other_NUM_SUBMENU_ITEMS + OTHER_GRID_COLS - 1) / OTHER_GRID_COLS;
 
-        if (isButtonPressed(BTN_UP)) {
-            int row = current_submenu_index / OTHER_GRID_COLS;
-            if (row > 0) {
-                current_submenu_index -= OTHER_GRID_COLS;
-            } else {
-                current_submenu_index += OTHER_GRID_COLS * (og_rows - 1);
-            }
-            last_interaction_time = millis();
-            displaySubmenu();
-            delay(200);
+    if (isButtonPressed(BTN_UP)) {
+        int row = current_submenu_index / OTHER_GRID_COLS;
+        if (row > 0) {
+            current_submenu_index -= OTHER_GRID_COLS;
+        } else {
+            current_submenu_index += OTHER_GRID_COLS * (og_rows - 1);
         }
+        last_interaction_time = millis();
+        displaySubmenu();
+        delay(200);
+    }
 
-        if (isButtonPressed(BTN_DOWN)) {
-            int row = current_submenu_index / OTHER_GRID_COLS;
-            if (row < og_rows - 1) {
-                current_submenu_index += OTHER_GRID_COLS;
-            } else {
-                current_submenu_index -= OTHER_GRID_COLS * (og_rows - 1);
-            }
-            last_interaction_time = millis();
-            displaySubmenu();
-            delay(200);
+    if (isButtonPressed(BTN_DOWN)) {
+        int row = current_submenu_index / OTHER_GRID_COLS;
+        if (row < og_rows - 1) {
+            current_submenu_index += OTHER_GRID_COLS;
+        } else {
+            current_submenu_index -= OTHER_GRID_COLS * (og_rows - 1);
         }
+        last_interaction_time = millis();
+        displaySubmenu();
+        delay(200);
+    }
 
-        if (isButtonPressed(BTN_LEFT)) {
-            int col = current_submenu_index % OTHER_GRID_COLS;
-            if (col > 0) {
-                current_submenu_index--;
-            } else {
-                current_submenu_index++;
-            }
-            last_interaction_time = millis();
-            displaySubmenu();
-            delay(200);
+    if (isButtonPressed(BTN_LEFT)) {
+        int col = current_submenu_index % OTHER_GRID_COLS;
+        if (col > 0) {
+            current_submenu_index--;
+        } else {
+            current_submenu_index++;
         }
+        last_interaction_time = millis();
+        displaySubmenu();
+        delay(200);
+    }
 
-        if (isButtonPressed(BTN_RIGHT)) {
-            int col = current_submenu_index % OTHER_GRID_COLS;
-            if (col < OTHER_GRID_COLS - 1) {
-                current_submenu_index++;
-            } else {
-                current_submenu_index--;
-            }
-            last_interaction_time = millis();
-            displaySubmenu();
-            delay(200);
+    if (isButtonPressed(BTN_RIGHT)) {
+        int col = current_submenu_index % OTHER_GRID_COLS;
+        if (col < OTHER_GRID_COLS - 1) {
+            current_submenu_index++;
+        } else {
+            current_submenu_index--;
         }
-    } else {
-        if (isButtonPressed(BTN_UP)) {
-            current_submenu_index =
-                (current_submenu_index - 1 + active_submenu_size) % active_submenu_size;
-            last_interaction_time = millis();
-            displaySubmenu();
-            delay(200);
-        }
-
-        if (isButtonPressed(BTN_DOWN)) {
-            current_submenu_index = (current_submenu_index + 1) % active_submenu_size;
-            last_interaction_time = millis();
-            displaySubmenu();
-            delay(200);
-        }
+        last_interaction_time = millis();
+        displaySubmenu();
+        delay(200);
     }
 
     if (isButtonPressed(BTN_SELECT)) {
         last_interaction_time = millis();
         delay(200);
-
-        if (other_layer == OTHER_LAYER_HOME) {
-            if (current_submenu_index == other_NUM_SUBMENU_ITEMS - 1) {
-                in_sub_menu = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displayMenu();
-                handleButtons();
-                is_main_menu = false;
-            } else if (current_submenu_index == 0) {
-                other_layer = OTHER_LAYER_RFID;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-            } else if (current_submenu_index == 1) {
-                other_layer = OTHER_LAYER_GPS;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-            } else if (current_submenu_index == 2) {
-                feature_active = true;
-                feature_exit_requested = false;
-                Spotter::spotterSetup();
-                while (!feature_exit_requested) {
-                    Spotter::spotterLoop();
-                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                        break;
-                    }
-                }
-                Spotter::exit();
-                feature_active = false;
-                feature_exit_requested = false;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                submenu_initialized = false;
-                displaySubmenu();
-                delay(200);
-            } else if (current_submenu_index == 3) {
-                feature_active = true;
-                feature_exit_requested = false;
-                DroneScan::setup();
-                while (!feature_exit_requested) {
-                    DroneScan::loop();
-                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                        break;
-                    }
-                }
-                DroneScan::exit();
-                feature_active = false;
-                feature_exit_requested = false;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                submenu_initialized = false;
-                displaySubmenu();
-                delay(200);
-            }
-        } else if (other_layer == OTHER_LAYER_RFID) {
-            if (current_submenu_index == rfid_NUM_SUBMENU_ITEMS - 1) {
-                other_layer = OTHER_LAYER_HOME;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-                is_main_menu = false;
-            } else {
-                otherRfidPlaceholderAction(current_submenu_index);
-            }
-        } else if (other_layer == OTHER_LAYER_GPS) {
-            if (current_submenu_index == gps_NUM_SUBMENU_ITEMS - 1) {
-                other_layer = OTHER_LAYER_HOME;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-                is_main_menu = false;
-            } else {
-                otherGpsPlaceholderAction(current_submenu_index);
-            }
-        }
+        launchDetectFeature(current_submenu_index);
+        return;
     }
 
     if (!feature_active) {
@@ -3477,39 +3438,23 @@ void handleOtherSubmenuButtons() {
         delay(10);
 
         int touched_slot = -1;
-        if (other_layer == OTHER_LAYER_HOME) {
-            for (int i = 0; i < other_NUM_SUBMENU_ITEMS; i++) {
-                int column = i % OTHER_GRID_COLS;
-                int row = i / OTHER_GRID_COLS;
-                int x_position = (column == 0) ? X_OFFSET_LEFT : X_OFFSET_RIGHT;
-                int y_position = Y_START + row * Y_SPACING;
-                int button_x1 = x_position;
-                int button_y1 = y_position;
-                /* TILE_W/TILE_H, not 100x60. Those are the 2.8" tile size,
-                 * and on the 3.5" the tiles are 145x92 -- so two thirds of
-                 * every tile in this grid did not respond to a tap. It
-                 * survived the panel sweep by looking like a hit box rather
-                 * than like a dimension. */
-                int button_x2 = x_position + TILE_W;
-                int button_y2 = y_position + TILE_H;
-                if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
-                    touched_slot = i;
-                    break;
-                }
-            }
-        } else {
-            for (int i = 0; i < active_submenu_size; i++) {
-                int yPos = submenuItemY(i);
-
-                int button_x1 = 10;
-                int button_y1 = yPos;
-                int button_x2 = 220;
-                int button_y2 = yPos + 28;
-
-                if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
-                    touched_slot = i;
-                    break;
-                }
+        for (int i = 0; i < other_NUM_SUBMENU_ITEMS; i++) {
+            int column = i % OTHER_GRID_COLS;
+            int row = i / OTHER_GRID_COLS;
+            int x_position = (column == 0) ? X_OFFSET_LEFT : X_OFFSET_RIGHT;
+            int y_position = Y_START + row * Y_SPACING;
+            int button_x1 = x_position;
+            int button_y1 = y_position;
+            /* TILE_W/TILE_H, not 100x60. Those are the 2.8" tile size,
+             * and on the 3.5" the tiles are 145x92 -- so two thirds of
+             * every tile in this grid did not respond to a tap. It
+             * survived the panel sweep by looking like a hit box rather
+             * than like a dimension. */
+            int button_x2 = x_position + TILE_W;
+            int button_y2 = y_position + TILE_H;
+            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+                touched_slot = i;
+                break;
             }
         }
 
@@ -3521,95 +3466,7 @@ void handleOtherSubmenuButtons() {
         last_interaction_time = millis();
         displaySubmenu();
         delay(200);
-
-        if (other_layer == OTHER_LAYER_HOME) {
-            if (current_submenu_index == other_NUM_SUBMENU_ITEMS - 1) {
-                in_sub_menu = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displayMenu();
-                handleButtons();
-                is_main_menu = false;
-            } else if (current_submenu_index == 0) {
-                other_layer = OTHER_LAYER_RFID;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-            } else if (current_submenu_index == 1) {
-                other_layer = OTHER_LAYER_GPS;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-            } else if (current_submenu_index == 2) {
-                feature_active = true;
-                feature_exit_requested = false;
-                Spotter::spotterSetup();
-                while (!feature_exit_requested) {
-                    Spotter::spotterLoop();
-                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                        break;
-                    }
-                }
-                Spotter::exit();
-                feature_active = false;
-                feature_exit_requested = false;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                submenu_initialized = false;
-                displaySubmenu();
-                delay(200);
-            } else if (current_submenu_index == 3) {
-                feature_active = true;
-                feature_exit_requested = false;
-                DroneScan::setup();
-                while (!feature_exit_requested) {
-                    DroneScan::loop();
-                    if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                        break;
-                    }
-                }
-                DroneScan::exit();
-                feature_active = false;
-                feature_exit_requested = false;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                submenu_initialized = false;
-                displaySubmenu();
-                delay(200);
-            }
-        } else if (other_layer == OTHER_LAYER_RFID) {
-            if (current_submenu_index == rfid_NUM_SUBMENU_ITEMS - 1) {
-                other_layer = OTHER_LAYER_HOME;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-                is_main_menu = false;
-            } else {
-                otherRfidPlaceholderAction(current_submenu_index);
-            }
-        } else if (other_layer == OTHER_LAYER_GPS) {
-            if (current_submenu_index == gps_NUM_SUBMENU_ITEMS - 1) {
-                other_layer = OTHER_LAYER_HOME;
-                other_menu_grid_initialized = false;
-                last_other_menu_index = -1;
-                current_submenu_index = 0;
-                updateActiveSubmenu();
-                submenu_initialized = false;
-                displaySubmenu();
-                is_main_menu = false;
-            } else {
-                otherGpsPlaceholderAction(current_submenu_index);
-            }
-        }
+        launchDetectFeature(current_submenu_index);
     }
 }
 
@@ -3814,10 +3671,14 @@ void handleButtons() {
             case 0: handleWiFiSubmenuButtons(); break;
             case 1: handleNRFSubmenuButtons(); break;
             case 2: handleOtherSubmenuButtons(); break;
-            case 3: /* Settings: full-screen AppSettings, not list submenu */ break;
+            case 3: handleListSubmenuButtons(launchGpsFeature,
+                                             gps_NUM_SUBMENU_ITEMS - 1); break;
             case 4: handleBluetoothSubmenuButtons(); break;
             case 5: handleSubGHzSubmenuButtons(); break;
-            case 6: handleToolsSubmenuButtons(); break;
+            case 6: handleListSubmenuButtons(launchRfidFeature,
+                                             rfid_NUM_SUBMENU_ITEMS - 1); break;
+            case 7: handleListSubmenuButtons(launchToolsFeature,
+                                             TOOLS_IDX_BACK); break;
             default: break;
         }
     } else {
@@ -3874,17 +3735,12 @@ void handleButtons() {
             last_interaction_time = millis();
             delay(200);
 
-            if (current_menu_index == 3) {
-                handleSettingsSubmenuButtons();
-            } else if (current_menu_index == 7) {
-                handleAboutPage();
-            } else {
+            {
                 updateActiveSubmenu();
 
                 if (active_submenu_items && active_submenu_size > 0) {
                     current_submenu_index = 0;
                     if (current_menu_index == 2) {
-                        other_layer = OTHER_LAYER_HOME;
                         other_menu_grid_initialized = false;
                         last_other_menu_index = -1;
                     }
@@ -3937,17 +3793,12 @@ void handleButtons() {
 
                     if (isTouchDownDismiss()) {
 
-                        if (current_menu_index == 3) {
-                            handleSettingsSubmenuButtons();
-                        } else if (current_menu_index == 7) {
-                            handleAboutPage();
-                        } else {
+                        {
                             updateActiveSubmenu();
 
                             if (active_submenu_items && active_submenu_size > 0) {
                                 current_submenu_index = 0;
                                 if (current_menu_index == 2) {
-                                    other_layer = OTHER_LAYER_HOME;
                                     other_menu_grid_initialized = false;
                                     last_other_menu_index = -1;
                                 }
