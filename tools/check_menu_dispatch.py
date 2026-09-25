@@ -97,6 +97,50 @@ def main():
         else:
             print(f"  ok    {var} page {page + 1}, {chain:<7} has no orphaned handler")
 
+    # ---- a branch must pin the index it is a branch for ------------------
+    #
+    # Every paged branch opens with `current_submenu_index = N;` and its
+    # while loop restates it. Renumbering a branch without renumbering those
+    # is silent and total: the while condition is false on the first test so
+    # the feature's loop never runs, and control falls out with the index
+    # naming a different entry, which the next pass then launches.
+    #
+    # That shipped. ARP Scanner pinned 1 while branching on 3, so it exited
+    # into Hidden SSID Revealer. The check above stayed green throughout,
+    # because every entry did still have a branch in both chains.
+    text = SKETCH.read_text(encoding="utf-8")
+    src_lines = text.split("\n")
+    head = re.compile(r"(\w+)_submenu_page == (\d+) && current_submenu_index == (\d+)")
+    pin = re.compile(r"^\s*current_submenu_index = (\d+);\s*$")
+
+    mismatched = []
+    pinned = 0
+    for i, ln in enumerate(src_lines[:-1]):
+        h = head.search(ln)
+        if not h:
+            continue
+        t = ln.strip()
+        if not (t.startswith("if (") or t.startswith("} else if (")
+                or t.startswith("while (")):
+            continue
+        p = pin.match(src_lines[i + 1])
+        if not p:
+            continue
+        pinned += 1
+        if int(p.group(1)) != int(h.group(3)):
+            mismatched.append("line %d: %s page %d branch %s pins %s"
+                              % (i + 2, h.group(1), int(h.group(2)) + 1,
+                                 h.group(3), p.group(1)))
+
+    checks += 1
+    if mismatched:
+        print("  FAIL  a branch pins an index it is not for")
+        for m in mismatched[:8]:
+            print("          " + m)
+        failed += 1
+    else:
+        print(f"  ok    all {pinned} branch pins match their own index")
+
     # ---- the menus that dispatch through one launch function ------------
     #
     # NRF24 and SubGHz used to repeat a ~28-line feature launch per entry,

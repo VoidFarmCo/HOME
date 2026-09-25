@@ -1441,7 +1441,7 @@ void handleWiFiSubmenuButtons() {
             }
         }
         if (wifi_submenu_page == 1 && current_submenu_index == 0) {
-            current_submenu_index = 6;
+            current_submenu_index = 0;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
@@ -1474,7 +1474,7 @@ void handleWiFiSubmenuButtons() {
             }
         }
         if (wifi_submenu_page == 1 && current_submenu_index == 1) {
-            current_submenu_index = 7;
+            current_submenu_index = 1;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
@@ -1507,13 +1507,13 @@ void handleWiFiSubmenuButtons() {
             }
         }
         if (wifi_submenu_page == 1 && current_submenu_index == 2) {
-            current_submenu_index = 0;
+            current_submenu_index = 2;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             WpsScanner::wpsScannerSetup();
             while (wifi_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
-                current_submenu_index = 0;
+                current_submenu_index = 2;
                 in_sub_menu = true;
                 WpsScanner::wpsScannerLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -1540,13 +1540,13 @@ void handleWiFiSubmenuButtons() {
             }
         }
         if (wifi_submenu_page == 1 && current_submenu_index == 3) {
-            current_submenu_index = 1;
+            current_submenu_index = 3;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             ArpScanner::arpScannerSetup();
             while (wifi_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
-                current_submenu_index = 1;
+                current_submenu_index = 3;
                 in_sub_menu = true;
                 ArpScanner::arpScannerLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -1573,13 +1573,13 @@ void handleWiFiSubmenuButtons() {
             }
         }
         if (wifi_submenu_page == 1 && current_submenu_index == 4) {
-            current_submenu_index = 2;
+            current_submenu_index = 4;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             KarmaAttack::karmaSetup();
             while (wifi_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
-                current_submenu_index = 2;
+                current_submenu_index = 4;
                 in_sub_menu = true;
                 KarmaAttack::karmaLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -1869,7 +1869,7 @@ void handleWiFiSubmenuButtons() {
                         delay(200);
                     }
                 } else if (wifi_submenu_page == 1 && current_submenu_index == 0) {
-                    current_submenu_index = 6;
+                    current_submenu_index = 0;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
@@ -1901,7 +1901,7 @@ void handleWiFiSubmenuButtons() {
                         delay(200);
                     }
                 } else if (wifi_submenu_page == 1 && current_submenu_index == 1) {
-                    current_submenu_index = 7;
+                    current_submenu_index = 1;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
@@ -1933,13 +1933,13 @@ void handleWiFiSubmenuButtons() {
                         delay(200);
                     }
                 } else if (wifi_submenu_page == 1 && current_submenu_index == 2) {
-                    current_submenu_index = 0;
+                    current_submenu_index = 2;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     WpsScanner::wpsScannerSetup();
                     while (wifi_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
-                        current_submenu_index = 0;
+                        current_submenu_index = 2;
                         in_sub_menu = true;
                         WpsScanner::wpsScannerLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -1965,13 +1965,13 @@ void handleWiFiSubmenuButtons() {
                         delay(200);
                     }
                 } else if (wifi_submenu_page == 1 && current_submenu_index == 3) {
-                    current_submenu_index = 1;
+                    current_submenu_index = 3;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     ArpScanner::arpScannerSetup();
                     while (wifi_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
-                        current_submenu_index = 1;
+                        current_submenu_index = 3;
                         in_sub_menu = true;
                         ArpScanner::arpScannerLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -1997,13 +1997,13 @@ void handleWiFiSubmenuButtons() {
                         delay(200);
                     }
                 } else if (wifi_submenu_page == 1 && current_submenu_index == 4) {
-                    current_submenu_index = 2;
+                    current_submenu_index = 4;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     KarmaAttack::karmaSetup();
                     while (wifi_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
-                        current_submenu_index = 2;
+                        current_submenu_index = 4;
                         in_sub_menu = true;
                         KarmaAttack::karmaLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2302,13 +2302,13 @@ void handleBluetoothSubmenuButtons() {
         }
 
         if (bluetooth_submenu_page == 1 && current_submenu_index == 0) {
-            current_submenu_index = 6;
+            current_submenu_index = 0;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             BleScan::bleScanSetup();
             while (bluetooth_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
-                current_submenu_index = 6;
+                current_submenu_index = 0;
                 in_sub_menu = true;
                 BleScan::bleScanLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2340,13 +2340,13 @@ void handleBluetoothSubmenuButtons() {
         }
 
         if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
-            current_submenu_index = 0;
+            current_submenu_index = 2;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             BleSkimmer::bleSkimmerSetup();
             while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
-                current_submenu_index = 0;
+                current_submenu_index = 2;
                 in_sub_menu = true;
                 BleSkimmer::bleSkimmerLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2379,13 +2379,13 @@ void handleBluetoothSubmenuButtons() {
 
 
         if (bluetooth_submenu_page == 1 && current_submenu_index == 3) {
-            current_submenu_index = 1;
+            current_submenu_index = 3;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             TrackerHunt::setup();
             while (bluetooth_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
-                current_submenu_index = 1;
+                current_submenu_index = 3;
                 in_sub_menu = true;
                 TrackerHunt::loop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2414,13 +2414,13 @@ void handleBluetoothSubmenuButtons() {
         }
 
         if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
-            current_submenu_index = 2;
+            current_submenu_index = 4;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             FastPairScan::fastPairSetup();
             while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
-                current_submenu_index = 2;
+                current_submenu_index = 4;
                 in_sub_menu = true;
                 FastPairScan::fastPairLoop();
                 if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2697,13 +2697,13 @@ void handleBluetoothSubmenuButtons() {
                         delay(200);
                     }
                 } else if (bluetooth_submenu_page == 1 && current_submenu_index == 0) {
-                    current_submenu_index = 6;
+                    current_submenu_index = 0;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     BleScan::bleScanSetup();
                     while (bluetooth_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
-                        current_submenu_index = 6;
+                        current_submenu_index = 0;
                         in_sub_menu = true;
                         BleScan::bleScanLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2732,13 +2732,13 @@ void handleBluetoothSubmenuButtons() {
                 } else if (bluetooth_submenu_page == 1 && current_submenu_index == 1) {
                     runBleDuckyFeature();
                 } else if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
-                    current_submenu_index = 0;
+                    current_submenu_index = 2;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     BleSkimmer::bleSkimmerSetup();
                     while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
-                        current_submenu_index = 0;
+                        current_submenu_index = 2;
                         in_sub_menu = true;
                         BleSkimmer::bleSkimmerLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2765,13 +2765,13 @@ void handleBluetoothSubmenuButtons() {
                         delay(200);
                     }
                 } else if (bluetooth_submenu_page == 1 && current_submenu_index == 3) {
-                    current_submenu_index = 1;
+                    current_submenu_index = 3;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     TrackerHunt::setup();
                     while (bluetooth_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
-                        current_submenu_index = 1;
+                        current_submenu_index = 3;
                         in_sub_menu = true;
                         TrackerHunt::loop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
@@ -2798,13 +2798,13 @@ void handleBluetoothSubmenuButtons() {
                         delay(200);
                     }
                 } else if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
-                    current_submenu_index = 2;
+                    current_submenu_index = 4;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     FastPairScan::fastPairSetup();
                     while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
-                        current_submenu_index = 2;
+                        current_submenu_index = 4;
                         in_sub_menu = true;
                         FastPairScan::fastPairLoop();
                         if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
