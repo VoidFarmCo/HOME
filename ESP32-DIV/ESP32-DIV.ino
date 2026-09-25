@@ -790,22 +790,51 @@ bool featureExitButtonPressed() {
   return isPhysicalButtonPressed(BTN_SELECT) || isTouchNavButtonPressed(BTN_SELECT);
 }
 
+/* Say why a feature is not here, then put the screen back.
+ *
+ * showNotification() draws a panel and sets notificationVisible; nothing
+ * here ever called hideNotification(), so the panel stayed up over a
+ * submenu that was still live underneath. Taps went to rows the user could
+ * no longer see, which reads as a message that cannot be dismissed. The
+ * 250 ms delay was not long enough to read it either.
+ */
 static void showFeatureUnavailable(const char* featureName, const char* requirement) {
   feature_active = false;
   feature_exit_requested = false;
   showNotification(featureName, requirement);
-  delay(250);
+
+  /* Long enough to read, and a tap or SELECT takes it away sooner. */
+  const uint32_t until = millis() + 3000;
+  while ((int32_t)(until - millis()) > 0) {
+    int x, y;
+    if (isButtonPressed(BTN_SELECT) || readTouchXY(x, y)) {
+      break;
+    }
+    delay(20);
+  }
+  /* Drain, so the press that dismissed this does not immediately reopen
+   * whatever row is under it. */
+  while (isButtonPressed(BTN_SELECT)) {
+    delay(10);
+  }
+
+  hideNotification();
+  submenu_initialized = false;
+  displaySubmenu();
 }
 
 static void runBleDuckyFeature() {
 #if FEATURE_BLE_DUCKY
-  current_submenu_index = 5;
+  /* Bluetooth page 2 index 1. It was 5 before the 6 + 5 rebalance, and this
+   * one is invisible on a non-S3 board because the whole branch is compiled
+   * out, so it survived the sweep that fixed the others. */
+  current_submenu_index = 1;
   in_sub_menu = true;
   feature_active = true;
   feature_exit_requested = false;
   Ducky::enter();
-  while (current_submenu_index == 5 && !feature_exit_requested) {
-      current_submenu_index = 5;
+  while (current_submenu_index == 1 && !feature_exit_requested) {
+      current_submenu_index = 1;
       in_sub_menu = true;
       Ducky::loop();
   }
