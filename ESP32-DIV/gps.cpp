@@ -620,8 +620,53 @@ bool handleRmcSentence(char* sentence) {
   return true;
 }
 
+/* Counters, so a receiver that does not send checksums is diagnosable
+ * rather than mysterious. A GPS that suddenly shows nothing looks identical
+ * to one with no antenna, and the difference is here. */
+uint32_t nmeaBadChecksum = 0;
+uint32_t nmeaNoChecksum = 0;
+
+/* The checksum is the XOR of every byte between '$' and '*', written as two
+ * hex digits after the '*'.
+ *
+ * A missing field counts as a failure rather than a pass. Truncation is the
+ * corruption this is most likely to see, and a sentence cut before its '*'
+ * would sail through a lenient check with its remaining fields intact and
+ * wrong. Every receiver this is built for sends the field.
+ */
+static bool nmeaChecksumOk(const char* line) {
+  const char* star = strchr(line, '*');
+  if (!star) {
+    nmeaNoChecksum++;
+    return false;
+  }
+  if (!isxdigit((unsigned char)star[1]) || !isxdigit((unsigned char)star[2])) {
+    nmeaBadChecksum++;
+    return false;
+  }
+
+  uint8_t sum = 0;
+  for (const char* p = line + 1; p < star; p++) {
+    sum ^= (uint8_t)*p;
+  }
+
+  const char hex[3] = { star[1], star[2], '\0' };
+  const uint8_t want = (uint8_t)strtoul(hex, nullptr, 16);
+  if (sum != want) {
+    nmeaBadChecksum++;
+    return false;
+  }
+  return true;
+}
+
 void dispatchNmeaLine(char* line) {
   if (line[0] != '$' || strlen(line) < 7) {
+    return;
+  }
+
+  /* Before any parser runs, and before stripChecksum() removes the
+   * evidence. */
+  if (!nmeaChecksumOk(line)) {
     return;
   }
   char t4 = line[3];
