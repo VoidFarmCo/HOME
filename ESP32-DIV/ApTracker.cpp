@@ -255,7 +255,11 @@ void enterPicker() {
   s_locked = false;
   stopListening();
   s_dirty = true;
-  setTouchNavLabels("Rescan", nullptr, "Exit", nullptr, "Track");
+  /* "" not nullptr for up and down: a null slot draws the dots icon,
+   * which is the bar saying that button does nothing, and in the
+   * picker they scroll the list. An empty label skips the word and
+   * draws the arrow. */
+  setTouchNavLabels("Rescan", "", "Exit", "", "Track");
   redrawTouchButtonBar();
 }
 
