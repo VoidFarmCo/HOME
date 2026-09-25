@@ -328,11 +328,8 @@ and the reasoning for that is in [hardware.md](hardware.md). Reversed, it puts
 two push-pull drivers on one net.
 
 The four-pin connectors -- P3, CN1 and P1 -- are **1.25 mm pitch**. P1 carries
-that label on Sunton's own drawing, and CN1 measured 1.29 mm against a microSD
-card used as a scale bar, 11.00 mm by specification. The 3% excess is parallax,
-because those pins sit on the connector's top face a few millimetres nearer the
-lens than the card; 1.50 mm would have been 14% out, well outside a reading
-that repeatable.
+that label on Sunton's own drawing, and a photogrammetric check of CN1 agreed
+with it independently.
 
 **SPEAK1 and BAT1 are two-pin and were never measured.** BAT1 reads 1.36 mm
 against P1 in one frame, which rules out JST PH 2.0 -- the connector most

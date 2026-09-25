@@ -389,12 +389,15 @@ LID_H     = 12;
  * longer, so only the window length and what sits under it change.
  *
  *   2.8"  ESP32-2432S028R  ILI9341  240x320  board 55.5 x 92
- *   3.5"  ESP32-3248S035R  ST7796   320x480  board 55.0 x 101   [VERIFY]
+ *   3.5"  ESP32-3248S035R  ST7796   320x480  board 55.0 x 101   [CONFIRMED]
  *
  * The 3.5" figures come from the vendor's dimensioned drawing (55 x 101
  * stated) with the glass measured against it at 54.8 x 84.4, sitting
- * 8.6 mm below the top edge and 8.0 mm above the bottom. Confirm with
- * calipers before printing a lid you intend to keep.
+ * 8.6 mm below the top edge and 8.0 mm above the bottom.
+ *
+ * 2026-09-24: the 3.5" lid has been printed and the board fits it. That
+ * retires the [VERIFY] these numbers carried, and it settles a question no
+ * amount of reading could -- see the note on BEZEL_W below.
  *
  * Default is 3.5 as of 2026-09-23: it is the reference board, the one the
  * firmware and this case are built for, and the only one anything has run
@@ -423,7 +426,19 @@ PANEL     = "3.5";
  *
  * The 2.8" values are left alone: they came from measurement rather than a
  * drawing, and there is no E32R35T-equivalent outline for that board here to
- * check them against. */
+ * check them against.
+ *
+ * Two things were wrong with the provenance and neither turned out to
+ * matter. QDtech's E32R35T is lcdwiki's board, not Sunton's -- the same
+ * wrong-board substitution that put an audio amplifier on GPIO 4 and
+ * invented an I2C JST. And Sunton's own datasheet gives the module as
+ * 101.5 x 54.9, which would make 55.50 too wide by 0.6.
+ *
+ * The printed lid accepts the board, so 56.0 is right in the only sense
+ * that counts. If 54.9 is the true width the clearance is 1.1 rather than
+ * 0.5 -- looser, not tighter, which is why a drawing of the wrong board
+ * still produced a part that fits. Do not tighten it on the strength of the
+ * datasheet: that document says 240x320 and 320x480 four lines apart. */
 BEZEL_W   = (PANEL == "3.5") ? 56.0 : 56.0;   // board + 0.5 clearance
 BEZEL_L   = (PANEL == "3.5") ? 102.0 : 92.5;
 

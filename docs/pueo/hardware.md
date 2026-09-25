@@ -29,13 +29,8 @@ listed as four pins with no stated purpose: `GND IO22 IO21 3.3V` is a
 four-pin DHT11 header, which is why there is a 3.3 V pin on it at all.
 
 **The four-pin connectors are 1.25 mm pitch.** P1 carries the vendor's own
-"4P 1.25" label, and CN1 measured 1.29 mm against a microSD card used as a
-scale bar -- 11.00 mm by specification, 573 px across 20 agreeing rows,
-giving 52.09 px/mm against a pin spacing of 67.17 px over seventeen
-readings. The 3% excess is parallax: those pins sit on the connector's top
-face, three or four millimetres nearer the lens than the card. 1.50 mm would
-have been 14% out, far outside a reading that repeatable. Two independent
-sources, one of them the manufacturer.
+"4P 1.25" label, and a photogrammetric check of CN1 agreed with it
+independently.
 
 ### BAT1 is not one of them
 
@@ -79,10 +74,11 @@ either, which is independent support for those having been lcdwiki's rather
 than this board's.
 
 Two things in it are not. It gives the module as 101.5 x 54.9 where the
-dimensioned drawing the enclosure uses says 55.50 wide; `BEZEL_W` is 56.0 and
-described as "board + 0.5 clearance", so if 54.9 is right the clearance is
-1.1 instead. Looser, not tighter, so nothing binds -- the comment is off, not
-the geometry.
+dimensioned drawing the enclosure uses says 55.50 wide, which would have made
+`BEZEL_W`'s 56.0 a 1.1 mm clearance rather than the 0.5 its comment claims.
+**Settled on 2026-09-24 by printing the lid: the board fits it.** Looser, not
+tighter, so nothing bound -- and that is why a drawing of the wrong board
+(QDtech's E32R35T, lcdwiki's, not Sunton's) still produced a part that works.
 
 And page 3 says "The display resolution is 240x320" in prose and "320X480
 resolution" in the feature list four lines below it. It is the manufacturer,
