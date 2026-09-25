@@ -667,7 +667,7 @@ def body(t, x, y, text, colour, bg):
 
 
 MENU = [
-    ("WiFi", "bitmap_icon_wifi"), ("2.4GHz", "bitmap_icon_jammer"),
+    ("WiFi", "bitmap_icon_wifi"), ("NRF24", "bitmap_icon_jammer"),
     ("More", "bitmap_icon_dots"), ("Settings", "bitmap_icon_setting"),
     ("Bluetooth", "bitmap_icon_spoofer"), ("SubGHz", "bitmap_icon_analyzer"),
     ("Tools", "bitmap_icon_stat"), ("About", "bitmap_icon_question"),

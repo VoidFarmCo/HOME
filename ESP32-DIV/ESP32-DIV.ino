@@ -34,10 +34,20 @@ void setBrightness(uint8_t value) {
 
 bool feature_exit_requested = false;
 
+/* The main menu, in COLUMN-MAJOR order. displayMenu() lays it out with
+ * column = i / 4 and row = i % 4, so 0..3 are the left column top to bottom
+ * and 4..7 are the right. Read as a list this looks shuffled; read as two
+ * columns it is what is on the screen. Adding an entry means thinking about
+ * which column it lands in, not appending.
+ *
+ * "NRF24" was "2.4GHz" until 0.4.11. It is the Nordic module -- Scanner,
+ * Proto Kill, ESB Sniffer, MouseJack -- and naming it by its band put it in
+ * competition with the two tiles above it, which are also 2.4 GHz radios.
+ * Somebody looking for the BLE jammer had a sound reason to open it. */
 const int NUM_MENU_ITEMS = 8;
 const char *menu_items[NUM_MENU_ITEMS] = {
     "WiFi",
-    "2.4GHz",
+    "NRF24",
     "More",
     "Settings",
     "Bluetooth",
@@ -45,6 +55,12 @@ const char *menu_items[NUM_MENU_ITEMS] = {
     "Tools",
     "About"};
 
+/* These names are upstream's and several no longer describe where they are
+ * used: the NRF24 tile wears bitmap_icon_jammer, Bluetooth wears
+ * bitmap_icon_spoofer, SubGHz wears bitmap_icon_analyzer. They render
+ * correctly -- they are generic glyphs, reused across menus -- so they are
+ * not renamed, because the other use sites would then be the misleading
+ * ones. Read the position, not the name. */
 const unsigned char *bitmap_icons[NUM_MENU_ITEMS] = {
     bitmap_icon_wifi,
     bitmap_icon_jammer,
