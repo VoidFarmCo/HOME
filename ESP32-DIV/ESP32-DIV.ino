@@ -91,8 +91,8 @@ const char *submenu_items[NUM_SUBMENU_ITEMS] = {
 
 // WiFi submenu is split across two pages (features after Hidden SSID on page 2).
 // Bottom row: icon | Main Menu                 Next/Prev Page | icon
-static constexpr int WIFI_PAGE0_FEATURES = 8;
-static constexpr int WIFI_PAGE1_FEATURES = 3;
+static constexpr int WIFI_PAGE0_FEATURES = 6;
+static constexpr int WIFI_PAGE1_FEATURES = 5;
 static int wifi_submenu_page = 0;
 
 const char *wifi_page0_items[WIFI_PAGE0_FEATURES] = {
@@ -101,18 +101,18 @@ const char *wifi_page0_items[WIFI_PAGE0_FEATURES] = {
     "WiFi Deauther",
     "Probe Request Flood",
     "Deauth Detector",
-    "WiFi Scanner",
-    "Captive Portal",
-    "Hidden SSID Revealer"};
+    "WiFi Scanner"};
 
 const char *wifi_page1_items[WIFI_PAGE1_FEATURES] = {
+    "Captive Portal",
+    "Hidden SSID Revealer",
     "WPS Scanner",
     "ARP Scanner",
     "Karma Attack"};
 
 // Bluetooth submenu uses the same paged footer layout as WiFi.
-static constexpr int BT_PAGE0_FEATURES = 8;
-static constexpr int BT_PAGE1_FEATURES = 3;
+static constexpr int BT_PAGE0_FEATURES = 6;
+static constexpr int BT_PAGE1_FEATURES = 5;
 static int bluetooth_submenu_page = 0;
 
 const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
@@ -121,11 +121,11 @@ const char *bluetooth_page0_items[BT_PAGE0_FEATURES] = {
     "Sour Apple",
     "AirTag Spoofer",
     "AirTag Sniffer",
-    "Sniffer",
-    "BLE Scanner",
-    "BLE Rubber Ducky"};
+    "Sniffer"};
 
 const char *bluetooth_page1_items[BT_PAGE1_FEATURES] = {
+    "BLE Scanner",
+    "BLE Rubber Ducky",
     "Skimmer Detect",
     "Hunt",
     "Fast Pair"};
@@ -231,12 +231,12 @@ const unsigned char *wifi_page0_icons[WIFI_PAGE0_FEATURES] = {
     bitmap_icon_wifi_jammer,
     bitmap_icon_Skull_3,
     bitmap_icon_eye2,
-    bitmap_icon_jammer,
-    bitmap_icon_bash,
-    bitmap_icon_eye_blind
+    bitmap_icon_jammer
 };
 
 const unsigned char *wifi_page1_icons[WIFI_PAGE1_FEATURES] = {
+    bitmap_icon_bash,
+    bitmap_icon_eye_blind,
     bitmap_icon_key,
     bitmap_icon_list,
     bitmap_icon_devil
@@ -248,12 +248,12 @@ const unsigned char *bluetooth_page0_icons[BT_PAGE0_FEATURES] = {
     bitmap_icon_apple,
     bitmap_icon_tags,
     bitmap_icon_magnifying_glass,
-    bitmap_icon_analyzer,
-    bitmap_icon_graph,
-    bitmap_icon_rubber_ducky
+    bitmap_icon_analyzer
 };
 
 const unsigned char *bluetooth_page1_icons[BT_PAGE1_FEATURES] = {
+    bitmap_icon_graph,
+    bitmap_icon_rubber_ducky,
     bitmap_icon_Wireless_4,
     bitmap_icon_compass,
     bitmap_icon_ble
@@ -1446,7 +1446,7 @@ void handleWiFiSubmenuButtons() {
                 delay(200);
             }
         }
-        if (wifi_submenu_page == 0 && current_submenu_index == 6) {
+        if (wifi_submenu_page == 1 && current_submenu_index == 0) {
             current_submenu_index = 6;
             in_sub_menu = true;
             feature_active = true;
@@ -1479,7 +1479,7 @@ void handleWiFiSubmenuButtons() {
                 delay(200);
             }
         }
-        if (wifi_submenu_page == 0 && current_submenu_index == 7) {
+        if (wifi_submenu_page == 1 && current_submenu_index == 1) {
             current_submenu_index = 7;
             in_sub_menu = true;
             feature_active = true;
@@ -1512,13 +1512,13 @@ void handleWiFiSubmenuButtons() {
                 delay(200);
             }
         }
-        if (wifi_submenu_page == 1 && current_submenu_index == 0) {
+        if (wifi_submenu_page == 1 && current_submenu_index == 2) {
             current_submenu_index = 0;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             WpsScanner::wpsScannerSetup();
-            while (wifi_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
+            while (wifi_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
                 current_submenu_index = 0;
                 in_sub_menu = true;
                 WpsScanner::wpsScannerLoop();
@@ -1545,13 +1545,13 @@ void handleWiFiSubmenuButtons() {
                 delay(200);
             }
         }
-        if (wifi_submenu_page == 1 && current_submenu_index == 1) {
+        if (wifi_submenu_page == 1 && current_submenu_index == 3) {
             current_submenu_index = 1;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             ArpScanner::arpScannerSetup();
-            while (wifi_submenu_page == 1 && current_submenu_index == 1 && !feature_exit_requested) {
+            while (wifi_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
                 current_submenu_index = 1;
                 in_sub_menu = true;
                 ArpScanner::arpScannerLoop();
@@ -1578,13 +1578,13 @@ void handleWiFiSubmenuButtons() {
                 delay(200);
             }
         }
-        if (wifi_submenu_page == 1 && current_submenu_index == 2) {
+        if (wifi_submenu_page == 1 && current_submenu_index == 4) {
             current_submenu_index = 2;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             KarmaAttack::karmaSetup();
-            while (wifi_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+            while (wifi_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
                 current_submenu_index = 2;
                 in_sub_menu = true;
                 KarmaAttack::karmaLoop();
@@ -1856,7 +1856,7 @@ void handleWiFiSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (wifi_submenu_page == 0 && current_submenu_index == 6) {
+                } else if (wifi_submenu_page == 1 && current_submenu_index == 0) {
                     current_submenu_index = 6;
                     in_sub_menu = true;
                     feature_active = true;
@@ -1888,7 +1888,7 @@ void handleWiFiSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (wifi_submenu_page == 0 && current_submenu_index == 7) {
+                } else if (wifi_submenu_page == 1 && current_submenu_index == 1) {
                     current_submenu_index = 7;
                     in_sub_menu = true;
                     feature_active = true;
@@ -1920,13 +1920,13 @@ void handleWiFiSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (wifi_submenu_page == 1 && current_submenu_index == 0) {
+                } else if (wifi_submenu_page == 1 && current_submenu_index == 2) {
                     current_submenu_index = 0;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     WpsScanner::wpsScannerSetup();
-                    while (wifi_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
+                    while (wifi_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
                         current_submenu_index = 0;
                         in_sub_menu = true;
                         WpsScanner::wpsScannerLoop();
@@ -1952,13 +1952,13 @@ void handleWiFiSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (wifi_submenu_page == 1 && current_submenu_index == 1) {
+                } else if (wifi_submenu_page == 1 && current_submenu_index == 3) {
                     current_submenu_index = 1;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     ArpScanner::arpScannerSetup();
-                    while (wifi_submenu_page == 1 && current_submenu_index == 1 && !feature_exit_requested) {
+                    while (wifi_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
                         current_submenu_index = 1;
                         in_sub_menu = true;
                         ArpScanner::arpScannerLoop();
@@ -1984,13 +1984,13 @@ void handleWiFiSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (wifi_submenu_page == 1 && current_submenu_index == 2) {
+                } else if (wifi_submenu_page == 1 && current_submenu_index == 4) {
                     current_submenu_index = 2;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     KarmaAttack::karmaSetup();
-                    while (wifi_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+                    while (wifi_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
                         current_submenu_index = 2;
                         in_sub_menu = true;
                         KarmaAttack::karmaLoop();
@@ -2272,13 +2272,13 @@ void handleBluetoothSubmenuButtons() {
             }
         }
 
-        if (bluetooth_submenu_page == 0 && current_submenu_index == 6) {
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 0) {
             current_submenu_index = 6;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             BleScan::bleScanSetup();
-            while (bluetooth_submenu_page == 0 && current_submenu_index == 6 && !feature_exit_requested) {
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
                 current_submenu_index = 6;
                 in_sub_menu = true;
                 BleScan::bleScanLoop();
@@ -2306,17 +2306,17 @@ void handleBluetoothSubmenuButtons() {
                 delay(200);
             }
         }
-        if (bluetooth_submenu_page == 0 && current_submenu_index == 7) {
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 1) {
             runBleDuckyFeature();
         }
 
-        if (bluetooth_submenu_page == 1 && current_submenu_index == 0) {
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
             current_submenu_index = 0;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             BleSkimmer::bleSkimmerSetup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
                 current_submenu_index = 0;
                 in_sub_menu = true;
                 BleSkimmer::bleSkimmerLoop();
@@ -2349,13 +2349,13 @@ void handleBluetoothSubmenuButtons() {
 
 
 
-        if (bluetooth_submenu_page == 1 && current_submenu_index == 1) {
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 3) {
             current_submenu_index = 1;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             TrackerHunt::setup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 1 && !feature_exit_requested) {
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
                 current_submenu_index = 1;
                 in_sub_menu = true;
                 TrackerHunt::loop();
@@ -2384,13 +2384,13 @@ void handleBluetoothSubmenuButtons() {
             }
         }
 
-        if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
+        if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
             current_submenu_index = 2;
             in_sub_menu = true;
             feature_active = true;
             feature_exit_requested = false;
             FastPairScan::fastPairSetup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+            while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
                 current_submenu_index = 2;
                 in_sub_menu = true;
                 FastPairScan::fastPairLoop();
@@ -2667,13 +2667,13 @@ void handleBluetoothSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (bluetooth_submenu_page == 0 && current_submenu_index == 6) {
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 0) {
                     current_submenu_index = 6;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     BleScan::bleScanSetup();
-                    while (bluetooth_submenu_page == 0 && current_submenu_index == 6 && !feature_exit_requested) {
+                    while (bluetooth_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
                         current_submenu_index = 6;
                         in_sub_menu = true;
                         BleScan::bleScanLoop();
@@ -2700,15 +2700,15 @@ void handleBluetoothSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (bluetooth_submenu_page == 0 && current_submenu_index == 7) {
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 1) {
                     runBleDuckyFeature();
-                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 0) {
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
                     current_submenu_index = 0;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     BleSkimmer::bleSkimmerSetup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 0 && !feature_exit_requested) {
+                    while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
                         current_submenu_index = 0;
                         in_sub_menu = true;
                         BleSkimmer::bleSkimmerLoop();
@@ -2735,13 +2735,13 @@ void handleBluetoothSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 1) {
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 3) {
                     current_submenu_index = 1;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     TrackerHunt::setup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 1 && !feature_exit_requested) {
+                    while (bluetooth_submenu_page == 1 && current_submenu_index == 3 && !feature_exit_requested) {
                         current_submenu_index = 1;
                         in_sub_menu = true;
                         TrackerHunt::loop();
@@ -2768,13 +2768,13 @@ void handleBluetoothSubmenuButtons() {
                         displaySubmenu();
                         delay(200);
                     }
-                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 2) {
+                } else if (bluetooth_submenu_page == 1 && current_submenu_index == 4) {
                     current_submenu_index = 2;
                     in_sub_menu = true;
                     feature_active = true;
                     feature_exit_requested = false;
                     FastPairScan::fastPairSetup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 2 && !feature_exit_requested) {
+                    while (bluetooth_submenu_page == 1 && current_submenu_index == 4 && !feature_exit_requested) {
                         current_submenu_index = 2;
                         in_sub_menu = true;
                         FastPairScan::fastPairLoop();
