@@ -668,9 +668,9 @@ def body(t, x, y, text, colour, bg):
 
 MENU = [
     ("WiFi", "bitmap_icon_wifi"), ("NRF24", "bitmap_icon_jammer"),
-    ("More", "bitmap_icon_dots"), ("Settings", "bitmap_icon_setting"),
+    ("Detect", "bitmap_icon_eye"), ("GPS", "bitmap_icon_satellite"),
     ("Bluetooth", "bitmap_icon_spoofer"), ("SubGHz", "bitmap_icon_analyzer"),
-    ("Tools", "bitmap_icon_stat"), ("About", "bitmap_icon_question"),
+    ("RFID/NFC", "bitmap_icon_rfid_chip"), ("System", "bitmap_icon_setting"),
 ]
 
 
