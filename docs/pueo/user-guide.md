@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="../img/pueo-guide.webp" width="100%"
+       alt="The Pueo mark: a stylised horned owl in green on near-black, with
+            a WiFi arc, a Bluetooth rune and a satellite across its chest and
+            the word PUEO beneath, in a sweep of concentric signal arcs.">
+</p>
+
 # Using Pueo
 
 This is the operating manual. It assumes you have a working unit: firmware
