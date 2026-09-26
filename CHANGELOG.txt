@@ -11,6 +11,47 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.13 - 2026-09-25
+-------------------
+
+Another one with no firmware source in it. The image differs from 0.4.12 by
+its version string and nothing else.
+
+  * The lid logo has been hanging off the lid. LOGO_Y centred a 30 mm owl in
+    the chin of the old 170 mm lid; the case has been 142 for a while, that
+    lid ends at y = -71, and the owl ran to -80.5. Nine and a half
+    millimetres of it was past the bottom edge and 69% of the deboss
+    survived. check_logo_scale.py had been failing on exactly this and
+    nobody had chased it, because LOGO is off by default and no printed part
+    ever showed it.
+
+  * Both numbers follow the lid now. The band is bounded by where the outer
+    face still has its full 2.5 mm, which is the rebate edge rather than the
+    window edge: above the rebate the skin thins to SCREEN_LIP, and a 0.6
+    cut into 1.0 leaves 0.4.
+
+      panel   band                LOGO_H   LOGO_Y    thinnest stroke
+      3.5"    -68.00 .. -42.68    25       -55.3     0.42 mm
+      2.8"    -68.00 .. -48.25    19       -58.1     0.32 mm
+
+  * The 2.8" cannot really carry this artwork: 0.32 mm is under one
+    extrusion on a 0.4 nozzle. It renders anyway rather than being dropped
+    without a word, and the model echoes a warning when you ask for it.
+
+  * check_logo_scale.py runs both panels instead of the default, and tests
+    clipping by name rather than leaving the next person to infer it from a
+    volume that came up short.
+
+  * Published STLs are unaffected. They render with LOGO false, and all four
+    parts compare identical by sorted facet sets before and after.
+
+Not in the archive but worth recording: the README claimed the 3.5" brings
+its SPI bus out on a connector. It does not, neither panel does, and six of
+the ten signals are soldered to the ESP-WROOM-32's own castellations either
+way. Its hardware table also gave the 2.8"'s chip selects while calling the
+3.5" the reference board.
+
+
 0.4.12 - 2026-09-25
 -------------------
 
