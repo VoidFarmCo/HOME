@@ -20,10 +20,18 @@ understanding before anything is drawn.
 
 **This board is drawn for the 2.8" ESP32-2432S028R.** The 3.5"
 ESP32-3248S035R is a supported panel for the firmware but not for this
-carrier: it is a different outline, and two of the signals below land
-elsewhere on it -- `CC1101_CS` is GPIO 21 rather than 27, and the touch
-controller is not on VSPI. Adapting J1 is a second-spin question, not an
-edit to this table.
+carrier: it is a different outline, two of the signals below land elsewhere
+on it, and the touch controller is not on VSPI. Adapting J1 is a second-spin
+question, not an edit to this table.
+
+The two are `CC1101_CS`, GPIO 21 rather than 27, and `NRF24 CSN`, GPIO 25
+rather than 4. Both splits are panel-driven and both are in `board_pueo.h`:
+the backlight and the chip select swap 21 and 27 between the panels, and 25
+is free on the 3.5" because its touch controller hangs off the display's SPI
+rather than taking its own bus at 25/32/39. Named here because this paragraph
+used to say "two of the signals" and then name one of them, which is the
+shape of a sentence somebody adapts one row against and ships with the other
+still wrong.
 
 Of the ten signals the firmware needs, only four reach a CYD header:
 
@@ -83,6 +91,13 @@ thinner. Lid hinge/flex cycles argue for GH.
 | 12 | PN532_SS | GPIO 17 | LED pad |
 | 13 | GPS_TX | GPIO 1 | **through R1, see below** |
 | 14 | GND | GND | |
+
+**Three rows move on the 3.5"**, and this is the whole list. Pin 7
+`CC1101_CS` goes to GPIO 21 and reaches P3 rather than CN1, which puts all
+three CC1101 control lines on one header. Pin 10 `NRF_CSN` goes to GPIO 25.
+Pin 13 `GPS_TX` keeps GPIO 1 but the connector is called P1 rather than P5.
+Nothing else changes: the VSPI three, `NRF_CE`, `PN532_SS` and the grounds
+are the same on both panels.
 
 Ground on pins 1, 2 and 14 so every signal has a return nearby. On a
 multi-drop SPI bus run through a cable this matters more than the pin count
