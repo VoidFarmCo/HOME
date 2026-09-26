@@ -630,14 +630,30 @@ class SpotterAdvCallbacks : public BLEAdvertisedDeviceCallbacks {
       }
     }
 
-    // Collect advertised 16-bit service UUIDs once.
+    // Collect advertised 16-bit service UUIDs once, and check the 128-bit
+    // ones as we go. A 128-bit service is somebody's own protocol rather
+    // than an allocation out of the shared SIG space, so a hit is worth more
+    // and there is no reason to collect them for a second pass.
     uint16_t services[8];
     uint8_t nServices = 0;
     const uint8_t count = dev->getServiceUUIDCount();
-    for (uint8_t i = 0; i < count && nServices < 8; i++) {
+    for (uint8_t i = 0; i < count; i++) {
       const NimBLEUUID u = dev->getServiceUUID(i);
       if (u.bitSize() == 16) {
-        services[nServices++] = (uint16_t)u.getNative()->u16.value;
+        if (nServices < 8) {
+          services[nServices++] = (uint16_t)u.getNative()->u16.value;
+        }
+        continue;
+      }
+      if (u.bitSize() != 128) {
+        continue;
+      }
+      for (size_t k = 0; k < kBle128SigCount; k++) {
+        if (memcmp(u.getNative()->u128.value, kBle128Sigs[k].uuid, 16) == 0) {
+          record(mac, rssi, kBle128Sigs[k].kind, kBle128Sigs[k].conf,
+                 kBle128Sigs[k].label, true);
+          break;
+        }
       }
     }
 
@@ -690,6 +706,7 @@ const char* kindText(Kind k) {
     case Kind::Camera:    return "CAMERA";
     case Kind::Pentest:   return "PENTEST";
     case Kind::Tracker:   return "TRACKER";
+    case Kind::Mesh:      return "MESH";
     default:              return "?";
   }
 }

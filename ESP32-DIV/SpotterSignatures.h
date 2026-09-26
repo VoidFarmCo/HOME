@@ -60,12 +60,15 @@
  * non-resolvable private address, so the strongest entry in the table is
  * also the one a randomised address could wear by chance.
  *
- * Not expressible here, and so deliberately left out rather than fudged:
- * the Flock accessory GATT service e8ccbb38-9532-46a8-9fe5-1814df172e6f and
- * the Nordic DFU service, both 128-bit, against a BleSig.service that is
- * uint16_t; and the Bluetooth Classic names, which Spotter does not scan for
- * at all. Picking either up means changing the struct or the scanner, not
- * this table.
+ * 128-bit services live in kBle128Sigs below. That table exists because
+ * this comment used to say they were not expressible and were left out
+ * rather than fudged, which was true of a uint16_t service field and stopped
+ * being true when Ble128Sig was added. The Flock accessory GATT service it
+ * named is in there now.
+ *
+ * Still not expressible, and still left out rather than fudged: Bluetooth
+ * Classic names, which Spotter does not scan for at all. Picking that up
+ * means changing the scanner, not this table.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 #include <stddef.h>   // size_t, for the table-length constants below
@@ -74,7 +77,7 @@
 namespace Spotter {
 
 enum class Kind : uint8_t { Unknown = 0, Alpr, Glasses, Bodycam, Accessory,
-                            Vehicle, Camera, Pentest, Tracker };
+                            Vehicle, Camera, Pentest, Tracker, Mesh };
 
 /* How much a single match is worth. Corroboration -- a second, differently
  * labelled signature on the same MAC -- promotes Likely to Strong. It does
@@ -100,6 +103,23 @@ struct NameSig {
 struct BleSig {
   uint16_t company;     // BLE manufacturer company ID, 0 = don't care
   uint16_t service;     // 16-bit service UUID, 0 = don't care
+  Kind kind;
+  Conf conf;
+  const char* label;
+};
+
+/* 128-bit service UUIDs, which BleSig cannot hold.
+ *
+ * Bytes are little-endian, the order NimBLE stores them in, so they read
+ * backwards against the printed form. The comment on each entry carries the
+ * printed UUID; compare against that rather than the array.
+ *
+ * A vendor-assigned 128-bit service is a much better signature than a 16-bit
+ * one: the 16-bit space is allocated by the SIG and shared, while a 128-bit
+ * UUID is one somebody generated for their own protocol. That is why these
+ * are Strong where an equivalent 16-bit match would not be. */
+struct Ble128Sig {
+  uint8_t uuid[16];
   Kind kind;
   Conf conf;
   const char* label;
@@ -258,6 +278,29 @@ static const OuiSig kOuiSigs[] = {
   {{0x02, 0xC0, 0xCA}, Kind::Pentest, Conf::Weak,   "Hak5 LAA default"},
   {{0x02, 0x13, 0x37}, Kind::Pentest, Conf::Weak,   "Hak5 LAA default"},
 
+  /* Pwnagotchi beacons from de:ad:be:ef:de:ad, a fixed address in its own
+   * source rather than a vendor block. Only the first three bytes are
+   * checked here, which is the table's shape, and de:ad:be is a joke prefix
+   * with no registered assignee, so the loss of specificity is small.
+   *
+   * Likely, not Strong, and check_spotter_oui.py is why. It was written as
+   * Strong on the argument that the BLE cross-match only fires on public
+   * addresses and anything beginning de:ad:be has the local bit set, so that
+   * path could never reach it. True about the mechanism and beside the
+   * point: Strong in this table means "a vendor's own IEEE block", and a
+   * joke prefix with no assignee is not one whatever the code does with it.
+   *
+   * The grade also matches what is actually being matched. Pwnagotchi's
+   * address is de:ad:be:ef:de:ad and this sees three bytes of six, so the
+   * signature really is weaker than the thing it stands for. A second hit on
+   * the same MAC promotes it.
+   *
+   * The advertisement also carries JSON with name, version, pwnd_tot,
+   * policy.deauth and uptime. None of that is read here: this table matches,
+   * it does not parse. Worth knowing it is there if the detail is ever
+   * wanted. */
+  {{0xDE, 0xAD, 0xBE}, Kind::Pentest, Conf::Likely, "Pwnagotchi"},
+
   {{0xB8, 0x35, 0x32}, Kind::Alpr, Conf::Weak,    "unregistered OUI"},
 };
 
@@ -352,7 +395,32 @@ static const NameSig kBleNameSigs[] = {
   {"DR ", 11, Kind::Vehicle, Conf::Likely, "KARR Cell module"},
 };
 
+/* ── BLE: 128-bit service UUIDs ────────────────────────────────────── */
+static const Ble128Sig kBle128Sigs[] = {
+  /* 6ba1b218-15a8-461f-9fa8-5dcae273eafd
+   *
+   * Meshtastic's BLE service, from their own firmware and documentation.
+   * Not surveillance gear, which is why it is Kind::Mesh: it says somebody
+   * is running a LoRa mesh node in range, which is worth knowing and is not
+   * the same claim as a camera.
+   *
+   * Cross-checked against Meshtastic's published UUID rather than taken on
+   * trust from where it was found. */
+  {{0xFD, 0xEA, 0x73, 0xE2, 0xCA, 0x5D, 0xA8, 0x9F,
+    0x1F, 0x46, 0xA8, 0x15, 0x18, 0xB2, 0xA1, 0x6B},
+   Kind::Mesh, Conf::Strong, "Meshtastic node"},
+
+  /* e8ccbb38-9532-46a8-9fe5-1814df172e6f
+   *
+   * The Flock accessory GATT service this file has named as missing since it
+   * was written. Now that a 128-bit table exists it goes in. */
+  {{0x6F, 0x2E, 0x17, 0xDF, 0x14, 0x18, 0xE5, 0x9F,
+    0xA8, 0x46, 0x32, 0x95, 0x38, 0xBB, 0xCC, 0xE8},
+   Kind::Accessory, Conf::Strong, "Flock accessory"},
+};
+
 constexpr size_t kOuiSigCount     = sizeof(kOuiSigs) / sizeof(kOuiSigs[0]);
+constexpr size_t kBle128SigCount  = sizeof(kBle128Sigs) / sizeof(kBle128Sigs[0]);
 constexpr size_t kSsidSigCount    = sizeof(kSsidSigs) / sizeof(kSsidSigs[0]);
 constexpr size_t kBleSigCount     = sizeof(kBleSigs) / sizeof(kBleSigs[0]);
 constexpr size_t kBleNameSigCount = sizeof(kBleNameSigs) / sizeof(kBleNameSigs[0]);
