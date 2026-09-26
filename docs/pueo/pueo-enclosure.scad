@@ -1,13 +1,13 @@
 // =====================================================
 //  PUEO enclosure - base and lid, both in this file
-//  78 x 142 x 20, or 85 x 170 with the external power stack
+//  84 x 142 x 20, or 85 x 170 with the external power stack
 //  zoned for RF/NFC/power separation
 //  every module below is editable - see MODULES list
 //
 //  THIS FILE CONTAINS BOTH PARTS. Which one renders is
-//  decided by PART, near the bottom. Opening the file
-//  in the GUI shows only the base, which is why the lid
-//  looks missing.
+//  decided by PART, in the BUILD OPTIONS block directly
+//  below. Opening the file in the GUI shows only the
+//  base, which is why the lid looks missing.
 //
 //    PART = "base"   the base           (default)
 //    PART = "lid"    the lid, alone
@@ -21,15 +21,54 @@
 //  In the GUI: edit PART below, or open the Customizer
 //  (Window > Customizer) and pick it there.
 //
+//  Every knob that changes what comes out is in the one
+//  block below. The reasoning behind each stays further
+//  down, beside the geometry it decides.
+//
 //  magikh0e.pl
 // =====================================================
+
+/* ══════════════════ BUILD OPTIONS ══════════════════
+ * The five that change what you get. Everything else in this file is
+ * geometry that follows from them.
+ *
+ *   PART       "base" | "lid" | "both"   which part renders
+ *   PANEL      "3.5"  | "2.8"            which CYD it is cut for
+ *   EXT_CHARGER  false  | true             a TP4056 rides inside
+ *   INSERTS    true   | false            M3 heat-set, or self-tapped
+ *   LOGO       false  | true             the owl in the lid
+ *
+ * "both" is for looking at, not for printing: it lays the two parts side
+ * by side in one solid.
+ *
+ * A base and a lid have to come from the same PANEL. The bezel moves with
+ * the panel and the microSD slot is placed from the bezel, so the base
+ * differs per panel as well, not just the lid.
+ *
+ * From the command line, -D overrides any of these:
+ *   openscad -D 'PART="lid"' -D 'PANEL="2.8"' -o lid-28.stl pueo-enclosure.scad
+ */
+PART      = "base";
+PANEL     = "3.5";
+EXT_CHARGER = false;
+INSERTS   = true;
+LOGO      = false;
+/* ═══════════════════════════════════════════════════ */
 
 /* ---------- envelope ---------- */
 /* ---- does your CYD charge its own battery? ----------------------------
  *
- * EXT_POWER = false   the board does it. 78 x 142.
- * EXT_POWER = true    it does not, so a TP4056 and an MT3608 ride inside
- *                     and the case grows to 85 x 170.
+ * EXT_CHARGER = false   the board does it. 84 x 142.
+ * EXT_CHARGER = true    it does not, so a TP4056 and an MT3608 ride inside
+ *                       and the case grows to 85 x 170.
+ *
+ * The name is about the CHARGER, not about where the power comes from.
+ * Running the thing off a USB lead is the ordinary case and needs no flag:
+ * the lid opening is cut either way. This one asks whether a charging
+ * circuit has to be carried in the case because the board lacks one.
+ *
+ * On the reference 3.5" it does not. Adding a TP4056 there buys nothing,
+ * because the FM5324GA described below already is one.
  *
  * The reference board -- Sunton ESP32-3248S035R -- carries an FM5324GA
  * beside its BAT1 connector, with a 2.2 uH inductor next to it. That part
@@ -50,9 +89,9 @@
  * list gives the 2.8" ESP32-2432S028R a battery connector too, so it very
  * likely has the same arrangement -- but nobody here has looked at what is
  * behind it. lcdwiki's boards are unknown. If yours has no BAT1, or has one
- * with no charger behind it, set EXT_POWER = true.
+ * with no charger behind it, set EXT_CHARGER = true.
  *
- * [VERIFY] with EXT_POWER = false the +3V3_RF buck has to take 5 V from
+ * [VERIFY] with EXT_CHARGER = false the +3V3_RF buck has to take 5 V from
  * somewhere, and the candidate is the 5V pin on P1. Nobody has confirmed
  * that pin is an output when the board is running from BAT1 rather than
  * from USB. Measure it before you rely on it.
@@ -61,7 +100,7 @@
  * making 5 V, it is about keeping the PA radios' current steps off
  * whatever feeds the display, and it is needed either way.
  */
-EXT_POWER = false;
+// EXT_CHARGER is set in BUILD OPTIONS at the top.
 
 /* Width is set by the corner bosses, not by the modules. The radios reach
  * x = -30.5 and 30, so a boss clearing CC1101 must sit at or left of -34.5
@@ -93,8 +132,8 @@ EXT_POWER = false;
  */
 BOSS_X   = 36;      // corner boss centres, small case
 BOSS_Y   = 66;
-W        = EXT_POWER ? 85 : 84;
-L        = EXT_POWER ? 170 : 142;
+W        = EXT_CHARGER ? 85 : 84;
+L        = EXT_CHARGER ? 170 : 142;
 H        = 20;      // outer height of the base
 WALL     = 2.5;
 FLOOR    = 4.0;     // general floor thickness
@@ -130,7 +169,7 @@ FILLET   = 3;       // outer corner radius
  * [VERIFY] measure your own inserts. 4.6 x 5.0 is the usual cheap kit but
  * they vary, and the hole wants to match the knurl, not the thread.
  */
-INSERTS   = true;
+// INSERTS is set in BUILD OPTIONS at the top.
 BOSS_R    = INSERTS ? 4.5 : 4.0;   // radius: 9.0 or 8.0 across
 BOSS_HOLE = INSERTS ? 2.1 : 1.5;   // radius: 4.2 for an insert, 3.0 for a screw
 BOSS_INSET = 6.0;
@@ -162,18 +201,23 @@ echo(str("room above the carrier = ", CARRIER_HEADROOM, " mm"));
 // micro-USB and USB-C on this revision; the opening is sized for the larger.
 /* Two different sockets, on two different parts.
  *
- * With EXT_POWER the jack is the TP4056's own micro-USB. That module sits in
+ * With EXT_CHARGER the jack is the TP4056's own micro-USB. That module sits in
  * the base, on its short end against the right wall, so the opening is a
  * rectangle through the base's long side and these three numbers place it.
  *
- * Without EXT_POWER there is no TP4056 and charging goes through the CYD's
+ * Without EXT_CHARGER there is no TP4056 and charging goes through the CYD's
  * own socket. The CYD is mounted in the LID, with its long axis down the
  * length of the case, so its sockets are at the short END. USB_Y was a
  * placeholder of 0 for this case and the opening it fed was on the base's
  * long side: the wrong wall of the wrong part, which is why it never lined
  * up with anything.
+ *
+ * The two are not alternatives. The lid opening is cut either way, because
+ * the CYD's socket is on the board either way and it is what you flash
+ * through. EXT_CHARGER only decides whether the BASE also gets a hole for a
+ * charger sitting next to it.
  */
-USB_W     = 11;     // EXT_POWER only: the TP4056 jack is ~8 wide
+USB_W     = 11;     // EXT_CHARGER only: the TP4056 jack is ~8 wide
 USB_HT    = 6;
 USB_Y     = -62;    // and where it sits along the base's right wall
 
@@ -243,7 +287,7 @@ MODULES_EXTERNAL = [
   [   0,  52,  16, 13, "ATGM336H GPS"   ]
 ];
 
-MODULES = EXT_POWER ? MODULES_EXTERNAL : MODULES_ONBOARD;
+MODULES = EXT_CHARGER ? MODULES_EXTERNAL : MODULES_ONBOARD;
 
 // Looked up by name so reordering MODULES cannot silently point the thin
 // floor at the wrong part.
@@ -316,7 +360,7 @@ module shell() {
 //
 // The 85 x 170 case keeps its original six: it is long enough that four
 // would leave too much unsupported bezel in the middle.
-BOSS_POS = EXT_POWER
+BOSS_POS = EXT_CHARGER
   ? [[-36.5,-79],[36.5,-79],[-36.5,24],[36.5,24],[-36.5,70],[36.5,70]]
   : [[-BOSS_X,-BOSS_Y],[BOSS_X,-BOSS_Y],[-BOSS_X,BOSS_Y],[BOSS_X,BOSS_Y]];
 module bosses() {
@@ -376,27 +420,26 @@ module penetrations() {
             rotate([90,0,0]) cylinder(h=4*WALL, r=SMA_D/2, center=true);
 
     // micro-USB, RIGHT wall, for the TP4056 that is only here with
-    // EXT_POWER. Z is anchored to the pocket floor, which is only right
+    // EXT_CHARGER. Z is anchored to the pocket floor, which is only right
     // while the modules sit on the floor -- see CARRIER note.
     //
-    // Without EXT_POWER the socket you plug into is the CYD's own, and that
+    // Without EXT_CHARGER the socket you plug into is the CYD's own, and that
     // is in the lid at the far end. See USB_LID_* and lid().
-    if (EXT_POWER)
+    if (EXT_CHARGER)
         translate([W/2, USB_Y, FLOOR - POCKET - 0.5 + USB_HT/2])
             cube([4*WALL, USB_W, USB_HT], center=true);
 
     // vents - bottom wall, clear of the USB cutout
-    for (x = EXT_POWER ? [-34,-28,-22,-16,-10,-4] : [-15,-9,-3,3,9,15])
+    for (x = EXT_CHARGER ? [-34,-28,-22,-16,-10,-4] : [-15,-9,-3,3,9,15])
         slot_Y(x, -L/2);
     // vents - left wall alongside the power zone
-    for (y = EXT_POWER ? [-76,-70,-64,-58,-52] : [-56,-50,-44,-38,-32])
+    for (y = EXT_CHARGER ? [-76,-70,-64,-58,-52] : [-56,-50,-44,-38,-32])
         slot_X(-W/2, y);
 }
 
 /* ---------- assembly ---------- */
-// "base", "lid", or "both". See the header. "both" is for viewing only:
+// PART is set in BUILD OPTIONS at the top. "both" is for viewing only:
 // it lays the two parts out side by side, which is not a printable STL.
-PART = "base";
 
 module base() {
     difference() {
@@ -438,8 +481,9 @@ LID_H     = 12;
  * other.
  *
  * Render with:  openscad -D PART=\"lid\" -D PANEL=\"2.8\" ...
+ *
+ * PANEL is set in BUILD OPTIONS at the top.
  */
-PANEL     = "3.5";
 
 /* 3.5" numbers are from QDtech's E32R35T outline drawing, V1.0 2024-08-14,
  * not from calipers. The PCB is 55.50 x 101.50 x 5.80 mm, corners R3.50,
@@ -665,7 +709,7 @@ BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the fa
  * wall. That band runs -82.5 to -46.25, and the screw pillars either side
  * are at x +/-36.5, which a ~29 mm wide logo on the centreline never reaches.
  */
-LOGO       = false;  // true puts the owl back in the chin
+// LOGO is set in BUILD OPTIONS at the top; true puts the owl in the chin.
 LOGO_H     = 30;     // artwork height in mm; see the note above before shrinking
 LOGO_DEPTH = 0.6;    // cut into a 2.5 mm skin, so 1.9 mm is left under it
 LOGO_Y     = (PANEL == "3.5") ? -65.5 : -64;   // centre of the chin band
@@ -1259,8 +1303,11 @@ module lid() {
         /* The CYD's own USB socket, through the end wall opposite the GPS
          * slot. Only when there is no TP4056 in the base to charge through
          * instead. Measured off a working print; see USB_LID_*. */
-        if (!EXT_POWER)
-            translate([USB_LID_X, -L/2, USB_LID_Z])
+        // Unconditional. EXT_CHARGER adds the TP4056's jack in the base, it
+        // does not take the CYD's socket off the board, and that socket is
+        // how the thing gets flashed. Gating this on the flag produced a
+        // case with no way in.
+        translate([USB_LID_X, -L/2, USB_LID_Z])
                 rotate([90, 0, 0])
                     cylinder(h = 4 * WALL, d = USB_LID_D, center = true);
 
