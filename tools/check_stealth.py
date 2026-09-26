@@ -113,6 +113,18 @@ TRANSMITTERS = [
     ("subghz.cpp",    "void saveSetup()",              "Saved Profile"),
 ]
 
+# The transmit paths that are not features and have no setup() to gate, so
+# they carry the check inside the function that does the transmitting and
+# report it to their caller instead of drawing the refusal screen. A caller
+# that forgets is then a caller that gets a refusal it has to display, rather
+# than a radio that keys.
+#
+#   (file, signature, the enum value it must return)
+GATED_CALLS = [
+    ("DeviceInfo.cpp",   "void read(", "Status::Refused"),
+    ("FastPairProbe.cpp", "void run(",  "Outcome::Refused"),
+]
+
 # Namespaces allowed to call esp_wifi_80211_tx, because each has a gated
 # setup() above. A new one here is a new transmitter that nothing refuses.
 TX_NAMESPACES = {
@@ -132,6 +144,24 @@ def main():
         ok("  and names itself",
            bool(body) and ('"%s"' % label) in body,
            "the refusal screen names some other feature")
+
+    print("\nthe transmit paths with no menu entry gate themselves:")
+    for fname, sig, refused in GATED_CALLS:
+        body = func_body(read(fname), sig)
+        ok("%-20s (%s)" % (sig.split("(")[0].split()[-1] + "()", fname),
+           bool(body) and "Stealth::on()" in body and refused in body,
+           "no body found for %r" % sig if not body
+           else "transmits with Stealth Mode on, or does not say it refused")
+        # A gate that runs after the connection is open is not a gate. The
+        # check is crude on purpose: the refusal has to come before anything
+        # that touches the radio.
+        if body:
+            gate = body.find("Stealth::on()")
+            radio = min([i for i in (body.find("createClient"),
+                                     body.find("NimBLEDevice::"),
+                                     len(body)) if i >= 0])
+            ok("  and refuses before it touches the radio", gate < radio,
+               "the gate is after the first radio call")
 
     print("\nRFID is gated once, where all of it is launched:")
     ino = (SKETCH / "ESP32-DIV.ino").read_text(encoding="utf-8", errors="replace")

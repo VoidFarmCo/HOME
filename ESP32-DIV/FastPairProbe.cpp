@@ -1,5 +1,7 @@
 #include "FastPairProbe.h"
 
+#include "Stealth.h"
+
 #include <string.h>
 
 #include "BleCompat.h"
@@ -72,6 +74,7 @@ const char* outcomeText(Outcome o) {
     case Outcome::NoResponse: return "no response";
     case Outcome::NoService:  return "no Fast Pair service";
     case Outcome::Failed:     return "probe failed";
+    case Outcome::Refused:    return "refused: stealth mode";
   }
   return "unknown";
 }
@@ -229,6 +232,18 @@ void run(const uint8_t addr[6], bool isPublic, uint16_t timeoutMs,
   }
   memset(out, 0, sizeof(*out));
   out->outcome = Outcome::Failed;
+
+  /* This writes to a characteristic, which is transmitting, so Stealth Mode
+   * has to stop it. Checked here rather than at the caller: the gate belongs
+   * on the function that does the transmitting, so a second caller cannot
+   * forget it. The scanner around this stays up, because the scan is passive
+   * and refusing the whole tool would be refusing the part that is quiet. */
+  if (Stealth::on()) {
+    out->outcome = Outcome::Refused;
+    say(out, "Settings > Stealth Mode");
+    return;
+  }
+
   say(out, "starting");
 
   const uint32_t startMs = millis();

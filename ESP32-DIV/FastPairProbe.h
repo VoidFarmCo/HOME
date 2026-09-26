@@ -110,6 +110,7 @@ enum class Outcome : uint8_t {
   NoResponse,    // nothing came back before the timeout -- see the header
   NoService,     // no 0xFE2C service or no Key-based Pairing characteristic
   Failed,        // could not connect, write, or set up crypto
+  Refused,       // Stealth Mode: this writes, so it is switched off
 };
 
 /** Everything one probe produced, for the UI and the log. */

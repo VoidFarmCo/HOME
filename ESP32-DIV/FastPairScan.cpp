@@ -3,6 +3,7 @@
 #include "BleCompat.h"
 #include "FastPair.h"
 #include "FastPairProbe.h"
+#include "Stealth.h"
 #include "config.h"
 #include "shared.h"
 #include "utils.h"
@@ -364,8 +365,19 @@ void drawConfirm() {
   }
 
   y += 6;
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.drawString("Right again to run.  Back to cancel.", 8, y);
+  /* Said before the confirm rather than after it. The probe refuses under
+   * stealth either way, but a device that takes the confirmation and then
+   * says no looks broken. */
+  if (Stealth::on()) {
+    tft.setTextColor(UI_WARN, TFT_BLACK);
+    tft.drawString("Stealth Mode is on: this will not run.", 8, y);
+    y += PUEO_BODY_LINE;
+    tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+    tft.drawString("Settings > Stealth Mode.  Back to cancel.", 8, y);
+  } else {
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.drawString("Right again to run.  Back to cancel.", 8, y);
+  }
 }
 
 void drawRunning() {
@@ -403,6 +415,8 @@ void drawResult() {
     c = TFT_RED;
   } else if (s_report.outcome == FastPairProbe::Outcome::NoResponse) {
     c = TFT_GREEN;
+  } else if (s_report.outcome == FastPairProbe::Outcome::Refused) {
+    c = UI_WARN;
   }
   tft.setTextColor(c, TFT_BLACK);
   tft.drawString(FastPairProbe::outcomeText(s_report.outcome), 8, y);
