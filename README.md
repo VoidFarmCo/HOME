@@ -160,11 +160,32 @@ device had never looked at, plus a probe for CVE-2025-36911. The probe is
 the one feature here that transmits at a single named target, and it sits
 behind a confirm screen that names the address.
 
+### Additions to tools that were already there
+
+**BLE Scanner** reads its detail view rather than dumping it. Appearance is
+decoded to a category and subcategory instead of a number, service UUIDs are
+named where the SIG assigned them, and **Info** connects to the device on
+screen and reads its Device Information Service: manufacturer, model, serial,
+and the firmware, hardware and software revision strings.
+
+That read is the only thing in the scanner that transmits. One device, chosen
+by the operator, reads only, nothing outside `0x180A`, and refused under
+Stealth Mode. What it is for is the question an advertisement never answers:
+not what a device is, but which build it is running, which is the question
+underneath whether something has been patched.
+
+**Beacon Spammer** takes its network names from `/ssids.txt` on the card when
+there is one, and falls back to the list built into the firmware, which is
+the same in every copy. The screen says which list it loaded.
+
 ### Three settings the device did not have
 
 **Stealth Mode** makes it receive only across the whole device. Nineteen
 features that transmit refuse to start and say so; scans that were quietly
-active, and there were twelve, are made passive instead of blocked.
+active, and there were twelve, are made passive instead of blocked. Two
+transmit paths have no menu entry to gate, the Fast Pair probe and the BLE
+scanner's Info read, so the check sits inside the function that would
+transmit and hands the refusal back to whatever called it.
 
 **SD Logging** is a master switch plus one per feature, and a feature says
 in its own words when it cannot log rather than failing quietly.

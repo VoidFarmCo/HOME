@@ -106,6 +106,23 @@ Spoofer**, **AirTag Sniffer**, **Sniffer**.
 Page two: **BLE Scanner**, **BLE Rubber Ducky**, **Skimmer Detect**,
 **Hunt**, **Fast Pair**.
 
+**BLE Scanner** lists what is advertising. Open a row for the detail view:
+address, signal, the manufacturer data, what the appearance field says the
+device claims to be, and the services it advertises, named where they are
+standard ones.
+
+**Info** in the detail view connects to that one device and reads its Device
+Information Service, which is where a device publishes its manufacturer,
+model, serial number and its firmware, hardware and software versions. It is
+the only thing in the scanner that transmits, it connects to the device you
+have open and nothing else, and it only reads. Not every device publishes
+one; when there is none you are told that, separately from a device that
+would not accept the connection at all.
+
+Use it when you want the version rather than the name. An advertisement says
+what something is, never which build it is running, and which build is the
+question behind whether it has been patched.
+
 **Hunt** is the Bluetooth equivalent of AP Tracker: choose a device and walk
 the gauge. **Skimmer Detect** looks for the BLE signatures card skimmers are
 known to advertise.
@@ -258,6 +275,15 @@ Nineteen tools, and with them the whole **RFID/NFC** menu. A PN532 reads a
 card by energising a field and waiting for the card to answer, so even
 **Card Reader** transmits; stealth gates that menu as one rather than entry
 by entry, and nothing in it opens.
+
+Two more things transmit without being tools in their own right, and both
+refuse where they stand rather than closing what they sit inside:
+
+- **Fast Pair**, the **Probe** button. The scan is passive and keeps
+  running; the probe writes to the device and does not. The confirm screen
+  says so before you confirm.
+- **BLE Scanner**, the **Info** button. Reading the Device Information
+  Service means opening a connection.
 
 Everything else stays available, which is most of the passive side: the
 scanners, the detectors, Surveillance, the drone detector and wardriving.

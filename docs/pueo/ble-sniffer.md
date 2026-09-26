@@ -112,11 +112,14 @@ Neither name says, so:
 |---|---|---|
 | scan | continuous | one shot, 5 s, rescan on demand |
 | output | scrolling event log | paged list, then a per-device detail view |
-| detail | none | name, MAC, RSSI, TX power, service UUID, manufacturer and service data |
+| detail | none | name, MAC, RSSI, TX power, appearance, service UUIDs named where standard, manufacturer and service data |
 | alerts | two, both unreliable | none |
+| transmits | never | only **Info**, on the one device you have open |
 | Classic | dead code for it | none attempted |
 
-Scanner is the one to reach for when the question is "what is that device".
+Scanner is the one to reach for when the question is "what is that device",
+and its **Info** button for "which build is it running", which it answers by
+connecting to that device and reading its Device Information Service.
 Sniffer is for watching arrivals and departures over time, provided the two
 alerts are read as noise.
 

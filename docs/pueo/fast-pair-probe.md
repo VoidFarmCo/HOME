@@ -47,7 +47,7 @@ did not happen, or happened against a key the Seeker controls.
 
 ## Reading a result
 
-Four outcomes, and the two interesting ones are both weaker than they look.
+Five outcomes, and the two interesting ones are both weaker than they look.
 
 **Responded.** It answered a handshake it could not have validated. That is
 the finding. The screen distinguishes three grades: the notification
@@ -72,6 +72,15 @@ service, or no Key-based Pairing characteristic. Nothing was tested.
 
 **Probe failed** — could not connect, the write was rejected, or the crypto
 would not set up. Nothing was tested.
+
+**Refused: stealth mode.** The probe writes, so Stealth Mode stops it.
+Nothing was transmitted and nothing was tested. The check is inside
+`FastPairProbe::run()` rather than at the button, so the gate is on the
+function that does the transmitting and a second caller cannot miss it; the
+confirm screen also says so before you confirm, because a device that takes
+a deliberate second keypress and then declines looks broken. The scan around
+it keeps running: it is passive, and refusing it would be refusing the part
+that is already quiet.
 
 ## What it does not do
 
