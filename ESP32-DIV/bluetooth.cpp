@@ -1,3 +1,4 @@
+#include "DeviceInfo.h"
 #include "Stealth.h"
 #include "SettingsStore.h"
 #include "Touchscreen.h"
@@ -4367,6 +4368,103 @@ static const char* bleServiceName(uint16_t uuid) {
   }
 }
 
+/* Connect to the device currently shown and read its Device Information
+ * Service.
+ *
+ * This is the one thing in the BLE scanner that transmits. It is behind the
+ * detail view, so reaching it means the operator picked a device out of a
+ * list and opened it, and it names the address on screen before it starts.
+ * Nothing here sweeps: one device, one connection, reads only.
+ *
+ * What it answers is "which build is this", which an advertisement never
+ * says. A vendor that bumps a revision string with a fix makes patch status
+ * readable from the device rather than from a support desk. */
+static void showDeviceInfo() {
+  const int deviceCount = bleResults.getCount();
+  if (deviceCount == 0 || currentIndex >= deviceCount) {
+    return;
+  }
+  BLEAdvertisedDevice device = bleResults.getDevice(currentIndex);
+  NimBLEAddress a = device.getAddress();
+  const String addrStr = a.toString().c_str();
+
+  /* Written order, AA:BB:CC:DD:EE:FF. NimBLEAddress stores little-endian
+   * and getNative() hands back that order, so this reverses it to match
+   * what DeviceInfo::read documents taking. Getting it backwards would
+   * connect to a different address and time out, and a timeout looks
+   * exactly like a device that will not talk. */
+  const uint8_t* native = a.getNative();
+  uint8_t addr[6];
+  for (int i = 0; i < 6; i++) {
+    addr[i] = native[5 - i];
+  }
+  const bool isPublic = (a.getType() == BLE_ADDR_PUBLIC);
+
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(UI_TEXT, TFT_BLACK);
+  tft.setTextSize(1);
+  int y = 50;
+  tft.setCursor(10, y);
+  tft.print("Reading " + addrStr);
+  y += 20;
+  tft.setCursor(10, y);
+  tft.setTextColor(UI_ICON, TFT_BLACK);
+  tft.print("connecting...");
+
+  DeviceInfo::Result info;
+  DeviceInfo::read(addr, isPublic, info);
+
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(UI_TEXT, TFT_BLACK);
+  y = 50;
+  tft.setCursor(10, y);
+  tft.print("Device Info: " + addrStr);
+
+  auto line = [&](const char* label, const String& v) {
+    if (v.length() == 0) {
+      return;
+    }
+    y += 20;
+    tft.setCursor(10, y);
+    tft.print(String(label) + ": " + v);
+  };
+
+  if (info.status == DeviceInfo::Status::Ok) {
+    line("Manufacturer", info.manufacturer);
+    line("Model", info.model);
+    line("Serial", info.serial);
+    line("Firmware", info.firmware);
+    line("Hardware", info.hardware);
+    line("Software", info.software);
+    if (info.found == 0) {
+      y += 20;
+      tft.setCursor(10, y);
+      tft.setTextColor(UI_WARN, TFT_BLACK);
+      tft.print("0x180A present but every field empty");
+    }
+  } else {
+    y += 20;
+    tft.setCursor(10, y);
+    tft.setTextColor(UI_WARN, TFT_BLACK);
+    tft.print(DeviceInfo::statusText(info.status));
+  }
+
+  drawTabBar("Rescan", false, "", true, "Back", false);
+
+  /* Modal. The read took a connection and a few seconds, and dropping
+   * straight back to the detail screen would put the answer on screen for
+   * one frame. */
+  delay(250);
+  for (;;) {
+    int tx, ty;
+    if (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT) ||
+        readTouchXY(tx, ty)) {
+      break;
+    }
+    delay(20);
+  }
+}
+
 void displayBLEDetails() {
 
   bleScanClearBody();
@@ -4459,7 +4557,7 @@ void displayBLEDetails() {
     tft.print("No Service Data");
   }
 
-  drawTabBar("Rescan", false, "", true, "Back", false);
+  drawTabBar("Rescan", false, "Info", false, "Back", false);
 }
 
 void runUI() {
@@ -4541,6 +4639,16 @@ void runUI() {
             drawButton(0, 304, 57, 16, "Rescan", true, false);
             delay(50);
             startBLEScan();
+            lastTouchActionMs = nowMs;
+          } else if (x >= 117 && x <= 179 && isDetailView) {
+            /* Connect to the one device on screen and read its Device
+             * Information Service. Only reachable from the detail view,
+             * which means the operator has already picked this device out
+             * of a list and looked at it. */
+            drawButton(117, 304, 57, 16, "Info", true, false);
+            showDeviceInfo();
+            screenNeedsUpdate = true;
+            fullScreenUpdate = true;
             lastTouchActionMs = nowMs;
           } else if (x >= 117 && x <= 179 && !isDetailView && !prevDisabled) {
             drawButton(117, 304, 57, 16, "Prev", true, false);
