@@ -1,5 +1,7 @@
 # Pueo
 
+*Pueo* is the Hawaiian owl, a low, silent flier that hunts by listening.
+
 **A handheld multi-radio field tool.** Open-source firmware for the
 "cheap yellow display" — a touchscreen ESP32 carrying a CC1101 for sub-GHz,
 an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and an ATGM336H for GPS, in
@@ -236,5 +238,3 @@ upstream, and the notice travels with any redistribution of this tree.
 **[CiferTech](https://github.com/cifertech)** wrote ESP32-DIV, which is
 almost all of this. Support the original project:
 [patreon.com/cifertech](https://www.patreon.com/cifertech).
-
-*Pueo* is the Hawaiian owl — a low, silent flier that hunts by listening.
