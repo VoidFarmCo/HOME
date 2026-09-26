@@ -359,6 +359,27 @@ static const BleSig kBleSigs[] = {
    * matches one value at a time, so these are the three that are actually
    * named as carrying data. They are 16-bit UUIDs outside the SIG-assigned
    * space, where any vendor may collide, hence Weak. */
+  /* Flipper Zero's BLE serial profile advertises 0x3080 with the case
+   * colour OR'd into the low nibble. From their own firmware,
+   * targets/f7/ble_glue/profiles/serial_profile.c:
+   *
+   *     .Service_UUID_16 = 0x3080,
+   *     config->adv_service.Service_UUID_16 |= furi_hal_version_get_hw_color();
+   *
+   * Four lines rather than a mask, because BleSig matches exact values and
+   * adding a mask field for one signature is not worth it. The cost is that
+   * a colour Flipper ships later needs a line here; the low nibble is the
+   * only thing that varies.
+   *
+   * Likely rather than Strong. This is the unallocated 16-bit space, which
+   * nothing stops another vendor using, and 0C:FA:22 already covers a
+   * Flipper whose BLE address is public. What these add is the case where it
+   * is not, and corroboration promotes them when both fire. */
+  {0x0000, 0x3080, Kind::Pentest, Conf::Likely, "Flipper Zero"},
+  {0x0000, 0x3081, Kind::Pentest, Conf::Likely, "Flipper Zero (black)"},
+  {0x0000, 0x3082, Kind::Pentest, Conf::Likely, "Flipper Zero (white)"},
+  {0x0000, 0x3083, Kind::Pentest, Conf::Likely, "Flipper Zero (clear)"},
+
   {0x0000, 0x3100, Kind::Alpr, Conf::Weak, "Raven GATT 3100"},
   {0x0000, 0x3101, Kind::Alpr, Conf::Weak, "Raven GATT 3101"},
   {0x0000, 0x3102, Kind::Alpr, Conf::Weak, "Raven GATT 3102"},
