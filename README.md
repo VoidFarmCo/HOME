@@ -252,7 +252,9 @@ Mostly the parts that decide whether the hardware works at all:
 - **Warnings** — `-w` and `-zmuldefs` removed from the build, and the
   underlying issues fixed rather than silenced
 
-And the ones that were giving wrong answers rather than crashing:
+And the ones that were giving wrong answers rather than crashing. Where a
+fix applies to upstream too it has been sent back, and the pull request is
+linked; the rest are CYD-specific or were already covered there.
 
 - **GPS** — NMEA sentences are checked against their own checksum before
   anything parses them. `stripChecksum()` truncated at the `*` and threw the
@@ -267,14 +269,24 @@ And the ones that were giving wrong answers rather than crashing:
   look like a version once. Before this the sub-GHz tools started against a
   radio that was not there and hung. All five features that use the radio go
   through the guard: Replay Attack, Sub-GHz Jammer, Sub-GHz Brute, Jamming
-  Detector and Saved Profiles.
+  Detector and Saved Profiles. Sent upstream as
+  [#257](https://github.com/cifertech/ESP32-DIV/pull/257).
 - **Scratch AP** — the interface the WiFi tools raise to push raw frames had
   a fixed WPA2 passphrase written into the source, so every unit running
   this brought up a visible network with a published key. It is hidden and
-  open now and carries no key at all.
+  open now and carries no key at all. Sent upstream as
+  [#258](https://github.com/cifertech/ESP32-DIV/pull/258).
 - **BLE spoofers** — the random MAC each round generated was never applied
   to the adapter, so Sour Apple and the spoofer transmitted from the same
-  address every time.
+  address every time. Not sent: upstream already had a patch for it.
+- **Sub-GHz jammer** — leaving the jammer while it was running did not stop
+  it transmitting. `jammingRunning` was only ever cleared by the toggle, so
+  backing out of the feature left the radio keyed. Sent upstream as
+  [#255](https://github.com/cifertech/ESP32-DIV/pull/255).
+- **Menu tables** — a checker that the parallel label and icon arrays are
+  fully initialised. They are walked by the same index, so a short icon
+  table is a null pointer dereference at a menu position nobody visits in
+  testing. Sent upstream as [#256](https://github.com/cifertech/ESP32-DIV/pull/256).
 
 ## License
 
