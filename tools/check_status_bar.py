@@ -6,7 +6,7 @@ status bar -- a survey of the drawing calls finds 74 with a literal y between
 20 and 48, eleven of them at exactly 20. Those screens cannot give the bar a
 single extra pixel without something being painted over.
 
-The menu grids can: their first tile is at Y_START, which on the 3.5" panel is
+The menu grids can: their first tile is at Y_START, which is
 44, leaving 24 px of bar-coloured nothing. So the height is shared state set
 by whichever function paints the screen, and the failure mode is a screen that
 forgets to declare one and inherits a tall bar over its own toolbar.
@@ -36,24 +36,14 @@ def ok(name, cond, detail=""):
         FAILED.append(name)
 
 
-def heights(panel35):
-    """The two heights as the preprocessor would see them."""
+def heights():
+    """The two bar heights, read rather than assumed."""
     src = (SKETCH / "shared.h").read_text(encoding="utf-8", errors="replace")
     short = re.search(r"#define\s+PUEO_STATUS_SHORT\s+(\d+)", src)
-    if not short:
+    tall = re.search(r"#define\s+PUEO_STATUS_TALL\s+(\d+)", src)
+    if not short or not tall:
         return None, None
-    short = int(short.group(1))
-    # #if PUEO_PANEL_35 / #define PUEO_STATUS_TALL n / #else / ... / #endif
-    m = re.search(r"#define\s+PUEO_STATUS_SHORT\s+\d+\s*\n"
-                  r"#if\s+PUEO_PANEL_35\s*\n"
-                  r"#define\s+PUEO_STATUS_TALL\s+(\d+)\s*\n"
-                  r"#else\s*\n"
-                  r"#define\s+PUEO_STATUS_TALL\s+(\w+)\s*\n"
-                  r"#endif", src)
-    if not m:
-        return short, None
-    tall = m.group(1) if panel35 else m.group(2)
-    return short, (int(tall) if tall.isdigit() else short)
+    return int(short.group(1)), int(tall.group(1))
 
 
 def functions(src):
@@ -80,21 +70,20 @@ def main():
     fns = functions(ino)
 
     print("the two heights:")
-    s28, t28 = heights(False)
-    s35, t35 = heights(True)
+    short, tall = heights()
     ok("shared.h defines PUEO_STATUS_SHORT and PUEO_STATUS_TALL",
-       s35 is not None and t35 is not None)
-    if s35 is None or t35 is None:
+       short is not None and tall is not None)
+    if short is None or tall is None:
         print("\nFAILED: %d of %d" % (len(FAILED) or 1, CHECKS))
         return 1
-    ok('the 2.8" has one height, so its layout cannot move', t28 == s28,
-       "SHORT=%s TALL=%s" % (s28, t28))
-    ok('the 3.5" tall bar is actually taller', t35 > s35,
+    s35, t35 = short, tall
+    ok("the tall bar is actually taller", t35 > s35,
        "SHORT=%s TALL=%s" % (s35, t35))
 
-    # The short bar's geometry is load-bearing: the 2.8" image is verified by
-    # rebuilding it and getting the same code back, which only holds while the
-    # centring reduces to the constants it replaced.
+    # The short bar's geometry is load-bearing: these two identities are what
+    # let the tall bar be introduced without moving anything drawn under a
+    # short one, and they only hold while the centring reduces to the
+    # constants it replaced.
     ok("centring the build string is an identity on the short bar",
        (s35 - 8) // 2 == 6, "(%d - 8) / 2 = %d, was y + 2 = 6" % (s35, (s35 - 8) // 2))
     ok("centring the battery block is an identity on the short bar",
@@ -126,15 +115,9 @@ def main():
     draw = re.compile(r"\.\w+\(\s*(?:[^,()]+|\([^()]*\))\s*,\s*(\d+)\s*[,)]")
     # `int yPos = 30 + ...`, `const int y = 44;`, `yTop = Y_START`
     origin = re.compile(r"\b\w*[yY]\w*\s*=\s*(\d+|[A-Z_][A-Z_0-9]*)\b")
-    # Panel-dependent constants appear twice, once per branch of
-    # `#if TFT_WIDTH >= 320`. Read the 3.5" branch first: it is the panel with
-    # a tall bar, and taking the other one resolves Y_START to 30 and
-    # condemns the very layout this exists to bless.
     consts = {}
-    b35 = re.search(r"#if TFT_WIDTH >= 320(.*?)#else", ino, re.S)
-    for src in ([b35.group(1)] if b35 else []) + [ino]:
-        for m in re.finditer(r"\b([A-Z_][A-Z_0-9]*)\s*=\s*(\d+)\s*;", src):
-            consts.setdefault(m.group(1), int(m.group(2)))
+    for m in re.finditer(r"\b([A-Z_][A-Z_0-9]*)\s*=\s*(\d+)\s*;", ino):
+        consts.setdefault(m.group(1), int(m.group(2)))
 
     tall_fns = [n for n, b in fns.items() if "PUEO_STATUS_TALL" in b]
     ok("something actually asks for the tall bar", bool(tall_fns), str(tall_fns))
@@ -156,10 +139,11 @@ def main():
        "displayPagedSubmenu" in short_fns, str(sorted(short_fns)))
 
     # The tiles themselves are placed from Y_START, not a literal, so they are
-    # checked against the constant rather than by the sweep above.
-    m = re.search(r"#if TFT_WIDTH >= 320(.*?)#else", ino, re.S)
-    y_start = int(re.search(r"Y_START\s*=\s*(\d+)", m.group(1)).group(1)) if m else None
-    ok("the 3.5\" tile row clears the tall bar",
+    # checked against the constant rather than by the sweep above. This is the
+    # check that says the tall bar is affordable at all: it buys its 14 px out
+    # of the gap above the first tile, and Y_START is where that gap ends.
+    y_start = consts.get("Y_START")
+    ok("the tile row clears the tall bar",
        y_start is not None and y_start >= t35,
        "Y_START=%s TALL=%s" % (y_start, t35))
     print("\nthe height reaches the bar:")

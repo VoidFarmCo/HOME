@@ -172,14 +172,10 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 
 /* Bring-up 2026-09-20: the board in hand is a 3.5" ESP32-3248S035R
  * (ST7796, 320x480, XPT2046 on the display's own SPI bus), not the 2.8"
- * ESP32-2432S028R this profile was written for. Everything the two boards
- * disagree about is gathered here.
- * TODO: make this a real board profile rather than a hand-set define. */
-#ifndef PUEO_PANEL_35
-#define PUEO_PANEL_35 1
-#endif
+ * ESP32-2432S028R this profile was written for. Everything the upstream
+ * profile gets wrong about it is gathered here.
+ * TODO: make this a real board profile rather than a pile of overrides. */
 
-#if PUEO_PANEL_35
 /* From the on-device calibrator, four crosshairs at the 20 px inset,
  * extrapolated out to the screen edges. Both axes run backwards on this
  * panel -- raw falls as the screen coordinate rises -- and that is carried
@@ -194,7 +190,6 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define TOUCH_Y_MAX 274    /* raw at screen y = 479 */
 #define TOUCH_INVERT_Y 0   /* direction lives in the values above */
 #define TOUCH_ROTATION 1   /* measured: rotation 0 transposed the axes */
-#endif
 
 #ifndef TOUCH_INVERT_Y
 #define TOUCH_INVERT_Y 0
@@ -284,15 +279,11 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  * 2026-09-20 read rails (x=4095 y=0 z=4095, unchanging under a press) on the
  * 25/32/39 trio, which is what an absent device looks like.
  *
- * It follows the panel now. Set by hand it was 1 for both boards, so the
- * 2.8" build drove touch through the display's bus, where its controller
- * is not -- and the only symptom would have been a panel that never
- * reports a press. */
-#if PUEO_PANEL_35
+ * This panel's XPT2046 hangs off the display's SPI behind TOUCH_CS, so it
+ * is 1 here. It was a hand-set 1 for both panels once, which was wrong on
+ * the other one, and the only symptom would have been a screen that never
+ * reported a press. */
 #define TOUCH_SHARES_TFT_SPI 1
-#else
-#define TOUCH_SHARES_TFT_SPI 0
-#endif
 #endif
 
 #if defined(BOARD_CYD)
@@ -717,16 +708,9 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  *
  * Deliberately not TFT_eSPI's TFT_WIDTH/TFT_HEIGHT: those are only correct
  * once TFT_eSPI.h has been included, and several of these screens compute
- * layout in headers that do not include it. These follow PUEO_PANEL_35
- * directly, which is also what User_Setup branches on, so the two cannot
- * disagree. */
-#if PUEO_PANEL_35
+ * layout in headers that do not include it. */
 #define PUEO_SCREEN_W 320
 #define PUEO_SCREEN_H 480
-#else
-#define PUEO_SCREEN_W 240
-#define PUEO_SCREEN_H 320
-#endif
 
 /* The status bar has two heights, and which one is showing is a property of
  * the screen under it rather than of the build.
@@ -736,32 +720,21 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  * eleven of those at exactly 20. Those screens cannot give the bar another
  * pixel without something being painted over.
  *
- * The menu grid is the exception. Its first tile is at Y_START, which on the
- * 3.5" panel is 44, so there are 24 px of bar-coloured nothing between the
- * bar and the tiles. That is the space this spends, and it spends it without
- * moving a tile.
- *
- * TALL is the same as SHORT on the 2.8", whose Y_START is 30 and which has
- * no room to give. That panel is built every release and has never been
- * booted; leaving its layout alone is also what lets the change be checked
- * by rebuilding its image and getting the same bytes back. */
-/* Menu tile icon size. A 16 px icon on the 3.5"'s 145x92 tile looks like
- * what it is -- a leftover from the 240x320 layout the tiles grew out of.
- * 32 fills it. The 2.8" tile is 100x60 and a 32 px icon plus a 16 px label
- * leaves four pixels of tile, so that panel keeps 16 and its grid does not
- * move. The icons are 16x16 bitmaps either way; 32 is the 16 doubled. */
+ * The menu grid is the exception. Its first tile is at Y_START, which is 44,
+ * so there are 24 px of bar-coloured nothing between the bar and the tiles.
+ * That is the space this spends, and it spends it without moving a tile. */
+/* Menu tile icon size. A 16 px icon on a 145x92 tile looks like what it is,
+ * a leftover from the 240x320 layout the tiles grew out of. 32 fills it.
+ * The icons are 16x16 bitmaps; 32 is the 16 doubled. */
 /* Body text on the list screens.
  *
- * The 3.5" panel is the denser of the two, not the looser: 577 px across a
- * 3.5 inch diagonal is 165 ppi against the 2.8"'s 143. So the same glyph in
- * the same number of pixels comes out 13% SMALLER on the bigger screen --
- * font 1 at size 1 is a 1.23 mm cap height there, about three and a half
- * point.
+ * This panel is dense rather than roomy: 577 px across a 3.5 inch diagonal
+ * is 165 ppi, so a glyph in a given number of pixels is physically small.
+ * Font 1 at size 1 is a 1.23 mm cap height, about three and a half point.
  *
- * What the extra pixels bought instead was rows. Surveillance showed
- * thirteen of them on the 3.5" against eight on the 2.8", all of it text you
- * cannot read at arm's length. Eight rows you can read is the better trade,
- * and eight is what the other panel shows anyway.
+ * What the pixels bought was rows, not legibility. Surveillance showed
+ * thirteen of them at that size, all of it text you cannot read at arm's
+ * length. Eight rows you can read is the better trade.
  *
  * Font 2 rather than font 1 at size 2: it is proportional, so it fits about
  * 40% more characters on a line, and these screens are mostly MAC addresses
@@ -770,32 +743,16 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
  * The drone detector deliberately does NOT use this. Four lines per aircraft
  * at this size takes it from ten rows to five against a six-aircraft table,
  * and there the count is the information. */
-#if PUEO_PANEL_35
 #define PUEO_BODY_FONT 2
 #define PUEO_BODY_H    16
 #define PUEO_BODY_LINE 18   /* pitch between consecutive lines */
 #define PUEO_BODY_GAP  20   /* pitch across a break between blocks */
 #define PUEO_BODY_SIZE 2    /* for drawString's size argument, font 1 */
-#else
-#define PUEO_BODY_FONT 1
-#define PUEO_BODY_H    10
-#define PUEO_BODY_LINE 11
-#define PUEO_BODY_GAP  16
-#define PUEO_BODY_SIZE 1
-#endif
 
-#if PUEO_PANEL_35
 #define PUEO_TILE_ICON 32
-#else
-#define PUEO_TILE_ICON 16
-#endif
 
 #define PUEO_STATUS_SHORT 20
-#if PUEO_PANEL_35
 #define PUEO_STATUS_TALL  34
-#else
-#define PUEO_STATUS_TALL  PUEO_STATUS_SHORT
-#endif
 
 #ifndef TFT_WIDTH
 #define TFT_WIDTH PUEO_SCREEN_W

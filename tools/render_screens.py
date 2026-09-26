@@ -65,48 +65,48 @@ PANEL = 35
 W, H = 320, 480
 
 
-def set_panel(panel):
-    """Resize the canvas and the layout to one of the two panels."""
+def set_panel(panel=35):
+    """The layout, in one place, matching shared.h.
+
+    Kept as a function rather than inlined because check_render_sync.py reads
+    it: it compares every constant here against the C the screens are drawn
+    from, and a renderer that has drifted draws a screen nobody will ever
+    see. It took a panel argument when this tree built two; there is one now,
+    and the argument is retained only so the signature does not have to be
+    chased through the callers.
+    """
     global PANEL, W, H
     global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
     global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL, TILE_ICON
     global BODY_FONT, BODY_LINE, BODY_LINE3, BODY_ROW, BODY_SIZE
-    PANEL = panel
-    W, H = (320, 480) if panel == 35 else (240, 320)
-    if panel == 35:
-        TILE_W, TILE_H, COLUMN_WIDTH = 145, 92, 155
-        Y_START, Y_SPACING = 44, 106
-        # icon(32) + 6 gap + label(16) = 54, centred in a 92 px tile
-        TILE_ICON_DY, TILE_TEXT_DY = 19, 57
-    else:
-        TILE_W, TILE_H, COLUMN_WIDTH = 100, 60, 120
-        Y_START, Y_SPACING = 30, 75
-        TILE_ICON_DY, TILE_TEXT_DY = 10, 30
+    PANEL = 35
+    W, H = 320, 480
+    TILE_W, TILE_H, COLUMN_WIDTH = 145, 92, 155
+    Y_START, Y_SPACING = 44, 106
+    # icon(32) + 6 gap + label(16) = 54, centred in a 92 px tile
+    TILE_ICON_DY, TILE_TEXT_DY = 19, 57
     X_OFFSET_RIGHT = X_OFFSET_LEFT + COLUMN_WIDTH
     # drawStatusBar()'s right-hand cluster: BLE icon, count, wifi bars, temp,
     # SD, plus gaps and a 4 px margin. Anchored to the right edge.
     STATUS_ICONS_W = 110
-    # PUEO_STATUS_TALL in shared.h: the menu grids get a taller bar on the
-    # 3.5", whose Y_START is 44. The 2.8"'s is 30 and has no room.
-    STATUS_TALL = 34 if panel == 35 else 20
-    # PUEO_BODY_FONT / PUEO_BODY_H in shared.h. The 3.5" is the denser
-    # panel, so identical pixels are smaller text on it; the list screens
-    # use font 2 there. The drone detector deliberately does not.
-    BODY_FONT = 2 if panel == 35 else 1
-    BODY_LINE = 18 if panel == 35 else 11
-    # kLine3 in Spotter.cpp and FastPairScan.cpp, not 2 * BODY_LINE: the
-    # 2.8" row is 30 px and two 11 px pitches under a 10 px glyph would
-    # spill into the next one, so its third line is compressed by a pixel.
-    BODY_LINE3 = 36 if panel == 35 else 21
-    BODY_ROW = 54 if panel == 35 else 30
+    # PUEO_STATUS_TALL in shared.h. The menu grids get the taller bar; their
+    # Y_START is 44, so it costs no tile.
+    STATUS_TALL = 34
+    # PUEO_BODY_FONT / PUEO_BODY_H in shared.h. This panel is dense, so the
+    # list screens use font 2. The drone detector deliberately does not.
+    BODY_FONT = 2
+    BODY_LINE = 18
+    # kLine3 in Spotter.cpp and FastPairScan.cpp, not 2 * BODY_LINE.
+    BODY_LINE3 = 36
+    BODY_ROW = 54
     # PUEO_BODY_SIZE: font 1 scaled, for the places that draw centred text
     # rather than a line. The gauge's distance readout is one of them.
-    BODY_SIZE = 2 if panel == 35 else 1
+    BODY_SIZE = 2
     global HUNT_ROW_H, HUNT_ROW_LINE2
-    HUNT_ROW_H = 40 if panel == 35 else 22
-    HUNT_ROW_LINE2 = 20 if panel == 35 else 12
-    # PUEO_TILE_ICON in shared.h. The 2.8" tile is 100x60 and has no room.
-    TILE_ICON = 32 if panel == 35 else 16
+    HUNT_ROW_H = 40
+    HUNT_ROW_LINE2 = 20
+    # PUEO_TILE_ICON in shared.h.
+    TILE_ICON = 32
 
 
 X_OFFSET_LEFT = 10
@@ -850,7 +850,7 @@ HUNT_TARGETS = [
      "rssi": -89, "age": 14},
 ]
 
-HUNT_ROW_H = 22   # set_panel() overrides for the 3.5"
+HUNT_ROW_H = 40   # set_panel() is the authority; see it for the rest
 HUNT_SEL_BG = rgb(0x2124)
 
 
@@ -1047,8 +1047,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(REPO, "render"))
     ap.add_argument("--scale", type=int, default=3)
-    ap.add_argument("--panel", type=int, choices=(28, 35), default=35,
-                    help="which CYD panel to draw for (default: 35)")
+    ap.add_argument("--panel", type=int, choices=(35,), default=35,
+                    help="kept so old invocations still parse; 35 is the "
+                         "only panel")
     args = ap.parse_args()
     set_panel(args.panel)
 

@@ -24,15 +24,9 @@ constexpr uint32_t kRedrawMs     = 400;
 /* Three lines to a row. The 2.8" numbers are the originals, kept exactly:
  * that panel has never been booted and this is not the change to start
  * moving it with. */
-#if PUEO_PANEL_35
 constexpr int      kRowH         = 54;
 constexpr int      kLine2        = 18;   /* second line, from the row top */
 constexpr int      kLine3        = 36;
-#else
-constexpr int      kRowH         = 30;
-constexpr int      kLine2        = 11;
-constexpr int      kLine3        = 21;
-#endif
 
 /* ── dwell ────────────────────────────────────────────────────────────────
  *

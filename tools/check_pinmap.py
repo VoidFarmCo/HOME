@@ -38,21 +38,20 @@ TFT_ROLES = {
 }
 
 
-def read_user_setup(panel):
-    """Display pins from User_Setup, as the given panel's build sees them.
+def read_user_setup():
+    """Display pins from User_Setup, as the build sees them.
 
     Run through the same Pre() as the sketch headers rather than scanned line
-    by line. User_Setup now branches on PUEO_PANEL_35 -- the two CYDs put the
-    backlight on different pins -- and a line scanner takes whichever branch
-    happens to be written first, which is how CC1101's chip select on GPIO 21
-    read as a collision for the 3.5" build and as clear for the 2.8" one when
-    the truth is the other way round.
+    by line. It is a short file with no branches in it today, and it is read
+    this way because it had them: a line scanner takes whichever arm is
+    written first, which is how CC1101's chip select on GPIO 21 once read as
+    a collision for one panel and as clear for the other when the truth was
+    the reverse.
     """
     out = {}
     if not USER_SETUP.exists():
         return out
     pre = Pre()
-    pre.macros["PUEO_PANEL_35"] = 1 if panel == 35 else 0
     pre.run(USER_SETUP)
     for macro, role in TFT_ROLES.items():
         pin = pre.resolve(macro)
@@ -101,16 +100,14 @@ def read_user_setup(panel):
 # Still a published source, and this board has now disagreed with four of
 # them. Nothing here depends on 26, 34 or 36.
 BOARD_FIXED = {
-    28: {4: "RGB LED red", 16: "RGB LED green", 17: "RGB LED blue",
-         34: "LDR", 26: "speaker"},
     35: {4: "RGB LED red", 16: "RGB LED blue", 17: "RGB LED green",
          26: "speaker", 34: "CdS light sensor", 36: "touch IRQ"},
 }
 
-def reserved_for(panel):
-    """Onboard hardware whose pads are already spoken for, for one panel."""
-    out = dict(BOARD_FIXED[panel])
-    out.update(read_user_setup(panel))
+def reserved_for():
+    """Onboard hardware whose pads are already spoken for."""
+    out = dict(BOARD_FIXED[35])
+    out.update(read_user_setup())
     return out
 
 # Pins we knowingly repurpose. The RGB LED is the only block of spare GPIO left
@@ -123,19 +120,17 @@ def reserved_for(panel):
 # Per panel, because "spare" is a property of the board and not of the number.
 #
 # The 2.8" gives up its RGB LED, its speaker and its LDR -- an LED, a buzzer
-# and a light sensor, none of which this tool uses. The 3.5" gives up its RGB
-# LED and nothing else; 26, 34 and 36 stay reserved because the board has
-# them and this tool has no use for a speaker, a light sensor or the touch
-# controller's interrupt.
+# The board gives up its RGB LED and nothing else. 26, 34 and 36 stay
+# reserved because the board has them and this tool has no use for a speaker,
+# a light sensor or the touch controller's interrupt.
 #
-# GPIO 4 is in the 3.5" set now that it has been shown to be an LED channel
-# on this board rather than an amplifier's enable. Nothing uses it there --
-# NRF24 CSN is 25 on that panel -- and the reason it moved off 4 in the first
-# place was the belief that it keyed an amp. That belief was about a
-# different board, but leaving CSN on 25 costs nothing and one fewer pin
-# read off a datasheet is worth more than the pin.
+# GPIO 4 is in the set now that it has been shown to be an LED channel here
+# rather than an amplifier's enable. Nothing uses it -- NRF24 CSN is 25 --
+# and the reason CSN moved off 4 in the first place was the belief that 4
+# keyed an amp. That belief was about a different board, but leaving CSN on
+# 25 costs nothing and one fewer pin read off a datasheet is worth more than
+# the pin.
 REPURPOSABLE = {
-    28: {4, 16, 17, 26, 34},
     35: {4, 16, 17},
 }
 
@@ -271,21 +266,14 @@ class Pre:
         return None
 
 
-PANELS = (28, 35)
-
-
-def check(panel):
-    """Print one panel's map and return its list of errors."""
-    reserved = reserved_for(panel)
+def check():
+    """Print the map and return the list of errors."""
+    reserved = reserved_for()
 
     pre = Pre()
-    # Seeded before the headers run, so shared.h and board_pueo.h take their
-    # #ifndef defaults as a build with -DPUEO_PANEL_35=<n> would.
-    pre.macros["PUEO_PANEL_35"] = 1 if panel == 35 else 0
     pre.run(SKETCH / "shared.h")
 
-    print(f'{panel / 10:.1f}" panel  --  board: '
-          f"{pre.macros.get('ESP32DIV_BOARD_NAME', '?')}")
+    print(f"board: {pre.macros.get('ESP32DIV_BOARD_NAME', '?')}")
     print()
 
     pins = {}
@@ -301,7 +289,7 @@ def check(panel):
         note = reserved.get(pin, "")
         tag = ""
         if note:
-            tag = (f"  [repurposed from {note}]" if pin in REPURPOSABLE[panel]
+            tag = (f"  [repurposed from {note}]" if pin in REPURPOSABLE[35]
                    else f"  [!! board uses this for {note}]")
         print(f"  GPIO {pin:>2}  {label:<20}{tag}")
 
@@ -332,7 +320,7 @@ def check(panel):
 
     # Landing on onboard hardware we did not consciously give up.
     for macro, (pin, label) in sorted(pins.items()):
-        if pin in reserved and pin not in REPURPOSABLE[panel]:
+        if pin in reserved and pin not in REPURPOSABLE[35]:
             errors.append("GPIO %d (%s) collides with onboard %s"
                           % (pin, label, reserved[pin]))
 
@@ -374,22 +362,17 @@ def check(panel):
 
 
 def main():
-    # Both panels, because both are published as flash images. A pin map that
-    # is clean for one and not the other is still a broken release, and which
-    # one is broken is not something a single-panel check can tell you.
-    rc = 0
-    for i, panel in enumerate(PANELS):
-        if i:
-            print()
-        errors = check(panel)
-        if errors:
-            print("COLLISIONS")
-            for e in errors:
-                print("  x " + e)
-            rc = 1
-        else:
-            print("no collisions")
-    return rc
+    # One panel now. This used to run twice, once per published image, because
+    # a pin map that is clean for one and not the other is still a broken
+    # release and a single-panel check could not say which.
+    errors = check()
+    if errors:
+        print("COLLISIONS")
+        for e in errors:
+            print("  x " + e)
+        return 1
+    print("no collisions")
+    return 0
 
 
 if __name__ == "__main__":

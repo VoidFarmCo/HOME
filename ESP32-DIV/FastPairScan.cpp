@@ -17,15 +17,9 @@ namespace {
 constexpr int      kMaxDevices = 24;
 /* Three lines to a row, same shape as Surveillance. The 2.8" numbers are
  * the originals and are kept exactly. */
-#if PUEO_PANEL_35
 constexpr int      kRowH       = 54;
 constexpr int      kLine2      = 18;   /* second line, from the row top */
 constexpr int      kLine3      = 36;
-#else
-constexpr int      kRowH       = 30;
-constexpr int      kLine2      = 11;
-constexpr int      kLine3      = 21;   /* 22 would not fit a 30 px row */
-#endif
 constexpr uint32_t kRedrawMs   = 400;
 constexpr uint16_t kProbeMs    = 4000;   // how long to wait for a notification
 

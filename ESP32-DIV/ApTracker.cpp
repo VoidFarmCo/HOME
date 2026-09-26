@@ -24,15 +24,9 @@ constexpr uint32_t kRedrawMs = 60;
 /* Two lines to a picker row, the same metrics TrackerHunt's picker uses so
  * the two screens read the same way. The 2.8" numbers are its originals;
  * that panel has never been booted. */
-#if PUEO_PANEL_35
 constexpr int kRowH     = 40;
 constexpr int kRowLine2 = 20;
 constexpr int kRowRight = 6;
-#else
-constexpr int kRowH     = 22;
-constexpr int kRowLine2 = 12;
-constexpr int kRowRight = 6;
-#endif
 
 struct Ap {
   uint8_t  bssid[6];

@@ -3,7 +3,6 @@
 #
 #   tools/build.sh setup    install core + libraries (once, ~1 GB)
 #   tools/build.sh          compile
-#   PUEO_PANEL=28 ...       target the 2.8" panel instead of the 3.5"
 #   tools/build.sh upload COM7
 #
 # Nothing here touches a global Arduino install. The core lives under
@@ -26,24 +25,8 @@ export ARDUINO_DIRECTORIES_DATA="$PUEO_ARDUINO_ROOT/data"
 export ARDUINO_DIRECTORIES_USER="$REPO/.arduino/user"
 export ARDUINO_DIRECTORIES_DOWNLOADS="$PUEO_ARDUINO_ROOT/downloads"
 
-# Which CYD panel this build targets. 35 is board_pueo.h's own default, so
-# `tools/build.sh` with nothing set builds what the tree says it is.
-#
-#   PUEO_PANEL=35   3.5" ESP32-3248S035R   ST7796    320x480   (default)
-#   PUEO_PANEL=28   2.8" ESP32-2432S028R   ILI9341   240x320
-#
-# The two differ in more than a display driver: CC1101_CS, the backlight pin
-# and which SPI bus the touch controller sits on all move with the panel. So
-# they get separate build directories. Sharing one lets arduino-cli reuse
-# objects compiled for the other panel -- which links, and boots, and is
-# wrong, with a blank screen or a chip select sitting on top of the
-# backlight and nothing on the console saying why.
-PUEO_PANEL="${PUEO_PANEL:-35}"
-case "$PUEO_PANEL" in
-  35) PANEL_DEF="-DPUEO_PANEL_35=1" ;;
-  28) PANEL_DEF="-DPUEO_PANEL_35=0" ;;
-  *)  echo "PUEO_PANEL must be 28 or 35, not '$PUEO_PANEL'" >&2; exit 2 ;;
-esac
+# One panel: the 3.5" ESP32-3248S035R. PUEO_PANEL and the -D it produced are
+# gone along with the 2.8" support they selected.
 # Which firmware. The detector is Pueo itself; the beacon is the bench
 # transmitter that emits the things the detector looks for, so a receive path
 # can be proved rather than assumed. They are separate images on purpose:
@@ -57,7 +40,7 @@ case "$PUEO_ROLE" in
   *) echo "PUEO_ROLE must be detector or beacon, not '$PUEO_ROLE'" >&2; exit 2 ;;
 esac
 
-BUILD_PATH="$PUEO_ARDUINO_ROOT/build-$PUEO_ROLE-$PUEO_PANEL"
+BUILD_PATH="$PUEO_ARDUINO_ROOT/build-$PUEO_ROLE"
 
 # The beacon includes the detector's headers rather than copying the
 # constants it has to match. arduino-cli compiles a sketch from a staging
@@ -248,12 +231,13 @@ prefix_maps() {
 # nothing until something re-installs it, and `setup` is a one-time step
 # nobody re-runs.
 #
-# That is not a hypothetical. 0.3.4's first cut shipped a 2.8" image built
-# against the 3.5"'s driver, size and backlight pin, because the panel split
-# was added to Libraries/User_Setup cyd.h and the stale installed copy was
-# what the compiler read -- the exact bug the split existed to fix, still
-# present in the artifact that claimed to fix it, and invisible to a check
-# that reads the repo.
+# That is not a hypothetical. Back when this tree built two panels, 0.3.4's
+# first cut shipped a 2.8" image carrying the 3.5"'s driver, size and
+# backlight pin: the fix went into Libraries/User_Setup cyd.h and the stale
+# installed copy was what the compiler read. The bug the fix existed to
+# prevent was still in the artifact that claimed to fix it, and invisible to
+# any check that reads the repo. One panel removes that particular pair of
+# wrong values, not the mechanism that served them.
 #
 # So every compile re-syncs it. cmp first, so an unchanged file is not
 # rewritten: touching it would rebuild the whole library on every run.
@@ -285,8 +269,8 @@ compile() {
   local rc=0
   local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
-    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
+    --build-property "compiler.c.extra_flags=$maps $ROLE_INC" \
+    --build-property "compiler.cpp.extra_flags=$maps $ROLE_INC" \
     --build-path "$BUILD_PATH" "$REPO/$SKETCH_DIR" >"$log" 2>&1 || rc=$?
 
   grep -E "ESP32-DIV[\\/][A-Za-z_]+\.(cpp|h|ino).*(warning|error):" "$log" || true
@@ -323,8 +307,8 @@ warnings() {
   rm -rf "$BUILD_PATH-warnings"
   local maps; maps="$(prefix_maps)"
   arduino-cli compile --warnings all -b "$FQBN" \
-    --build-property "compiler.c.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
-    --build-property "compiler.cpp.extra_flags=$maps $PANEL_DEF $ROLE_INC" \
+    --build-property "compiler.c.extra_flags=$maps $ROLE_INC" \
+    --build-property "compiler.cpp.extra_flags=$maps $ROLE_INC" \
     --build-path "$BUILD_PATH-warnings" "$REPO/$SKETCH_DIR" 2>&1 \
     | grep -E "warning:|Sketch uses|Global variables"
 }
@@ -345,8 +329,8 @@ upload() {
 
   # Say which firmware is going onto which port, before it goes.
   #
-  # There are two roles and two panels now, and the port number does not
-  # change when the board on the end of the cable does. A detector was
+  # There are two roles, and the port number does not change when the board
+  # on the end of the cable does. A detector was
   # overwritten with the beacon image this way: same COM port, different
   # board, and nothing in the output said which of the two was being sent.
   # The upload succeeded and reported success, because it was a successful
@@ -361,7 +345,7 @@ upload() {
   # units, so this costs seconds when there is nothing to do.
   compile
 
-  echo "== uploading $PUEO_ROLE firmware, $PUEO_PANEL\" panel, to $port =="
+  echo "== uploading $PUEO_ROLE firmware to $port =="
   if [ "$PUEO_ROLE" = "beacon" ]; then
     echo "   (this is the bench TRANSMITTER, not Pueo)"
   fi

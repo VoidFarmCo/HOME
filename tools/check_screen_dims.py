@@ -169,8 +169,9 @@ def main():
     shared = (SKETCH / "shared.h").read_text(encoding="utf-8", errors="replace")
     ok("shared.h defines PUEO_SCREEN_W and PUEO_SCREEN_H",
        "PUEO_SCREEN_W" in shared and "PUEO_SCREEN_H" in shared)
-    ok("and branches them on PUEO_PANEL_35",
-       re.search(r"#if PUEO_PANEL_35\s*\n#define PUEO_SCREEN_W", shared) is not None)
+    ok("and states them once, not per panel",
+       "PUEO_PANEL_35" not in shared,
+       "a panel branch is back in shared.h")
 
     for name in UI_FILES:
         path = SKETCH / name
@@ -185,51 +186,45 @@ def main():
         ok(f"{name} states no dimension as a literal",
            not hits, "; ".join(hits[:3]))
 
-    print("\nboth panels reach it:")
-    seen = {}
-    for panel in (28, 35):
-        pre = Pre({"PUEO_PANEL_35": 1 if panel == 35 else 0})
-        pre.run(SKETCH / "shared.h")
-        seen[panel] = (pre.value("PUEO_SCREEN_W"), pre.value("PUEO_SCREEN_H"),
-                       pre.value("TOUCH_SHARES_TFT_SPI"))
-        w, h, _ = seen[panel]
-        want = (240, 320) if panel == 28 else (320, 480)
-        ok(f'{panel/10:.1f}" is {want[0]}x{want[1]}', (w, h) == want, f"got {w}x{h}")
+    print("\nthe sketch says 320x480:")
+    pre = Pre({})
+    pre.run(SKETCH / "shared.h")
+    w, h = pre.value("PUEO_SCREEN_W"), pre.value("PUEO_SCREEN_H")
+    ok("PUEO_SCREEN_W/H are 320x480", (w, h) == (320, 480), f"got {w}x{h}")
+    ok("touch shares the display bus",
+       pre.value("TOUCH_SHARES_TFT_SPI") == 1,
+       "the XPT2046 is behind TOUCH_CS on this panel")
 
-    ok("the two panels are not the same size",
-       seen[28][:2] != seen[35][:2])
-    ok("touch shares the display bus on the 3.5\" and not on the 2.8\"",
-       seen[35][2] == 1 and seen[28][2] == 0,
-       f"2.8\"={seen[28][2]} 3.5\"={seen[35][2]}")
-
+    # This was a cross-panel check and it is still worth running, because the
+    # thing it caught was never really "two panels disagree". It was two files
+    # disagreeing: shared.h computes the layout, TFT_eSPI drives the glass, and
+    # nothing but this makes them say the same number.
     print("\nTFT_eSPI agrees with the sketch:")
-    for panel in (28, 35):
-        pre = Pre({"PUEO_PANEL_35": 1 if panel == 35 else 0})
-        pre.run(USER_SETUP)
-        w = pre.value("TFT_WIDTH")
-        h = pre.value("TFT_HEIGHT")
-        bl = pre.value("TFT_BL")
-        driver = ("ST7796_DRIVER" if "ST7796_DRIVER" in pre.macros else
-                  "ILI9341_2_DRIVER" if "ILI9341_2_DRIVER" in pre.macros else "?")
-        want_w, want_h = (240, 320) if panel == 28 else (320, 480)
-        want_bl = 21 if panel == 28 else 27
-        want_drv = "ILI9341_2_DRIVER" if panel == 28 else "ST7796_DRIVER"
-        ok(f'{panel/10:.1f}" User_Setup is {want_drv} at {want_w}x{want_h}',
-           (w, h, driver) == (want_w, want_h, want_drv),
-           f"got {driver} at {w}x{h}")
-        ok(f'{panel/10:.1f}" backlight is GPIO {want_bl}', bl == want_bl, f"got {bl}")
-        # The whole point of the two images: one inverts, the other does not.
-        inv_on = "TFT_INVERSION_ON" in pre.macros
-        ok(f'{panel/10:.1f}" inversion is {"ON" if panel == 28 else "OFF"}',
-           inv_on == (panel == 28))
+    pre = Pre({})
+    pre.run(USER_SETUP)
+    tw, th = pre.value("TFT_WIDTH"), pre.value("TFT_HEIGHT")
+    bl = pre.value("TFT_BL")
+    driver = ("ST7796_DRIVER" if "ST7796_DRIVER" in pre.macros else
+              "ILI9341_2_DRIVER" if "ILI9341_2_DRIVER" in pre.macros else "?")
+    ok("User_Setup is ST7796_DRIVER at 320x480",
+       (tw, th, driver) == (320, 480, "ST7796_DRIVER"),
+       f"got {driver} at {tw}x{th}")
+    ok("and it is the same size the sketch lays out for", (tw, th) == (w, h),
+       f"User_Setup {tw}x{th} against shared.h {w}x{h}")
+    ok("backlight is GPIO 27", bl == 27, f"got {bl}")
+    # Getting this backwards renders every colour as its complement. The other
+    # panel wanted it ON, which is how the value was ever in question.
+    ok("inversion is OFF", "TFT_INVERSION_ON" not in pre.macros)
 
     # The copy the compiler actually reads.
     #
     # TFT_eSPI takes its configuration from User_Setup.h inside the installed
     # library, not from the file in this repo; build.sh copies one to the
-    # other. Every check above reads the repo's copy, so all of them passed
-    # while the installed one was still the old unconditional ST7796 -- and
-    # 0.3.4's first cut shipped a 2.8" image built with the 3.5"'s driver,
+    # other. Every check above reads the repo's copy, so all of them can pass
+    # against an installed copy that says something else. That is not
+    # hypothetical: back when this tree built two panels, every check above
+    # passed while the installed file was still the old unconditional ST7796,
+    # and 0.3.4's first cut shipped a 2.8" image carrying the 3.5"'s driver,
     # size and backlight pin. A check that reads only the source cannot see
     # that, which is the whole reason this one exists.
     #

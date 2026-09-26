@@ -1,41 +1,25 @@
  
 //ESP32-DIV CYD
 
-// ── Which CYD panel ─────────────────────────────────────────────────────────
+// ── The panel ───────────────────────────────────────────────────────────────
 //
-// Both boards are called a "cheap yellow display" and they are not the same
-// display. Everything that differs between them is here, in one block,
-// rather than spread through the vendor sections below -- the six settings
-// were scattered when this file targeted one board, and the 2.8" image in
-// 0.3.4 was built with the 3.5"'s driver because six edits are easy to make
-// five of.
+// 3.5" ESP32-3248S035R: ST7796, 320x480, backlight on GPIO 27.
 //
-// PUEO_PANEL_35 arrives as a -D from tools/build.sh, so this file sees the
-// same value the sketch does. Undefined means 3.5", matching board_pueo.h.
+// These five used to be a branch on PUEO_PANEL_35, with a second set for the
+// 2.8" ESP32-2432S028R. They are kept together in one block because that is
+// what the branch taught: when they were scattered through the vendor
+// sections below, 0.3.4's 2.8" image shipped with the 3.5"'s driver, because
+// six edits are easy to make five of.
 //
-//   PUEO_PANEL=35   3.5" ESP32-3248S035R   ST7796    320x480   backlight 27
-//   PUEO_PANEL=28   2.8" ESP32-2432S028R   ILI9341   240x320   backlight 21
-//
-// The inversion flag is not cosmetic trivia: with ST7796's setting on an
-// ILI9341 every colour comes out as its complement, which during bring-up
-// showed up as orange rendering cyan.
-//
-// The SPI pins, TFT_CS/DC/RST and TOUCH_CS are identical on both boards and
-// stay in their usual sections. Only these six move.
+// TFT_INVERSION_OFF is not cosmetic trivia. The other panel wanted it ON, and
+// getting it backwards makes every colour come out as its complement, which
+// during bring-up showed up as orange rendering cyan.
 
-#if defined(PUEO_PANEL_35) && PUEO_PANEL_35 == 0
-  #define ILI9341_2_DRIVER
-  #define TFT_WIDTH  240
-  #define TFT_HEIGHT 320
-  #define TFT_INVERSION_ON
-  #define TFT_BL   21
-#else
-  #define ST7796_DRIVER
-  #define TFT_WIDTH  320
-  #define TFT_HEIGHT 480
-  #define TFT_INVERSION_OFF
-  #define TFT_BL   27
-#endif
+#define ST7796_DRIVER
+#define TFT_WIDTH  320
+#define TFT_HEIGHT 480
+#define TFT_INVERSION_OFF
+#define TFT_BL   27
 
 
 

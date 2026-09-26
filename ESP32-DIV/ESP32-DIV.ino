@@ -860,12 +860,13 @@ unsigned long last_interaction_time = 0;
 int last_menu_index = -1;
 bool menu_initialized = false;
 
-/* Menu grid geometry. The 2.8" values are the originals and are kept
- * exactly, because the screen renders in render/ were drawn against them.
- * The 3.5" panel is 320x480 rather than 240x320, so its tiles are sized to
- * fill it instead of leaving a border of unused pixels: same 2x4 grid, same
- * 10 px margins and gaps, just bigger. */
-#if TFT_WIDTH >= 320
+/* Menu grid geometry, for a 320x480 panel. A 2x4 grid of tiles sized to fill
+ * it, with 10 px margins and gaps.
+ *
+ * These branched on TFT_WIDTH while this tree built a 240x320 panel too. The
+ * branch is gone with that panel, but the numbers it held are the ones the
+ * screen renders in render/ are drawn against, so tools/check_render_sync.py
+ * still compares them against tools/render_screens.py constant by constant. */
 const int TILE_W = 145;
 const int TILE_H = 92;
 const int COLUMN_WIDTH = 155;
@@ -876,17 +877,6 @@ const int Y_SPACING = 106;
 // icon(32) + 6 gap + label(16) = 54, centred in a 92 px tile
 const int TILE_ICON_DY = 19;
 const int TILE_TEXT_DY = 57;
-#else
-const int TILE_W = 100;
-const int TILE_H = 60;
-const int COLUMN_WIDTH = 120;
-const int X_OFFSET_LEFT = 10;
-const int X_OFFSET_RIGHT = X_OFFSET_LEFT + COLUMN_WIDTH;
-const int Y_START = 30;
-const int Y_SPACING = 75;
-const int TILE_ICON_DY = 10;
-const int TILE_TEXT_DY = 30;
-#endif
 
 void displayOtherMenuGrid();
 void displayPagedSubmenu();

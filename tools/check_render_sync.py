@@ -6,21 +6,22 @@ TFT_eSPI's fonts and replays the drawing calls at the coordinates the source
 gives -- which is what makes the pictures evidence rather than illustration.
 
 It cannot include the firmware's headers to get those coordinates. It is
-Python, the constants are C, and half of them sit behind a preprocessor
-branch. So it carries its own copy, and a copy is a thing that drifts.
+Python and the constants are C, so it carries its own copy, and a copy is a
+thing that drifts.
 
 Nothing would tell you when it did. The renderer would keep producing
 plausible screenshots, the pictures on the site would keep looking like the
 device, and they would be showing a layout the firmware had stopped using.
 That is worse than no pictures: a wrong screenshot is believed.
 
-This compares the two sides, constant by constant, for both panels. Every
-entry below is a number that exists twice on purpose.
+This compares the two sides, constant by constant. Every entry below is a
+number that exists twice on purpose.
 
     python tools/check_render_sync.py
 
 Reads source; needs no board.
 """
+import ast
 import re
 import sys
 from pathlib import Path
@@ -47,65 +48,37 @@ def read(p):
     return p.read_text(encoding="utf-8", errors="replace")
 
 
-def c_panel_consts(src, names, defines=None):
-    """{name: (value_35, value_28)} for constants defined once per panel.
+def c_consts(src, names, defines=None):
+    """{name: value} for top-level C constants and object-like defines.
 
-    Two things this has to know, both learned by getting them wrong.
+    A value is not always a literal: one define can name another, and one
+    level of that is resolved from `defines`.
 
-    The panel is not always spelled the same way. shared.h guards on
-    `#if PUEO_PANEL_35`; the menu grid in the sketch guards on
-    `#if TFT_WIDTH >= 320`, which is the same question asked of the panel's
-    width. Both mean "the 3.5 inch arm".
-
-    And a value is not always a literal. The 2.8" status bar is
-    `#define PUEO_STATUS_TALL PUEO_STATUS_SHORT` -- it is the short bar,
-    named rather than repeated. One level of that is resolved from `defines`.
-
-    The branch is tracked rather than assumed to come first. It does today,
-    and an #else that swapped places would otherwise compare each panel
-    against the other one's numbers and pass, which is the exact failure
-    this file exists to stop.
+    This used to walk `#if PUEO_PANEL_35` / `#else` arms and return a pair per
+    name, because every constant here existed twice. There is one panel now,
+    so there is one value, and the branch tracking went with the panel.
     """
     defines = defines or {}
-    out = {n: [None, None] for n in names}
-    branch = None          # 0 = the 3.5" arm, 1 = the 2.8" arm
-    depth = 0
+    out = {n: None for n in names}
     for line in src.splitlines():
         t = line.strip()
-        if re.match(r"#if\s+PUEO_PANEL_35\b", t) or \
-           re.match(r"#if\s+TFT_WIDTH\s*>=\s*320\b", t):
-            branch, depth = 0, 1
-            continue
-        if branch is not None:
-            if t.startswith("#if"):
-                depth += 1
-                continue
-            if t.startswith("#else") and depth == 1:
-                branch = 1
-                continue
-            if t.startswith("#endif"):
-                depth -= 1
-                if depth == 0:
-                    branch = None
-                continue
-        if branch is None:
-            continue
         m = re.match(r"(?:static\s+)?(?:const|constexpr)\s+u?int\w*\s+(\w+)"
                      r"\s*=\s*(-?\d+)\s*;", t)
         if not m:
             # The trailing comment is not optional decoration to skip over:
-            # requiring end-of-line here made PUEO_BODY_LINE, _GAP and _SIZE
-            # invisible on the 3.5" arm, which is the only arm that carries
-            # the note explaining them.
+            # requiring end-of-line here once made PUEO_BODY_LINE, _GAP and
+            # _SIZE invisible, because they are the ones carrying the note
+            # that explains them.
             m = re.match(r"#define\s+(\w+)\s+(-?\w+)\s*(?://|/\*|$)", t)
-        if m and m.group(1) in out:
-            v = m.group(2)
-            if not v.lstrip("-").isdigit():
-                v = defines.get(v)          # one level of indirection
-                if v is None:
-                    continue
-            out[m.group(1)][branch] = int(v)
-    return {k: tuple(v) for k, v in out.items()}
+        if not m or m.group(1) not in out:
+            continue
+        v = m.group(2)
+        if not v.lstrip("-").isdigit():
+            v = defines.get(v)
+            if v is None:
+                continue
+        out[m.group(1)] = int(v)
+    return out
 
 
 def c_plain_defines(src, names):
@@ -118,41 +91,39 @@ def c_plain_defines(src, names):
     return out
 
 
-def py_ternary(src, name):
-    """`NAME = 18 if panel == 35 else 11` -> (18, 11).
+def py_consts(path):
+    """Every integer set_panel() assigns, read with ast.
 
-    set_panel() writes a constant two ways: in the `if panel == 35:` arms
-    when several are set together, and as a one-line conditional when one
-    stands alone. py_panel_consts() reads the first and cannot see the
-    second, which is where the body metrics live.
+    Parsed rather than pattern-matched. set_panel() assigns three ways --
+    `A = 1`, `A, B = 1, 2`, and formerly a conditional -- and each way needed
+    its own regex. A constant none of them matched came back None, and the
+    comparison that followed was None against None, which passes. ast sees
+    every form, and a form it cannot fold to an int is simply absent, which
+    is a missing key rather than a silent match.
     """
-    m = re.search(r"^\s*%s\s*=\s*(-?\d+)\s+if\s+panel\s*==\s*35\s+else\s+"
-                  r"(-?\d+)\s*$" % name, src, re.M)
-    return (int(m.group(1)), int(m.group(2))) if m else None
-
-
-def py_panel_consts(src, names):
-    """The same, out of set_panel()'s `if panel == 35:` / `else:` arms."""
-    body = src[src.index("def set_panel("):]
-    body = body[:body.index("\n\nX_OFFSET_LEFT")]
-    arm35 = body[body.index("if panel == 35:"):body.index("    else:")]
-    arm28 = body[body.index("    else:"):]
+    tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+    fn = next((n for n in ast.walk(tree)
+               if isinstance(n, ast.FunctionDef) and n.name == "set_panel"),
+              None)
+    if fn is None:
+        return {}
     out = {}
-    for n in names:
-        vals = []
-        for arm in (arm35, arm28):
-            got = None
-            # `TILE_W, TILE_H, COLUMN_WIDTH = 145, 92, 155`
-            for m in re.finditer(r"^\s*([\w,\s]+?)\s*=\s*([^\n]+)$", arm, re.M):
-                keys = [k.strip() for k in m.group(1).split(",")]
-                vv = [v.strip() for v in m.group(2).split(",")]
-                if n in keys and len(keys) == len(vv):
-                    v = vv[keys.index(n)]
-                    if v.lstrip("-").isdigit():
-                        got = int(v)
-                        break
-            vals.append(got)
-        out[n] = tuple(vals)
+
+    def store(target, value):
+        if isinstance(target, ast.Name) and isinstance(value, ast.Constant) \
+           and isinstance(value.value, int) and not isinstance(value.value, bool):
+            out[target.id] = value.value
+
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Assign):
+            continue
+        for tgt in node.targets:
+            if isinstance(tgt, ast.Tuple) and isinstance(node.value, ast.Tuple) \
+               and len(tgt.elts) == len(node.value.elts):
+                for t, v in zip(tgt.elts, node.value.elts):
+                    store(t, v)
+            else:
+                store(tgt, node.value)
     return out
 
 
@@ -166,43 +137,37 @@ def main():
     drone = read(SKETCH / "DroneScan.cpp")
     rend = read(RENDER)
 
-    print("the menu grid, per panel:")
+    py = py_consts(RENDER)
+
+    def compare(label, cvals, pairs):
+        for cname, pname in pairs:
+            cv, pv = cvals.get(cname), py.get(pname)
+            ok("  %-17s %-18s %s" % (label, cname, cv),
+               cv is not None and pv is not None and cv == pv,
+               "firmware %s, renderer %s (%s)" % (cv, pv, pname))
+
+    print("the menu grid:")
     grid = ["TILE_W", "TILE_H", "COLUMN_WIDTH", "Y_START", "Y_SPACING",
             "TILE_ICON_DY", "TILE_TEXT_DY"]
-    c = c_panel_consts(ino, grid)
-    p = py_panel_consts(rend, grid)
-    for n in grid:
-        ok('  %-13s 3.5" %s   2.8" %s' % (n, c[n][0], c[n][1]),
-           c[n] == p[n] and None not in c[n],
-           "firmware %s, renderer %s" % (c[n], p[n]))
+    compare("ESP32-DIV.ino", c_consts(ino, grid), [(n, n) for n in grid])
 
-    print("\nthe chrome, per panel:")
+    print("\nthe chrome:")
     chrome = ["PUEO_STATUS_TALL", "PUEO_TILE_ICON"]
-    c2 = c_panel_consts(shared, chrome,
-                        c_plain_defines(shared, ["PUEO_STATUS_SHORT"]))
-    for cname, pname in (("PUEO_STATUS_TALL", "STATUS_TALL"),
-                         ("PUEO_TILE_ICON", "TILE_ICON")):
-        got = py_ternary(rend, pname)
-        ok('  %-18s 3.5" %s   2.8" %s' % (cname, c2[cname][0], c2[cname][1]),
-           got is not None and got == c2[cname],
-           "firmware %s, renderer %s" % (c2[cname], got))
+    c2 = c_consts(shared, chrome,
+                  c_plain_defines(shared, ["PUEO_STATUS_SHORT"]))
+    compare("shared.h", c2, [("PUEO_STATUS_TALL", "STATUS_TALL"),
+                             ("PUEO_TILE_ICON", "TILE_ICON")])
 
-    print("\nthe body text on the list screens, per panel:")
-    # The 3.5" is the denser panel, so the same pixels are smaller text on
-    # it and the lists draw in font 2 there. Everything under it -- the line
-    # pitch, the band a redraw clears, the size a centred line is scaled to
-    # -- has to move with the font, on both sides of the fence.
-    body = c_panel_consts(shared, ["PUEO_BODY_FONT", "PUEO_BODY_H",
-                                   "PUEO_BODY_LINE", "PUEO_BODY_GAP",
-                                   "PUEO_BODY_SIZE"])
-    for cname, pname in (("PUEO_BODY_FONT", "BODY_FONT"),
-                         ("PUEO_BODY_LINE", "BODY_LINE"),
-                         ("PUEO_BODY_SIZE", "BODY_SIZE")):
-        got = py_ternary(rend, pname)
-        ok('  %-16s 3.5" %s   2.8" %s' % (cname, body[cname][0],
-                                          body[cname][1]),
-           got is not None and got == body[cname] and None not in body[cname],
-           "firmware %s, renderer %s" % (body[cname], got))
+    print("\nthe body text on the list screens:")
+    # Everything under the font -- the line pitch, the band a redraw clears,
+    # the size a centred line is scaled to -- has to move with it, on both
+    # sides of the fence.
+    body = c_consts(shared, ["PUEO_BODY_FONT", "PUEO_BODY_H",
+                             "PUEO_BODY_LINE", "PUEO_BODY_GAP",
+                             "PUEO_BODY_SIZE"])
+    compare("shared.h", body, [("PUEO_BODY_FONT", "BODY_FONT"),
+                               ("PUEO_BODY_LINE", "BODY_LINE"),
+                               ("PUEO_BODY_SIZE", "BODY_SIZE")])
 
     # PUEO_BODY_H and PUEO_BODY_GAP have no counterpart -- the renderer does
     # not redraw in place and does not draw the prose screens -- so they are
@@ -210,22 +175,20 @@ def main():
     # the bottom of the old text on screen, and that is the defect that took
     # four screens.
     fh = {2: 16, 1: 8}
-    missing = sorted(n for n, v in body.items() if None in v)
-    ok("  every body constant was found on both arms", not missing,
+    missing = sorted(n for n, v in body.items() if v is None)
+    ok("  every body constant was found", not missing,
        "not resolved: %s" % ", ".join(missing))
-    for i, panel in ((0, '3.5"'), (1, '2.8"')):
-        if missing:
-            break
-        f, h, line, gap = (body["PUEO_BODY_FONT"][i], body["PUEO_BODY_H"][i],
-                           body["PUEO_BODY_LINE"][i], body["PUEO_BODY_GAP"][i])
-        ok("  %s PUEO_BODY_H %s covers a font-%s glyph" % (panel, h, f),
+    if not missing:
+        f, h = body["PUEO_BODY_FONT"], body["PUEO_BODY_H"]
+        line, gap = body["PUEO_BODY_LINE"], body["PUEO_BODY_GAP"]
+        ok("  PUEO_BODY_H %s covers a font-%s glyph" % (h, f),
            f in fh and h >= fh[f], "font %s is %s px tall" % (f, fh.get(f)))
-        ok("  %s the line pitch %s clears the band %s" % (panel, line, h),
+        ok("  the line pitch %s clears the band %s" % (line, h),
            line >= h, "lines would overlap")
-        ok("  %s the block gap %s is wider than the line pitch" % (panel, gap),
+        ok("  the block gap %s is wider than the line pitch" % gap,
            gap > line)
 
-    print("\nthe rows on each list screen, per panel:")
+    print("\nthe rows on each list screen:")
     # Surveillance and Fast Pair draw the same three-line row; Hunt's picker
     # draws two. The renderer replays all three.
     rows = [
@@ -239,18 +202,13 @@ def main():
                                    ("kRowLine2", "HUNT_ROW_LINE2")]),
     ]
     for fname, src, pairs in rows:
-        c3 = c_panel_consts(src, [c for c, _ in pairs])
-        for cname, pname in pairs:
-            got = py_ternary(rend, pname)
-            ok('  %-17s %-10s 3.5" %s   2.8" %s'
-               % (fname, cname, c3[cname][0], c3[cname][1]),
-               got is not None and got == c3[cname] and None not in c3[cname],
-               "firmware %s, renderer %s" % (c3[cname], got))
+        compare(fname, c_consts(src, [c for c, _ in pairs]), pairs)
 
     # Surveillance and Fast Pair are the same row by intent -- the comment in
     # FastPairScan.cpp says so. It said so while they disagreed.
-    sp = c_panel_consts(spotter, ["kRowH", "kLine2", "kLine3"])
-    fp = c_panel_consts(fastpair, ["kRowH", "kLine2", "kLine3"])
+    three = ["kRowH", "kLine2", "kLine3"]
+    sp = c_consts(spotter, three)
+    fp = c_consts(fastpair, three)
     ok("  Surveillance and Fast Pair draw the same row", sp == fp,
        "Spotter %s, Fast Pair %s" % (sp, fp))
 
@@ -258,32 +216,34 @@ def main():
     # the next device's first.
     #
     # It is the glyph that has to fit, not the band. PUEO_BODY_H is the glyph
-    # plus its leading -- 10 for an 8 px font-1 glyph, 16 for font 2, which
-    # has none -- and the leading is allowed to reach into the top of the
-    # next row, because that row's own first line clears it again on the way
-    # past. The 2.8" has always relied on that: 21 + 10 is 31 in a 30 px row,
-    # and the text stops at 29.
-    for fname, src in (("Spotter.cpp", spotter),
-                       ("FastPairScan.cpp", fastpair)):
-        c3 = c_panel_consts(src, ["kRowH", "kLine3"])
-        for i, panel in ((0, '3.5"'), (1, '2.8"')):
-            glyph = fh.get(body["PUEO_BODY_FONT"][i])
-            rowh, lead = c3["kRowH"][i], body["PUEO_BODY_H"][i] - glyph
-            ok("  %s %s: the third line ends at %d in a %d px row"
-               % (fname, panel, c3["kLine3"][i] + glyph, rowh),
-               c3["kLine3"][i] + glyph <= rowh,
+    # plus its leading -- 16 for font 2, which has none -- and the leading is
+    # allowed to reach into the top of the next row, because that row's own
+    # first line clears it again on the way past.
+    if not missing:
+        glyph = fh.get(body["PUEO_BODY_FONT"])
+        lead = body["PUEO_BODY_H"] - glyph
+        for fname, src in (("Spotter.cpp", spotter),
+                           ("FastPairScan.cpp", fastpair)):
+            c3 = c_consts(src, ["kRowH", "kLine3"])
+            rowh = c3["kRowH"]
+            ok("  %s: the third line ends at %d in a %d px row"
+               % (fname, c3["kLine3"] + glyph, rowh),
+               c3["kLine3"] + glyph <= rowh,
                "it runs %d px into the next row's text"
-               % (c3["kLine3"][i] + glyph - rowh))
-            ok("  %s %s: and clears no further than %d px past it"
-               % (fname, panel, lead),
-               c3["kLine3"][i] + body["PUEO_BODY_H"][i] <= rowh + lead,
+               % (c3["kLine3"] + glyph - rowh))
+            ok("  %s: and clears no further than %d px past it" % (fname, lead),
+               c3["kLine3"] + body["PUEO_BODY_H"] <= rowh + lead,
                "the band would erase part of the next row")
 
     print("\nthe panel itself:")
-    m = re.search(r"W,\s*H\s*=\s*\(320,\s*480\)\s*if\s*panel\s*==\s*35"
-                  r"\s*else\s*\(240,\s*320\)", rend)
-    ok("  320x480 / 240x320", m is not None,
-       "the renderer's canvas no longer matches the two panels")
+    # Against shared.h rather than a literal, so the canvas cannot be right
+    # here while being wrong where the firmware lays out against it.
+    dims = c_consts(shared, ["PUEO_SCREEN_W", "PUEO_SCREEN_H"])
+    ok("  the canvas is %sx%s, the size shared.h lays out for"
+       % (dims["PUEO_SCREEN_W"], dims["PUEO_SCREEN_H"]),
+       (py.get("W"), py.get("H"))
+       == (dims["PUEO_SCREEN_W"], dims["PUEO_SCREEN_H"]),
+       "renderer %sx%s" % (py.get("W"), py.get("H")))
 
     print("\nshowFeatureMark(), which every feature opens on:")
     body = utils[utils.index("void showFeatureMark("):]

@@ -1,6 +1,6 @@
 #pragma once
 /* ─────────────────────────────────────────────────────────────────────────────
- * Pueo — custom handheld, CYD ESP32-2432S028R base.
+ * Pueo — custom handheld, CYD ESP32-3248S035R base.
  *
  * This is an OVERLAY, not a new board branch. Every pin macro in shared.h is
  * wrapped in #ifndef, and BoardConfig.h is included before those defaults are
@@ -14,10 +14,8 @@
  *
  *   VSPI (shared bus)   SCK 18   MOSI 23   MISO 19
  *     SD (onboard)      CS  5
- *     CC1101            CS  21 *    GDO0 22 (TX)   GDO2 35 (RX)
- *                       * 27 on the 2.8" panel; see CC1101_CS below
- *     NRF24L01+PA+LNA   CSN 4 *     CE   16        IRQ unconnected
- *                       * 25 on the 3.5" panel; see CSN_PIN_1 below
+ *     CC1101            CS  21      GDO0 22 (TX)   GDO2 35 (RX)
+ *     NRF24L01+PA+LNA   CSN 25      CE   16        IRQ unconnected
  *     PN532 V3 (SPI)    SS  17
  *   GPS ATGM336H        ESP32 RX on GPIO 1, GPS RX not connected
  *
@@ -25,26 +23,18 @@
  * That is intended — they are the only pins left.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-/* Which CYD panel. shared.h guards its own definition with #ifndef, so
- * setting it here wins -- and it has to be here, because this overlay is
- * included before shared.h evaluates its defaults, and CC1101_CS below
- * depends on it.
+/* One panel: the 3.5" ESP32-3248S035R, ST7796, 320x480, backlight GPIO 27.
  *
- *   0  2.8" ESP32-2432S028R   ILI9341  240x320   backlight GPIO 21
- *   1  3.5" ESP32-3248S035R   ST7796   320x480   backlight GPIO 27
- */
-#ifndef PUEO_PANEL_35
-#define PUEO_PANEL_35 1
-#endif
+ * This used to branch on PUEO_PANEL_35 and carry a second set of values for
+ * the 2.8" ESP32-2432S028R. That panel was built every release and never
+ * booted, so what the branch actually held was an untested claim in the one
+ * file where a wrong pin is a shorted output. It is gone, and so is every
+ * "on the other panel" footnote that existed to serve it. */
 
 #define BOARD_CYD
 
 #ifndef ESP32DIV_BOARD_NAME
-#if PUEO_PANEL_35
 #define ESP32DIV_BOARD_NAME "Pueo (CYD 3.5)"
-#else
-#define ESP32DIV_BOARD_NAME "Pueo (CYD 2.8)"
-#endif
 #endif
 
 /* ── CC1101 SubGHz ──────────────────────────────────────────────────────────
@@ -55,24 +45,15 @@
  * ELECHOUSE setGDO(gdo0, gdo2) is called as setGDO(TX, RX) in subghz.cpp,
  * which is correct. GPIO 35 is input-only, which suits GDO2 and makes the
  * assignment impossible to get backwards. */
-/* CS is 21 rather than the stock CYD's 27, and that is panel-driven.
- * On the 3.5" ESP32-3248S035R the backlight is on GPIO 27, so the stock
- * assignment fights it: driving the chip select would dim the screen.
- * The two boards swap the pair -- 21 is the backlight on the 2.8" and 27
- * on the 3.5" -- so 21 is free here and 27 is not.
+/* CS is 21 rather than the stock CYD's 27, because on this panel the
+ * backlight is on 27 and the stock assignment fights it: driving the chip
+ * select would dim the screen. 21 is free here for the same reason.
  *
  * It also lands CS on the Expand IO header (P3: GND, IO35, IO22, IO21)
  * alongside GDO0 and GDO2, which puts all three CC1101 control lines on a
  * connector instead of a solder pad.
- *
- * [VERIFY] on the 2.8" board 21 IS the backlight, so this has to move back
- * to 27 there. It is the one pin the two panels cannot share.
  */
-#if PUEO_PANEL_35
 #define CC1101_CS     21   /* 27 is the backlight on this panel */
-#else
-#define CC1101_CS     27
-#endif
 #define SUBGHZ_TX_PIN 22   /* -> CC1101 GDO0 */
 #define SUBGHZ_RX_PIN 35   /* <- CC1101 GDO2, input-only pin */
 
@@ -93,9 +74,7 @@
  * Confirmed on the board -- moving the slider changed nothing before this,
  * which is what says 21 is not the backlight here.
  */
-#if PUEO_PANEL_35
 #define BACKLIGHT_PIN 27
-#endif
 
 /* ── NRF24L01+PA+LNA ────────────────────────────────────────────────────────
  * One module, not three. Stock CYD defaults put CSN_PIN_1 on 17 (we need that
@@ -103,26 +82,19 @@
  * 25 (collides with the XPT2046 touch clock — a real bug on the stock CYD
  * profile, not just a Pueo problem).
  *
- * CSN follows the panel. The reason it was made to was a belief about GPIO 4
- * that has since been measured and was wrong.
+ * CSN is 25, and it is 25 rather than GPIO 4 for a reason that turned out to
+ * be wrong. The belief was that 4 keyed an audio amplifier's enable on this
+ * panel. Measured 2026-09-23 by driving each candidate low and watching which
+ * colour came up: GPIO 4 is the RGB LED's red channel here, exactly as it is
+ * on Sunton's other board. The amplifier belongs to lcdwiki's E32R35T, which
+ * is a different board whose datasheet this tree followed for months.
  *
- *   2.8" ESP32-2432S028R   GPIO 4 is the RGB LED's red channel
- *   3.5" ESP32-3248S035R   GPIO 4 is the RGB LED's red channel too,
- *                          measured 2026-09-23. lcdwiki's E32R35T puts an
- *                          audio amplifier's enable there and moves RGB red
- *                          to 22; that is a different board, and this tree
- *                          followed its datasheet for months.
+ * It stays on 25 anyway. 25 is free on this panel, the assignment is
+ * published and built against, and what would be gained by moving it back is
+ * one pin. One fewer pin taken on a datasheet's word is worth more than that.
  *
- * So 4 was never the hazard it is described as below, and CSN could sit on
- * it here as it does on the 2.8". It stays on 25 anyway: 25 is free on this
- * panel, the split is already published and built against, and the argument
- * for moving it back rests on one measurement of one board. One fewer pin
- * taken on a datasheet's word is worth more than the pin.
- *
- * 25 is free on the 3.5" for the reason the paragraph above says it is not
- * free on the 2.8" — that panel puts touch on its own bus at 25/32/39,
- * while the 3.5" hangs its XPT2046 off the display's SPI behind TOUCH_CS.
- * The pin that collides on one board is the spare on the other.
+ * 25 is free here because this panel hangs its XPT2046 off the display's SPI
+ * behind TOUCH_CS rather than giving touch its own bus at 25/32/39.
  *
  * [WARNING] free on the 3248S035**R**, which is the resistive-touch part.
  * The 3248S035**C** is the same board with a GT911 capacitive controller
@@ -130,10 +102,6 @@
  * -C board would drive a chip select into the touch controller. The two
  * are told apart by whether touch works at all: an XPT2046 behind
  * TOUCH_CS, which this build drives, is silent on a -C board.
- *
- * Not changed on the 2.8": anyone who followed the build guide has CSN
- * soldered to the GPIO 4 pad, and a published pin map is a thing people
- * have already acted on.
  *
  * radio2/radio3 in bluetooth.cpp are aliased onto the same physical module.
  * The three-radio BLE jammer modes therefore run degraded on one radio; they
@@ -144,11 +112,7 @@
  * double-assignment in the handoff resolves to "PN532 takes 17, NRF24 IRQ
  * stays off the board". */
 #define CE_PIN_1  16
-#if PUEO_PANEL_35
 #define CSN_PIN_1 25
-#else
-#define CSN_PIN_1 4
-#endif
 #define CE_PIN_2  CE_PIN_1
 #define CSN_PIN_2 CSN_PIN_1
 #define CE_PIN_3  CE_PIN_1
@@ -157,11 +121,8 @@
 #define PUEO_NRF24_MODULE_COUNT 1
 
 /* ── sound ──────────────────────────────────────────────────────────────────
- * Both boards bring a speaker out to a 2-pin connector, driven from GPIO 26,
- * which is DAC2. Sound is 3.5"-only here and the guards below say so rather
- * than relying on nobody calling it -- on the 2.8" GPIO 26 is free, but that
- * panel's NRF24 CSN is GPIO 4 and the sound path used to assert 4 as an
- * amplifier enable, which would have keyed a radio.
+ * The board brings a speaker out to a 2-pin connector, driven from GPIO 26,
+ * which is DAC2.
  *
  * There is no enable pin on this board, and there was never meant to be one
  * here. The whole amplifier-enable story came off lcdwiki's page for their
@@ -181,9 +142,7 @@
  * a 2-pin SPEAK connector and you attach your own speaker, so a board out of
  * the bag is silent however correct this is. [verify] nothing has metered
  * what is between GPIO 26 and that connector here. */
-#if PUEO_PANEL_35
 #define BUZZER_PIN       26   /* speaker drive, also DAC2 */
-#endif
 
 /* ── PN532 V3 (SPI mode: DIP CH1=OFF, CH2=ON) ───────────────────────────────
  * Stock CYD default is SS 25, which is the XPT2046 touch clock. Moved to 17. */
