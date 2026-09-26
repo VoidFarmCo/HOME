@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="docs/img/pueo-header.webp" width="100%"
+       alt="The Pueo mark: a stylised horned owl in green on near-black, with
+            a WiFi arc, a Bluetooth rune and a satellite worked across its
+            chest and the word PUEO beneath, standing in a sweep of concentric
+            signal arcs.">
+</p>
+
 # Pueo
 
 *Pueo* is the Hawaiian owl, a low, silent flier that hunts by listening.
