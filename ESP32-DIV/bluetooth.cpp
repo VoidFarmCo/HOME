@@ -3644,7 +3644,10 @@ OperationMode currentMode = BLE_MODULE;
 
 bool jammerActive = false;
 
-const byte bluetooth_channels[] = {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
+/* RF_CH, so the centre is 2400 + n MHz. Bluetooth starts at 2402, which is
+ * channel 2: 0 and 1 were below the band and were dropped. Nineteen now,
+ * not twenty-one, and none of them spent outside what they are aimed at. */
+const byte bluetooth_channels[] = {32, 34, 46, 48, 50, 52, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
 const byte ble_channels[] = {2, 26, 80};
 
 /* Round-robin with a dwell, rather than a fresh random pick every time round
@@ -5541,7 +5544,9 @@ OperationMode currentMode = WiFi_MODULE;
 
 bool jammerActive = false;
 
-const byte bluetooth_channels[] =        {32, 34, 46, 48, 50, 52, 0, 1, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
+/* See the note in BleJammer: 0 and 1 are 2400 and 2401, below Bluetooth's
+ * 2402 start, and were dropped from this copy at the same time. */
+const byte bluetooth_channels[] =        {32, 34, 46, 48, 50, 52, 2, 4, 6, 8, 22, 24, 26, 28, 30, 74, 76, 78, 80};
 const byte ble_channels[] =              {2, 26, 80};
 const byte WiFi_channels[] =             {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 const byte usbWireless_channels[] =      {40, 50, 60};
