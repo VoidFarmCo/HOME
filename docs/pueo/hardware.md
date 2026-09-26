@@ -92,8 +92,9 @@ resolution" in the feature list four lines below it. It is the manufacturer,
 but it is not careful, and it is copy-pasted from the smaller panel's
 document. Weigh it accordingly.
 
-**The serial header is P1 on this panel.** The 2.8" calls the same thing P5,
-and this document said P5 for both after someone read that off a 2.8" board.
+**The serial header is P1.** This document called it P5 for a while, which is
+what Sunton's smaller board calls the same connector; somebody read it off one
+of those and it stood here unchallenged until a board was in hand.
 
 Its pins run **5V, TX, RX, GND** with 5V nearest the corner mounting hole and
 GND furthest from it. That order matters more than the inventory does: the
@@ -115,52 +116,46 @@ the compiler will and cross-references them against the CYD's own wiring.
 | VSPI MOSI | 23 | shared bus |
 | VSPI MISO | 19 | shared bus |
 | SD CS | 5 | onboard slot |
-| CC1101 CS | **21 / 27** | panel-dependent, see below |
+| CC1101 CS | 21 | 27 is the backlight, see below |
 | CC1101 GDO0 (TX) | 22 | P3 header |
 | CC1101 GDO2 (RX) | 35 | P3 header, input-only pin |
-| NRF24 CSN | 4 / 25 | was RGB LED red (2.8"); 25 on the 3.5", see below |
+| NRF24 CSN | 25 | see below; GPIO 4 is the RGB LED's red channel |
 | NRF24 CE | 16 | was RGB LED green |
 | NRF24 IRQ | not connected | see below |
 | PN532 SS | 17 | was RGB LED blue, SPI mode (DIP CH1=OFF, CH2=ON) |
-| GPS TX -> ESP32 | 1 | UART0 TX, the `TX` pin on P1 (P5 on the 2.8") |
+| GPS TX -> ESP32 | 1 | UART0 TX, the `TX` pin on P1 |
 | GPS RX | not connected | |
 
-**Which 2.8" board you have matters more than it should.** "Cheap yellow
-display" names boards from at least two vendors. This tree targets Sunton's
-**ESP32-2432S028R**, whose silkscreen reads `ESP32 2432S028`. lcdwiki's
-2.8" is the **E32R28T** -- a different board, 50.00 x 86.00 mm against the
-Sunton's larger outline, and it puts the RGB LED's red channel on GPIO 22
-and an audio amplifier's enable on GPIO 4. Nothing here has been built for
-it, and the 2.8" image would drive that amplifier as a chip select.
+**Which board you have matters more than it should.** "Cheap yellow display"
+names boards from at least two vendors. This tree targets Sunton's
+**ESP32-3248S035R**. lcdwiki's 3.5" is the **E32R35T**, a different board that
+puts an audio amplifier's enable on GPIO 4 and moves the RGB LED's red channel
+to GPIO 22. Nothing here has been built for it, and this image would drive
+that amplifier as a chip select.
 
-**Both Sunton boards agree about GPIO 4: it is the RGB LED's red channel.**
-That was measured on 2026-09-23, by driving each candidate low in turn -- the
-LED is common anode, so a pin sinks its own channel -- and watching which
-colour came up. GPIO 4 red, 16 blue, 17 green, and 22 nothing at all.
+**On the Sunton board GPIO 4 is the RGB LED's red channel.** Measured on
+2026-09-23, by driving each candidate low in turn -- the LED is common anode,
+so a pin sinks its own channel -- and watching which colour came up. GPIO 4
+red, 16 blue, 17 green, and 22 nothing at all. This tree had followed the
+lcdwiki datasheet for months.
 
 Until then this section said GPIO 4 was an **audio amplifier's enable** on the
 3.5" with RGB red moved to 22. That is true of lcdwiki's E32R35T and of
 nothing in this build. The pin map had been following a datasheet for a board
 nobody here owns.
 
-It cost less than it might have. NRF24 CSN follows the panel, 4 on the 2.8"
-and **25 on the 3.5"**, and the reason given for the split -- that keying an
-amplifier enable at chip-select rates clicks and draws off the display's rail
--- was about a hazard that is not there. CSN stays on 25 anyway: it is free on
-that panel, the split is published and built against, and the case for
-reverting rests on one measurement of one board, which is the same weight of
-evidence that put the amplifier there to begin with.
+It cost less than it might have. **NRF24 CSN is 25**, and the reason it was
+moved off GPIO 4 -- that keying an amplifier enable at chip-select rates
+clicks and draws off the display's rail -- was about a hazard that is not
+there. It stays on 25 anyway: 25 is free, the assignment is published and
+built against, and what reverting would buy is one pin.
 
-25 is free there for the same reason it is not free on the
-2.8": that panel puts touch on its own bus at 25/32/39, while the 3.5" hangs its
-XPT2046 off the display's SPI behind TOUCH_CS. The pin that collides on one
-board is the spare on the other.
+25 is free because this board hangs its XPT2046 off the display's SPI behind
+TOUCH_CS rather than giving touch its own bus at 25/32/39, which is what the
+stock CYD profile assumes and why that profile puts a chip select there.
 
-The 2.8" is left alone deliberately. A published pin map is a thing people have
-already soldered to.
-
-Two more pins on the 3.5", neither of which Pueo drives: GPIO 34 is a CdS
-light sensor, as it is on the 2.8", and GPIO 36 is the touch IRQ.
+Two more pins Pueo does not drive: GPIO 34 is a CdS light sensor and GPIO 36
+is the touch IRQ.
 
 **The lcdwiki 4.0" E32R40T is pin-identical to the 3.5"** on every line
 lcdwiki publishes, at the same 320x480, differing only in the controller's
@@ -172,17 +167,16 @@ amplifier's DAC output rather than a plain speaker pin.
 The onboard RGB LED is gone on both. GPIO 4/16/17 are the only contiguous spare pins on
 this board, and three radios need six lines.
 
-## CC1101 CS is the one pin the two panels cannot share
+## CC1101 CS is 21, and the backlight is why
 
-The backlight moves between them: GPIO 21 on the 2.8" ESP32-2432S028R, GPIO 27
-on the 3.5" ESP32-3248S035R. Whichever one the display is not using is the one
-free for a chip select, so `CC1101_CS` is 27 on the 2.8" and 21 on the 3.5",
-selected by `PUEO_PANEL_35` in `board_pueo.h`.
+The stock CYD profile puts `CC1101_CS` on GPIO 27. On this board 27 is the
+backlight, so driving the chip select would dim the screen. 21 is free here
+for the same reason: the two pins swap roles between Sunton's 3.5" and their
+2.8", and this is the larger one.
 
-On the 3.5" that is a small bonus: 21 is on the Expand IO header (P3: GND,
-IO35, IO22, IO21) beside GDO0 and GDO2, so all three CC1101 control lines reach
-a connector instead of a pad. On the 2.8" board 27 is on CN1, which is also a
-header, so the count of soldered joints is the same either way.
+It is a small bonus rather than a compromise. 21 is on the Expand IO header
+(P3: GND, IO35, IO22, IO21) beside GDO0 and GDO2, so all three CC1101 control
+lines reach a connector instead of a pad.
 
 `tools/check_pinmap.py` reads the backlight pin out of `User_Setup cyd.h`
 rather than assuming it, so putting the select on the wrong one fails the

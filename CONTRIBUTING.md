@@ -18,11 +18,9 @@ Say what you are doing first, in
 this tree has a lot of load-bearing detail that is not obvious from reading
 it, and half an hour of conversation can save a rewrite.
 
-Two kinds of report are worth more than code here, because nobody working
-on it can produce them:
+One kind of report is worth more than code here, because nobody working on
+it can produce it:
 
-- **Anything from the 2.8&Prime; ESP32-2432S028R.** It is built every release
-  and has never been booted.
 - **A near miss**, such as the 3248S035**C** with capacitive touch. GPIO 25
   goes to its GT911 and this image drives a chip select into that pin.
 
@@ -45,12 +43,13 @@ which turned out to be load-bearing.
 **Arduino core 2.0.10 exactly. Do not bump it.** Newer cores change NimBLE
 and the WiFi driver in ways this tree depends on not changing.
 
+One board, the 3.5&Prime; ESP32-3248S035R. The 2.8&Prime; ESP32-2432S028R was
+supported up to 0.4.13; `PUEO_PANEL_35` went with it.
+
 Two builds exist, selected by environment:
 
 | | |
 |---|---|
-| `PUEO_PANEL_35=1` | 3.5&Prime; ESP32-3248S035R, the reference board |
-| `PUEO_PANEL_35=0` | 2.8&Prime; ESP32-2432S028R |
 | `PUEO_ROLE=detector` | the firmware |
 | `PUEO_ROLE=beacon` | PueoBeacon, the bench transmitter |
 
@@ -126,8 +125,8 @@ Follow what is there. The patterns that matter:
 - Exit a feature with `feature_exit_requested = true`, not `return` or
   `break` from inside its loop.
 - **Pin assignments belong in [board_pueo.h](ESP32-DIV/board_pueo.h)**, not
-  in feature files and not in `shared.h`. Pins that differ between the two
-  panels are `#if PUEO_PANEL_35`, and the header says why for each one.
+  in feature files and not in `shared.h`, and the header says why for each
+  one.
 - No blocking `delay()` over about 200 ms in a feature loop; use `millis()`.
 - Display writes go through the theme constants in `shared.h`.
 - `#pragma once` in new headers.
@@ -143,9 +142,9 @@ number, leave the reasoning where the number was.
 
 - One thing per pull request.
 - Target the **`pueo`** branch.
-- Say **which panel you tested on**, and say so plainly if you only
-  compiled. Compile-only is acceptable for the 2.8&Prime;, since nobody has
-  a booted one, but it has to be stated rather than implied.
+- Say plainly if you only compiled rather than running it on a board. That
+  is often fine; it is not fine to leave it to be assumed. The 2.8&Prime; was
+  dropped because compile-only was all it ever had.
 - Include the check output if you added or changed one.
 
 Commit messages: a short subject line in the imperative, then prose

@@ -319,8 +319,10 @@ the feature has its own switch turned off.
 
 ## A note on the 2.8 inch panel
 
-Pueo builds for two boards. The 3.5 inch ESP32-3248S035R is the one this has
-been run on. The 2.8 inch ESP32-2432S028R compiles and is released every
-version, but nobody has booted one. If you are using it and something in
-this guide does not match what you see, that is worth reporting rather than
-assuming you have it wrong.
+Pueo is for the 3.5 inch ESP32-3248S035R and nothing else.
+
+It used to build a 2.8 inch ESP32-2432S028R image as well. That image was
+released every version and nobody ever booted one, so it was never support in
+any sense you could rely on, and it is gone after 0.4.13. Those releases are
+still published if you want to try one, and the last of them is where to
+start; nothing after it will run on that board at all.

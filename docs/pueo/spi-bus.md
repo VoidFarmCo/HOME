@@ -12,21 +12,24 @@ clock.
 The ESP32 has two general-purpose SPI peripherals. TFT_eSPI takes HSPI for the
 display. Everything else shares VSPI:
 
-This table is the 2.8" ESP32-2432S028R. Two rows move on the 3.5"
-ESP32-3248S035R: the XPT2046 is on the display's bus rather than this one, so
-it is not a contender for MISO at all, and `CC1101_CS` is 21 rather than 27
-because 27 is that panel's backlight. Everything else is identical.
-
 | device | CS | SCK | MISO | MOSI | driver behaviour |
 |---|---|---|---|---|---|
-| XPT2046 touch | 33 | 25 | **39** | 32 | own `beginTransaction`, 2 MHz |
 | SD card | 5 | 18 | **19** | 23 | own frequency via `SD.begin` |
-| CC1101 | 27 * | 18 | **19** | 23 | **bare `SPI.transfer()`, no transaction** |
-| NRF24 | 4 | 18 | **19** | 23 | own `beginTransaction`, 16 MHz |
+| CC1101 | 21 | 18 | **19** | 23 | **bare `SPI.transfer()`, no transaction** |
+| NRF24 | 25 | 18 | **19** | 23 | own `beginTransaction`, 16 MHz |
 | PN532 | 17 | 18 | 19 | 23 | **bit-bangs the pads**, LSB-first |
 
-Touch is the one that was missing from the handoff's list, and it is the one
-that matters most, because it is the only input device on a CYD.
+**Touch is not on this bus, and most of this file is about the board where it
+was.** The 3.5" ESP32-3248S035R hangs its XPT2046 off the display's own SPI
+behind `TOUCH_CS`. The 2.8" ESP32-2432S028R, which this tree built until
+0.4.13, gave touch its own pins at 33/25/39/32 on VSPI, which made it a fifth
+contender here and the worst one, because it is the only input device on a
+CYD and its failure mode is a screen that stops responding.
+
+The analysis below was done against that board, and it is kept rather than
+trimmed for two reasons. The four devices above still share one MISO between
+them, so the mechanism is the same with one fewer contender. And the SpiBus
+layer it produced is what the firmware runs today.
 
 ## The real conflict is the GPIO matrix, not the clock
 

@@ -18,33 +18,32 @@ understanding before anything is drawn.
 
 ## Why it cannot plug in
 
-**This board is drawn for the 2.8" ESP32-2432S028R.** The 3.5"
-ESP32-3248S035R is a supported panel for the firmware but not for this
-carrier: it is a different outline, two of the signals below land elsewhere
-on it, and the touch controller is not on VSPI. Adapting J1 is a second-spin
-question, not an edit to this table.
+**This board is drawn for the 3.5" ESP32-3248S035R**, which is the only panel
+the firmware supports. It was drawn for the 2.8" ESP32-2432S028R until that
+panel was dropped after 0.4.13, and retargeting it cost three rows of J1 and
+nothing else: the outline comes from the enclosure base rather than from the
+display, and the base does not change with the panel.
 
-The two are `CC1101_CS`, GPIO 21 rather than 27, and `NRF24 CSN`, GPIO 25
-rather than 4. Both splits are panel-driven and both are in `board_pueo.h`:
-the backlight and the chip select swap 21 and 27 between the panels, and 25
-is free on the 3.5" because its touch controller hangs off the display's SPI
-rather than taking its own bus at 25/32/39. Named here because this paragraph
-used to say "two of the signals" and then name one of them, which is the
-shape of a sentence somebody adapts one row against and ships with the other
-still wrong.
+The three are `CC1101_CS`, GPIO 21 rather than 27 and on a header rather than
+a pad; `NRF24 CSN`, GPIO 25 rather than 4; and the serial connector, which
+this board calls P1 and the other called P5. The first two are in
+`board_pueo.h` and always were: the backlight and the chip select swap 21 and
+27 between the two boards, and 25 is free here because this panel's touch
+controller hangs off the display's SPI instead of taking its own bus at
+25/32/39.
 
 Of the ten signals the firmware needs, only four reach a CYD header:
 
 | signal | GPIO | where it is |
 |---|---|---|
-| CC1101 CS | 27 | CN1 header |
+| CC1101 CS | 21 | P3 header |
 | CC1101 GDO0 | 22 | P3 header |
 | CC1101 GDO2 | 35 | P3 header |
-| GPS RX | 1 | P5 JST |
+| GPS RX | 1 | P1 JST |
 | VSPI SCK | 18 | **microSD slot pin** |
 | VSPI MOSI | 23 | **microSD slot pin** |
 | VSPI MISO | 19 | **microSD slot pin** |
-| NRF24 CSN | 4 | **RGB LED pad** |
+| NRF24 CSN | 25 | **module pad** |
 | NRF24 CE | 16 | **RGB LED pad** |
 | PN532 SS | 17 | **RGB LED pad** |
 
@@ -55,7 +54,7 @@ one documented place** instead of thirty scattered across four modules — and
 an intermittent joint on MISO presents exactly like the bus faults that cost
 a week of firmware archaeology, so reducing their count is not cosmetic.
 
-**[verify]** Confirm CN1/P3/P5 pinouts against your actual board before
+**[verify]** Confirm the P3 and P1 pinouts against your actual board before
 committing. CYD revisions differ, and the silkscreen is the authority.
 
 ## Architecture
@@ -83,21 +82,18 @@ thinner. Lid hinge/flex cycles argue for GH.
 | 4 | VSPI_SCK | GPIO 18 | SD slot pad |
 | 5 | VSPI_MOSI | GPIO 23 | SD slot pad |
 | 6 | VSPI_MISO | GPIO 19 | SD slot pad |
-| 7 | CC1101_CS | GPIO 27 | CN1 |
+| 7 | CC1101_CS | GPIO 21 | P3 |
 | 8 | CC1101_GDO0 | GPIO 22 | P3 |
 | 9 | CC1101_GDO2 | GPIO 35 | P3, input-only on the ESP32 side |
-| 10 | NRF_CSN | GPIO 4 | LED pad |
+| 10 | NRF_CSN | GPIO 25 | module pad, not a header |
 | 11 | NRF_CE | GPIO 16 | LED pad |
 | 12 | PN532_SS | GPIO 17 | LED pad |
 | 13 | GPS_TX | GPIO 1 | **through R1, see below** |
 | 14 | GND | GND | |
 
-**Three rows move on the 3.5"**, and this is the whole list. Pin 7
-`CC1101_CS` goes to GPIO 21 and reaches P3 rather than CN1, which puts all
-three CC1101 control lines on one header. Pin 10 `NRF_CSN` goes to GPIO 25.
-Pin 13 `GPS_TX` keeps GPIO 1 but the connector is called P1 rather than P5.
-Nothing else changes: the VSPI three, `NRF_CE`, `PN532_SS` and the grounds
-are the same on both panels.
+All three CC1101 control lines land on P3, which is the one place this board
+is easier than its predecessor: chip select, GDO0 and GDO2 reach a connector
+rather than costing a joint.
 
 Ground on pins 1, 2 and 14 so every signal has a return nearby. On a
 multi-drop SPI bus run through a cable this matters more than the pin count
@@ -831,7 +827,7 @@ this size. Not taken here, for three reasons:
 
 - It needs two control lines, TX_EN and RX_EN, and there is no spare pair on
   this board. The obvious candidates are gone: GPIO 4 is the RGB LED's red
-  channel and the 2.8" panel's NRF24 CSN, and GPIO 0 is a strapping pin that
+  channel, and GPIO 0 is a strapping pin that
   decides boot mode. The RGB LED gave up its three pins and UART0 gave up a
   fourth, so fitting a PA means J1 grows and something else moves.
 - It moves the power budget. +20 dBm on the RF rail is a different peak draw

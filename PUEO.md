@@ -10,11 +10,13 @@ board — the one this has run on, the one with a dimensioned enclosure, and
 the one that brings its SPI bus out on a connector rather than asking for
 three joints on a microSD slot.
 
-The 2.8" ESP32-2432S028R is built every release and **has never been
-booted**. It compiles clean and reproduces from its own archive; nobody has
-put it on a board. Treat it the way this project treats its radio claims --
-written carefully, not witnessed. It
-covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
+The 2.8" ESP32-2432S028R was supported up to 0.4.13 and is not any more. It
+was built every release and never booted, so what was published for it was an
+image that compiled rather than one that worked. Dropping it is what stops
+this tree carrying a second set of pin numbers nobody has ever checked
+against a board.
+
+Pueo covers WiFi and BLE reconnaissance, sub-GHz capture and replay, NFC read and
 clone, GPS wardriving and jam detection. It is a fork of CiferTech's
 ESP32-DIV, which is MIT; this fork is GPL-3.0-or-later. It diverges mainly
 in the parts

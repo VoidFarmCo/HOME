@@ -12,10 +12,10 @@ derived from the pin map in [hardware.md](hardware.md), which
 CYD schematic, and from module datasheets. Treat the order as reasoned and
 the timings as untested.
 
-**Which board you have changes where two wires go.** Step 2 found that the
-2.8" and the 3.5" do not agree about GPIO 4, and the pin map now follows the
-panel. Every place that matters is marked below; if you are building on a
-3.5", read those before you cut anything.
+**This is for the 3.5" Sunton ESP32-3248S035R and nothing else.** The 2.8"
+ESP32-2432S028R was supported up to 0.4.13; its image was built every release
+and never booted. Wiring instructions for a board nobody has run are worse
+than none, so they are gone with it.
 
 **The 3.5" connector table was rewritten on 2026-09-23** against a photograph
 of the actual board, which is Sunton's and has Sunton's two breakout headers
@@ -71,17 +71,19 @@ SMA is a module you replace.
 ### "Cheap yellow display" names at least four boards
 
 Two vendors, and they do not agree about GPIO 4. Get this wrong and the
-NRF24's chip select lands on an audio amplifier.
+NRF24's chip select lands on an audio amplifier. Only the second column is
+this build's board; the rest are here to be told apart from it.
 
-| | Sunton **ESP32-2432S028R** | Sunton **ESP32-3248S035R** | lcdwiki **E32R28T** | lcdwiki **E32R35T** |
+| | Sunton **ESP32-3248S035R** | lcdwiki **E32R35T** | Sunton **ESP32-2432S028R** | lcdwiki **E32R28T** |
 |---|---|---|---|---|
-| Size | 2.8" | 3.5" | 2.8" | 3.5" |
-| Driver | ILI9341 | ST7796 | ILI9341V | ST7796 |
-| RGB LED | **4** / 16 / 17 | **4** / 16 / 17 | **22** / 16 / 17 | **22** / 16 / 17 |
-| GPIO 4 is | the LED's red | the LED's red | **amp enable** | **amp enable** |
-| Backlight | 21 | **27** | 21 | 27 |
-| Breakouts | P3, CN1, P5 | **P3, CN1, P1** | 1.25 mm JST | SPI / I2C / UART JSTs |
-| Outline | ~56 × 92.5 mm | — | 50.00 × 86.00 | 55.50 × 101.50 |
+| | **this build** | not this | dropped after 0.4.13 | never supported |
+| Size | 3.5" | 3.5" | 2.8" | 2.8" |
+| Driver | ST7796 | ST7796 | ILI9341 | ILI9341V |
+| RGB LED | **4** / 16 / 17 | **22** / 16 / 17 | **4** / 16 / 17 | **22** / 16 / 17 |
+| GPIO 4 is | the LED's red | **amp enable** | the LED's red | **amp enable** |
+| Backlight | **27** | 27 | 21 | 21 |
+| Breakouts | **P3, CN1, P1** | SPI / I2C / UART JSTs | P3, CN1, P5 | 1.25 mm JST |
+| Outline | — | 55.50 × 101.50 | ~56 × 92.5 mm | 50.00 × 86.00 |
 
 **The 3.5" board this was built against is Sunton's, silkscreened
 `ESP32-035`** — the short form of `ESP32-3248S035R`, which is the part the
@@ -136,23 +138,21 @@ cutting one.
 None of this has been on a 4.0" board. It is two datasheets agreeing, which
 is a good reason to expect it to work and not the same thing as it working.
 
-If your 2.8" board's silkscreen reads `ESP32 2432S028`, it is the Sunton and
-the 2.8" column below is for you. If it reads `E32R28T`, it is not, and
-nothing in this tree has been built for it.
+### The board this tree builds for
 
-### The two panels this tree builds for
+| | 3.5″ ESP32-3248S035R |
+|---|---|
+| Display | ST7796, 320×480 |
+| Touch | XPT2046 on the display's SPI, CS 33 |
+| Backlight | GPIO 27 |
+| RGB LED | 4 / 16 / 17 |
+| GPIO 4 is | the LED's red channel |
+| GPIO 34 is | a CdS light sensor |
+| Flash image | `pueo-<ver>-merged.bin` |
 
-Both are sold as a "cheap yellow display" and they are not the same board.
-
-| | 2.8″ ESP32-2432S028R | 3.5″ ESP32-3248S035R |
-|---|---|---|
-| Display | ILI9341, 240×320 | ST7796, 320×480 |
-| Touch | XPT2046 on its own bus, 25/32/39 | XPT2046 on the display's SPI, CS 33 |
-| Backlight | GPIO 21 | GPIO 27 |
-| RGB LED | 4 / 16 / 17 | 4 / 16 / 17 |
-| GPIO 4 is | the LED's red channel | the LED's red channel |
-| GPIO 34 is | a CdS light sensor | a CdS light sensor |
-| Flash image | `pueo-<ver>-merged.bin` | `pueo-<ver>-35-merged.bin` |
+**That filename changed meaning.** Up to 0.4.13 the plain name was the 2.8"
+image and this board's carried a `-35`. From the next release the plain name
+is this board and there is no other.
 
 The 3.5" figures are from lcdwiki's E32R35T page and QDtech's outline drawing
 (V1.0, 2024-08-14): PCB 55.50 × 101.50 × 5.80 mm, corners R3.50, four 3.20 mm
@@ -226,28 +226,27 @@ shared bus lines are one spine there rather than nine wires, which is what they
 are electrically.
 
 **Six joints, on the board this was built against.** An earlier version of
-this table said three, because the 3.5" column described lcdwiki's E32R35T
-and the board in hand is Sunton's `ESP32-035`. Read the section under the
-table before you trust either column.
+this table said three, because it described lcdwiki's E32R35T and the board
+in hand is Sunton's `ESP32-035`. Read the section under the table before you
+trust it.
 
-| Signal | GPIO | 2.8" ESP32-2432S028R | 3.5" Sunton `ESP32-035` |
-|---|---|---|---|
-| CC1101 CS | 27 / 21 | see below | **P3**, `IO21` |
-| CC1101 GDO0 (TX) | 22 | P3, header | **P3**, `IO22` |
-| CC1101 GDO2 (RX) | 35 | P3, header | **P3**, `IO35` |
-| GPS TX → ESP32 | 1 | **P5** JST, `TX` | **P1** JST, `TX` |
-| VSPI SCK | 18 | module pad 9R, **solder** | module pad 9R, **solder** |
-| VSPI MOSI | 23 | module pad 2R, **solder** | module pad 2R, **solder** |
-| VSPI MISO | 19 | module pad 8R, **solder** | module pad 8R, **solder** |
-| NRF24 CSN | 4 / 25 | module pad 13R, **solder** | module pad 10L, **solder** |
-| NRF24 CE | 16 | module pad 12R, **solder** | module pad 12R, **solder** |
-| PN532 SS | 17 | module pad 11R, **solder** | module pad 11R, **solder** |
+| Signal | GPIO | Sunton `ESP32-035`, the 3.5" |
+|---|---|---|
+| CC1101 CS | 21 | **P3**, `IO21` |
+| CC1101 GDO0 (TX) | 22 | **P3**, `IO22` |
+| CC1101 GDO2 (RX) | 35 | **P3**, `IO35` |
+| GPS TX → ESP32 | 1 | **P1** JST, `TX` |
+| VSPI SCK | 18 | module pad 9R, **solder** |
+| VSPI MOSI | 23 | module pad 2R, **solder** |
+| VSPI MISO | 19 | module pad 8R, **solder** |
+| NRF24 CSN | 25 | module pad 10L, **solder** |
+| NRF24 CE | 16 | module pad 12R, **solder** |
+| PN532 SS | 17 | module pad 11R, **solder** |
 
 Not connected, deliberately: **NRF24 IRQ** (nothing in the tree reads it; the
 driver polls) and **GPS RX** (the module only ever talks).
 
-**The SPI bus is not brought out on either board, but do not solder to the
-microSD slot.** Earlier versions of this guide sent you to the card slot's own
+**The SPI bus is not brought out, but do not solder to the microSD slot.** Earlier versions of this guide sent you to the card slot's own
 pins for SCK, MOSI and MISO, and called those three joints the whole
 difficulty of the build, because the slot still has to work afterwards —
 Spotter's capture log and the wardriver both write to it.
@@ -307,26 +306,18 @@ worth knowing it is there before you go looking for spare pins.
 
 ### [verify] Read your own silkscreen before you cut a wire
 
-The 3.5" column was read off a photograph of the actual board, connector by
-connector. The 2.8" column was not, and one entry in it is now suspect:
+The table above was read off a photograph of the actual board, connector by
+connector. The version before it was not, and it was wrong twice.
 
-**`CC1101 CS` on the 2.8" is listed as reaching CN1, and on the board in hand
-CN1 carries `GND IO22 IO21 3.3V` with no IO27 on it.** If the two panels
-share Sunton's CN1 pinout — and they share P3's — then 27 is not on a
-connector there either and that build needs a seventh joint. Nobody has had a
-2.8" under a meter, so this is flagged rather than corrected.
+Two lessons out of that. The first is that "cheap yellow display" names at
+least four boards, and a render of one is not a description of another. The
+second is that this guide and [hardware.md](hardware.md) disagreed about where
+GDO0 lands — hardware.md had P3 and was right — and neither of them noticed,
+because prose does not get checked the way the pin map does.
 
-Two lessons in the same table. The first is that "cheap yellow display" names
-at least four boards and a render of one is not a description of another. The
-second is that this guide and [hardware.md](hardware.md) disagreed about
-where GDO0 lands on the 3.5" — hardware.md had P3 and was right — and neither
-of them noticed, because prose does not get checked the way the pin map does.
-
-The 2.8"'s serial connector is **P5**, a four-pin JST carrying `GND TX RX
-VIN`. This guide called it P1 until someone read it off a board -- and then
-applied the correction to both panels, which was wrong. **The 3.5"'s really
-is P1**, beside the USB-C socket, carrying `5V TX RX GND` with 5V nearest
-the corner mounting hole.
+**The serial connector is P1**, beside the USB-C socket, carrying
+`5V TX RX GND` with 5V nearest the corner mounting hole. This guide called it
+P5 for a while, which is what Sunton's smaller board calls its equivalent.
 
 Get that order off your own silkscreen before you crimp. The GPS's transmit
 line goes to the pin marked `TX` -- the ESP32's own UART0 transmit, GPIO 1 --
@@ -408,15 +399,15 @@ between two of the pads you just worked on.
 from +3V3_RF. Then the jamming detector: activity on screen is enough to say
 the bus and the chip select both work.
 
-**On a 3.5" board, CSN is GPIO 25, not GPIO 4.** Not because GPIO 4 is
-dangerous there — it is the RGB LED's red channel on this board, same as the
-2.8", and that was measured rather than read off a datasheet. The split came
-from believing 4 was an audio amplifier's enable, which is true of lcdwiki's
-E32R35T and not of this one. It stays on 25 because 25 is free there and the
-map is published. The firmware already picks 25; what this guide cannot do is
-solder the wire to the right pad for you. 25 is not on a header -- it is one of
-the pins the 2.8" uses for its separate touch bus, so on the 3.5" it is free but
-still needs finding on the silkscreen.
+**CSN is GPIO 25, not GPIO 4.** Not because GPIO 4 is dangerous — it is the
+RGB LED's red channel on this board, measured rather than read off a
+datasheet. The assignment came from believing 4 was an audio amplifier's
+enable, which is true of lcdwiki's E32R35T and not of this one. It stays on 25
+because 25 is free and the map is published. The firmware already picks 25;
+what this guide cannot do is solder the wire to the right pad for you. 25 is
+not on a header, and it is free here only because this board's touch
+controller shares the display's SPI rather than taking a bus of its own, so
+it still needs finding on the silkscreen.
 
 **5. NRF24.** CSN and CE to the RGB LED pads, power from +3V3_RF, and the
 10 µF at the module. The channel scanner should show a populated 2.4 GHz
@@ -443,10 +434,13 @@ exist at the same time. It returns when you leave the feature. This is
 inherent to the wiring, and the reasoning for choosing that pin over GPIO 3
 is in [hardware.md](hardware.md).
 
-**The RGB LED does nothing.** It is gone. On the 2.8" that is GPIO 4, 16 and 17;
-on the 3.5" the red channel is GPIO 22 instead of 4, and CC1101's GDO0 lands on
-it, so on that board the red LED flickers with sub-GHz traffic rather than going
-dark.
+**The RGB LED does nothing.** It is gone: GPIO 4, 16 and 17 are the NRF24's
+and the PN532's now.
+
+This paragraph used to say the red channel was GPIO 22 here, so the LED would
+flicker with sub-GHz traffic rather than go dark. That is lcdwiki's E32R35T.
+On this board, measured on 2026-09-23, GPIO 4 is red, 16 is blue, 17 is green
+and 22 is nothing at all.
 
 The LED is spent because those were the only contiguous spare pins on the
 board and three radios needed six lines. On the 3.5" the amplifier on GPIO 4

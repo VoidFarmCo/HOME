@@ -29,9 +29,10 @@ get soldered to the ESP-WROOM-32 module's own castellations either way; the
 3.5" is ahead because all three CC1101 control lines land on one 4-pin
 connector rather than two.
 
-The 2.8" **ESP32-2432S028R** is built every release and **has never been
-booted**. It compiles clean and reproduces from its own archive; nobody has
-put it on a board.
+The 2.8" **ESP32-2432S028R** was supported up to **0.4.13** and is not any
+more. It was built every release and never booted, so what shipped for it was
+an image that compiled rather than one that worked. Those releases are still
+published and still carry their digests.
 
 It covers Wi-Fi and BLE reconnaissance, sub-GHz capture and replay, NFC read
 and clone, GPS wardriving, and jam detection.
@@ -65,21 +66,18 @@ invasive to send back as a patch.
 
 ## Hardware
 
-A stock CYD (ESP32-WROOM-32, XPT2046 touch, SD slot) plus four modules. Pins
-are the 3.5" reference board's; where the 2.8" differs it is in the last
-column, and it is only ever the chip select.
+A stock CYD (ESP32-WROOM-32, XPT2046 touch, SD slot) plus four modules.
 
-| Module | Interface | 2.8" differs | Notes |
-|---|---|---|---|
-| CC1101 (HW-863) | VSPI, CS 21 | CS 27 | sub-GHz, board-mounted SMA |
-| NRF24L01+PA+LNA | VSPI, CSN 25 / CE 16 | CSN 4 | 2.4 GHz, needs its own 3.3 V rail |
-| PN532 V3 | VSPI, SS 17 | — | NFC, SPI mode |
-| ATGM336H | UART, TX into GPIO 1 | — | GPS, antenna on a u.FL pigtail |
+| Module | Interface | Notes |
+|---|---|---|
+| CC1101 (HW-863) | VSPI, CS 21 | sub-GHz, board-mounted SMA |
+| NRF24L01+PA+LNA | VSPI, CSN 25 / CE 16 | 2.4 GHz, needs its own 3.3 V rail |
+| PN532 V3 | VSPI, SS 17 | NFC, SPI mode |
+| ATGM336H | UART, TX into GPIO 1 | GPS, antenna on a u.FL pigtail |
 
-Both chip selects move for the same reason in opposite directions: the pin
-that is free on one panel is taken on the other. 27 is the 3.5"'s backlight;
-25 is the 2.8"'s touch clock. The display driver differs too, ST7796 against
-ILI9341, which is a one-line change in the TFT_eSPI setup.
+Both chip selects are where they are because the obvious pin was taken: 27 is
+the backlight, and the stock CYD profile puts a chip select on 25, which is
+the touch clock on the smaller board this used to build for as well.
 
 <p align="center">
   <img src="docs/img/pueo-inside-lid.webp" width="360"
@@ -258,11 +256,8 @@ bar, and what you did. A pin map or a serial log beats a description.
 everything else. *Q&A* for whether a particular CYD variant will work,
 *Show and tell* for builds and prints, *Ideas* for features.
 
-Two things are especially useful, because nobody here can produce them:
+One thing is especially useful, because nobody here can produce it:
 
-- **Anything from the 2.8&Prime; ESP32-2432S028R.** It is built every release
-  and has never been booted. It compiles clean and reproduces from its own
-  archive, and that is the entire extent of what is known about it.
 - **A board that is nearly but not quite this one.** The
   3248S035**C** with capacitive touch is the obvious case: GPIO 25 goes to
   its GT911, and this image drives a chip select into that pin. If you have
