@@ -49,4 +49,35 @@ void powerDown();
 /** Channel the carrier is on, or 0xFF when it is not running. */
 uint8_t channel();
 
+/* ── the passive side ────────────────────────────────────────────────────
+ * The same chip will tell you whether anything else is on air, which is a
+ * more useful thing to do with it than transmitting.
+ *
+ * What it gives you is the RPD: one bit, latched while the receiver is on,
+ * set when the channel carried more than about -64 dBm. Not a level, not a
+ * spectrum, and not calibrated. Sample a channel repeatedly and count the
+ * ones and you have an occupancy figure; that is the whole instrument.
+ *
+ * -64 dBm is high. A strong nearby transmitter shows and a weak distant one
+ * does not, so an empty result means "nothing loud here" rather than
+ * "nothing here". Worth remembering before reading a flat sweep as quiet.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Receiver on for RPD sampling. Stops any carrier first. */
+void startReceiver();
+
+/** True when RPD latched on `ch`. Dwell is on top of the 130 us settle. */
+bool sampleRpd(uint8_t ch, uint16_t dwellUs = 40);
+
+/** Receiver off, chip still powered. */
+void stopReceiver();
+
+/* The band, in this chip's own channel numbering: centre = 2400 + n MHz.
+ *
+ * RF_CH takes 0..125, which reaches 2525 and runs 41 MHz past the top of
+ * the ISM allocation. A sweep has no business up there, so these are the
+ * limits every caller should use rather than the register's range. */
+constexpr uint8_t kChanMin = 0;    // 2400 MHz
+constexpr uint8_t kChanMax = 83;   // 2483 MHz, ISM ends at 2483.5
+
 }  // namespace Nrf24Raw

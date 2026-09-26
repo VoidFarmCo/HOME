@@ -19,6 +19,7 @@ constexpr uint8_t REG_EN_AA      = 0x01;
 constexpr uint8_t REG_SETUP_RETR = 0x04;
 constexpr uint8_t REG_RF_CH      = 0x05;
 constexpr uint8_t REG_RF_SETUP   = 0x06;
+constexpr uint8_t REG_RPD        = 0x09;
 constexpr uint8_t REG_TX_ADDR    = 0x10;
 
 constexpr uint8_t CMD_W_REGISTER   = 0x20;
@@ -28,6 +29,12 @@ constexpr uint8_t CMD_REUSE_TX_PL  = 0xE3;
 
 /* CONFIG */
 constexpr uint8_t CFG_PWR_UP  = 0x02;
+constexpr uint8_t CFG_PRIM_RX = 0x01;
+
+/* RPD, bit 0. Latched while the receiver is on and cleared by dropping CE,
+ * which is why each channel is sampled with its own CE up and down rather
+ * than by leaving the receiver running across the sweep. */
+constexpr uint8_t RPD_SIGNAL  = 0x01;
 
 /* RF_SETUP. CONT_WAVE and PLL_LOCK together are what make the output an
  * unmodulated carrier rather than a transmission. RF_DR_HIGH with RF_DR_LOW
@@ -187,6 +194,59 @@ void powerDown() {
 
 uint8_t channel() {
   return s_channel;
+}
+
+void startReceiver() {
+  if (!s_present) {
+    return;
+  }
+  stop();                            // carrier bits cleared, FIFO flushed
+  SpiBus::claim(SpiBus::Dev::Nrf24);
+
+  ceLow();
+  writeReg(REG_EN_AA, 0x00);         // no auto-acknowledge, so nothing replies
+  writeReg(REG_SETUP_RETR, 0x00);
+
+  /* RF_SETUP without CONT_WAVE or PLL_LOCK. Data rate still matters: the RPD
+   * threshold is measured through the receiver's own filter, so 2 Mbps gives
+   * a wider window than 1 Mbps would and sees more of what is next door. */
+  writeReg(REG_RF_SETUP, RF_DR_HIGH | RF_PWR_MAX);
+  writeReg(REG_CONFIG, CFG_PWR_UP | CFG_PRIM_RX);
+  delayMicroseconds(kPowerUpUs);
+  s_channel = 0xFF;
+}
+
+bool sampleRpd(uint8_t ch, uint16_t dwellUs) {
+  if (!s_present) {
+    return false;
+  }
+  SpiBus::claim(SpiBus::Dev::Nrf24);
+
+  /* CE down, retune, CE up, wait, read, CE down again.
+   *
+   * The last step is not tidiness. RPD latches on and is only cleared by
+   * leaving RX, so a sweep that leaves CE high reads the first busy channel
+   * it found for every channel after it, and comes back saying the whole
+   * band is occupied. */
+  ceLow();
+  writeReg(REG_RF_CH, ch);
+  ceHigh();
+  delayMicroseconds(kSettleUs + dwellUs);
+  const uint8_t rpd = readReg(REG_RPD);
+  ceLow();
+
+  s_channel = ch;
+  return (rpd & RPD_SIGNAL) != 0;
+}
+
+void stopReceiver() {
+  if (!s_present) {
+    return;
+  }
+  SpiBus::claim(SpiBus::Dev::Nrf24);
+  ceLow();
+  writeReg(REG_CONFIG, CFG_PWR_UP);  // back to primary TX, idle
+  s_channel = 0xFF;
 }
 
 }  // namespace Nrf24Raw
