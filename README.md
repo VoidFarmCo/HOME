@@ -252,6 +252,30 @@ Mostly the parts that decide whether the hardware works at all:
 - **Warnings** — `-w` and `-zmuldefs` removed from the build, and the
   underlying issues fixed rather than silenced
 
+And the ones that were giving wrong answers rather than crashing:
+
+- **GPS** — NMEA sentences are checked against their own checksum before
+  anything parses them. `stripChecksum()` truncated at the `*` and threw the
+  two hex digits away, so a corrupted RMC still looked like a well formed
+  RMC, with a plausible latitude and timestamp, and the wardriver wrote it
+  to the card as a real fix. A sentence with no checksum at all is rejected
+  too, because truncation is the likely corruption here and a sentence cut
+  before its `*` would otherwise pass with its remaining fields intact and
+  wrong.
+- **CC1101 presence** — read back `PARTNUM` and `VERSION` over SPI and check
+  the answer is one a CC1101 would give, twice, because a floating line can
+  look like a version once. Before this the sub-GHz tools started against a
+  radio that was not there and hung. All five features that use the radio go
+  through the guard: Replay Attack, Sub-GHz Jammer, Sub-GHz Brute, Jamming
+  Detector and Saved Profiles.
+- **Scratch AP** — the interface the WiFi tools raise to push raw frames had
+  a fixed WPA2 passphrase written into the source, so every unit running
+  this brought up a visible network with a published key. It is hidden and
+  open now and carries no key at all.
+- **BLE spoofers** — the random MAC each round generated was never applied
+  to the adapter, so Sour Apple and the spoofer transmitted from the same
+  address every time.
+
 ## License
 
 **GPL-3.0-or-later** for this fork's own code — see [LICENSE](LICENSE).
