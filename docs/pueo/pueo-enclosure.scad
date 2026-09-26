@@ -228,10 +228,16 @@ USB_Y     = -62;    // and where it sits along the base's right wall
  * is sound.
  *
  * USB_D is the hole that worked, not the socket. At 14 it is wider than the
- * lid is thick, so it takes the full wall height and there is room to shrink
- * it once somebody measures the socket itself. Left generous deliberately:
- * a cable that will not seat is worse than an opening that shows daylight,
- * and this is the end you plug into. */
+ * lid is thick, so it takes the full wall height.
+ *
+ * Confirmed by fit on 2026-09-25, not by a caliper on the socket. This was
+ * written as "left generous deliberately, there is room to shrink it once
+ * somebody measures the socket itself", which was a hedge. It is the right
+ * size: the plug seats, the opening does not show daylight around it. Do not
+ * shrink it to a measurement of the socket and call that an improvement --
+ * the socket is not what has to pass through, the moulded boot of whatever
+ * cable is in your hand is, and those vary. 14 is the number that took a
+ * real cable on a real print. */
 USB_LID_X = -0.5;   // very nearly centred on the width
 USB_LID_Z = 1.0;    // above the lid's mating face, near the board's underside
 USB_LID_D = 14.0;
