@@ -169,45 +169,30 @@ def main():
 
     # The lid itself: the deboss must remove what the artwork says it will.
     #
-    # Both panels, not just the default. What this caught was an owl hanging
-    # off the bottom of a lid that had got shorter, and there is no reason
-    # that can only happen on one of them.
+    # What this caught was an owl hanging off the bottom of a lid that had got
+    # shorter, which the render did not show and no printed part ever would
+    # have: LOGO is off by default.
     lid_scad = 'use <%s/pueo-enclosure.scad>\n' % scad_dir
     with open(SCAD, encoding="utf-8") as f:
         text = f.read()
     depth = float(re.search(r"LOGO_DEPTH\s*=\s*([\d.]+)", text).group(1))
+    lh = float(re.search(r"LOGO_H\s*=\s*([-\d.]+)", text).group(1))
 
-    def panel_value(name):
-        """LOGO_H follows the panel now, so read both branches."""
-        m = re.search(name + r'\s*=\s*\(PANEL == "3\.5"\)\s*\?\s*([-\d.]+)'
-                      r'\s*:\s*([-\d.]+)', text)
-        if m:
-            return {"3.5": float(m.group(1)), "2.8": float(m.group(2))}
-        m = re.search(name + r"\s*=\s*([-\d.]+)", text)
-        v = float(m.group(1))
-        return {"3.5": v, "2.8": v}
-
-    heights = panel_value("LOGO_H")
-
-    for panel in ("3.5", "2.8"):
-        lh = heights[panel]
-        print('lid, %s" panel, LOGO_H = %g:' % (panel, lh))
-        defines = ['PART="lid"', 'PANEL="%s"' % panel]
-        on = render(exe, lid_scad + "lid();\n", tmp, "lidon" + panel,
-                    defines + ["LOGO=true"])
-        off = render(exe, lid_scad + "lid();\n", tmp, "lidoff" + panel,
-                     defines + ["LOGO=false"])
-        removed = volume(off) - volume(on)
-        want = ink * (lh / float(ph)) ** 2 * depth
-        # Clipping is what a volume shortfall means, so say that rather than
-        # leaving the next person to work back from a number.
-        case("nothing clipped", removed >= want * (1 - TOL_AREA),
-             "all of the owl is on the lid")
-        case("deboss volume", abs(removed - want) / want < TOL_AREA,
-             "%.1f mm3 (want %.1f, at %g mm tall x %g deep)"
-             % (removed, want, lh, depth))
-        case("LOGO=false is a no-op on volume", volume(off) > volume(on),
-             "%.1f vs %.1f mm3" % (volume(off), volume(on)))
+    print("lid, LOGO_H = %g:" % lh)
+    defines = ['PART="lid"']
+    on = render(exe, lid_scad + "lid();\n", tmp, "lidon", defines + ["LOGO=true"])
+    off = render(exe, lid_scad + "lid();\n", tmp, "lidoff", defines + ["LOGO=false"])
+    removed = volume(off) - volume(on)
+    want = ink * (lh / float(ph)) ** 2 * depth
+    # Clipping is what a volume shortfall means, so say that rather than
+    # leaving the next person to work back from a number.
+    case("nothing clipped", removed >= want * (1 - TOL_AREA),
+         "all of the owl is on the lid")
+    case("deboss volume", abs(removed - want) / want < TOL_AREA,
+         "%.1f mm3 (want %.1f, at %g mm tall x %g deep)"
+         % (removed, want, lh, depth))
+    case("LOGO=false is a no-op on volume", volume(off) > volume(on),
+         "%.1f vs %.1f mm3" % (volume(off), volume(on)))
 
     print()
     print("ok -- %d checks" % checks)

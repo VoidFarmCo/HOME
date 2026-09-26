@@ -29,11 +29,10 @@
 // =====================================================
 
 /* ══════════════════ BUILD OPTIONS ══════════════════
- * The five that change what you get. Everything else in this file is
+ * The four that change what you get. Everything else in this file is
  * geometry that follows from them.
  *
  *   PART       "base" | "lid" | "both"   which part renders
- *   PANEL      "3.5"  | "2.8"            which CYD it is cut for
  *   EXT_CHARGER  false  | true             a TP4056 rides inside
  *   INSERTS    true   | false            M3 heat-set, or self-tapped
  *   LOGO       false  | true             the owl in the lid
@@ -41,15 +40,14 @@
  * "both" is for looking at, not for printing: it lays the two parts side
  * by side in one solid.
  *
- * A base and a lid have to come from the same PANEL. The bezel moves with
- * the panel and the microSD slot is placed from the bezel, so the base
- * differs per panel as well, not just the lid.
+ * Cut for the 3.5" ESP32-3248S035R. There was a PANEL option and a set of
+ * 2.8" numbers behind it; they were never printed, and the firmware stopped
+ * supporting that panel after 0.4.13.
  *
  * From the command line, -D overrides any of these:
- *   openscad -D 'PART="lid"' -D 'PANEL="2.8"' -o lid-28.stl pueo-enclosure.scad
+ *   openscad -D 'PART="lid"' -o lid.stl pueo-enclosure.scad
  */
 PART      = "base";
-PANEL     = "3.5";
 EXT_CHARGER = false;
 INSERTS   = true;
 LOGO      = false;
@@ -486,9 +484,7 @@ LID_H     = 12;
  * too. A base built at one setting does not pair with a lid built at the
  * other.
  *
- * Render with:  openscad -D PART=\"lid\" -D PANEL=\"2.8\" ...
- *
- * PANEL is set in BUILD OPTIONS at the top.
+ * Render with:  openscad -D PART=\"lid\" ...
  */
 
 /* 3.5" numbers are from QDtech's E32R35T outline drawing, V1.0 2024-08-14,
@@ -517,15 +513,15 @@ LID_H     = 12;
  * 0.5 -- looser, not tighter, which is why a drawing of the wrong board
  * still produced a part that fits. Do not tighten it on the strength of the
  * datasheet: that document says 240x320 and 320x480 four lines apart. */
-BEZEL_W   = (PANEL == "3.5") ? 56.0 : 56.0;   // board + 0.5 clearance
-BEZEL_L   = (PANEL == "3.5") ? 102.0 : 92.5;
+BEZEL_W   = 56.0;    // board + 0.5 clearance
+BEZEL_L   = 102.0;
 
 /* Corner radius of the window. The 3.5" board's own corners are R3.50, so a
  * 2 mm window leaves four crescents of lid covering the PCB corners.
  *
  * Only the 2.8" cuts a board-sized window now; see the block below for what
  * the 3.5" does instead. */
-BEZEL_R   = (PANEL == "3.5") ? 3.5 : 2;
+BEZEL_R   = 3.5;
 
 /* ---------- 3.5" screen: aperture, rebate, and four M3 posts ----------
  *
@@ -673,7 +669,7 @@ SCREEN_LED_D   =  3.2;    // a light pipe, or just a hole
  * Measuring the drawing's own pixels puts the socket centre at 42.6 mm from
  * the top against the 43.61 the dimension chain gives, and its mouth about
  * 3 mm in from the edge. The dimensioned number is the one used.       */
-SD_SLOT   = (PANEL == "3.5");
+SD_SLOT   = true;
 SD_SIDE   = -1;       // left edge viewed from the front, per the Back view
 SD_Y      = 7.14;     // mm above the board centre, from the dimension chain
 SD_W      = 16;       // opening along the board's length
@@ -688,7 +684,7 @@ SD_Z      = LID_H - SCREEN_LIP - SCREEN_STACK - SCREEN_PCB_T - 1.0;
 
 /* The longer window eats into the chin. Nudging it 2 mm toward the top,
  * where nothing lives, keeps a printable margin around the owl. */
-BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the face
+BEZEL_Y   = 2;       // shift the screen up/down the face
 
 /* ---------- owl, debossed into the lid face ----------
  *
@@ -739,9 +735,9 @@ BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the fa
  * real answer there is different artwork, not a smaller copy of this one.
  */
 // LOGO is set in BUILD OPTIONS at the top; true puts the owl in the chin.
-LOGO_H     = (PANEL == "3.5") ? 25 : 19;       // largest that fits the band
+LOGO_H     = 25;     // largest that fits the band
 LOGO_DEPTH = 0.6;    // cut into a 2.5 mm skin, so 1.9 mm is left under it
-LOGO_Y     = (PANEL == "3.5") ? -55.3 : -58.1; // centre of the chin band
+LOGO_Y     = -55.3;  // centre of the chin band
 
 // 8 px of the artwork's 474 is its thinnest stroke.
 LOGO_STROKE = LOGO_H * 8 / 474;
@@ -1325,11 +1321,10 @@ module lid() {
             // screw pillars matching the base bosses
             for (p = BOSS_POS)
                 translate([p[0], p[1], 0]) cylinder(h=LID_H, r=BOSS_R);
-            // 3.5" screen posts, hanging off the plate down to the PCB's
-            // top face. Height falls out of the stack: the module's front
-            // bears on the lip, so the PCB sits SCREEN_STACK below it.
-            if (PANEL == "3.5")
-                for (dx = [-1, 1], dy = [-1, 1])
+            // Screen posts, hanging off the plate down to the PCB's top
+            // face. Height falls out of the stack: the module's front bears
+            // on the lip, so the PCB sits SCREEN_STACK below it.
+            for (dx = [-1, 1], dy = [-1, 1])
                     translate([dx * SCREEN_HOLE_DX,
                                BEZEL_Y + dy * SCREEN_HOLE_DY,
                                LID_H - SCREEN_LIP - SCREEN_STACK])
@@ -1347,25 +1342,18 @@ module lid() {
                 rotate([90, 0, 0])
                     cylinder(h = 4 * WALL, d = USB_LID_D, center = true);
 
-        // The window. On the 2.8" this is still the board's outline; on the
-        // 3.5" it is the screen's aperture, with the rebate cut below it.
-        if (PANEL == "3.5") {
-            // aperture, through the lip
-            translate([0, BEZEL_Y + SCREEN_APER_DY, LID_H - 2.5 - 1])
-                linear_extrude(2.5 + 2)
-                    rrect(SCREEN_APER_W, SCREEN_APER_L, SCREEN_APER_R);
-            // rebate for the module, from the plate's underside up to the lip
-            translate([0, BEZEL_Y, LID_H - 2.5])
-                linear_extrude(2.5 - SCREEN_LIP + 0.01)
-                    rrect(SCREEN_MOD_W, SCREEN_MOD_L, SCREEN_MOD_R);
-        } else {
-            translate([0, BEZEL_Y, -1])
-                linear_extrude(LID_H+2) rrect(BEZEL_W, BEZEL_L, BEZEL_R);
-        }
+        // The window: the screen's aperture, with the rebate cut below it.
+        // aperture, through the lip
+        translate([0, BEZEL_Y + SCREEN_APER_DY, LID_H - 2.5 - 1])
+            linear_extrude(2.5 + 2)
+                rrect(SCREEN_APER_W, SCREEN_APER_L, SCREEN_APER_R);
+        // rebate for the module, from the plate's underside up to the lip
+        translate([0, BEZEL_Y, LID_H - 2.5])
+            linear_extrude(2.5 - SCREEN_LIP + 0.01)
+                rrect(SCREEN_MOD_W, SCREEN_MOD_L, SCREEN_MOD_R);
         // RGB LED, in the strip above the screen -- position checked on a print
-        if (PANEL == "3.5")
-            translate([SCREEN_LED_X, BEZEL_Y + SCREEN_LED_Y, LID_H - 2.5 - 1])
-                cylinder(h = 2.5 + 2, d = SCREEN_LED_D);
+        translate([SCREEN_LED_X, BEZEL_Y + SCREEN_LED_Y, LID_H - 2.5 - 1])
+            cylinder(h = 2.5 + 2, d = SCREEN_LED_D);
         // screw clearance holes, countersunk from outside
         for (p = BOSS_POS)
             translate([p[0], p[1], 0]) {
@@ -1373,8 +1361,7 @@ module lid() {
                 translate([0,0,LID_H-2.2]) cylinder(h=2.4, r1=1.7, r2=3.2);
             }
         // pilot holes down the screen posts
-        if (PANEL == "3.5")
-            for (dx = [-1, 1], dy = [-1, 1])
+        for (dx = [-1, 1], dy = [-1, 1])
                 translate([dx * SCREEN_HOLE_DX,
                            BEZEL_Y + dy * SCREEN_HOLE_DY,
                            LID_H - SCREEN_LIP - SCREEN_STACK - 0.5])

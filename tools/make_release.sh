@@ -237,15 +237,12 @@ Pueo ${VERSION} - source archive
   tools/build.sh merge      single flash image at offset 0
   tools/build.sh upload COM7
 
-Builds for the 3.5" ESP32-3248S035R by default. For the 2.8" ESP32-2432S028R
-put PUEO_PANEL=28 in front of every one of those:
+Builds for the 3.5" ESP32-3248S035R, which is the only panel this supports.
 
-  PUEO_PANEL=28 tools/build.sh
-  PUEO_PANEL=28 tools/build.sh merge
-
-The panels differ in the display driver, the backlight pin, CC1101's chip
-select and which SPI bus touch is on. The wrong image is a dark screen
-rather than an error.
+The 2.8" ESP32-2432S028R was supported up to 0.4.13 and is not any more. It
+was built every release and never booted, so what was published for it was
+an image that compiled, not one that worked. Those releases are still there
+and still carry their digests, and 0.4.13 is the last of them.
 
 Requires arduino-cli and Python 3 with Pillow (only for the bitmap tools).
 
@@ -274,48 +271,41 @@ rm -rf "$STAGE"
 SIZE=$(du -b "$OUT/${NAME}.zip" | cut -f1)
 echo "$OUT/${NAME}.zip  ($(( SIZE / 1024 )) KB)"
 
-# One image per CYD panel, because the two are not interchangeable: the
-# display driver, the backlight pin, CC1101's chip select and which SPI bus
-# the touch controller sits on all move between them. Flashing the wrong one
-# is a dark screen, not an error message, so it is not a thing to let someone
-# discover on their own board.
+# One detector image, for the 3.5" ESP32-3248S035R.
 #
-# The unsuffixed name keeps meaning what it has meant since 0.1.0 -- the 2.8"
-# ESP32-2432S028R -- even though the tree itself now defaults to the 3.5".
-# Repointing a filename whose digest is already published elsewhere is how a
-# checksum starts failing for a reason nobody can reconstruct later.
+# THE PLAIN NAME CHANGED MEANING. From 0.1.0 until the 2.8" was dropped,
+# pueo-<version>-merged.bin was the 2.8" image and the 3.5" carried a -35
+# suffix. It is now the 3.5", and there is no 2.8" image at all.
 #
-# Build path comes from build.sh rather than being spelled again here; it
-# moved with the panel once already.
+# Repointing a published filename is normally exactly the wrong thing to do:
+# a digest somebody kept starts failing for a reason nobody can reconstruct.
+# It is survivable here only because every published digest stays in
+# CHANGELOG.txt beside the downloads, the old releases are not rewritten, and
+# the alternative was a -35 suffix that no longer distinguishes anything.
+# The release notes have to say it in as many words. Anyone who flashes the
+# plain name out of habit on a 2.8" board gets a dark screen, not an error.
+#
+# Build path comes from build.sh rather than being spelled again here.
 if [ "$WITH_BIN" = "1" ]; then
-  for panel in 28 35; do
-    case "$panel" in
-      28) suffix="";    label='2.8"' ;;
-      35) suffix="-35"; label='3.5"' ;;
-    esac
-    out="$OUT/pueo-${VERSION}${suffix}-merged.bin"
-    PUEO_PANEL="$panel" bash tools/build.sh >/dev/null
-    PUEO_PANEL="$panel" bash tools/build.sh merge >/dev/null
-    cp "$(PUEO_PANEL="$panel" bash tools/build.sh path)/pueo-merged.bin" "$out"
-    echo "$out  ($(( $(du -b "$out" | cut -f1) / 1024 )) KB)  $label panel"
-  done
+  out="$OUT/pueo-${VERSION}-merged.bin"
+  bash tools/build.sh >/dev/null
+  bash tools/build.sh merge >/dev/null
+  cp "$(bash tools/build.sh path)/pueo-merged.bin" "$out"
+  echo "$out  ($(( $(du -b "$out" | cut -f1) / 1024 )) KB)  3.5\" panel"
 
-  # The bench beacon, 3.5" only.
+  # The bench beacon.
   #
   # It is a transmitter, and everything else built here is a receiver, so it
-  # carries the role in its name rather than only a panel: "beacon" has to be
-  # in the filename of anything somebody might flash by reaching for the
-  # wrong line. The detector images keep the names they have had since 0.1.0.
-  #
-  # 3.5" only because that is the panel the second board is. A 2.8" beacon
-  # would compile and reproduce and nobody would have booted it, and an
-  # unbooted transmitter is a worse thing to publish than an unbooted
-  # receiver -- the receiver fails by finding nothing.
+  # carries the role in its name: "beacon" has to be in the filename of
+  # anything somebody might flash by reaching for the wrong line. The -35 is
+  # kept although it no longer distinguishes a panel, because this exact
+  # filename is already published against three releases' digests and the
+  # suffix costs nothing.
   bout="$OUT/pueo-${VERSION}-beacon-35-merged.bin"
-  PUEO_ROLE=beacon PUEO_PANEL=35 bash tools/build.sh >/dev/null
-  PUEO_ROLE=beacon PUEO_PANEL=35 bash tools/build.sh merge >/dev/null
-  cp "$(PUEO_ROLE=beacon PUEO_PANEL=35 bash tools/build.sh path)/pueo-merged.bin" "$bout"
-  echo "$bout  ($(( $(du -b "$bout" | cut -f1) / 1024 )) KB)  bench TRANSMITTER, 3.5\" panel"
+  PUEO_ROLE=beacon bash tools/build.sh >/dev/null
+  PUEO_ROLE=beacon bash tools/build.sh merge >/dev/null
+  cp "$(PUEO_ROLE=beacon bash tools/build.sh path)/pueo-merged.bin" "$bout"
+  echo "$bout  ($(( $(du -b "$bout" | cut -f1) / 1024 )) KB)  bench TRANSMITTER"
 fi
 
 ( cd "$OUT" && sha256sum pueo-${VERSION}-* > "pueo-${VERSION}.sha256" )
