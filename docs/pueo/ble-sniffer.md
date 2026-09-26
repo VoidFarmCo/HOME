@@ -114,7 +114,7 @@ Neither name says, so:
 | output | scrolling event log | paged list, then a per-device detail view |
 | detail | none | name, MAC, RSSI, TX power, appearance, service UUIDs named where standard, manufacturer and service data |
 | alerts | two, both unreliable | none |
-| transmits | never | only **Info**, on the one device you have open |
+| transmits | scan requests, unless stealth | scan requests, plus a connection when you press **Info** |
 | Classic | dead code for it | none attempted |
 
 Scanner is the one to reach for when the question is "what is that device",

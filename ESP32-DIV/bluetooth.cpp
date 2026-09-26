@@ -4371,10 +4371,12 @@ static const char* bleServiceName(uint16_t uuid) {
 /* Connect to the device currently shown and read its Device Information
  * Service.
  *
- * This is the one thing in the BLE scanner that transmits. It is behind the
- * detail view, so reaching it means the operator picked a device out of a
- * list and opened it, and it names the address on screen before it starts.
- * Nothing here sweeps: one device, one connection, reads only.
+ * This is the one thing in the BLE scanner that opens a connection. The scan
+ * is active unless stealth is on, so the scanner was never silent, but a
+ * connection is a different order of loud. It is behind the detail view, so
+ * reaching it means the operator picked a device out of a list and opened it,
+ * and it names the address on screen before it starts. Nothing here sweeps:
+ * one device, one connection, reads only.
  *
  * What it answers is "which build is this", which an advertisement never
  * says. A vendor that bumps a revision string with a fix makes patch status

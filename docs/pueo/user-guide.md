@@ -113,9 +113,13 @@ standard ones.
 
 **Info** in the detail view connects to that one device and reads its Device
 Information Service, which is where a device publishes its manufacturer,
-model, serial number and its firmware, hardware and software versions. It is
-the only thing in the scanner that transmits, it connects to the device you
-have open and nothing else, and it only reads. Not every device publishes
+model, serial number and its firmware, hardware and software versions. It
+connects to the device you have open and nothing else, and it only reads.
+
+It is the only thing in the scanner that connects to anything. The scan
+itself is not silent either: a BLE scan asks every advertiser it hears for
+its name unless stealth mode is on. A connection is louder than asking,
+which is why this one needs a button. Not every device publishes
 one; when there is none you are told that, separately from a device that
 would not accept the connection at all.
 

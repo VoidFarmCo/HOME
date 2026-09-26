@@ -168,9 +168,12 @@ named where the SIG assigned them, and **Info** connects to the device on
 screen and reads its Device Information Service: manufacturer, model, serial,
 and the firmware, hardware and software revision strings.
 
-That read is the only thing in the scanner that transmits. One device, chosen
-by the operator, reads only, nothing outside `0x180A`, and refused under
-Stealth Mode. What it is for is the question an advertisement never answers:
+That read is the only thing in the scanner that opens a connection. The scan
+was never silent: a BLE scan is active unless told otherwise and sends a scan
+request to every advertiser it hears, which is one of the things Stealth Mode
+makes passive. A connection is a different order of loud, so the read is one
+device, chosen by the operator, reads only, nothing outside `0x180A`, and
+refused under Stealth Mode. What it is for is the question an advertisement never answers:
 not what a device is, but which build it is running, which is the question
 underneath whether something has been patched.
 
