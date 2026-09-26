@@ -5,10 +5,19 @@
 an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and an ATGM336H for GPS, in
 a printed enclosure zoned to keep the radios apart.
 
+<p align="center">
+  <img src="docs/img/pueo-assembled.webp" width="420"
+       alt="The assembled Pueo: a purple 3D-printed case with a 3.5 inch screen
+            showing the main menu, eight tiles in two columns, with two antennas
+            standing off the top edge.">
+</p>
+
 Two panels, one image each. The **3.5" ESP32-3248S035R** is the reference
-board: it is the one this has run on, the one with a dimensioned enclosure,
-and the one that brings its SPI bus out on a connector instead of asking you
-to solder to the microSD slot's pins.
+board: it is the one this has run on and the one with a dimensioned
+enclosure. Neither panel breaks out the SPI bus, so six of the ten signals
+get soldered to the ESP-WROOM-32 module's own castellations either way; the
+3.5" is ahead because all three CC1101 control lines land on one 4-pin
+connector rather than two.
 
 The 2.8" **ESP32-2432S028R** is built every release and **has never been
 booted**. It compiles clean and reproduces from its own archive; nobody has
@@ -31,7 +40,9 @@ and clone, GPS wardriving, and jam detection.
 
 Pueo is a fork of **[ESP32-DIV](https://github.com/cifertech/ESP32-DIV) by
 CiferTech**, which is MIT. This fork is GPL-3.0-or-later. Nearly every
-feature here is theirs; go star the original.
+feature here is theirs; go star the original, and if you want to support the
+work this is built on, [their Patreon](https://www.patreon.com/cifertech) is
+the place rather than this repo's sponsor button.
 
 Forked at `90f7967c4dc7bcd8c09ebdcf421886737516ddc2` (upstream main,
 2026-09-01, eleven commits past `v1.7.2`). Upstream is kept as a read-only
@@ -44,14 +55,35 @@ invasive to send back as a patch.
 
 ## Hardware
 
-A stock CYD (ESP32-WROOM, ILI9341, XPT2046 touch, SD slot) plus:
+A stock CYD (ESP32-WROOM-32, XPT2046 touch, SD slot) plus four modules. Pins
+are the 3.5" reference board's; where the 2.8" differs it is in the last
+column, and it is only ever the chip select.
 
-| Module | Interface | Notes |
-|---|---|---|
-| CC1101 (HW-863) | VSPI, CS 27 | sub-GHz, board-mounted SMA |
-| NRF24L01+PA+LNA | VSPI, CSN 4 / CE 16 | 2.4 GHz, needs its own 3.3 V rail |
-| PN532 V3 | VSPI, SS 17 | NFC, SPI mode |
-| ATGM336H | UART, RX on GPIO 1 | GPS, antenna on a u.FL pigtail |
+| Module | Interface | 2.8" differs | Notes |
+|---|---|---|---|
+| CC1101 (HW-863) | VSPI, CS 21 | CS 27 | sub-GHz, board-mounted SMA |
+| NRF24L01+PA+LNA | VSPI, CSN 25 / CE 16 | CSN 4 | 2.4 GHz, needs its own 3.3 V rail |
+| PN532 V3 | VSPI, SS 17 | — | NFC, SPI mode |
+| ATGM336H | UART, TX into GPIO 1 | — | GPS, antenna on a u.FL pigtail |
+
+Both chip selects move for the same reason in opposite directions: the pin
+that is free on one panel is taken on the other. 27 is the 3.5"'s backlight;
+25 is the 2.8"'s touch clock. The display driver differs too, ST7796 against
+ILI9341, which is a one-line change in the TFT_eSPI setup.
+
+<p align="center">
+  <img src="docs/img/pueo-inside-lid.webp" width="360"
+       alt="The inside of the printed lid with the display board screwed into
+            it, a USB-C cable running out through an opening in the end wall
+            and a microSD card seated in its socket.">
+  <img src="docs/img/pueo-enclosure.webp" width="440"
+       alt="The enclosure rendered from its OpenSCAD source: the base with its
+            module pockets on the left, the lid with its display window on the
+            right.">
+</p>
+
+<p align="center"><sub>Left: the board in the lid, both openings in use.
+Right: the two printed parts, rendered from source.</sub></p>
 
 Three of those pins are the CYD's onboard RGB LED, which Pueo gives up. The
 GPS lands on GPIO 1 — UART0's *transmit* pin — which looks wrong and is

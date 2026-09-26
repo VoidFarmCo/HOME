@@ -706,13 +706,43 @@ BEZEL_Y   = (PANEL == "3.5") ? 2 : 0;         // shift the screen up/down the fa
  * smaller copy of this one.
  *
  * LOGO_Y sits it in the chin, between the screen window and the bottom
- * wall. That band runs -82.5 to -46.25, and the screw pillars either side
- * are at x +/-36.5, which a ~29 mm wide logo on the centreline never reaches.
+ * wall, and both numbers below follow the lid rather than being chosen.
+ *
+ * They were wrong for a year of edits. The band used to run -82.5 to -46.25
+ * on a 170 mm lid and LOGO_Y = -65.5 centred a 30 mm owl in it. The case is
+ * 142 now, the lid ends at -71, and that same -65.5 put nine and a half
+ * millimetres of the owl past the bottom edge. Only 69% of the deboss
+ * survived, which is what check_logo_scale.py had been reporting.
+ *
+ * What bounds the band is where the outer face still has its full 2.5 mm,
+ * not where the window is. Above the rebate the skin thins to SCREEN_LIP,
+ * and a 0.6 cut into 1.0 of material leaves 0.4. So the ceiling is the
+ * rebate edge on the 3.5" and the board window on the 2.8":
+ *
+ *   3.5"   BEZEL_Y - SCREEN_MOD_L/2  = -40.68   band -68.00 .. -42.68
+ *   2.8"   BEZEL_Y - BEZEL_L/2       = -46.25   band -68.00 .. -48.25
+ *
+ * after 3 mm off the bottom edge and 2 mm off the window. The screw pillars
+ * at x +/-36 are never reached by a logo this narrow on the centreline.
+ *
+ * [WARNING] the 2.8" cannot really carry this artwork. 19 mm is all that
+ * fits and its thinnest strokes come out at 19 * 8/474 = 0.32 mm, under one
+ * extrusion on a 0.4 nozzle, so they close up as the first layer squashes.
+ * It is rendered anyway rather than silently dropped, with the echo below
+ * saying so, because LOGO is opt-in and the choice is the printer's. The
+ * real answer there is different artwork, not a smaller copy of this one.
  */
 // LOGO is set in BUILD OPTIONS at the top; true puts the owl in the chin.
-LOGO_H     = 30;     // artwork height in mm; see the note above before shrinking
+LOGO_H     = (PANEL == "3.5") ? 25 : 19;       // largest that fits the band
 LOGO_DEPTH = 0.6;    // cut into a 2.5 mm skin, so 1.9 mm is left under it
-LOGO_Y     = (PANEL == "3.5") ? -65.5 : -64;   // centre of the chin band
+LOGO_Y     = (PANEL == "3.5") ? -55.3 : -58.1; // centre of the chin band
+
+// 8 px of the artwork's 474 is its thinnest stroke.
+LOGO_STROKE = LOGO_H * 8 / 474;
+if (LOGO && LOGO_STROKE < 0.4)
+    echo(str("WARNING: the logo's thinnest strokes are ", LOGO_STROKE,
+             " mm at LOGO_H = ", LOGO_H,
+             ", under one extrusion on a 0.4 nozzle. They will close up."));
 LOGO_SVG   = "pueo-owl.svg";
 LOGO_PX_W  = 462;    // the SVG's own viewBox, so scaling stays honest
 LOGO_PX_H  = 474;
