@@ -1,205 +1,169 @@
-# Contributing to ESP32-DIV
+# Contributing to Pueo
 
-Thank you for your interest in contributing to **ESP32-DIV**! This document outlines the process for reporting bugs, requesting features, and submitting code or documentation improvements.
+Pueo is a fork of [ESP32-DIV](https://github.com/cifertech/ESP32-DIV) by
+CiferTech, targeting a stock "cheap yellow display" with modules bolted on.
+This file used to be upstream's, unedited, which meant it sent people to
+their repository and their branches. It is Pueo's now.
 
----
-
-## Table of Contents
-
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [How to Contribute](#how-to-contribute)
-  - [Reporting Bugs](#reporting-bugs)
-  - [Suggesting Features](#suggesting-features)
-  - [Submitting Pull Requests](#submitting-pull-requests)
-- [Development Setup](#development-setup)
-- [Coding Standards](#coding-standards)
-- [Commit Message Guidelines](#commit-message-guidelines)
-- [Branch Naming](#branch-naming)
+If you want to contribute to ESP32-DIV itself, go there instead. Fixes that
+are not CYD-specific are often better off upstream, and several from this
+fork have gone that way.
 
 ---
 
-## Code of Conduct
+## Before you write anything
 
-By participating in this project you agree to be respectful and constructive. Harassment, discrimination, or abusive behaviour of any kind will not be tolerated.
+Say what you are doing first, in
+[an issue or a discussion](README.md#issues-or-discussions). Not ceremony:
+this tree has a lot of load-bearing detail that is not obvious from reading
+it, and half an hour of conversation can save a rewrite.
 
----
+Two kinds of report are worth more than code here, because nobody working
+on it can produce them:
 
-## Getting Started
-
-1. **Fork** the repository using the Fork button at the top of the page.
-2. **Clone** your fork locally:
-   ```bash
-   git clone https://github.com/<your-username>/ESP32-DIV.git
-   cd ESP32-DIV
-   ```
-3. Create a new **branch** for your change:
-   ```bash
-   git checkout -b feat/your-descriptive-branch-name
-   ```
-4. Make your changes, then **commit** and **push** to your fork.
-5. Open a **Pull Request** against the `dev` branch of `cifertech/ESP32-DIV`.
-
-> All PRs target `dev` first. Once tested and verified on real hardware, changes are merged into `main` as part of a release.
+- **Anything from the 2.8&Prime; ESP32-2432S028R.** It is built every release
+  and has never been booted.
+- **A near miss**, such as the 3248S035**C** with capacitive touch. GPIO 25
+  goes to its GT911 and this image drives a chip select into that pin.
 
 ---
 
-## How to Contribute
+## Building
 
-### Reporting Bugs
-
-Before opening a bug report, please:
-
-- Search [existing issues](https://github.com/cifertech/ESP32-DIV/issues) to avoid duplicates.
-- Check the [Troubleshooting & FAQ](README.md#troubleshooting--faq) section of the README.
-
-When creating a bug report, include:
-
-| Field | Details |
-|---|---|
-| **Firmware version** | e.g. v1.7.2 |
-| **Hardware revision** | v1 / v2 / CYD / with Shield |
-| **Arduino IDE version** | e.g. 2.3.2 |
-| **ESP32 board package version** | 2.0.10 (Espressif) |
-| **Steps to reproduce** | Numbered, minimal steps |
-| **Expected behaviour** | What should happen |
-| **Actual behaviour** | What actually happens |
-| **Serial output / logs** | Paste relevant output in a code block |
-
-### Suggesting Features
-
-- Open a [Discussion](https://github.com/cifertech/ESP32-DIV/discussions) first before writing any code this ensures the feature fits the project direction.
-- Describe the use case, not just the implementation idea.
-- If the feature requires hardware changes, note which modules or pins are involved.
-- Once discussed and approved, open an [issue](https://github.com/cifertech/ESP32-DIV/issues/new) with the label `enhancement`.
-
-### Submitting Pull Requests
-
-- Keep PRs **focused** one feature or fix per PR.
-- **Test on real hardware** before submitting compile-only checks are not enough. Note which board version you tested on (v1, v2, or CYD).
-- Reference the related issue in the PR description: `Fixes #123` or `Closes #456`.
-- Ensure your branch is up to date with `dev` before opening a PR:
-  ```bash
-  git fetch upstream
-  git rebase upstream/dev
-  ```
-- Fill in the PR template completely.
-- All PRs require review from a maintainer before merging.
-
----
-
-## Development Setup
-
-### Requirements
-
-| Tool | Version |
-|---|---|
-| Arduino IDE | 2.x (recommended) |
-| ESP32 board package (Espressif) | **2.0.10 exactly** |
-| Python + esptool | For manual flashing |
-
-### Installing the ESP32 Board Package
-
-1. Open Arduino IDE → **File → Preferences**.
-2. Add this URL to *Additional Boards Manager URLs*:
-   ```
-   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-   ```
-3. Go to **Tools → Board → Boards Manager**, search for `esp32`, and install version **2.0.10** by Espressif Systems. Do not use a newer version it may cause compatibility issues.
-
-### Replacing platform.txt
-
-After installing the board package, you must replace the default `platform.txt` with the one included in the repo:
-
-- Find the file in the repo at `Flash File/platform.txt`
-- Replace the file in your Arduino15 ESP32 package directory:
-  - **Windows:** `C:\Users\<user>\AppData\Local\Arduino15\packages\esp32\hardware\esp32\2.0.10\platform.txt`
-  - **macOS:** `~/Library/Arduino15/packages/esp32/hardware/esp32/2.0.10/platform.txt`
-  - **Linux:** `~/.arduino15/packages/esp32/hardware/esp32/2.0.10/platform.txt`
-
-### Installing Libraries
-
-Copy every folder inside `Libraries/` from the repo into your Arduino `libraries` directory. **Do not use the Library Manager versions** the repo includes customized versions required for correct pin mapping and display configuration.
-
-Key libraries included:
-
-- `TFT_eSPI`
-- `PCF8574`
-- `XPT2046_Touchscreen`
-- `NimBLE-Arduino`
-- `RCSwitch`
-- `ELECHOUSE_CC1101_SRC_DRV`
-- `arduinoFFT`
-
-### Arduino IDE Settings
-
-| Setting | Value |
-|---|---|
-| Board | ESP32S3 Dev Module (v2) / ESP32 Dev Module (v1, CYD) |
-| Flash Size | 16MB |
-| Partition Scheme | Minimal SPIFFS |
-| PSRAM | OPI PSRAM |
-| Upload Speed | 921600 |
-
-### Entering Download Mode
-
-If the board does not enter download mode automatically during upload, hold **BOOT**, press **RESET**, then release **BOOT** before clicking Upload.
-
----
-
-## Coding Standards
-
-- Follow the existing **namespace-per-feature** pattern (`namespace WifiScan { ... }`).
-- Every feature module must expose at minimum a `Setup()` and `Loop()` function.
-- Use `feature_exit_requested = true` to exit a feature loop rather than calling `return` or `break` directly inside the loop.
-- Avoid blocking `delay()` calls longer than **200 ms** inside feature loops use non-blocking timing with `millis()`.
-- All display writes should respect the active theme via `UI_BG`, `UI_FG`, `UI_TEXT`, `UI_ICON`, and `UI_ACCENT` constants defined in `shared.h`.
-- Hardware-specific pin assignments belong in `shared.h` using `#if defined(CONFIG_IDF_TARGET_ESP32S3)` / `#elif defined(CONFIG_IDF_TARGET_ESP32)` guards never hardcode pins directly in feature files.
-- Do **not** use `Serial.print` in production code paths use the built-in Serial Monitor feature or TFT debug overlays.
-- Use `#pragma once` instead of header guards for new header files.
-
----
-
-## Commit Message Guidelines
-
-Follow the **Conventional Commits** specification:
-
-```
-<type>(<scope>): <short summary>
-
-[optional body]
-[optional footer]
+```bash
+bash tools/build.sh
 ```
 
-| Type | When to use |
-|---|---|
-| `feat` | New feature or module |
-| `fix` | Bug fix |
-| `docs` | Documentation only changes |
-| `refactor` | Code change with no feature or fix |
-| `chore` | Build, CI, dependency updates |
-| `style` | Formatting, whitespace (no logic change) |
+That is the build. There is no Arduino IDE workflow to follow, no
+`platform.txt` to swap by hand, and no libraries to copy into place;
+`build.sh` does all of it and strips upstream's `-w` and `-zmuldefs` so the
+compiler is allowed to talk. See
+[docs/pueo/warnings.md](docs/pueo/warnings.md) and
+[zmuldefs.md](docs/pueo/zmuldefs.md) for what those two were hiding, one of
+which turned out to be load-bearing.
 
-**Examples:**
-```
-feat(wifi): add Karma Attack to WiFi menu
-fix(rfid): resolve crash when no card is present on startup
-fix(v1): correct battery ADC pin assignment in shared.h
-docs: update CONTRIBUTING with dev branch workflow
-chore(ci): add Arduino compile check workflow
-```
+**Arduino core 2.0.10 exactly. Do not bump it.** Newer cores change NimBLE
+and the WiFi driver in ways this tree depends on not changing.
+
+Two builds exist, selected by environment:
+
+| | |
+|---|---|
+| `PUEO_PANEL_35=1` | 3.5&Prime; ESP32-3248S035R, the reference board |
+| `PUEO_PANEL_35=0` | 2.8&Prime; ESP32-2432S028R |
+| `PUEO_ROLE=detector` | the firmware |
+| `PUEO_ROLE=beacon` | PueoBeacon, the bench transmitter |
 
 ---
 
-## Branch Naming
+## What has to pass
 
-| Pattern | Example |
-|---|---|
-| `feat/<description>` | `feat/karma-attack` |
-| `fix/<description>` | `fix/wifi-scanner-nvs-crash` |
-| `docs/<description>` | `docs/add-contributing-guide` |
-| `chore/<description>` | `chore/update-libraries` |
+```bash
+for t in tools/check_*.py; do python "$t" || echo "FAIL $t"; done
+```
+
+All of them, before a pull request. They are not lint. Each one exists
+because something specific went wrong and shipped:
+
+- `check_menu_dispatch.py` and `check_menu_tables.py` exist because a menu
+  rebalance renumbered branches without their bodies, and ARP exited into
+  Hidden SSID for a release.
+- `check_nrf24_rpd.py` exists because the RPD latches, so a sweep that
+  forgets to drop CE reports the whole band busy and looks plausible doing
+  it.
+- `check_pinmap.py` runs inside the build, because two features claiming
+  one pin is the failure this hardware makes easiest.
+
+**If you fix a bug that a check would have caught, add the check.** Then
+break the fix on purpose and confirm the check fails. A check that has
+never failed has not been tested.
+
+The build must stay `-Wall -Wextra` clean.
 
 ---
 
-> Questions? Start a [Discussion](https://github.com/cifertech/ESP32-DIV/discussions) or open an [Issue](https://github.com/cifertech/ESP32-DIV/issues). We appreciate every contribution, no matter how small!
+## Licensing, which is stricter here than upstream
+
+Upstream is MIT. **This fork is GPL-3.0-or-later**, and that constrains what
+can be added.
+
+Release 0.2.2 removed RF24 because it is **GPL-2.0-only**, which cannot
+lawfully share a binary with arduinoFFT or NimBLE-Arduino. The conflict was
+inherited and sat there from 0.1.0. 0.2.1 is pinned on the download page
+forever as the last release that contained it.
+
+So, for any new dependency:
+
+- MIT, BSD, Apache-2.0 and GPL-3.0-or-later are fine.
+- **GPL-2.0-only is not**, no matter how convenient the library is.
+- If you need what a GPL-2.0-only library does, drive the registers. That is
+  what [Nrf24Raw](ESP32-DIV/Nrf24Raw.h) is, and the interface to that part
+  turned out to be twenty lines.
+
+See [docs/pueo/licensing.md](docs/pueo/licensing.md).
+
+---
+
+## Reproducible builds
+
+Every release's `merged.bin` rebuilds byte-identically from its own
+`-src.zip`. That is a published property, checked before each release, and
+it is worth not breaking.
+
+It means no timestamps, no build counters, and no absolute paths in the
+image. `build.sh` passes `-ffile-prefix-map` for the last one. Extract to a
+short path such as `C:\pv` when verifying: NimBLE's sources sit deep enough
+that a temp directory blows past Windows' path limit, and a junction does
+not help because the compiler canonicalises through it.
+
+---
+
+## Code
+
+Follow what is there. The patterns that matter:
+
+- **Namespace per feature**, exposing `Setup()` and `Loop()`.
+- Exit a feature with `feature_exit_requested = true`, not `return` or
+  `break` from inside its loop.
+- **Pin assignments belong in [board_pueo.h](ESP32-DIV/board_pueo.h)**, not
+  in feature files and not in `shared.h`. Pins that differ between the two
+  panels are `#if PUEO_PANEL_35`, and the header says why for each one.
+- No blocking `delay()` over about 200 ms in a feature loop; use `millis()`.
+- Display writes go through the theme constants in `shared.h`.
+- `#pragma once` in new headers.
+
+**Comments should say why, not what.** This tree is unusual in how much it
+explains, and that is deliberate: most of the hard-won facts in it are
+things that look like mistakes until you know the reason. If you move a
+number, leave the reasoning where the number was.
+
+---
+
+## Pull requests
+
+- One thing per pull request.
+- Target the **`pueo`** branch.
+- Say **which panel you tested on**, and say so plainly if you only
+  compiled. Compile-only is acceptable for the 2.8&Prime;, since nobody has
+  a booted one, but it has to be stated rather than implied.
+- Include the check output if you added or changed one.
+
+Commit messages: a short subject line in the imperative, then prose
+explaining why. Look at `git log` before writing one. The convention here is
+that the message carries the reasoning that does not fit in a comment.
+
+---
+
+## Code of conduct
+
+Be respectful and constructive. Harassment, discrimination, or abuse of any
+kind is not welcome here.
+
+---
+
+## A word about what this is for
+
+Pueo transmits, and several of its features jam or impersonate. It is for
+networks and devices you own or have written permission to test.
+Contributions that only make sense for use against other people's equipment
+are not wanted, and neither is help with that.
