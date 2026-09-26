@@ -1,0 +1,65 @@
+# Pueo beacon spammer, SSID list.
+#
+# Copy to the root of the microSD card as /ssids.txt. One name per line.
+# Blank lines and lines starting with # are skipped. Names longer than 32
+# characters are truncated, because 32 is the 802.11 limit. The first 64
+# names are used; anything after that is ignored.
+#
+# Without this file the firmware falls back to a list built into the image,
+# and says so on screen when it starts. That built-in list is the same in
+# every copy of this firmware, which makes it a fingerprint: broadcasting it
+# announces the tool rather than blending into anything. That is the reason
+# this file exists.
+#
+# Two of the built-ins are kept here by request.
+
+LookMaNoCables
+ItHurtsWhen_IP
+
+# --- the rest, none of which are in the built-in list ---
+
+Abandon_All_Packets
+Bandwidth_Bandit
+Bring_Your_Own_Bytes
+Broadcast_Storm
+Cable_Optional
+Certificate_Expired
+Connection_Refused
+Definitely_The_Router
+Dial_Up_Nostalgia
+Do_Not_Resuscitate
+Drop_Bear_Networks
+Ethernet_Is_Fine_Too
+Fibre_Optic_Illusion
+Ghost_In_The_Cable
+Gigabit_Aspirations
+Handshake_Pending
+Hertz_So_Good
+Hotspot_The_Dog
+Latency_Lounge
+Layer_8_Problem
+Mildly_Encrypted
+Modem_Warfare
+Nacho_WiFi
+No_Carrier
+Not_The_Neighbours
+Packet_Loss_Prevention
+Ping_Of_Destiny
+Please_Stand_By
+Port_Forward_Unto_Dawn
+Probably_A_Fridge
+Router_Under_Duress
+Signal_Not_Found
+Silent_But_Deadline
+Subnet_Dwellers
+Switching_Fabric_Softener
+Terms_And_Conditions
+The_Cake_Is_A_LAN
+The_Promised_LAN
+Throughput_And_Through
+Transmission_Denied
+Two_Point_Four_Only
+Unplug_And_Pray
+Very_Secure_Network
+Wire_We_Still_Here
+Zero_Bars_Of_Effort

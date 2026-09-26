@@ -2,6 +2,7 @@
 #include "Eapol.h"
 #include "KeyboardUI.h"
 #include "SettingsStore.h"
+#include "SpiBus.h"
 #include "Touchscreen.h"
 #include "config.h"
 #include "esp_ota_ops.h"
@@ -1054,7 +1055,14 @@ bool btnRightPress;
 bool btnSelectPress;
 bool btnDownPress;
 
-static const char* ssidList[] = {
+/* The fallback, used when the card has nothing to say.
+ *
+ * These are jokes, and that is the problem with relying on them: a fixed
+ * set is a fingerprint. Anyone who has seen this firmware once knows
+ * Wu-Tang_LAN on sight, so the broadcast identifies the tool rather than
+ * blending into anything. Fine for a demo, useless for a test where the
+ * names are supposed to mean something. Hence the file below. */
+static const char* kBuiltinSsids[] = {
   "404_SSID_Not_Found", "Free_WiFi_Promise", "PrettyFlyForAWiFi", "Wi-Fight_The_Power",
   "Tell_My_WiFi_LoveHer", "Wu-Tang_LAN", "LAN_of_the_Free", "No_More_Data",
   "Panic!_At_the_WiFi", "HideYoKidsHideYoWiFi", "Definitely_Not_A_Spy", "Click_and_Die",
@@ -1067,7 +1075,80 @@ static const char* ssidList[] = {
   "Meme_LANd"
 };
 
-static const int ssidCount = sizeof(ssidList) / sizeof(ssidList[0]);
+static const int kBuiltinCount = sizeof(kBuiltinSsids) / sizeof(kBuiltinSsids[0]);
+
+/* /ssids.txt, one name per line. 32 is the 802.11 limit for an SSID, so a
+ * longer line is truncated rather than rejected; 64 entries is where the
+ * static buffer was capped, which is 2 KB and more names than a beacon
+ * round-trip wants anyway. */
+static constexpr int kMaxFileSsids = 64;
+static constexpr int kSsidMaxLen   = 32;
+static const char*   kSsidFilePath = "/ssids.txt";
+
+/* Heap, not .bss. At 64 x 33 this is 2112 bytes and the link fails:
+ * `dram0_0_seg' overflowed by 1808. Static space here is spent, heap is
+ * not, and the lifetime is honest anyway because nothing outside this
+ * feature reads the list. */
+typedef char SsidSlot[kSsidMaxLen + 1];
+static SsidSlot* s_fileSsids     = nullptr;
+static int       s_fileSsidCount = 0;
+
+static void freeSsidBuffer() {
+  if (s_fileSsids) {
+    free(s_fileSsids);
+    s_fileSsids = nullptr;
+  }
+  s_fileSsidCount = 0;
+}
+
+/* Loaded from the card, or the built-ins. One accessor pair so the five
+ * call sites below do not each have to know which. */
+static int spamSsidCount() {
+  return s_fileSsidCount > 0 ? s_fileSsidCount : kBuiltinCount;
+}
+
+static const char* spamSsidAt(int i) {
+  return s_fileSsidCount > 0 ? s_fileSsids[i] : kBuiltinSsids[i];
+}
+
+/* Returns the number read. Zero is not an error: no card, no file, or a
+ * file of nothing but comments all mean "use the built-ins", and the caller
+ * says which on screen rather than failing. */
+static int loadSsidsFromSd() {
+  freeSsidBuffer();
+
+  SpiBus::claim(SpiBus::Dev::Sd);
+  if (!SD.exists(kSsidFilePath)) {
+    return 0;
+  }
+  File f = SD.open(kSsidFilePath, FILE_READ);
+  if (!f) {
+    return 0;
+  }
+
+  s_fileSsids = (SsidSlot*)malloc(sizeof(SsidSlot) * kMaxFileSsids);
+  if (!s_fileSsids) {
+    /* Out of heap is a fallback, not a failure: the built-ins still work. */
+    f.close();
+    return 0;
+  }
+
+  while (f.available() && s_fileSsidCount < kMaxFileSsids) {
+    String line = f.readStringUntil('\n');
+    line.trim();                       /* also drops the \r on CRLF files */
+    if (line.length() == 0 || line[0] == '#') {
+      continue;
+    }
+    if (line.length() > kSsidMaxLen) {
+      line = line.substring(0, kSsidMaxLen);
+    }
+    strncpy(s_fileSsids[s_fileSsidCount], line.c_str(), kSsidMaxLen);
+    s_fileSsids[s_fileSsidCount][kSsidMaxLen] = '\0';
+    s_fileSsidCount++;
+  }
+  f.close();
+  return s_fileSsidCount;
+}
 
 uint8_t spamchannel = 1;
 bool    spam        = false;
@@ -1246,7 +1327,17 @@ void output() {
   }
   delay(200);
 
-  printLine(70 + y_offset, UI_WARN, "[!] SSID list ready");
+  /* Which list, said out loud. A silent fallback is the worst of the three
+   * outcomes: you would be broadcasting the built-in jokes while believing
+   * you were broadcasting your own file. */
+  const int fromCard = loadSsidsFromSd();
+  if (fromCard > 0) {
+    printLine(70 + y_offset, UI_WARN,
+              "[+] " + String(fromCard) + " SSIDs from /ssids.txt");
+  } else {
+    printLine(70 + y_offset, UI_WARN,
+              "[!] No /ssids.txt, using " + String(spamSsidCount()) + " built-in");
+  }
   delay(150);
 
   printLine(80 + y_offset, UI_WARN, "[!] Cycling all SSIDs");
@@ -1255,7 +1346,7 @@ void output() {
   printLine(110 + y_offset, UI_TEXT, "[*] Starting broadcast");
   delay(150);
 
-  const int maxLines = min(ssidCount, min(18, spamMaxListLines()));
+  const int maxLines = min(spamSsidCount(), min(18, spamMaxListLines()));
   for (int i = 0; i < maxLines; i++) {
     const int y = 130 + i * 10 + y_offset;
     if (!spamYFits(y, 10)) {
@@ -1264,7 +1355,7 @@ void output() {
     tft.setTextColor(WHITE, TFT_BLACK);
     tft.setCursor(2, y);
     tft.print("[+] ");
-    tft.print(ssidList[i]);
+    tft.print(spamSsidAt(i));
     delay(40);
   }
 
@@ -1276,9 +1367,10 @@ void spammer() {
     spamchannel = 1;
   }
 
-  const int idx = s_ssidIdx % ssidCount;
-  s_ssidIdx = (uint8_t)((s_ssidIdx + 1) % ssidCount);
-  const char* ssid = ssidList[idx];
+  const int n = spamSsidCount();
+  const int idx = s_ssidIdx % n;
+  s_ssidIdx = (uint8_t)((s_ssidIdx + 1) % n);
+  const char* ssid = spamSsidAt(idx);
 
   // Stable locally-administered MAC per SSID index so phones keep distinct APs.
   uint8_t mac[6] = {
@@ -1358,7 +1450,7 @@ void beaconSpam() {
         channel = (uint8_t)random(1, kMaxChannel + 1);
         esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
 
-        const char* ssid = ssidList[floodIdx % ssidCount];
+        const char* ssid = spamSsidAt(floodIdx % spamSsidCount());
         floodIdx++;
 
         uint8_t mac[6] = {
@@ -1572,6 +1664,9 @@ void beaconSpamSetup() {
 void beaconSpamLoop() {
 
   if (feature_active && (isButtonPressed(BTN_SELECT) || featureExitButtonPressed())) {
+    /* Give the list back. 2 KB is not much, but holding it for the rest of
+     * the session to save one SD read on re-entry is the wrong trade. */
+    freeSsidBuffer();
     feature_exit_requested = true;
     return;
   }
