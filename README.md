@@ -202,6 +202,8 @@ one linker override that turned out to be load-bearing.
 
 | | |
 |---|---|
+| [docs/pueo/user-guide.md](docs/pueo/user-guide.md) | using one: the menus, the card, settings, stealth |
+| [docs/pueo/build-guide.md](docs/pueo/build-guide.md) | building one: parts, soldering, the ten signals |
 | [PUEO.md](PUEO.md) | build, layout, scope, and what will bite you |
 | [docs/pueo/hardware.md](docs/pueo/hardware.md) | pin map and the GPIO 1 handover |
 | [docs/pueo/spi-bus.md](docs/pueo/spi-bus.md) | the shared bus, and why touch was losing it |
