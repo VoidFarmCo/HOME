@@ -11,6 +11,40 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.12 - 2026-09-25
+-------------------
+
+A documentation release. No firmware source changed between 0.4.11 and this,
+and the only difference in the image is the version string it reports.
+
+It exists because a published archive is the only copy of the docs most
+people will read, and 0.4.11's carries text that has since been removed. The
+alternative was editing 0.4.11 in place, which would have broken every digest
+on the download page and the reproducible-build claim with them. Cutting a
+new one is the honest way to change what is published.
+
+  * Third-party project references removed from the docs. Each was carrying
+    part of an argument rather than sitting there as a citation, so each
+    passage was rewritten rather than cut: the EAPOL rationale now rests on
+    ESP32-DIV having no EAPOL anywhere in its tree, and the sub-GHz PA
+    section on this board's own pin budget.
+
+  * The changelog entry for the PA decision said GPIO 4 was "the NRF24's CSN
+    here". That stopped being true for the reference board when CSN moved to
+    25 on the 3.5". It is the RGB LED's red channel.
+
+  * BAT1's polarity is recorded as measured rather than read: the pin marked
+    BAT- is the one that beeps against CN1's ground. The FM5324GA has no
+    reverse protection on its cell input, so the cost of guessing is the
+    charger.
+
+  * The enclosure model gained a USB opening where the socket actually is,
+    through the lid's end wall rather than the base's long side, and the
+    flag that used to be EXT_POWER is EXT_CHARGER. The model is not shipped
+    in this archive and never has been; this is here because the build guide
+    and the PCB notes describe it.
+
+
 0.4.11 - 2026-09-25
 -------------------
 
