@@ -254,9 +254,13 @@ Proto Kill         Replay Attack       Saved Profile       Sour Apple
 SubGHz Jammer      WPS Scanner         WiFi Deauther
 ```
 
-Nineteen of them. Everything else stays available, which is most of the
-passive side: the scanners, the detectors, Surveillance, the drone
-detector, wardriving, NFC reading.
+Nineteen tools, and with them the whole **RFID/NFC** menu. A PN532 reads a
+card by energising a field and waiting for the card to answer, so even
+**Card Reader** transmits; stealth gates that menu as one rather than entry
+by entry, and nothing in it opens.
+
+Everything else stays available, which is most of the passive side: the
+scanners, the detectors, Surveillance, the drone detector and wardriving.
 
 Use it when you want to be certain the device is only listening.
 
