@@ -210,6 +210,30 @@ one linker override that turned out to be load-bearing.
 | [docs/pueo/pcb-design.md](docs/pueo/pcb-design.md) | carrier board: netlist, power tree, placement |
 | [docs/pueo/pueo-enclosure.scad](docs/pueo/pueo-enclosure.scad) | the printed enclosure |
 
+## Issues or discussions
+
+Both are open, and on a hardware project they overlap enough to be worth
+splitting on purpose.
+
+**[Issues](https://github.com/magikh0e/pueo/issues)** for something broken
+and reproducible: wrong behaviour, a build that fails, a crash, a feature
+that does nothing. Say which panel you are on, the version from the status
+bar, and what you did. A pin map or a serial log beats a description.
+
+**[Discussions](https://github.com/magikh0e/pueo/discussions)** for
+everything else. *Q&A* for whether a particular CYD variant will work,
+*Show and tell* for builds and prints, *Ideas* for features.
+
+Two things are especially useful, because nobody here can produce them:
+
+- **Anything from the 2.8&Prime; ESP32-2432S028R.** It is built every release
+  and has never been booted. It compiles clean and reproduces from its own
+  archive, and that is the entire extent of what is known about it.
+- **A board that is nearly but not quite this one.** The
+  3248S035**C** with capacitive touch is the obvious case: GPIO 25 goes to
+  its GT911, and this image drives a chip select into that pin. If you have
+  one, the answer is interesting either way.
+
 ## What changed from upstream
 
 Mostly the parts that decide whether the hardware works at all:
