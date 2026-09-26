@@ -302,7 +302,16 @@ compile() {
   fi
 
   if [ "$rc" -ne 0 ]; then
-    grep -E "error:|Error during build" "$log" | head -20
+    # Compiler errors carry "error:". Linker diagnostics mostly do not, and
+    # the one line that does says the least: a DRAM overflow prints three
+    # useful lines naming the section, the region and the byte count, then
+    # "collect2.exe: error: ld returned 1 exit status". Grepping for "error:"
+    # alone kept only the last of those, so a build that ran out of static
+    # memory reported nothing but a failed exit status and sent the reader
+    # to the log file. Both classes are matched now.
+    grep -E "error:|Error during build|undefined reference|multiple definition|will not fit in region|overflowed by|does not fit|ld returned" "$log" \
+      | sed -E "s#^.*/ld(\.exe)?: #ld: #" \
+      | sort -u | head -20
     return "$rc"
   fi
 }
