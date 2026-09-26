@@ -625,7 +625,8 @@ NFC_INDEX    5  ->  looked up by name     reordering MODULES can no longer
 ```
 
 Housekeeping picked up along the way: the header said `85 x 140 x 20` while
-`L = 170`, and it still said HALEHOUND. Both fixed. Part names in MODULES
+`L = 170`, and it still carried the name the workspace had before this was
+called Pueo. Both fixed. Part names in MODULES
 now match the netlist (`ATGM336H GPS`, `MP2307 buck`).
 
 Pockets left deliberately oversized, with a comment saying so: MT3608 36 x 17
@@ -810,14 +811,14 @@ what bring-up teaches you.
 ### Deliberately not fitted: a sub-GHz PA
 
 The stock CC1101 transmits at +12 dBm. An Ebyte E07-433M20S reaches roughly
-+20 dBm, and HaleHound-CYD (MIT, same CYD family) wires one alongside the
-CC1101 for exactly that. Not taken here, for three reasons:
++20 dBm on the same 433 MHz work, and it drops in beside a CC1101 on a board
+this size. Not taken here, for three reasons:
 
-- It needs two control lines, TX_EN and RX_EN. HaleHound puts them on GPIO 4
-  and GPIO 0. GPIO 4 is the NRF24's CSN here, and GPIO 0 is a strapping pin
-  that decides boot mode. There is no third pair of spare pins on this board
-  -- the RGB LED already gave up its three and UART0 gave up a fourth -- so
-  fitting it means J1 grows and something else moves.
+- It needs two control lines, TX_EN and RX_EN, and there is no spare pair on
+  this board. The obvious candidates are gone: GPIO 4 is the RGB LED's red
+  channel and the 2.8" panel's NRF24 CSN, and GPIO 0 is a strapping pin that
+  decides boot mode. The RGB LED gave up its three pins and UART0 gave up a
+  fourth, so fitting a PA means J1 grows and something else moves.
 - It moves the power budget. +20 dBm on the RF rail is a different peak draw
   from the one the buck and the 0.5 mm +3V3_RF pour were sized for, and that
   sizing is still marked [verify].

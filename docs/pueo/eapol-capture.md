@@ -11,10 +11,9 @@ already does.
 
 ## Why it is worth doing here
 
-`HaleHound-CYD` advertises "EAPOL Capture -- WPA 4-way handshake + PMKID
-extraction". That project ships a README and a LICENSE and no source, and
-the ESP32-DIV it derives from has no EAPOL anywhere in its tree. So the
-feature exists in this lineage as a claim rather than as code.
+ESP32-DIV has no EAPOL anywhere in its tree, and neither does anything
+derived from it that ships source. The feature exists in this lineage as a
+claim on feature lists rather than as code, which is the gap this closes.
 
 `ESP32Marauder` does implement it, is **MIT licensed** (Copyright (c) 2020
 Just Call Me Koko), and is therefore usable here with attribution. Reading

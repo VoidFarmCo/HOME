@@ -1714,9 +1714,9 @@ against the source rather than by reading:
 Carrier board:
 
   * An Ebyte E07-433M20S gives the CC1101 about +20 dBm against the stock
-    +12, and HaleHound-CYD fits one on the same board family. Recorded as a
-    decision rather than adopted: TX_EN and RX_EN land on GPIO 4, which is
-    the NRF24's CSN here, and GPIO 0, a strapping pin. Nothing is spare
+    +12, and it drops in beside one on a board this size. Recorded as a
+    decision rather than adopted: TX_EN and RX_EN want GPIO 4, which is the
+    RGB LED's red channel, and GPIO 0, a strapping pin. Nothing is spare
     after the RGB LED gave up three pins and UART0 a fourth. The RF rail was
     not sized for that peak, and transmit testing happens in a cage where
     8 dB buys nothing.
