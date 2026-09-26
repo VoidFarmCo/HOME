@@ -4277,6 +4277,96 @@ void updateBLEList() {
   }
 }
 
+/* Bluetooth SIG appearance, split as the spec does: the top ten bits are a
+ * category and the bottom six a subcategory within it.
+ *
+ * Only the categories worth naming on a screen this size are here, and HID
+ * is the only one whose subcategories are broken out. That is deliberate:
+ * HID is where the difference between a keyboard and a digitiser matters to
+ * whoever is reading, and everywhere else the category alone says enough.
+ *
+ * This is inspection, not detection. A device advertising as a keyboard has
+ * told you it is a keyboard, and something impersonating one would say the
+ * same, which is why none of this is a Spotter signature. */
+static const char* bleAppearanceName(uint16_t app, char* buf, size_t n) {
+  const uint16_t cat = app >> 6;
+  const uint16_t sub = app & 0x3F;
+
+  if (cat == 15) {  /* Human Interface Device */
+    const char* s;
+    switch (sub) {
+      case 1:  s = "keyboard"; break;
+      case 2:  s = "mouse"; break;
+      case 3:  s = "joystick"; break;
+      case 4:  s = "gamepad"; break;
+      case 5:  s = "digitiser"; break;
+      case 6:  s = "card reader"; break;
+      case 7:  s = "digital pen"; break;
+      case 8:  s = "barcode scanner"; break;
+      default: s = nullptr; break;
+    }
+    if (s) {
+      snprintf(buf, n, "HID %s", s);
+    } else {
+      snprintf(buf, n, "HID");
+    }
+    return buf;
+  }
+
+  const char* c;
+  switch (cat) {
+    case 0:  c = "Unknown"; break;
+    case 1:  c = "Phone"; break;
+    case 2:  c = "Computer"; break;
+    case 3:  c = "Watch"; break;
+    case 4:  c = "Clock"; break;
+    case 5:  c = "Display"; break;
+    case 6:  c = "Remote control"; break;
+    case 7:  c = "Eye glasses"; break;
+    case 8:  c = "Tag"; break;
+    case 9:  c = "Keyring"; break;
+    case 10: c = "Media player"; break;
+    case 11: c = "Barcode scanner"; break;
+    case 12: c = "Thermometer"; break;
+    case 13: c = "Heart rate sensor"; break;
+    case 14: c = "Blood pressure"; break;
+    case 16: c = "Glucose meter"; break;
+    case 17: c = "Running sensor"; break;
+    case 18: c = "Cycling"; break;
+    /* Stops at 18 on purpose. The first draft carried names up to 52 and
+     * had them shifted: Earbud was written as category 51 when 0x0C40 is
+     * 49, and the medical ones above it were wrong by the same amount.
+     * Anything not named here falls through to "category N", which is a
+     * true statement about a number rather than a confident wrong word. */
+    default: c = nullptr; break;
+  }
+  if (c) {
+    snprintf(buf, n, "%s", c);
+  } else {
+    snprintf(buf, n, "category %u", (unsigned)cat);
+  }
+  return buf;
+}
+
+/* Common 16-bit services, so the UUID line says something as well as showing
+ * the number. Not exhaustive and not meant to be: these are the ones that
+ * turn up constantly and that a reader would otherwise go and look up. */
+static const char* bleServiceName(uint16_t uuid) {
+  switch (uuid) {
+    case 0x1800: return "Generic Access";
+    case 0x1801: return "Generic Attribute";
+    case 0x180A: return "Device Information";
+    case 0x180F: return "Battery";
+    case 0x1812: return "HID";
+    case 0xFD5F: return "Meta";
+    case 0xFE9F: return "Google Fast Pair";
+    case 0xFEAA: return "Eddystone";
+    case 0xFEEC: return "Tile";
+    case 0xFEED: return "Tile";
+    default:     return nullptr;
+  }
+}
+
 void displayBLEDetails() {
 
   bleScanClearBody();
@@ -4320,10 +4410,31 @@ void displayBLEDetails() {
     tft.print("Tx Power: not advertised");
   }
 
+  /* What the device says it is. Guarded like the rest: an unadvertised
+   * appearance is absent rather than zero, and zero is a real value meaning
+   * Unknown, so printing the field unconditionally would invent a claim. */
+  y += 20;
+  tft.setCursor(10, y);
+  if (device.haveAppearance()) {
+    char appBuf[28];
+    tft.print("Appearance: " +
+              String(bleAppearanceName(device.getAppearance(), appBuf, sizeof(appBuf))));
+  } else {
+    tft.print("Appearance: not advertised");
+  }
+
   if (device.haveServiceUUID()) {
     y += 20;
     tft.setCursor(10, y);
-    tft.print("Service UUID: " + String(device.getServiceUUID().toString().c_str()));
+    const NimBLEUUID su = device.getServiceUUID();
+    const char* known = (su.bitSize() == 16)
+                          ? bleServiceName((uint16_t)su.getNative()->u16.value)
+                          : nullptr;
+    if (known) {
+      tft.print("Service: " + String(known) + " (" + String(su.toString().c_str()) + ")");
+    } else {
+      tft.print("Service UUID: " + String(su.toString().c_str()));
+    }
   } else {
     y += 20;
     tft.setCursor(10, y);
