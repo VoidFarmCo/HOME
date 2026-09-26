@@ -278,6 +278,24 @@ static const OuiSig kOuiSigs[] = {
   {{0x02, 0xC0, 0xCA}, Kind::Pentest, Conf::Weak,   "Hak5 LAA default"},
   {{0x02, 0x13, 0x37}, Kind::Pentest, Conf::Weak,   "Hak5 LAA default"},
 
+  /* ALFA's own block, and the one 02:C0:CA above is derived from: set the
+   * locally-administered bit on 00:C0:CA and you get it. A Pineapple wearing
+   * the LAA default is advertising a spoof of this.
+   *
+   * Weak, and it has to stay Weak. ALFA sell adapters to everyone doing
+   * wireless work, so this means "an ALFA radio is in range" and not "a
+   * Pineapple is". What it is good for is the thing the Liteon entries above
+   * are good for: sitting under a stronger signature on the same MAC and
+   * turning a guess into a finding.
+   *
+   * Three other OUIs are commonly listed alongside this one as Hak5 markers
+   * and none of them are here. 00:13:EF and A4:2B:B0 get cited as Atheros or
+   * Qualcomm and the IEEE registry says Kingjon Digital Technology and
+   * TP-LINK; whoever wrote that list did not check. 00:E0:4C really is
+   * Realtek, and Realtek is in so much unrelated consumer hardware that even
+   * Weak would be generous. */
+  {{0x00, 0xC0, 0xCA}, Kind::Pentest, Conf::Weak,   "ALFA (Pineapple radio?)"},
+
   /* Pwnagotchi beacons from de:ad:be:ef:de:ad, a fixed address in its own
    * source rather than a vendor block. Only the first three bytes are
    * checked here, which is the table's shape, and de:ad:be is a joke prefix
@@ -317,6 +335,18 @@ static const NameSig kSsidSigs[] = {
   {"Flock",            0, Kind::Alpr, Conf::Likely, "Flock (bare)"},
 
   {"Penguin-", 0, Kind::Accessory, Conf::Likely, "Flock battery pack"},
+
+  /* The O.MG cable brings up its own access point for command and control,
+   * and the SSID it is flashed with by default is in their own tooling:
+   *
+   *   O-MG/O.MG-Firmware, flash.py
+   *     self.WIFI_SSID = "O.MG"
+   *
+   * Likely rather than Strong because it is a default and the flasher takes
+   * an override, so anyone deploying one deliberately has probably changed
+   * it. What it catches is one left as shipped, which is worth catching:
+   * the whole point of the device is that it looks like a cable. */
+  {"O.MG", 0, Kind::Pentest, Conf::Likely, "O.MG cable (default SSID)"},
 };
 
 /* ── BLE: advertisement contents ─────────────────────────────────────────── */

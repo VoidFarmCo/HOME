@@ -192,6 +192,9 @@ SHORT_PREFIX = 6
 # way "dr " is not, and that is a judgement someone should have to write down.
 SHORT_BUT_DELIBERATE = {
     "Flock": "a distinctive word, and already graded Likely for this reason",
+    "O.MG": "two periods and that capitalisation are not a coincidence; an "
+            "exact length is wrong here because the flasher appends nothing "
+            "but the user may",
 }
 
 # {"QT ", 11, Kind::Vehicle, Conf::Likely, "KARR BT module"},

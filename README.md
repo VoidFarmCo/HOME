@@ -130,7 +130,7 @@ surveillance and tracking hardware that announces itself: plate readers and
 their accessories, body cameras, fixed cameras and doorbells, smart glasses,
 item trackers, vehicle modules and pentest kit. It matches Wi-Fi OUIs,
 network names, BLE device names and 16- and 128-bit service UUIDs against
-106 signatures across nine kinds, and grades what it finds rather than
+108 signatures across nine kinds, and grades what it finds rather than
 asserting it.
 
 Two of those are not surveillance gear and are there because knowing they
