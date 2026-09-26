@@ -4985,7 +4985,7 @@ void deautherLoop() {
                  * up a visible WPA2 network with a published password. A
                  * random key per boot fixed the publishing; not being on the
                  * air at all is better. */
-                ap_config.ap.password[0] = ' ';
+                ap_config.ap.password[0] = '\0';
                 ap_config.ap.authmode = WIFI_AUTH_OPEN;
                 ap_config.ap.ssid_hidden = 1;
                 ap_config.ap.max_connection = 4;
@@ -5684,7 +5684,7 @@ void probeRequestFloodLoop() {
                  * up a visible WPA2 network with a published password. A
                  * random key per boot fixed the publishing; not being on the
                  * air at all is better. */
-                ap_config.ap.password[0] = ' ';
+                ap_config.ap.password[0] = '\0';
                 ap_config.ap.authmode = WIFI_AUTH_OPEN;
                 ap_config.ap.ssid_hidden = 1;
                 ap_config.ap.max_connection = 4;
