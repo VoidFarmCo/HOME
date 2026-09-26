@@ -129,8 +129,16 @@ Five features are Pueo's own. Four of them only listen.
 surveillance and tracking hardware that announces itself: plate readers and
 their accessories, body cameras, fixed cameras and doorbells, smart glasses,
 item trackers, vehicle modules and pentest kit. It matches Wi-Fi OUIs,
-network names, BLE device names and service UUIDs against 99 signatures
-across eight kinds, and grades what it finds rather than asserting it.
+network names, BLE device names and 16- and 128-bit service UUIDs against
+102 signatures across nine kinds, and grades what it finds rather than
+asserting it.
+
+Two of those are not surveillance gear and are there because knowing they
+are nearby is worth something on its own. **Pwnagotchi** beacons from a fixed
+`de:ad:be:ef:de:ad` with its stats in the payload, so it announces itself
+more clearly than most of the things it is looking for. **Meshtastic** nodes
+advertise their own 128-bit BLE service, and get a kind of their own rather
+than being filed under something they are not.
 
 **Drone Detector** reads ASTM F3411 Broadcast Remote ID on both the Wi-Fi
 and BLE paths: the UAS ID, position, altitude, speed, and the operator's own
