@@ -83,10 +83,15 @@ it with a source on BAT1 and the board comes up, no USB anywhere in the
 sequence. The boost has a key. The board was never refusing, it was waiting to
 be switched on, and plugging USB in was only the other way of doing that.
 
-**[verify] which button that is.** RESET and BOOT are the only two on the
-board, and the one described is whichever sits nearest BAT1. The silkscreen
-label has not been read, and it is worth reading, because an enclosure has to
-leave that button pressable and cannot do so by accident.
+**It is silkscreened `SW1`.** Read off the board on 2026-09-27, which also
+corrects what was written here first: RESET and BOOT are not the only buttons
+on this thing. `SW1` sits beside BAT1 and is the charger's key, and a dedicated
+power button is what a power-bank front end wants, so its presence is a sign
+the battery path was meant to be used rather than left over.
+
+The enclosure has to reach it. Nothing in the current model does, because until
+today there was no reason for it to, and a button that starts the device is not
+something to leave under a lid.
 
 **A bench supply is not a cell, and the difference showed here.** Repeating
 that last step from a supply at 3.7 V with a 500 mA limit switched the board
