@@ -113,7 +113,7 @@ LOGO      = false;
  * carrier PCB it is nothing; as a module in the hand-wired build it wants a
  * small one or a bigger pocket.
  *
- * What does NOT become optional is the MP2307 buck. That is not about
+ * What does NOT become optional is the converter. That is not about
  * making 5 V, it is about keeping the PA radios' current steps off
  * whatever feeds the display, and it is needed either way.
  */
@@ -287,7 +287,7 @@ VENT_Z1  =  6;
 MODULES_ONBOARD = [
   // The charger and the 5 V boost are on the CYD. What is left down here is
   // the independent rail for the PA radios.
-  [   0, -60,  20, 12, "MP2307 buck"    ],   // part is 17.9 x 12
+  [   0, -60,  20, 12, "buck-boost"     ],   // S7V8F3 11.4 x 16.5, turned 90
   // Centred, and its leads go to the CYD's own BAT1.
   [   0, -35,  45, 34, "LiPo pack"      ],
   [   0,   4,  43, 41, "PN532 V3"       ],   // <-- gets the thin floor
@@ -300,7 +300,7 @@ MODULES_EXTERNAL = [
   // Three in the power zone, and they are what makes this case 85 wide.
   [ -19, -65,  36, 17, "MT3608 boost"   ],
   [  26.6, -62, 27, 17, "TP4056 charger" ],  // right edge flush to the wall
-  [ -29, -48,  20, 12, "MP2307 buck"    ],
+  [ -29, -48,  20, 12, "buck-boost"     ],
   [ -16, -23,  45, 34, "LiPo pack"      ],
   [   0,  18,  43, 41, "PN532 V3"       ],
   [ -23,  61.5,15, 40, "HW-863 CC1101"  ],
