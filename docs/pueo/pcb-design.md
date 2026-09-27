@@ -1113,3 +1113,36 @@ this size. Not taken here, for three reasons:
 
 Worth revisiting only if the sub-GHz work ever moves outside a cage, and
 then as a second-spin change with the pin budget reopened.
+
+### Deliberately not fitted: a bigger 2.4 GHz PA
+
+Same question on the other radio, and the numbers are worse. The module here
+is a generic NRF24L01+PA+LNA, budgeted at ~115 mA transmitting at +20 dBm. An
+Ebyte E01-2G4M27SX reaches +27 dBm, and Ebyte give its peak transmit current
+as **500 mA**.
+
+That is not a tweak to the budget, it is a different rail:
+
+    +3V3_RF peak, as budgeted     349 mA
+    with an E01 in place of it    734 mA
+
+And the input side is where it bites, because the supply is now a USB pin
+rather than a cell. 734 mA at 3.3 V is 2.4 W out, so about 2.7 W in at 90%,
+which is roughly **670 mA drawn through P1's `5V`** -- a pin that has been
+proven at 92 mA and nowhere near it.
+
+The S7V8F3 is rated 1 A stepping down, so it would carry the load on paper
+with thin margin. P1 is the part nobody can vouch for.
+
+Ebyte also ask for **at least 100 µF** of decoupling on that module against
+the 10 µF specified here for the current one, which is its own evidence about
+the size of the transients.
+
+So: not fitted, and if it ever is, it reopens the converter, the input pin and
+the decoupling together rather than being a module swap.
+
+**What does carry across from any PA module is the rule this design was built
+on**: an amplified radio gets its own regulated rail and never shares the
+CYD's 3.3 V. That is the one piece of inherited advice that has survived every
+revision, including the one that deleted the 5 V rail it originally arrived
+attached to.
