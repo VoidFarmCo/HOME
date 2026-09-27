@@ -11,6 +11,149 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.14 - 2026-09-26
+-------------------
+
+  * THE FLASH IMAGE FILENAME HAS CHANGED MEANING. Since 0.1.0,
+    pueo-<version>-merged.bin has been the 2.8" ESP32-2432S028R image and the
+    3.5" ESP32-3248S035R carried a -35 suffix. From this release the plain
+    name IS the 3.5", and there is no 2.8" image at all.
+
+    If you have been reaching for the unsuffixed file out of habit and you
+    are on a 2.8" board, it will not work, and it will not tell you so: the
+    panel is chosen at compile time, there is no runtime detection, and the
+    symptom is a dark screen rather than an error.
+
+    Repointing a published filename is normally exactly the wrong thing to
+    do. A digest somebody kept starts failing for a reason they cannot
+    reconstruct. It is survivable here because every published digest stays
+    in this file, no earlier release is rewritten, and the alternative was
+    carrying a -35 suffix that no longer distinguishes anything.
+
+  * 0.4.13 IS THE LAST RELEASE WITH A 2.8" IMAGE, and it is pinned. It will
+    not be pruned when newer releases supersede it, the way 0.2.1 is not
+    pruned: each is the last release of a state this project has left, and
+    the digest in this file is the only remaining evidence of what that state
+    produced. 0.2.1 is a licence boundary, the last release containing RF24
+    (GPL-2.0-only). 0.4.13 is a hardware boundary.
+
+  * The 2.8" ESP32-2432S028R is dropped. It was built every release and never
+    booted by anyone here, so what shipped for it was an image that compiled
+    rather than one that worked, which is not support in any sense worth
+    claiming.
+
+    The cost of keeping it was not the build. It was that every pin, every
+    dimension and every table in the documentation had two answers, and
+    nearly every documentation error found in the last week traced back to
+    that: CC1101_CS colliding with the backlight on GPIO 21, NRF24 CSN being
+    4 or 25 depending on which board was meant, the serial header called P1
+    on one and P5 on the other, CN1 credited with a GPIO 27 it does not
+    carry. One panel deletes that class of mistake instead of fixing
+    instances of it.
+
+    The image is unchanged by the removal. Built before and after and
+    compared byte for byte: 1,784,160 bytes both times, and exactly 64 bytes
+    differ, in two 32-byte runs -- the ELF SHA-256 in the app descriptor at
+    0xB0 and esptool's image hash at the tail, both of which hash the image
+    and so cannot match when anything about the ELF moves. Every executable
+    byte is identical.
+
+    The enclosure lost its PANEL option too. Both parts re-rendered and
+    compared by facet set rather than by bytes, because OpenSCAD is not
+    deterministic and renders the same file to different bytes at the same
+    size: lid 4636 facets, base 2944, identical sets. The 2.8" STLs stay
+    published and can no longer be regenerated; the base is no loss, since
+    base-28 and base-35 are the same solid.
+
+  * The Fast Pair probe transmits and nothing was stopping it. It writes
+    eighty bytes to a characteristic, and Stealth Mode did not refuse it: the
+    nineteen gated features are all menu entries with a setup() to gate, and
+    the probe is a keypress inside a scanner that is otherwise passive, so it
+    fell between them. Stealth was device-wide everywhere except the one
+    feature whose own header opens by stating what it transmits.
+
+    The gate is inside FastPairProbe::run() rather than at the button, so it
+    sits on the function that does the transmitting and a second caller
+    cannot forget it. It returns Outcome::Refused instead of drawing the
+    refusal screen, because that screen exits the whole feature and the scan
+    around it is passive and has no reason to stop. The confirm screen says
+    so before you confirm.
+
+  * BLE Scanner reads a chosen device's Device Information Service. Info in
+    the detail view connects to the one device on screen, reads GATT 0x180A,
+    and shows manufacturer, model, serial, and the firmware, hardware and
+    software revision strings.
+
+    An advertisement says what a device is. It never says which build it is
+    running, and which build is the question underneath whether something has
+    been patched.
+
+    One device, chosen by the operator; nothing scans and nothing sweeps.
+    Reads only: no writes, no pairing, no authentication, nothing outside
+    0x180A. Refused under Stealth Mode, checked inside the read rather than
+    at the caller, because a GATT connection transmits. "Connected but has no
+    0x180A" is reported separately from "would not connect", because one says
+    it talked and had nothing to say and the other says it will not talk.
+
+  * BLE Scanner's detail view decodes the appearance field to a category and
+    subcategory instead of a number, and names service UUIDs where the SIG
+    assigned them.
+
+  * Surveillance: 108 signatures over nine kinds, up from 99 over eight.
+
+    128-bit service UUIDs, which the 16-bit field cannot hold. A
+    vendor-generated 128-bit service is much better evidence than a 16-bit
+    one, because the 16-bit space is allocated by the SIG and shared.
+
+    Two of the new kinds are not surveillance gear and are there because
+    knowing they are nearby is worth something on its own. Meshtastic nodes
+    advertise their own 128-bit service and get a kind of their own rather
+    than being filed under something they are not. Pwnagotchi beacons from a
+    fixed de:ad:be:ef:de:ad with its stats in the payload, graded likely
+    rather than strong: that address is a convention rather than an
+    allocation, so anything can wear it.
+
+    Flipper Zero by its advertised service 0x3080-0x3083, read out of
+    Flipper's own serial profile rather than a community detector -- those
+    are one service on differently coloured hardware, not four services.
+    Hak5 LAA defaults, the O.MG cable's default SSID, and Alfa's registered
+    block 00:C0:CA, which is the radio in a Pineapple.
+
+    Two OUI attributions were checked against the IEEE registry and rejected:
+    00:13:EF is Kingjon and A4:2B:B0 is TP-LINK, not Atheros or Qualcomm.
+
+  * Beacon Spammer reads its network list from /ssids.txt on the card, and
+    falls back to the list built into the firmware, which is identical in
+    every copy. The screen says which list it loaded. Up to 64 names of 32
+    characters; # starts a comment.
+
+  * The sub-GHz and BLE jammer channel tables dropped two entries that were
+    below the band. Channels 0 and 1 sit under Bluetooth's 2402 MHz start.
+
+  * wifi.cpp carried two literal NUL bytes where a \0 escape was meant, which
+    is why git had been treating the file as binary and refusing to diff it.
+
+  * tools/build.sh reports linker errors rather than only the fact that there
+    was one. Its failure grep matched compiler diagnostics and "collect2:
+    error: ld returned", so a section overflow printed nothing useful.
+
+  * check_stealth.py grew a table for gates that live inside a function and
+    report a status rather than drawing the refusal screen, which is the
+    shape both DeviceInfo::read and FastPairProbe::run use. It checks the
+    order too: a gate after the connection is open is not a gate.
+
+  * docs/pueo/user-guide.md is new: operating the device, assuming one that
+    is assembled and working.
+
+  * Two documentation errors that were not simplifications. build-guide.md
+    said the RGB LED's red channel is GPIO 22 on this board, so the LED would
+    flicker with sub-GHz traffic rather than go dark; that is lcdwiki's
+    E32R35T, and on this board, measured 2026-09-23, GPIO 4 is red, 16 blue,
+    17 green and 22 nothing. The website said GPIO 34 is a battery divider;
+    it is a CdS light sensor, corrected in the firmware docs and not on the
+    site until now.
+
+
 0.4.13 - 2026-09-25
 -------------------
 

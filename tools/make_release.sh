@@ -383,15 +383,24 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
 
   # ── retention ────────────────────────────────────────────────────────────
   #
-  # Keep the release just cut, the one before it, and 0.2.1. Everything else
-  # goes, so the download list stays short and the directory does not fill
-  # with images nobody will flash.
+  # Keep the release just cut, the one before it, and the two pinned below.
+  # Everything else goes, so the download list stays short and the directory
+  # does not fill with images nobody will flash.
   #
-  # 0.2.1 is the exception because of the licence rather than the code: it is
-  # the last release that still contained RF24, which is GPL-2.0-only and
-  # could not share a binary with arduinoFFT or NimBLE. 0.2.2 is where that
-  # ended. Anyone holding a 0.2.1 digest is holding the last of a distinct
-  # licence state, so it stays reachable. See docs/pueo/licensing.md.
+  # Both pins are there for the same reason: each is the last release of a
+  # state this project no longer occupies, so the digest somebody is holding
+  # is the only remaining evidence of what that state produced.
+  #
+  # 0.2.1 is a licence boundary. It is the last release that still contained
+  # RF24, which is GPL-2.0-only and could not share a binary with arduinoFFT
+  # or NimBLE. 0.2.2 is where that ended. See docs/pueo/licensing.md.
+  #
+  # 0.4.13 is a hardware boundary. It is the last release with a 2.8"
+  # ESP32-2432S028R image in it. That image was never booted by anyone here,
+  # which is why the panel was dropped, and it is exactly why the release
+  # stays reachable: if somebody does put it on a board, this is the only
+  # build they can put there, and it would be a poor answer to say it used to
+  # be downloadable.
   #
   # Nothing is lost by pruning the rest: every release's digests are in
   # CHANGELOG.txt, which is published beside the downloads and ships inside
@@ -402,12 +411,15 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
   # image exists only from 0.3.4 on; rm -f makes its absence a no-op for
   # every earlier version, and leaving the name out instead would make it
   # the one artefact that is never pruned.
-  PUBLISH_KEEP_ALWAYS="0.2.1"
+  PUBLISH_KEEP_ALWAYS="0.2.1 0.4.13"
 
   published=$(ls "$DEST" 2>/dev/null \
     | sed -n 's/^pueo-\([0-9][0-9.]*\)\.sha256$/\1/p' | sort -V)
   keep=$(printf '%s\n' $published | tail -2)
-  keep=$(printf '%s\n%s\n' "$keep" "$PUBLISH_KEEP_ALWAYS" | sort -V -u)
+  # Unquoted on purpose: PUBLISH_KEEP_ALWAYS holds more than one version now,
+  # and the membership test below is grep -qx, which matches whole lines. Two
+  # versions on one line match nothing and both pinned releases get pruned.
+  keep=$(printf '%s\n' $keep $PUBLISH_KEEP_ALWAYS | sort -V -u)
 
   pruned=0
   for v in $published; do
