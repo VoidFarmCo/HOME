@@ -171,9 +171,9 @@ the compiler will and cross-references them against the CYD's own wiring.
 | CC1101 GDO0 (TX) | 22 | P3 header |
 | CC1101 GDO2 (RX) | 35 | P3 header, input-only pin |
 | NRF24 CSN | 25 | see below; GPIO 4 is the RGB LED's red channel |
-| NRF24 CE | 16 | was RGB LED green |
+| NRF24 CE | 16 | was RGB LED blue |
 | NRF24 IRQ | not connected | see below |
-| PN532 SS | 17 | was RGB LED blue, SPI mode (DIP CH1=OFF, CH2=ON) |
+| PN532 SS | 17 | was RGB LED green, SPI mode (DIP CH1=OFF, CH2=ON) |
 | GPS TX -> ESP32 | 1 | UART0 TX, the `TX` pin on P1 |
 | GPS RX | not connected | |
 
@@ -239,7 +239,11 @@ that amplifier as a chip select.
 **On the Sunton board GPIO 4 is the RGB LED's red channel.** Measured on
 2026-09-23, by driving each candidate low in turn -- the LED is common anode,
 so a pin sinks its own channel -- and watching which colour came up. GPIO 4
-red, 16 blue, 17 green, and 22 nothing at all. This tree had followed the
+red, 16 blue, 17 green, and 22 nothing at all. The table above said 16 green
+and 17 blue until 2026-09-26: the measurement corrected the prose here and
+never reached the pin map three screens up, where a reader is more likely to
+look. `check_pinmap.py` had it right the whole time, which is the argument for
+putting facts somewhere a machine reads them. This tree had followed the
 lcdwiki datasheet for months.
 
 Until then this section said GPIO 4 was an **audio amplifier's enable** on the
