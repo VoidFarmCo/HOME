@@ -1088,7 +1088,7 @@ lunch. Fit:
 - Power tree with the separate RF rail
 - Module headers at the enclosure-fixed positions
 - R1, the series-resistor footprints, the decoupling
-- Test points on +5V_SW, +3V3_RF, SCK, MISO and GPIO 1
+- Test points on P1's 5 V in, +3V3_RF, SCK, MISO and GPIO 1
 
 Leave off anything not needed to prove the above. The second spin is for
 what bring-up teaches you.
