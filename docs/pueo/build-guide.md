@@ -421,6 +421,24 @@ module is silent and looks like a bad joint.
 **7. GPS.** One signal — module TX to GPIO 1 — plus power from +3V3_RF and an
 active antenna with sky view. Give it minutes, not seconds, for a first fix.
 
+**Do not take its VCC from P1's 5V pin.** That pin sits on the same four-way
+connector as the TX line you are wiring, one position away, which is the whole
+reason this needs saying. The ATGM336H's **absolute maximum VCC is 3.6 V** —
+a destruction limit, not a recommendation — and P1 carries 5 V whenever USB
+does.
+
+Wiring diagrams in circulation show GPS `VCC` going to `VIN` on this connector,
+and they are right about the module they describe: a GT-U7 or NEO-6M breakout
+carries its own regulator and takes 5 V happily. The ATGM336H breakout used
+here has not been shown to. **3.3 V is the safe answer either way**, because a
+breakout with a regulator will run from it too, and one without passes it
+straight to a part that wants exactly that.
+
+Leave the module's RX open as well. Those same diagrams land it on GPIO 3,
+which is UART0 receive and is driven by the USB-UART bridge — so console
+output would arrive at the GPS's command input, and that input accepts
+configuration commands.
+
 Test after each module rather than at the end. Five devices share VSPI; the
 failure you are trying to avoid is one intermittent joint that presents as
 four unrelated faults.
