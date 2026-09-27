@@ -89,10 +89,22 @@ LOGO      = false;
  * behind it. lcdwiki's boards are unknown. If yours has no BAT1, or has one
  * with no charger behind it, set EXT_CHARGER = true.
  *
- * [VERIFY] with EXT_CHARGER = false the +3V3_RF buck has to take 5 V from
- * somewhere, and the candidate is the 5V pin on P1. Nobody has confirmed
- * that pin is an output when the board is running from BAT1 rather than
- * from USB. Measure it before you rely on it.
+ * Measured on 2026-09-26, and the answer was no. P1's 5V pin is an INPUT.
+ * On battery alone it holds about 4 V unloaded and 0 V under 92 mA; with USB
+ * attached it holds 4.75 V under the same load. It is the board's 5 V input
+ * node, alive only while tethered.
+ *
+ * So the +3V3_RF buck cannot take 5 V from the board. On battery there is no
+ * 5 V anywhere in the case, and the base has to make the radios' rail from
+ * the cell itself.
+ *
+ * [DECIDE] what makes it. Restoring the MT3608 undoes the deletion that fixed
+ * the height: CARRIER_HEADROOM is 13.9 mm and that module is 14. The better
+ * shape is probably one buck-boost from the cell straight to 3.3 V, instead
+ * of boosting to 5 and bucking back down, since 3.7 V to 3.3 V does not need
+ * a trip through 5 V. That is a smaller part than the two this deleted, so
+ * the 84 x 142 envelope may well still hold -- but nobody has placed one in
+ * the floorplan yet, and the height budget is what bit last time.
  *
  * What does NOT become optional is the MP2307 buck. That is not about
  * making 5 V, it is about keeping the PA radios' current steps off

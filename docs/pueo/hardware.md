@@ -76,27 +76,34 @@ one way in a photograph and the other way on the bench.
 
 **Measured on the board on 2026-09-26, battery only, USB unplugged.**
 
-| condition | reading |
-|---|---|
-| battery at BAT+/BAT- | 3.8 V |
-| P1 `5V` to GND, unloaded | ~4 V |
-| P1 `5V` to GND, 54.4 Ω load | **0 V** |
+Cell at 3.8 V, load 54.4 Ω, which draws 92 mA at 5 V:
 
-That is the whole answer. A rail that holds 4 V open-circuit and collapses to
-zero at 92 mA is not a rail; it is a high-impedance node being read by a
-10 MΩ meter. Unpowered, `5V` to BAT+ measures **1.3 MΩ**, and 1.3 MΩ feeding
-54 Ω divides down to nothing, which is exactly what the meter shows.
+| supply | unloaded | under load |
+|---|---|---|
+| **battery only** | ~4 V | **0 V** |
+| **USB connected** | ~4 V | **4.75 V** |
 
-Sunton's own label says as much and was believed too late: P1 is the
-**"4P 1.25 Power supply base"**. A supply base is where you put power in.
+The pin is the board's 5 V input node and nothing else. It is live when USB
+is, and dead when it is not. Sunton's own label said so and was believed too
+late: P1 is the **"4P 1.25 Power supply base"**, and a supply base is where
+you put power in.
 
-**So the carrier cannot take 5 V from here.** If it needs 5 V it has to make
-its own, from the cell or from USB.
+On battery the 4 V is meaningless. Unpowered, `5V` to BAT+ measures **1.3 MΩ**,
+and 1.3 MΩ feeding 54 Ω divides to nothing, which is what the meter shows. A
+10 MΩ meter on a megohm node reads most of the cell voltage and tells you
+nothing about whether anything can be drawn from it.
 
-**[verify] what the pin does with USB attached.** Everything above is battery
-only. If it is a VBUS pass-through then it is live when USB is, which would
-make it an input that can also back-feed, and that changes what is safe to
-wire to it. Same load, same probes, USB plugged in, is one reading.
+On USB the 0.25 V below nominal across 92 mA is about 2.7 Ω of series
+resistance, which is cable and trace rather than a junction. A diode would
+have dropped more and held it flatter.
+
+**So the carrier cannot take 5 V from here.** A rail alive only while tethered
+to USB cannot feed the radios of a battery-powered device. Whatever the base
+needs, it makes from the cell.
+
+**And feeding 5 V into this pin puts a second source on a node USB also
+drives.** That is the designed direction -- it is an input -- but nothing here
+knows what arbitrates the two, and the charger is on the same side of it.
 
 #### How this was got wrong first, which is the useful part
 
