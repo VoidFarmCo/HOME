@@ -114,6 +114,27 @@ degrades a pin slowly rather than failing loudly.
 
 ## Power tree
 
+**[decide] Which board makes the 5 V.** This tree has the carrier charging the
+cell and boosting it, and J1.3 carrying that up to the CYD. The CYD already
+does both. Its FM5324GA is a charger and a synchronous 5 V boost in one
+package, wired to BAT1 and, as measured on 2026-09-26, to P1's `5V` pin --
+see hardware.md. So the TP4056 and the MT3608 below duplicate silicon that is
+already soldered to the board they feed.
+
+The other direction is to delete both, take 5 V from P1 into the carrier, and
+let the CYD own the battery. That is fewer parts, one charger rather than two
+competing ones, and one connector doing what the harness already does.
+
+It is not decided here because two things are unknown: whether that boost
+actually switches, which nobody has put a load on yet, and what it can supply
+if it does. Until those are measured, drawing either version is drawing on an
+assumption.
+
+**What must not happen either way is both.** J1.3 as drawn feeds 5 V from the
+carrier into a pin that is a boost output on the other side. Two sources onto
+one node, one of them back-fed through a body diode into a converter that is
+asleep, is not a thing to resolve in copper after the fact.
+
 ```
   USB-C ──► TP4056 ──► 1S LiPo ──► MT3608 ──► +5V_SW ─┬─► CYD (J1.3)
            (1 A chg)   3.0-4.2 V     boost             ├─► PN532 VCC

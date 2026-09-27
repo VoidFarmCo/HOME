@@ -72,6 +72,46 @@ its cell input, so the cost of being wrong is the charger, and a label three
 millimetres from the pin it refers to is exactly the kind of thing that reads
 one way in a photograph and the other way on the bench.
 
+### P1's `5V` is the boost's output, not the battery
+
+**Measured on the board on 2026-09-26.** The question was whether that pin is
+a real 5 V rail the carrier could take power from, or just the battery net
+wearing a `5V` silkscreen.
+
+It is the boost output. The evidence is the asymmetry:
+
+| probes | reading |
+|---|---|
+| BAT+ to `5V` | conducts |
+| `5V` to BAT+ | 1.3 MΩ |
+
+A short is symmetric. Conduction one way and megohms the other is a junction,
+and a junction between the cell and that pin, oriented so current flows out of
+the battery, is the high-side FET's body diode in the boost. The 2.2 µH
+inductor beside the FM5324GA is the other half of the same topology.
+
+**The trap is that an unloaded measurement looks like a dead rail.** The
+FM5324GA has no-load shutdown, so with nothing drawing current the converter
+sleeps and the pin sits at roughly the battery voltage, leaked through that
+body diode. Measured with USB in and the cell charging it read about 4 V,
+which is a charging cell, not a boost. With USB out it still showed voltage,
+by the same path. None of that means the rail is broken and none of it means
+the pin is the battery; it means nothing has asked the boost to start.
+
+So do not conclude anything from an unloaded reading on that pin. Put about
+100 mA on it -- 4 x 220 Ω in parallel is 55 Ω and stays inside a quarter-watt
+part -- and measure across the load, on battery alone.
+
+**[verify] whether it actually switches.** The body diode says the boost is
+wired to that pin. It does not say the silicon works, because a dead
+converter has the same diode. One reading under load settles it: about 5.0 V
+held for half a minute is a working boost, battery voltage under load is not.
+Nobody has done that yet.
+
+Also unknown: how much it can supply. The FM5324GA's boost is specified for a
+power-bank USB output, so it is likely to be amps rather than milliamps, but
+this board's implementation has not been measured and the inductor is small.
+
 ### What else the datasheet is good for, and where it is not
 
 Two things in it are worth keeping. It gives the mounting holes as 94.5 x
