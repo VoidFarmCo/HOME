@@ -78,15 +78,17 @@ The cell tells the same story from the other side. With a 3.8 V pouch on BAT1
 the board would not start either, but once USB had booted it, pulling USB left
 it running on the cell.
 
-**A bench supply is not a cell, and the difference shows here.** Repeating that
-last step from a supply at 3.7 V switched the board off the moment USB came
-out. The likely reason is the current limit rather than the board: the whole
-load transfers in one step, and a supply in constant-current answers that by
-collapsing its voltage where a cell answers it by sagging a few millivolts.
-Lead and contact resistance compounds it -- an ohm at 300 mA is 0.3 V, which
-turns 3.7 at the terminals into 3.4 at the board. **[verify] by repeating it at
-4.0 V with the limit at 1.5 A** and watching the current at the instant USB
-leaves.
+**A bench supply is not a cell, and the difference showed here.** Repeating
+that last step from a supply at 3.7 V with a 500 mA limit switched the board
+off the moment USB came out. At **4.0 V with a 1.5 A limit it stays running**,
+so it was the limit and not the board: the whole load transfers in one step,
+and a supply in constant-current answers that by collapsing its voltage where a
+cell answers it by sagging a few millivolts.
+
+Which is a measurement in itself. **The board wants more than 500 mA from a 4 V
+input**, so anything powering it through BAT1 has to be able to deliver that
+without drooping -- a bench supply set conservatively will appear to be a dead
+board.
 
 That is ordinary behaviour for the part. The FM5324GA is a charger and a
 power-bank boost in one, and boost stages of that kind sit disabled until
