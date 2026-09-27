@@ -154,6 +154,35 @@ This is the single change most worth having in copper rather than in a
 build note, because it is invisible, it is easy to forget, and forgetting it
 degrades a pin slowly rather than failing loudly.
 
+### Nothing in the base needs 5 V
+
+Both datasheets are in hand now and they agree: the 5 V rail has no consumers.
+
+| part | supply | source |
+|---|---|---|
+| ATGM336H GPS | 2.7 to **3.6 V max** | its manual, v1.2 |
+| PN532 V3 | **3.3 V** to 5 V | Elechouse V3 guide |
+| CC1101 | 3.3 V | |
+| NRF24 PA+LNA | 3.3 V | |
+
+The PN532 was the last candidate and it takes 3.3 V happily. Its onboard level
+shifter exists for I2C and UART, which are 5 V tolerant; **SPI on that board is
+3.3 V TTL**, and SPI is the mode this build uses. So there is no level
+translation to pay for either.
+
+**So delete the 5 V stage rather than rebuilding it.** The base needs one rail,
++3V3_RF, and one converter to make it from the cell. Going up to 5 V and back
+down to 3.3 V was only ever there to feed a buck that cannot take a 1S cell
+directly; with nothing else on 5 V, a single buck-boost does the whole job.
+
+**[decide] what J1 pin 3 carries, or whether it exists.** It was `+5V_SW`, the
+carrier feeding the CYD. In the default build the CYD has the battery on its
+own BAT1 and powers itself, and the floorplan already puts the cell in the base
+with its leads running to that connector. If the carrier taps the same cell for
+its buck-boost, J1 has no power pin at all -- thirteen nets, all signals and
+grounds. That is a smaller connector as well as a simpler one, which bears on
+the connector question above.
+
 ### The GPS is a 3.3 V part, and it feeds its own antenna
 
 From the ATGM336H-5N user manual, v1.2, which settles what was a [verify]:
@@ -239,7 +268,7 @@ allocates a third power module at (-29, -48).
 | load | rail | typical | peak | source |
 |---|---|---|---|---|
 | CYD (ESP32 + ILI9341 + backlight) | +5V_SW | ~200 mA | ~500 mA on WiFi TX | **[verify]** |
-| PN532 | +5V_SW | ~10 mA idle | ~100 mA field on | **[verify]** |
+| PN532 | **+3V3_RF** | ~10 mA idle | ~100 mA field on | rail from datasheet, current **[verify]** |
 | NRF24L01+PA+LNA | +3V3_RF | 45 mA RX | ~115 mA TX @ +20 dBm | **[verify]** |
 | CC1101 | +3V3_RF | 16 mA RX | ~34 mA TX @ +10 dBm | **[verify]** |
 | ATGM336H | +3V3_RF | <25 mA @3.3 V | **100 mA peak** | datasheet |
