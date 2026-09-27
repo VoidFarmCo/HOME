@@ -453,8 +453,11 @@ If that is short, the lever is the backlight, not the radios.
   regulator. This module is notorious for browning out on TX transients and
   the inductance of a few centimetres of trace is enough to cause it.
 - 100 nF at every module's VCC pin.
-- 100 µF bulk on +3V3_RF at the buck output.
-- 220 µF bulk on +5V_SW at the boost output, close to J1.
+- 100 µF bulk on +3V3_RF at the buck-boost output.
+- 220 µF bulk at the converter's input, close to where P1's 5 V arrives. This
+  was specified at the boost's output on +5V_SW; there is no +5V_SW and no
+  boost now, but the reason survives -- the input is at the far end of a USB
+  cable and a connector, and the converter's draw steps with the radios.
 
 ### Trace widths
 

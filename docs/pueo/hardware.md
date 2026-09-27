@@ -177,6 +177,58 @@ the compiler will and cross-references them against the CYD's own wiring.
 | GPS TX -> ESP32 | 1 | UART0 TX, the `TX` pin on P1 |
 | GPS RX | not connected | |
 
+### Second-hand pin maps name lcdwiki's boards, and this is not one
+
+Every wrong pin this project has carried had the same shape: an lcdwiki
+description applied to a Sunton board. Not one of them was a typo, and not one
+was caught by reading the tree. They were caught by measuring.
+
+| | lcdwiki E32R35T | Sunton ESP32-3248S035R |
+|---|---|---|
+| GPIO 4 | audio amplifier enable | **RGB LED red**, measured 2026-09-23 |
+| GPIO 22 | RGB LED red | nothing |
+| GPIO 34 | battery divider | **CdS light sensor** |
+| breakouts | SPI / I2C / UART JSTs | **P3 and CN1**, no SPI breakout at all |
+
+The GPIO 4 one was the expensive one. Believing it keyed an amplifier is why
+NRF24 CSN was moved to GPIO 25, to avoid a hazard that does not exist on this
+board.
+
+**Where it comes from is second-hand pin maps.** CYD advice in circulation
+tends to name lcdwiki part numbers -- `E32R35T` for the 3.5", `E32R28T` for
+the 2.8" -- and to close with some form of "all other pins identical". The
+first half is often right about the pin it is discussing. The second half is
+the trap: those two boards may well match each other, and neither of them is
+this one.
+
+One piece of inherited advice shows the shape completely. It reads, of the
+same two lcdwiki boards: *NRF24 CSN moves to GPIO 26, GPIO 4 used for CC1101
+PA TX_EN.* Every part of that is sound where it was written and wrong here.
+
+The reason does not apply: a CC1101 with a power amplifier needs TX_EN and
+RX_EN lines, and that design spent GPIO 4 on one. The HW-863 breakout in this
+build has no PA and no such pins, which is also why the E07 upgrade discussed
+in pcb-design.md was rejected -- there is no spare pair for it.
+
+And the destination is worse than the reason. **GPIO 26 on this board is the
+speaker**, `BUZZER_PIN`, on DAC2. Following that note would trade a working
+radio pin for a dead one and lose sound as well.
+
+Worth noticing that the same advice may be where "do not use GPIO 4" entered
+this tree at all. It was recorded here as an audio amplifier's enable, which
+is lcdwiki's story; it may equally have arrived as a pin already spent on a PA
+control line. Either way it produced the same result, NRF24 CSN moved to 25 to
+dodge a hazard this board does not have.
+
+**So inherited advice is a hypothesis, not a fact**, and the test is cheap.
+The backlight claim came in that way and survived, because it was checked here
+on the board: moving the brightness slider did nothing until GPIO 27 was
+driven. The GPIO 4 claim came in the same way and did not survive the first
+time anyone drove each candidate low and watched which colour came up.
+
+Read the silkscreen before trusting a pin map, and prefer a measurement to a
+part number every time the two are available.
+
 **Which board you have matters more than it should.** "Cheap yellow display"
 names boards from at least two vendors. This tree targets Sunton's
 **ESP32-3248S035R**. lcdwiki's 3.5" is the **E32R35T**, a different board that
