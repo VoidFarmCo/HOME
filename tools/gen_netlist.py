@@ -59,12 +59,12 @@ MODULES = [
     # It is in this list because the enclosure reserves the pocket and the
     # pour has to keep out from under it.
     ("LiPo pack",       "BT1",  0.0, -35.0, 45, 34),
-    ("PN532 V3",        "J4",   0.0,   4.0, 43, 41),
-    ("HW-863 CC1101",   "J2", -23.0,  48.0, 15, 40),
-    ("NRF24 PA+LNA",    "J3",  22.0,  47.5, 16, 41),
+    ("PN532 V3",        "J6",   0.0,   4.0, 43, 41),
+    ("HW-863 CC1101",   "J4", -23.0,  48.0, 15, 40),
+    ("NRF24 PA+LNA",    "J5",  22.0,  47.5, 16, 41),
     # ATGM336H, 16 x 13, antenna on a 90 mm u.FL pigtail rather than a patch
     # on the module. Centred in the corridor between the two radios.
-    ("ATGM336H GPS",    "J5",   0.0,  40.0, 16, 13),
+    ("ATGM336H GPS",    "J7",   0.0,  40.0, 16, 13),
 ]
 
 SMA_X = [-23.0, 22.0]       # scad SMA_X, 45 mm apart
@@ -76,15 +76,15 @@ SMA_X = [-23.0, 22.0]       # scad SMA_X, 45 mm apart
 #
 # Three cables reach the CYD, because only four of the ten signals land on a
 # connector it already has. J1 carries the six that have to be soldered, plus
-# grounds. J6 goes straight to P3 and J7 straight to P1.
+# grounds. J2 goes straight to P3 and J3 straight to P1.
 #
-# J1, J6 and J7 pin numbers are ours to choose. J1 is fixed here and matches
-# docs/pueo/pcb-design.md; J6 and J7 follow the CYD header's own order, so the
+# J1, J2 and J3 pin numbers are ours to choose. J1 is fixed here and matches
+# docs/pueo/pcb-design.md; J2 and J3 follow the CYD header's own order, so the
 # cable is straight through with nothing crossed.
 NETS = [
     ("GND", [("J1", "1"), ("J1", "5"), ("J1", "9"),
-             ("J6", "1"), ("J7", "4"),
-             ("J2", "GND"), ("J3", "GND"), ("J4", "GND"), ("J5", "GND"),
+             ("J2", "1"), ("J3", "4"),
+             ("J4", "GND"), ("J5", "GND"), ("J6", "GND"), ("J7", "GND"),
              ("U3", "GND"),
              ("C1", "2"), ("C2", "2"), ("C3", "2"), ("C4", "2"),
              ("C5", "2"), ("C6", "2"), ("C7", "2"),
@@ -95,11 +95,11 @@ NETS = [
     # Power in. P1's 5V is the CYD's 5 V INPUT node, not an output: measured
     # 4.75 V at 92 mA with USB connected, and 0 V under the same load on
     # battery alone. The carrier taps it and makes its own 3.3 V.
-    ("+5V_IN", [("J7", "1"), ("U3", "VIN"), ("C6", "1"), ("TP1", "1")],
+    ("+5V_IN", [("J3", "1"), ("U3", "VIN"), ("C6", "1"), ("TP1", "1")],
      "from P1 pin 1, about 260 mA at full load, 0.5 mm"),
 
-    ("+3V3_RF", [("U3", "VOUT"), ("J2", "VCC"), ("J3", "VCC"), ("J4", "VCC"),
-                 ("J5", "VCC"),
+    ("+3V3_RF", [("U3", "VOUT"), ("J4", "VCC"), ("J5", "VCC"), ("J6", "VCC"),
+                 ("J7", "VCC"),
                  ("C1", "1"), ("C2", "1"), ("C3", "1"), ("C4", "1"),
                  ("C5", "1"), ("C7", "1"), ("TP2", "1")],
      "the one rail this board makes, and everything on it. Separate from the "
@@ -108,31 +108,31 @@ NETS = [
     # SPI, with the series-resistor break between the connector and the bus.
     ("SCK_J1",   [("J1", "2"), ("R2", "1")], "from CYD GPIO 18"),
     ("MOSI_J1",  [("J1", "3"), ("R3", "1")], "from CYD GPIO 23"),
-    ("VSPI_SCK", [("R2", "2"), ("J2", "SCK"), ("J3", "SCK"), ("J4", "SCK"),
+    ("VSPI_SCK", [("R2", "2"), ("J4", "SCK"), ("J5", "SCK"), ("J6", "SCK"),
                   ("TP3", "1")],
      "daisy-chain along a spine, short stubs"),
-    ("VSPI_MOSI", [("R3", "2"), ("J2", "MOSI"), ("J3", "MOSI"), ("J4", "MOSI")],
+    ("VSPI_MOSI", [("R3", "2"), ("J4", "MOSI"), ("J5", "MOSI"), ("J6", "MOSI")],
      "as above"),
-    ("VSPI_MISO", [("J1", "4"), ("J2", "MISO"), ("J3", "MISO"), ("J4", "MISO"),
+    ("VSPI_MISO", [("J1", "4"), ("J4", "MISO"), ("J5", "MISO"), ("J6", "MISO"),
                    ("TP4", "1")],
      "no series resistor: an input at the CYD end"),
 
     # Chip selects and control. Static during a transaction, so these are the
     # nets to route awkwardly if something has to be.
-    ("NRF_CSN",  [("J1", "6"), ("J3", "CSN")], "CYD GPIO 25, a module pad"),
-    ("NRF_CE",   [("J1", "7"), ("J3", "CE")],  "CYD GPIO 16, an RGB LED pad"),
-    ("PN532_SS", [("J1", "8"), ("J4", "SS")],  "CYD GPIO 17, an RGB LED pad"),
+    ("NRF_CSN",  [("J1", "6"), ("J5", "CSN")], "CYD GPIO 25, a module pad"),
+    ("NRF_CE",   [("J1", "7"), ("J5", "CE")],  "CYD GPIO 16, an RGB LED pad"),
+    ("PN532_SS", [("J1", "8"), ("J6", "SS")],  "CYD GPIO 17, an RGB LED pad"),
 
     # The CC1101's three lines are the only signals with a header at the CYD
-    # end, so they leave on their own 4-way to P3 instead of through J1. J6's
+    # end, so they leave on their own 4-way to P3 instead of through J1. J2's
     # order is P3's order: GND, IO35, IO22, IO21.
-    ("CC1101_GDO2", [("J6", "2"), ("J2", "GDO2")], "CYD GPIO 35, input-only"),
-    ("CC1101_GDO0", [("J6", "3"), ("J2", "GDO0")], "CYD GPIO 22"),
-    ("CC1101_CS",   [("J6", "4"), ("J2", "CSN")],  "CYD GPIO 21"),
+    ("CC1101_GDO2", [("J2", "2"), ("J4", "GDO2")], "CYD GPIO 35, input-only"),
+    ("CC1101_GDO0", [("J2", "3"), ("J4", "GDO0")], "CYD GPIO 22"),
+    ("CC1101_CS",   [("J2", "4"), ("J4", "CSN")],  "CYD GPIO 21"),
 
     # GPS, through the series resistor, onto P1's pin marked TX.
-    ("GPS_TX_RAW", [("J5", "TX"), ("R1", "1")], "GPS module transmit"),
-    ("GPS_TX",     [("R1", "2"), ("J7", "2"), ("TP6", "1")],
+    ("GPS_TX_RAW", [("J7", "TX"), ("R1", "1")], "GPS module transmit"),
+    ("GPS_TX",     [("R1", "2"), ("J3", "2"), ("TP6", "1")],
      "to CYD GPIO 1 through R1. The ESP32 drives that pin at boot and the GPS "
      "drives it always, so R1 limits the contention. GPS_UART_TX is -1, so "
      "nothing goes the other way"),
@@ -151,17 +151,19 @@ FIRMWARE_CHECK = {
 }
 
 BOM = [
+    # J1 to J3 are the three cables to the lid. J4 to J7 are the module
+    # headers on this board.
     ("J1",  1, "Connector 9-way 1.25mm MX1.25",
      "lid harness: the six signals that have to be soldered, plus grounds"),
-    ("J2",  1, "Header 2x4 2.54mm", "HW-863 CC1101 module [verify pinout]"),
-    ("J3",  1, "Header 2x4 2.54mm", "NRF24L01+PA+LNA module [verify pinout]"),
-    ("J4",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
-    ("J5",  1, "Header 1x5 2.54mm", "ATGM336H GPS, VCC GND TX RX PPS"),
-    ("J6",  1, "Connector 4-way 1.25mm MX1.25",
+    ("J2",  1, "Connector 4-way 1.25mm MX1.25",
      "straight to the CYD's P3, in P3's own order: GND, IO35, IO22, IO21"),
-    ("J7",  1, "Connector 4-way 1.25mm MX1.25",
+    ("J3",  1, "Connector 4-way 1.25mm MX1.25",
      "straight to the CYD's P1: 5V, TX, RX, GND. Pin 3 is unused, because "
      "GPS_UART_TX is -1 and nothing is sent to the GPS"),
+    ("J4",  1, "Header 2x4 2.54mm", "HW-863 CC1101 module [verify pinout]"),
+    ("J5",  1, "Header 2x4 2.54mm", "NRF24L01+PA+LNA module [verify pinout]"),
+    ("J6",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
+    ("J7",  1, "Header 1x5 2.54mm", "ATGM336H GPS, VCC GND TX RX PPS"),
     ("U3",  1, "Pololu S7V8F3 buck-boost, 11.4 x 16.5 mm",
      "3.3 V from P1's 5 V, ~1 A. Fixed output: there is no trimpot to set "
      "wrong, which is the whole reason it replaced an adjustable module"),
@@ -220,7 +222,7 @@ def write_netlist_txt(path):
         "Pueo carrier board - netlist",
         "",
         "Pin names are functional, not numbered: module pin numbers come from",
-        "the datasheets. J1, J6 and J7 numbers are ours; J1 matches",
+        "the datasheets. J1, J2 and J3 numbers are ours; J1 matches",
         "docs/pueo/pcb-design.md and the two 4-ways follow the CYD header order.",
         "",
         "Generated by tools/gen_netlist.py from ESP32-DIV/board_pueo.h.",
@@ -262,10 +264,10 @@ def write_placement(path):
         for name, ref, x, y, wd, ht in MODULES:
             kx, ky = to_kicad(x, y)
             note = ""
-            if ref == "J4":
+            if ref == "J6":
                 note = "KEEP-OUT: no copper or pour, 1.4 mm floor window under the coil"
-            elif ref in ("J2", "J3"):
-                sma = SMA_X[0] if ref == "J2" else SMA_X[1]
+            elif ref in ("J4", "J5"):
+                sma = SMA_X[0] if ref == "J4" else SMA_X[1]
                 note = "board SMA must land at enclosure x=%.0f (kicad x=%.2f)" % (
                     sma, to_kicad(sma, 0)[0])
             elif ref == "BT1":

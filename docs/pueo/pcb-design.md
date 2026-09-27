@@ -64,8 +64,8 @@ committing. CYD revisions differ, and the silkscreen is the authority.
   ┌──────────────┐                 ┌────────────────────────────┐
   │ CYD          │                 │  radios · power · SMAs     │
   │  soldered ───┼──── J1  9-way ──┤                            │
-  │  P3 ─────────┼──── J6  4-way ──┤                            │
-  │  P1 ─────────┼──── J7  4-way ──┤                            │
+  │  P3 ─────────┼──── J2  4-way ──┤                            │
+  │  P1 ─────────┼──── J3  4-way ──┤                            │
   │  pigtail ────┤                 │                            │
   └──────────────┘                 └────────────────────────────┘
 ```
@@ -81,8 +81,8 @@ tinned serves those perfectly.
 | | ways | carries |
 |---|---|---|
 | **J1** | 9 | the six soldered signals, plus three grounds. No power pin |
-| **J6** | 4 | straight to `P3`, in `P3`'s own order: GND, IO35, IO22, IO21 |
-| **J7** | 4 | straight to `P1`: 5V, TX, RX, GND. The 5 V in, and the GPS out |
+| **J2** | 4 | straight to `P3`, in `P3`'s own order: GND, IO35, IO22, IO21 |
+| **J3** | 4 | straight to `P1`: 5V, TX, RX, GND. The 5 V in, and the GPS out |
 
 **The 14-way it replaced was the one part that needed a crimp tool.** That
 draft said 14-way 1.25 mm JST-GH, because GH is easier to hand-assemble than
@@ -130,17 +130,17 @@ second, which is what stopped it being found after fabrication.
 | 9 | GND | GND | |
 
 Six signals and three grounds, which is every wire that has to be soldered at
-the CYD end and nothing else. The three CC1101 lines left for `J6` because
-`P3` already presents them, and the GPS left for `J7` because `P1` already
+the CYD end and nothing else. The three CC1101 lines left for `J2` because
+`P3` already presents them, and the GPS left for `J3` because `P1` already
 presents the pin it needs. There is no supply here at all.
 
-`J7` pin 3 is `P1`'s RX and stays unconnected: `GPS_UART_TX` is `-1`, so
+`J3` pin 3 is `P1`'s RX and stays unconnected: `GPS_UART_TX` is `-1`, so
 nothing is ever sent to the GPS.
 
 | | |
 |---|---|
-| **J6** to `P3` | 1 GND, 2 CC1101_GDO2, 3 CC1101_GDO0, 4 CC1101_CS |
-| **J7** to `P1` | 1 +5V_IN, 2 GPS_TX, 3 *(unused)*, 4 GND |
+| **J2** to `P3` | 1 GND, 2 CC1101_GDO2, 3 CC1101_GDO0, 4 CC1101_CS |
+| **J3** to `P1` | 1 +5V_IN, 2 GPS_TX, 3 *(unused)*, 4 GND |
 
 All three CC1101 control lines land on P3, which is the one place this board
 is easier than its predecessor: chip select, GDO0 and GDO2 reach a connector
@@ -566,7 +566,7 @@ kicad_y = 82.5 - enclosure_y    the base interior, less 2.5 mm walls
 ```
 
 Checked after generation: all eight modules sit inside the outline, none
-overlap, and the SMA positions land exactly on the J2 and J3 centres. The
+overlap, and the SMA positions land exactly on the J4 and J5 centres. The
 tightest gaps are 2 mm (PN532 to NRF24, and the buck to the battery), so
 there is little room to move anything without revisiting the enclosure.
 
@@ -793,7 +793,7 @@ The part in hand is an **ATGM336H** on a GOOUUU breakout, 16 x 13 mm, with a
 **The footprint collapses.** 28 x 27 was budgeted; 16 x 13 is what turned
 up. That is roughly 550 mm2 of floor handed back, in the middle of the
 board, next to the battery. It also resolves the `[verify pinout]` note on
-J5 -- the silkscreen matches the assumed order exactly, so the netlist
+J7 -- the silkscreen matches the assumed order exactly, so the netlist
 stands.
 
 Firmware is unaffected: `GPS_UART_BAUD` is 9600 and the ATGM336H defaults to
@@ -805,7 +805,7 @@ wherever the module sits, and this one does not. But 90 mm is short, and it
 is measured through whatever path the cable can actually take:
 
 ```
-  from J5 at (24, -21) to ...          straight line
+  from J7 at (24, -21) to ...          straight line
   top centre, the slot cut today          94.1 mm    over
   top left, clear of the NRF24           105.8 mm    over
   upper right wall                        61.5 mm    ok
@@ -816,7 +816,7 @@ so treat anything past about 75 mm as doubtful.
 
 ### Where it went
 
-**J5 moved from (24, -21) to (0, 52).** The antenna slot the enclosure
+**J7 moved from (24, -21) to (0, 52).** The antenna slot the enclosure
 already cuts sits hard against the inside of the top wall, centred, so the
 antenna lands at about (0, 80). From the new position the run is **28 mm**
 against 90 mm of cable -- comfortable even after routing around things, with
@@ -852,7 +852,7 @@ SMA bulkheads, so a -130 dBm L1 receiver sits between a 433 MHz transmitter
 and a 2.4 GHz PA. The pigtail means it *could* go elsewhere -- flat against
 a side wall or the inside of the lid -- which is a freedom the patch-antenna
 assumption never had. That is an enclosure decision rather than a board one,
-and it can be made later without moving J5 again: 90 mm of cable reaches
+and it can be made later without moving J7 again: 90 mm of cable reaches
 most of the upper half of the case from (0, 52).
 
 So the PN532 is the one module with a reason not to be socketed, which cuts
