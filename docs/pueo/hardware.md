@@ -301,8 +301,10 @@ PA TX_EN.* Every part of that is sound where it was written and wrong here.
 
 The reason does not apply: a CC1101 with a power amplifier needs TX_EN and
 RX_EN lines, and that design spent GPIO 4 on one. The HW-863 breakout in this
-build has no PA and no such pins, which is also why the E07 upgrade discussed
-in pcb-design.md was rejected -- there is no spare pair for it.
+build has no PA and no such pins. The E07 upgrade discussed in pcb-design.md
+runs into the same wall from the other side, and for a sharper reason than the
+missing pins: this firmware already uses both GDO lines to carry data, so the
+one way of driving a PA that costs no GPIOs is closed here.
 
 And the destination is worse than the reason. **GPIO 26 on this board is the
 speaker**, `BUZZER_PIN`, on DAC2. Following that note would trade a working

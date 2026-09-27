@@ -1095,22 +1095,98 @@ what bring-up teaches you.
 
 ### Deliberately not fitted: a sub-GHz PA
 
-The stock CC1101 transmits at +12 dBm. An Ebyte E07-433M20S reaches roughly
-+20 dBm on the same 433 MHz work, and it drops in beside a CC1101 on a board
-this size. Not taken here, for three reasons:
+The stock CC1101 transmits at +12 dBm, which this firmware already asks for:
+`setPA(12)` at three sites in `subghz.cpp`, the chip's own ceiling. An Ebyte
+E07-433M20S reaches +20 dBm on the same 433 MHz work from a footprint that fits
+the same space, and its core is a CC1101, so every register, the whole driver
+and all six SPI wires are unchanged.
 
-- It needs two control lines, TX_EN and RX_EN, and there is no spare pair on
-  this board. The obvious candidates are gone: GPIO 4 is the RGB LED's red
-  channel, and GPIO 0 is a strapping pin that
-  decides boot mode. The RGB LED gave up its three pins and UART0 gave up a
-  fourth, so fitting a PA means J1 grows and something else moves.
-- It moves the power budget. +20 dBm on the RF rail is a different peak draw
-  from the one the buck and the 0.5 mm +3V3_RF pour were sized for, and that
-  sizing is still marked [verify].
-- Transmit testing happens in a shielded enclosure, where 8 dB buys nothing.
+Asked in September 2026 whether it would therefore just work as a swap. Most of
+it would. The amplifier would not, and that is the half worth understanding
+before ordering one.
 
-Worth revisiting only if the sub-GHz work ever moves outside a cage, and
-then as a second-spin change with the pin budget reopened.
+**The module cannot be left to itself.** Ebyte's manual gives `TX_EN` and
+`RX_EN` as active-high inputs that must be asserted before data moves, and says
+they cannot both be high. Float them and the T/R switch sits in a state the
+manual does not describe, with a PA and an LNA in the path that are not
+enabled. So a straight swap is not "the same radio, louder". It is plausibly
+quieter than the bare CC1101 it replaced, which is the worst way to find out.
+
+**The trick that normally makes those pins free is already spent here.** The
+usual way to drive a CC1101 PA costs no GPIOs at all: configure the radio's own
+`GDO0` and `GDO2` as `PA_PD` and `LNA_PD` through the IOCFG registers, and the
+switch follows the radio automatically. This build cannot. Both GDO pins carry
+data, `SUBGHZ_TX_PIN` on GPIO 22 and `SUBGHZ_RX_PIN` on GPIO 35, handed to the
+driver as `setGDO(TX, RX)` at five sites, which is what the OOK work needs them
+for. That is the real obstacle, and until now this section did not mention it.
+
+**The power objection was overstated.** This section used to give the budget as
+one of three reasons. It moves the budget by 66 mA:
+
+| | CC1101 | E07-433M20S |
+|---|---|---|
+| transmit | 34 mA @ +10 dBm | **100 mA @ +20 dBm** |
+| receive | 16 mA | 20 mA |
+| sleep | | 2 uA |
+| supply | 3.3 V | 2.1 to 3.3 V, **3.6 V absolute max** |
+
+| | now | with E07 |
+|---|---|---|
+| +3V3_RF worst case | 349 mA | **415 mA** |
+| reflected onto P1's 5 V | 256 mA | 304 mA |
+| from the bank, with the CYD | 566 mA | **614 mA** |
+
+The +3V3_RF pour is sized for 500 mA already, the S7V8F3 is a 1 A part, and the
+module's supply range covers the rail exactly as the CC1101 does. Nothing in
+the power design has to change. Module figures from the E07-433M20S user
+manual, v1.20.
+
+**Three ways to do it, cheapest first.**
+
+1. **Tie `RX_EN` high and `TX_EN` low.** A permanently enabled LNA. No GPIOs, no
+   firmware change, and every receive path gains the module's sensitivity while
+   every transmit path silently radiates nothing. For scanning and analysis
+   that is a real option rather than a consolation prize.
+2. **One GPIO and an inverter.** The two signals are complementary, so
+   `TX_EN = G` with `RX_EN = !G` halves the cost to a single pin. The firmware
+   then has to drive it, and the scope is bounded: 15 call sites in
+   `subghz.cpp`, 9 `SetTx()` and 6 `SetRx()`, which a wrapper around those two
+   covers.
+3. **Free a real pair** and drive both directly. The obvious candidates are
+   gone: GPIO 4 is the RGB LED's red channel, and GPIO 0 is a strapping pin that
+   decides boot mode. The RGB LED gave up its three pins and UART0 gave up a
+   fourth, so this means J1 grows and something else moves. Second-spin work,
+   with the pin budget reopened.
+
+**[verify] the direction of `GDO0` before trusting any of this.** Ebyte's pin
+table lists it as an output, while this firmware drives it as an input to the
+radio for asynchronous TX. Almost certainly the module passes the CC1101's pin
+straight through and it is as bidirectional as the chip makes it, but a buffer
+in the way would be a contention. It is a meter and five minutes.
+
+**What other projects say about it, and how much transfers.** A set of notes on
+this module reads: *powered from an independent 5V to 3.3V buck, not the CYD's
+3.3 V rail, because the PA module draws too much current; same for the NRF24
+E01-2G4M27SX; enable PA mode in Settings > CC1101 Module; E32R28T/E32R35T
+only.*
+
+The first two transfer completely and are the rule this board was built on
+before the notes were seen. The third does not: there is no PA mode setting in
+this tree, and the only thing resembling one is `setPA(12)`, which sets the
+CC1101's own output power and has nothing to do with an external amplifier's
+enable pins. Whatever that toggle does over there, it does not exist here.
+
+The fourth is the one to read carefully, because `E32R28T` and `E32R35T` are
+lcdwiki part numbers rather than Sunton ones, and confusing the two is exactly
+how four wrong pins entered this tree. A note scoped to those boards is scoped
+to hardware that is not this hardware, which is the whole reason the GPIO 4
+advice had to be thrown out. See hardware.md.
+
+**Two reasons it is still not fitted.** Transmit testing happens in a shielded
+enclosure, where 8 dB buys nothing. And 100 mW at 433 MHz is well above what the
+ISM allocations permit for general use on either side of the Atlantic, so the
+extra power is only usable in the cage where it is not needed. Worth revisiting
+if the sub-GHz work ever moves outside one.
 
 ### Deliberately not fitted: a bigger 2.4 GHz PA
 
