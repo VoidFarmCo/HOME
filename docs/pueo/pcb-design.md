@@ -102,17 +102,16 @@ and their order do not change.
 are rated 1 A each, and 28 is what pre-crimped GH cable comes as. The same
 figure applies to PicoBlade. So a contact is the limit here, not the copper.
 
-**[decide] whether one 5 V pin is enough**, and this depends on the power tree
-above rather than on the connector. J1 has three grounds and one supply: GND on
-1, 2 and 14, `+5V_SW` on 3. The return is split three ways and the feed is not.
+**[decided] no 5 V pin at all, 2026-09-26.** This used to ask whether one 5 V
+contact could carry what J1 would have to deliver, and worried that the return
+was split three ways while the feed was not. The power tree answered it by
+deleting the question. The CYD powers itself over its own USB-C, the carrier
+taps P1 for the converter, and J1 carries signals and grounds only.
 
-At 1 A that is comfortable while the carrier feeds the CYD, which draws around
-200 mA rising to 500 on WiFi transmit. It is not comfortable the other way
-round. If the CYD ends up owning the battery and feeding the carrier from P1,
-pin 3 carries three radios, the PN532 and the 3.3 V buck through one contact,
-and that wants a second 5 V pin paralleled the way the grounds already are.
-Deciding the power tree first and the pin count second keeps that from being
-discovered after fabrication.
+So J1 is 9-way with three grounds and no supply, and the contact rating that
+worried this paragraph is not in the path any more. It is worth keeping as a
+record of the order things were decided in: the power tree first, the pin count
+second, which is what stopped it being found after fabrication.
 
 ### J1 pinout
 
@@ -120,7 +119,7 @@ discovered after fabrication.
 |---|---|---|---|
 | 1 | GND | GND | |
 | 2 | GND | GND | two grounds, one at each end of the connector |
-| 3 | *(was +5V_SW)* | -- | **removed**: the CYD powers itself from BAT1 |
+| 3 | *(was +5V_SW)* | -- | **removed**: the CYD powers itself over its own USB-C |
 | 4 | VSPI_SCK | GPIO 18 | SD slot pad |
 | 5 | VSPI_MOSI | GPIO 23 | SD slot pad |
 | 6 | VSPI_MISO | GPIO 19 | SD slot pad |
@@ -601,6 +600,12 @@ datasheets to move things too.
 
 ## The MT3608, and a bring-up order that matters
 
+**This section applies to `EXT_CHARGER` builds only.** The default build has no
+boost and no charger inside the case: the CYD is powered over its own USB-C and
+the carrier taps P1's 5 V for one converter. Everything below is about the
+variant that carries its own charger, which the enclosure still lays out as
+`MODULES_EXTERNAL`.
+
 Pin names are `VIN+`/`VIN-`/`OUT+`/`OUT-`, not the `VIN`/`VOUT`/`GND` the
 netlist first assumed. `VIN-` and `OUT-` are the same node on a boost, so
 both land on ground.
@@ -628,7 +633,7 @@ So the assembly order is not a preference:
 3.  Only then fit J1
 ```
 
-TP1 exists on `+5V_SW` for exactly this. Worth a line of silkscreen next to
+A test point on the boost's output exists for exactly this. Worth a line of silkscreen next to
 the pot saying `SET 5V FIRST`, because the person who assembles the second
 one in a year will not remember.
 
