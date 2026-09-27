@@ -156,26 +156,25 @@ degrades a pin slowly rather than failing loudly.
 
 ## Power tree
 
-**[decide] Which board makes the 5 V.** This tree has the carrier charging the
-cell and boosting it, and J1.3 carrying that up to the CYD. The CYD already
-does both. Its FM5324GA is a charger and a synchronous 5 V boost in one
-package, wired to BAT1 and, as measured on 2026-09-26, to P1's `5V` pin --
-see hardware.md. So the TP4056 and the MT3608 below duplicate silicon that is
-already soldered to the board they feed.
+**The carrier makes its own 5 V, and that is settled.** This was briefly open,
+because the CYD carries an FM5324GA that is a charger and a 5 V boost in one
+package and it looked as though the carrier could simply take 5 V from P1 and
+delete its own TP4056 and MT3608.
 
-The other direction is to delete both, take 5 V from P1 into the carrier, and
-let the CYD own the battery. That is fewer parts, one charger rather than two
-competing ones, and one connector doing what the harness already does.
+It cannot. Measured on 2026-09-26: P1's `5V` sits at about 4 V unloaded and at
+**0 V under 92 mA**, on a 3.8 V cell. It is a high-impedance node, not a
+source, and Sunton labels P1 the "4P 1.25 Power supply base" because power is
+meant to go in there rather than come out. See hardware.md.
 
-It is not decided here because two things are unknown: whether that boost
-actually switches, which nobody has put a load on yet, and what it can supply
-if it does. Until those are measured, drawing either version is drawing on an
-assumption.
+So the tree below stands as drawn. One thing follows from it that did not
+before:
 
-**What must not happen either way is both.** J1.3 as drawn feeds 5 V from the
-carrier into a pin that is a boost output on the other side. Two sources onto
-one node, one of them back-fed through a body diode into a converter that is
-asleep, is not a thing to resolve in copper after the fact.
+**[verify] before J1.3 is routed to P1 at all.** The pin is an input, so
+feeding the carrier's 5 V into it is the direction it was designed for. What
+has not been measured is what sits between that pin and the cell: whether the
+charger back-feeds, and whether the pin is live when USB is attached. Powering
+the board through P1 while USB is also plugged in puts two supplies on one
+node, and nothing here knows yet what arbitrates them.
 
 ```
   USB-C ──► TP4056 ──► 1S LiPo ──► MT3608 ──► +5V_SW ─┬─► CYD (J1.3)

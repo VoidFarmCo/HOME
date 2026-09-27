@@ -72,45 +72,49 @@ its cell input, so the cost of being wrong is the charger, and a label three
 millimetres from the pin it refers to is exactly the kind of thing that reads
 one way in a photograph and the other way on the bench.
 
-### P1's `5V` is the boost's output, not the battery
+### P1's `5V` is an input. You cannot draw from it.
 
-**Measured on the board on 2026-09-26.** The question was whether that pin is
-a real 5 V rail the carrier could take power from, or just the battery net
-wearing a `5V` silkscreen.
+**Measured on the board on 2026-09-26, battery only, USB unplugged.**
 
-It is the boost output. The evidence is the asymmetry:
-
-| probes | reading |
+| condition | reading |
 |---|---|
-| BAT+ to `5V` | conducts |
-| `5V` to BAT+ | 1.3 MΩ |
+| battery at BAT+/BAT- | 3.8 V |
+| P1 `5V` to GND, unloaded | ~4 V |
+| P1 `5V` to GND, 54.4 Ω load | **0 V** |
 
-A short is symmetric. Conduction one way and megohms the other is a junction,
-and a junction between the cell and that pin, oriented so current flows out of
-the battery, is the high-side FET's body diode in the boost. The 2.2 µH
-inductor beside the FM5324GA is the other half of the same topology.
+That is the whole answer. A rail that holds 4 V open-circuit and collapses to
+zero at 92 mA is not a rail; it is a high-impedance node being read by a
+10 MΩ meter. Unpowered, `5V` to BAT+ measures **1.3 MΩ**, and 1.3 MΩ feeding
+54 Ω divides down to nothing, which is exactly what the meter shows.
 
-**The trap is that an unloaded measurement looks like a dead rail.** The
-FM5324GA has no-load shutdown, so with nothing drawing current the converter
-sleeps and the pin sits at roughly the battery voltage, leaked through that
-body diode. Measured with USB in and the cell charging it read about 4 V,
-which is a charging cell, not a boost. With USB out it still showed voltage,
-by the same path. None of that means the rail is broken and none of it means
-the pin is the battery; it means nothing has asked the boost to start.
+Sunton's own label says as much and was believed too late: P1 is the
+**"4P 1.25 Power supply base"**. A supply base is where you put power in.
 
-So do not conclude anything from an unloaded reading on that pin. Put about
-100 mA on it -- 4 x 220 Ω in parallel is 55 Ω and stays inside a quarter-watt
-part -- and measure across the load, on battery alone.
+**So the carrier cannot take 5 V from here.** If it needs 5 V it has to make
+its own, from the cell or from USB.
 
-**[verify] whether it actually switches.** The body diode says the boost is
-wired to that pin. It does not say the silicon works, because a dead
-converter has the same diode. One reading under load settles it: about 5.0 V
-held for half a minute is a working boost, battery voltage under load is not.
-Nobody has done that yet.
+**[verify] what the pin does with USB attached.** Everything above is battery
+only. If it is a VBUS pass-through then it is live when USB is, which would
+make it an input that can also back-feed, and that changes what is safe to
+wire to it. Same load, same probes, USB plugged in, is one reading.
 
-Also unknown: how much it can supply. The FM5324GA's boost is specified for a
-power-bank USB output, so it is likely to be amps rather than milliamps, but
-this board's implementation has not been measured and the inductor is small.
+#### How this was got wrong first, which is the useful part
+
+The FM5324GA beside BAT1 is a charger *and* a synchronous boost with no-load
+shutdown, so the first theory was a sleeping converter: an unloaded pin
+sitting at cell voltage through the high-side FET's body diode, waking under
+load. Everything fitted. It was wrong.
+
+Two things should have killed it earlier. The forward resistance was never
+asked for -- "not open" was read as "low", when a diode and a megohm leak both
+answer to that description, and only one of them is a diode. And the
+prediction was never taken seriously enough to be checked against: a silicon
+body diode passing 92 mA drops about 0.7 V, so the theory predicted roughly
+3.1 V under load. It measured 0.
+
+An unloaded reading on a high-impedance node tells you almost nothing, and a
+theory that explains every observation you happen to have is not thereby
+correct. The load was what settled it, and it settled it in one reading.
 
 ### What else the datasheet is good for, and where it is not
 
