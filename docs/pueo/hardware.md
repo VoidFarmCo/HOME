@@ -67,7 +67,7 @@ under the `BAT-` marking is the one that conducts. The silkscreen and the
 meter agree, which is worth saying because four other things this board was
 supposed to be turned out to describe somebody else's hardware.
 
-### The board cannot cold-start from BAT1
+### BAT1 needs the button, and the button is on the board
 
 **Observed 2026-09-26.** A bench supply on BAT1, at 3.8 V and at 4.25 V, both
 with the output confirmed live and the voltage present at the pin: the board
@@ -78,17 +78,47 @@ The cell tells the same story from the other side. With a 3.8 V pouch on BAT1
 the board would not start either, but once USB had booted it, pulling USB left
 it running on the cell.
 
+**Resolved 2026-09-27: the button beside the BAT1 connector starts it.** Press
+it with a source on BAT1 and the board comes up, no USB anywhere in the
+sequence. The boost has a key. The board was never refusing, it was waiting to
+be switched on, and plugging USB in was only the other way of doing that.
+
+**[verify] which button that is.** RESET and BOOT are the only two on the
+board, and the one described is whichever sits nearest BAT1. The silkscreen
+label has not been read, and it is worth reading, because an enclosure has to
+leave that button pressable and cannot do so by accident.
+
 **A bench supply is not a cell, and the difference showed here.** Repeating
 that last step from a supply at 3.7 V with a 500 mA limit switched the board
 off the moment USB came out. At **4.0 V with a 1.5 A limit it stays running**,
-so it was the limit and not the board: the whole load transfers in one step,
-and a supply in constant-current answers that by collapsing its voltage where a
-cell answers it by sagging a few millivolts.
+so it was the limit and not the board.
 
-Which is a measurement in itself. **The board wants more than 500 mA from a 4 V
-input**, so anything powering it through BAT1 has to be able to deliver that
-without drooping -- a bench supply set conservatively will appear to be a dead
-board.
+### What the board actually draws
+
+**Measured 2026-09-27, and it is the first measured figure in the entire load
+budget.** Running from BAT1 with USB out, beacon spammer transmitting:
+
+  4.00 V    0.448 A    1.787 W
+
+That number explains the drop-out above better than the guess that followed it.
+The same 1.787 W at 3.7 V is **483 mA**, which leaves about 3% of headroom
+under a 500 mA limit, and the whole load transfers in one step when USB leaves.
+The supply was not set wrongly by a wide margin. It was set wrongly by a hair,
+and the step did the rest.
+
+So the claim that first went in here, that the board wants more than 500 mA at
+4 V, is wrong: it wants 448. The limit matters at 3.7 V, not at 4.
+
+**At the USB socket the same work costs less**, because the boost is not in the
+path there. Allowing 85 to 90% for the boost that the BAT1 path goes through,
+1.787 W at the cell is about **310 mA at 5 V**. The budget had carried ~500 mA
+for the CYD on WiFi TX, so that estimate was high by roughly half, on the
+largest single line in it.
+
+Read it as one sample, not a range. The backlight sat wherever the firmware
+leaves it, beacon transmission is duty-cycled so this is an average rather than
+a peak, and nothing here establishes the idle figure the budget also guesses
+at.
 
 That is ordinary behaviour for the part. The FM5324GA is a charger and a
 power-bank boost in one, and boost stages of that kind sit disabled until
@@ -96,21 +126,23 @@ something enables them -- a key press, or a load-detect event. Once enabled
 they stay on, which is exactly the asymmetry seen here: it will not start from
 a cell, and it will not stop when USB goes away.
 
-**This is the finding that would have sunk an internal-battery build.** A
-handheld that needs a USB cable plugged in and pulled out before it will turn
-on is not a handheld. It was found a few hours after the decision to run on USB
-was taken for unrelated reasons, which is luck rather than judgement.
+**An internal-battery build is workable after all, with a condition.** For a
+day this looked like the finding that sank one, on the grounds that a handheld
+needing a USB cable plugged in and pulled out before it turns on is not a
+handheld. A button press is a different proposition entirely: that is just how
+a power bank behaves, and nobody minds. The condition is that the enclosure has
+to expose the button, which the current one does not, because until today there
+was no reason to.
 
-**It also gives EXT_CHARGER a second reason to exist.** That flag was about
-whether the board can charge a cell; this board can. What it cannot do is start
-from one. A build that wants a self-starting battery device needs an external
-boost feeding 5 V into P1 -- which is what EXT_CHARGER already fits -- because
-a boost with no enable pin runs the moment its input appears, and P1's 5 V is a
-real input that will accept it.
+The decision to run on USB stands regardless. It was taken for other reasons,
+none of which depended on the cold-start question: runtime from a bank beats a
+cell that fits, and P1's 5 V is a real input.
 
-**[verify] whether any button starts it.** RESET and BOOT are the only ones on
-the board. If either reaches the charger's key pin, that is a start mechanism
-and this whole section becomes a footnote. Nobody has tried.
+**EXT_CHARGER keeps a narrower version of its second reason.** That flag was
+about whether the board can charge a cell; this board can. A build that wants
+to start with no button at all still needs an external boost feeding 5 V into
+P1, which is what EXT_CHARGER fits, because a boost with no enable pin runs the
+moment its input appears.
 
 **5 V on BAT1 does nothing, and did no harm once.** Tried on 2026-09-26 with a
 bench supply: the board stayed dark, and booted normally on USB straight

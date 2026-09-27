@@ -411,41 +411,39 @@ what exposed it here was a datasheet and a resistor rather than a review.
 
 ### Budget
 
-| load | typical | peak | source |
-|---|---|---|---|
 | load | rail | typical | peak | source |
 |---|---|---|---|---|
-| CYD (ESP32 + ILI9341 + backlight) | +5V_SW | ~200 mA | ~500 mA on WiFi TX | **[verify]** |
 | PN532 | **+3V3_RF** | ~10 mA idle | ~100 mA field on | rail from datasheet, current **[verify]** |
 | NRF24L01+PA+LNA | +3V3_RF | 45 mA RX | ~115 mA TX @ +20 dBm | **[verify]** |
 | CC1101 | +3V3_RF | 16 mA RX | ~34 mA TX @ +10 dBm | **[verify]** |
 | ATGM336H | +3V3_RF | <25 mA @3.3 V | **100 mA peak** | datasheet |
 
-With the buck downstream of the boost, the 3.3 V loads no longer draw from
-the battery in parallel with the CYD — they are reflected onto +5V_SW,
-scaled by 3.3/5 and divided by the buck's efficiency:
+The CYD is not in that table any more, because it does not draw through the
+carrier at all: it powers itself from its own USB-C, and the carrier taps P1
+only for the converter. The rail's own draw reflects back onto P1's 5 V, scaled
+by 3.3/5 and divided by the converter's efficiency:
 
 ```
-                  CYD   PN532   +3V3_RF        +5V_SW    battery @ 3.7 V
-  worst case      500     100   189 -> 139     739 mA         1174 mA
-  realistic       500      10   155 -> 114     624 mA          992 mA
+                  +3V3_RF        drawn at 5 V     plus the CYD    from the bank
+  worst case      349 mA    ->      256 mA           310 mA           566 mA
+  idle             96 mA    ->       70 mA          ~200 mA           270 mA
 ```
 
 Worst case assumes everything transmits at once, which the SPI bus makes
 impossible: it is shared and `SpiBus` enforces one owner at a time, so the
-radios cannot all be mid-transaction together. Realistic is CYD on WiFi plus
-one radio plus GPS.
+radios cannot all be mid-transaction together.
 
-**Size the boost for 800 mA continuous at 5 V**, which is about **1.2 A from
-the cell** at peak. That is up from the earlier figure, and the increase is
-the direct cost of moving the buck downstream — the RF rail used to bypass
-the boost entirely. The cell and its protection circuit must tolerate 1.2 A;
-many small protection boards cut out around 2 A, which is closer than it
-sounds. The MT3608 is rated 2 A switch current, so it is inside spec but
-will run warm in a sealed enclosure.
+**The CYD's 310 mA is measured**, not estimated: 448 mA at 4.00 V through BAT1
+with the beacon spammer running, 1.787 W, converted to the 5 V socket by
+allowing 85 to 90% for the boost that the BAT1 path goes through and the USB
+path does not. See *What the board actually draws* in
+[hardware.md](hardware.md). The idle figure beside it is still a guess.
 
-**Runtime**, 2000 mAh cell, 600 mA average at 5 V: roughly **2 hours**.
-If that is short, the lever is the backlight, not the radios.
+**Any power bank will do this.** 566 mA at 5 V sits inside the 1 A a basic bank
+delivers and a long way inside 2 A. Runtime is the bank's rather than a cell's:
+a 10,000 mAh bank is roughly 30 Wh usable, and at about 2.8 W that is **ten
+hours or so**, against the two a 2000 mAh internal cell would have given. If it
+is short, the lever is the backlight, not the radios.
 
 ### Decoupling
 
@@ -465,7 +463,7 @@ If that is short, the lever is the backlight, not the radios.
 
 | net | current | width |
 |---|---|---|
-| battery, boost in/out, +5V_SW | up to 1.6 A | **1.0 mm** |
+| P1's 5 V in, to the converter | up to 260 mA | **0.5 mm** |
 | +3V3_RF | up to 500 mA | **0.5 mm** |
 | signals | — | 0.25 mm |
 
