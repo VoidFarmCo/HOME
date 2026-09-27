@@ -209,11 +209,31 @@ detection and short-circuit protection built in. Budget for it on +3V3_RF
 rather than anywhere else: 3 mA with the antenna open, 50 mA into a short,
 which the module limits rather than passing through.
 
-**[verify] the backup cell.** VBAT keeps the RTC and SRAM alive for 10 uA and
-is what separates a 1 s hot start from a 35 s cold one. Nothing in this design
-says where it comes from, and the breakout in hand has not been looked at. A
-GPS that cold-starts every time is a usability problem rather than a fault, so
-it would be easy to ship without noticing.
+**There is no backup cell, and there is no way to add one.** Checked against
+the breakout on 2026-09-26: it is a GOOUUU board, 16 x 13 mm, and its header
+is `VCC GND TX RX PPS`. Five pins. `VBAT` is not among them and neither is
+`ON/OFF`, and there is no coin cell or supercap on the board.
+
+So the RTC and SRAM die with the rail and every power-up is a cold start,
+<=35 s rather than the <=1 s the module is capable of.
+
+That matters less than it sounds, because the rail is always on: the GPS is
+powered from boot whether or not a GPS feature is ever opened, so it has
+acquired long before anyone goes looking. The 35 s is once per power-up of the
+device, not once per use.
+
+What it does cost is **25 mA continuously**, from boot, for a receiver that
+may not be used that session. That is the argument for power-gating the GPS,
+and this breakout forecloses it too: `ON/OFF` is not brought out either. The
+choice the board offers is always-on-and-cold-starting, or absent.
+
+Getting either back means soldering to the module's own castellations at
+0.65 mm pitch, past the breakout. Worth knowing before that is the only
+option left.
+
+Confirmed at the same time: the antenna is 20 x 6 mm on a 90 mm u.FL pigtail,
+which is what this document already assumed and what the enclosure's GPS
+recess is cut for.
 
 ## Power tree
 
