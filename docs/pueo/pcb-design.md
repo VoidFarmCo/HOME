@@ -120,7 +120,7 @@ discovered after fabrication.
 |---|---|---|---|
 | 1 | GND | GND | |
 | 2 | GND | GND | two grounds, one at each end of the connector |
-| 3 | +5V_SW | 5V in | board feeds the CYD, see power tree |
+| 3 | *(was +5V_SW)* | -- | **removed**: the CYD powers itself from BAT1 |
 | 4 | VSPI_SCK | GPIO 18 | SD slot pad |
 | 5 | VSPI_MOSI | GPIO 23 | SD slot pad |
 | 6 | VSPI_MISO | GPIO 19 | SD slot pad |
@@ -175,13 +175,15 @@ translation to pay for either.
 down to 3.3 V was only ever there to feed a buck that cannot take a 1S cell
 directly; with nothing else on 5 V, a single buck-boost does the whole job.
 
-**[decide] what J1 pin 3 carries, or whether it exists.** It was `+5V_SW`, the
-carrier feeding the CYD. In the default build the CYD has the battery on its
-own BAT1 and powers itself, and the floorplan already puts the cell in the base
-with its leads running to that connector. If the carrier taps the same cell for
-its buck-boost, J1 has no power pin at all -- thirteen nets, all signals and
-grounds. That is a smaller connector as well as a simpler one, which bears on
-the connector question above.
+**J1 carries no power, decided 2026-09-26.** Pin 3 was `+5V_SW`, the carrier
+feeding the CYD. The CYD has the cell on its own BAT1 and powers itself, and
+the carrier taps the same cell for its buck-boost, so there is nothing for that
+pin to do. **Thirteen nets**, all signals and grounds, which makes the
+connector question above easier as well as smaller.
+
+It also removes the hazard that replaced it: nothing now feeds 5 V into P1, so
+there is no second source on a node USB also drives, and no question about what
+arbitrates them.
 
 ### The GPS is a 3.3 V part, and it feeds its own antenna
 
@@ -215,42 +217,60 @@ it would be easy to ship without noticing.
 
 ## Power tree
 
-**The carrier makes its own 5 V, and that is settled.** This was briefly open,
-because the CYD carries an FM5324GA that is a charger and a 5 V boost in one
-package and it looked as though the carrier could simply take 5 V from P1 and
-delete its own TP4056 and MT3608.
-
-It cannot. Measured on 2026-09-26: P1's `5V` sits at about 4 V unloaded and at
-**0 V under 92 mA**, on a 3.8 V cell. It is a high-impedance node, not a
-source, and Sunton labels P1 the "4P 1.25 Power supply base" because power is
-meant to go in there rather than come out. See hardware.md.
-
-So the tree below stands as drawn. One thing follows from it that did not
-before:
-
-**[verify] before J1.3 is routed to P1 at all.** The pin is an input, so
-feeding the carrier's 5 V into it is the direction it was designed for. What
-has not been measured is what sits between that pin and the cell: whether the
-charger back-feeds, and whether the pin is live when USB is attached. Powering
-the board through P1 while USB is also plugged in puts two supplies on one
-node, and nothing here knows yet what arbitrates them.
+**Decided 2026-09-26: one rail, one converter, and the cell stays the CYD's.**
 
 ```
-  USB-C ──► TP4056 ──► 1S LiPo ──► MT3608 ──► +5V_SW ─┬─► CYD (J1.3)
-           (1 A chg)   3.0-4.2 V     boost             ├─► PN532 VCC
-                                                       │
-                                                       └─► MP2307 ──► +3V3_RF ─┬─► NRF24
-                                                           buck                ├─► CC1101
-                                                                               └─► ATGM336H
+  USB-C ──► FM5324GA ──► 1S LiPo ──┬──► CYD, through its own BAT1
+  (on the    charger      3.0-4.2 V │
+   CYD)      + boost                └──► buck-boost ──► +3V3_RF ─┬─► NRF24
+             (unused)                    (carrier)               ├─► CC1101
+                                                                 ├─► ATGM336H
+                                                                 └─► PN532
 ```
 
-**The buck has to hang off the boost, not off the battery.** An earlier
-draft of this tree fed it from +VSYS directly, which cannot work: a buck
-only steps down, and 1S LiPo swings 3.0-4.2 V against a 3.3 V target. Below
-about 3.6 V the rail would sag with the battery and the PA modules would
-brown out exactly when the pack is low. The MP2307 module is spec'd from
-4.75 V input in any case, so it is out of range across the whole discharge
-curve. Boost to 5 V, then buck to 3.3 V.
+The cell lives in the base, in the pocket the floorplan already has at 0, -35,
+and its leads run up to BAT1 exactly as the enclosure comment says. The carrier
+taps the same cell. Nothing else is needed, because the CYD charges and powers
+itself and every module in the base takes 3.3 V.
+
+**Three parts leave the design**, and none of them is a compromise:
+
+| part | why it is gone |
+|---|---|
+| TP4056 charger | the CYD's FM5324GA does it, confirmed on the bench |
+| MT3608 boost | nothing wants 5 V, so there is nothing to boost for |
+| MP2307 buck | it needs 4.75 V in and the cell never reaches it |
+
+The 5 V rail only ever existed to feed a buck that cannot take a 1S cell. Once
+the GPS and the PN532 datasheets showed nothing else wanted 5 V, the whole
+stage was a conversion to nowhere. The MT3608 and the MP2307 are both in hand
+and both stay on the shelf.
+
+**[decide] which buck-boost**, and whether it fits. The slot at 0, -60 is
+20 x 12 mm for a part that was 17.9 x 12, so there is 2.1 mm of slack in one
+axis and none in the other. Most off-the-shelf buck-boost breakouts are larger
+than that. As an IC on the carrier PCB it is a non-issue; as a module in the
+hand-wired build it wants a small one or a bigger pocket.
+
+Sizing it: the radios are the load that matters, and the GPS's peak is 100 mA
+on its own.
+
+**[verify] where over-discharge protection comes from.** This matters more
+than it looks. The TP4056 module carried a DW01 and an FS8205 in the cell's
+negative line, and an earlier netlist wired the load around them -- charging
+would have worked, over-current would have worked, and over-discharge cutoff
+would silently not have existed. That module is gone now, so the protection
+went with it. What is left is whatever the pouch's own PCM does and whatever
+the FM5324GA does, and neither has been established. A flat lithium cell taken
+below 2.5 V is the failure this prevents, and it fails quietly.
+
+**Why it has to be a buck-boost and not a buck.** A buck only steps down, and
+a 1S LiPo swings 3.0-4.2 V against a 3.3 V target: above about 3.6 V a buck
+works, below it the rail sags with the battery and the PA modules brown out
+exactly when the pack is low. The MP2307 is spec'd from 4.75 V in, so it is
+out of range across the entire discharge curve rather than part of it. This is
+the same reasoning that used to argue for boosting to 5 V first; the
+conclusion changed when it turned out nothing needed the 5 V.
 
 That costs a conversion: two switchers in series at roughly 90% each is
 about 81% end to end on the RF rail, against the ~90% a single buck-boost

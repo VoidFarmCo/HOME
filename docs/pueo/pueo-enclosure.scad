@@ -98,13 +98,20 @@ LOGO      = false;
  * 5 V anywhere in the case, and the base has to make the radios' rail from
  * the cell itself.
  *
- * [DECIDE] what makes it. Restoring the MT3608 undoes the deletion that fixed
- * the height: CARRIER_HEADROOM is 13.9 mm and that module is 14. The better
- * shape is probably one buck-boost from the cell straight to 3.3 V, instead
- * of boosting to 5 and bucking back down, since 3.7 V to 3.3 V does not need
- * a trip through 5 V. That is a smaller part than the two this deleted, so
- * the 84 x 142 envelope may well still hold -- but nobody has placed one in
- * the floorplan yet, and the height budget is what bit last time.
+ * Decided 2026-09-26: ONE buck-boost, from the cell straight to 3.3 V. The
+ * MT3608 does not come back and neither does the MP2307. Both datasheets are
+ * in now and nothing in the base wants 5 V -- the GPS is capped at 3.6 V
+ * absolute and the PN532 takes 3.3, so the 5 V stage was a conversion to
+ * nowhere. The MP2307 cannot do it alone either: it needs 4.75 V in.
+ *
+ * The envelope holds. One converter is smaller than the two this deleted, and
+ * the slot for it is the one already here at 0, -60.
+ *
+ * [VERIFY] that a real part fits that slot. It is 20 x 12 for a part that was
+ * 17.9 x 12, so 2.1 mm of slack in one axis and none in the other. Most
+ * off-the-shelf buck-boost breakouts are bigger than that. As an IC on the
+ * carrier PCB it is nothing; as a module in the hand-wired build it wants a
+ * small one or a bigger pocket.
  *
  * What does NOT become optional is the MP2307 buck. That is not about
  * making 5 V, it is about keeping the PA radios' current steps off
