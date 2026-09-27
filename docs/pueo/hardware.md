@@ -67,6 +67,49 @@ under the `BAT-` marking is the one that conducts. The silkscreen and the
 meter agree, which is worth saying because four other things this board was
 supposed to be turned out to describe somebody else's hardware.
 
+### The board cannot cold-start from BAT1
+
+**Observed 2026-09-26.** A bench supply on BAT1, at 3.8 V and at 4.25 V, both
+with the output confirmed live and the voltage present at the pin: the board
+does nothing and draws **0.000 A**. Plug USB in and it boots. So the path
+works; what is missing is whatever starts it.
+
+The cell tells the same story from the other side. With a 3.8 V pouch on BAT1
+the board would not start either, but once USB had booted it, pulling USB left
+it running on the cell.
+
+**A bench supply is not a cell, and the difference shows here.** Repeating that
+last step from a supply at 3.7 V switched the board off the moment USB came
+out. The likely reason is the current limit rather than the board: the whole
+load transfers in one step, and a supply in constant-current answers that by
+collapsing its voltage where a cell answers it by sagging a few millivolts.
+Lead and contact resistance compounds it -- an ohm at 300 mA is 0.3 V, which
+turns 3.7 at the terminals into 3.4 at the board. **[verify] by repeating it at
+4.0 V with the limit at 1.5 A** and watching the current at the instant USB
+leaves.
+
+That is ordinary behaviour for the part. The FM5324GA is a charger and a
+power-bank boost in one, and boost stages of that kind sit disabled until
+something enables them -- a key press, or a load-detect event. Once enabled
+they stay on, which is exactly the asymmetry seen here: it will not start from
+a cell, and it will not stop when USB goes away.
+
+**This is the finding that would have sunk an internal-battery build.** A
+handheld that needs a USB cable plugged in and pulled out before it will turn
+on is not a handheld. It was found a few hours after the decision to run on USB
+was taken for unrelated reasons, which is luck rather than judgement.
+
+**It also gives EXT_CHARGER a second reason to exist.** That flag was about
+whether the board can charge a cell; this board can. What it cannot do is start
+from one. A build that wants a self-starting battery device needs an external
+boost feeding 5 V into P1 -- which is what EXT_CHARGER already fits -- because
+a boost with no enable pin runs the moment its input appears, and P1's 5 V is a
+real input that will accept it.
+
+**[verify] whether any button starts it.** RESET and BOOT are the only ones on
+the board. If either reaches the charger's key pin, that is a start mechanism
+and this whole section becomes a footnote. Nobody has tried.
+
 **5 V on BAT1 does nothing, and did no harm once.** Tried on 2026-09-26 with a
 bench supply: the board stayed dark, and booted normally on USB straight
 afterwards. It runs from BAT1 at 3.7 V, so the path works; something between
