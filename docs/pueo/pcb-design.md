@@ -237,16 +237,53 @@ recess is cut for.
 
 ## Power tree
 
-**Decided 2026-09-26: one rail, one converter, and the cell stays the CYD's.**
+**Decided 2026-09-26: one rail, one converter, powered over USB.**
 
 ```
-  USB-C ──► FM5324GA ──► 1S LiPo ──┬──► CYD, through its own BAT1
-  (on the    charger      3.0-4.2 V │
-   CYD)      + boost                └──► buck-boost ──► +3V3_RF ─┬─► NRF24
-             (unused)                    (carrier)               ├─► CC1101
-                                                                 ├─► ATGM336H
-                                                                 └─► PN532
+  USB-C ──► the CYD ──┬──► the CYD itself
+  from a bank         │
+  or a charger        └──► P1 `5V` ──► buck-boost ──► +3V3_RF ─┬─► NRF24
+                                       (carrier)               ├─► CC1101
+                                                               ├─► ATGM336H
+                                                               └─► PN532
 ```
+
+Power comes in on the CYD's own USB-C, from a power bank for portable use or a
+charger on the bench. The carrier taps P1's `5V`, which is the board's 5 V
+input node and is live whenever USB is -- measured 4.75 V at 92 mA. That is
+what the project's original notes meant by "tap 5V from USB VBUS, before the
+CYD's regulator", and it is the pin they meant.
+
+**Why not a cell: they are hard to source and a bank is not.** A power bank
+also arrives with its own charger and its own protection circuit, both already
+certified, which deletes three problems rather than solving them: sourcing the
+cell, charging it, and the over-discharge protection that went out with the
+TP4056.
+
+**A cell is still a drop-in, and nothing here precludes it.** The enclosure
+keeps its LiPo pocket and its BAT1 route; unused it is empty space, and no
+part reprints either way. Fitting one is a single wire:
+
+| | converter input | behaviour |
+|---|---|---|
+| no cell | P1's `5V` | USB only, radios die with the cable |
+| cell fitted | the battery | radios stay up unplugged, charger tops it up |
+
+That the decision is deferrable at all is down to the converter. The S7V8F3
+spans 2.7 to 11.8 V, so both sources sit well inside its range and the same
+part in the same pocket serves either.
+
+**[verify] what P1's `5V` will actually deliver.** 4.75 V at 92 mA is the only
+loaded measurement there is, and the radios peak at 349 mA on +3V3_RF, which
+is roughly 250 mA drawn at 5 V. Two unknowns follow. If the 0.25 V below
+nominal is IR drop it implies about 2.7 Ω, which would put the pin near 4 V at
+full load -- harmless to a converter that starts at 2.7 V, but worth knowing.
+And nothing establishes what that pin and its trace are rated to carry
+continuously.
+
+Two load points settle both, with 4 x 220 Ω and then 8: `V = Vsrc - I*R` gives
+the source voltage and the series resistance, and extrapolates to 350 mA
+without needing a 14 Ω load.
 
 The cell lives in the base, in the pocket the floorplan already has at 0, -35,
 and its leads run up to BAT1 exactly as the enclosure comment says. The carrier
