@@ -44,138 +44,130 @@ def to_kicad(x, y):
     return round(x + BOARD_W / 2, 2), round(BOARD_L / 2 - y, 2)
 
 
-# From pueo-enclosure.scad MODULES[]: (name, refdes, x, y, w, h)
+# From pueo-enclosure.scad MODULES_ONBOARD[]: (name, refdes, x, y, w, h).
+#
+# The default build, which is the one with no charger inside the case. The
+# EXT_CHARGER variant puts an MT3608 and a TP4056 down here as well; this
+# netlist does not describe that board.
 MODULES = [
-    # Two sources disagree: 36 x 17 x 6.25 and 30 x 17 x 14. Carrying the
-    # larger footprint, since an oversized pocket is slack and an undersized
-    # one is interference. Height is unresolved and matters more -- at 14 mm
-    # this module cannot be socketed, only soldered down.
-    ("MT3608 boost",   "U1",  -19.0, -65.0, 36, 17),
-    # 27 x 17 measured off the module, not the 26 x 19 the enclosure
-    # assumes. Mounted rotated 180 deg from the usual photo so the USB
-    # jack faces +X, out through the right wall.
-    ("TP4056 charger", "U2",   26.6, -62.0, 27, 17),
-    # MP2307 "Mini-360": 17.9 x 12, adjustable via a single-turn trimpot.
-    ("MP2307 buck",    "U3",  -29.0, -48.0, 17.9, 12),
-    ("LiPo pack",      "BT1", -16.0, -23.0, 45, 34),
-    # ATGM336H, not the GT-U7 that was assumed: 16 x 13 with the antenna on
-    # a 90 mm u.FL pigtail rather than a patch on the module. Moved up from
-    # (24, -21), where the pigtail could not reach the top-wall antenna slot
-    # at (0, 80). Centred in the 29.75 mm corridor between the two radios:
-    # 7.5 mm to the CC1101, 6.25 mm to the NRF24, 7.0 mm to the PN532.
-    ("ATGM336H GPS",   "J5",    0.0,  52.0, 16, 13),
-    ("PN532 V3",       "J4",    0.0,  18.0, 43, 41),
-    # 28 x 15 PCB, 38 x 15 overall -- the SMA jack is soldered to the module
-    # edge, so the antenna position is fixed by where the module sits.
-    ("HW-863 CC1101",  "J2",  -23.0,  61.5, 15, 38),
-    # 41 x 15.5 per the listing, the 41 including the SMA body. Exactly the
-    # length of the pocket the enclosure cuts, with zero clearance.
-    ("NRF24 PA+LNA",   "J3",   22.0,  61.0, 15.5, 41),
+    # The enclosure pocket is 20 x 12. The part chosen for it is a Pololu
+    # S7V8F3 at 11.4 x 16.5, which fits only turned 90 degrees, because 16.5
+    # will not go into 12. [verify] against the real part before the pocket
+    # is cut again.
+    ("3.3V buck-boost", "U3",   0.0, -60.0, 20, 12),
+    # Not wired to this board at all: a cell here runs to the CYD's own BAT1.
+    # It is in this list because the enclosure reserves the pocket and the
+    # pour has to keep out from under it.
+    ("LiPo pack",       "BT1",  0.0, -35.0, 45, 34),
+    ("PN532 V3",        "J4",   0.0,   4.0, 43, 41),
+    ("HW-863 CC1101",   "J2", -23.0,  48.0, 15, 40),
+    ("NRF24 PA+LNA",    "J3",  22.0,  47.5, 16, 41),
+    # ATGM336H, 16 x 13, antenna on a 90 mm u.FL pigtail rather than a patch
+    # on the module. Centred in the corridor between the two radios.
+    ("ATGM336H GPS",    "J5",   0.0,  40.0, 16, 13),
 ]
 
 SMA_X = [-23.0, 22.0]       # scad SMA_X, 45 mm apart
-USBC_Y = -62.0              # scad USBC_Y, right wall
+# No USB opening in any of these walls in this build: the only socket is the
+# CYD's own, and the CYD is in the lid.
 
 # ── Nets ────────────────────────────────────────────────────────────────────
 # (net, [(refdes, pin-name), ...], note)
 #
-# J1 is the lid harness. Its pin numbers ARE ours to choose, so they are
-# fixed here and match docs/pueo/pcb-design.md.
+# Three cables reach the CYD, because only four of the ten signals land on a
+# connector it already has. J1 carries the six that have to be soldered, plus
+# grounds. J6 goes straight to P3 and J7 straight to P1.
+#
+# J1, J6 and J7 pin numbers are ours to choose. J1 is fixed here and matches
+# docs/pueo/pcb-design.md; J6 and J7 follow the CYD header's own order, so the
+# cable is straight through with nothing crossed.
 NETS = [
-    ("GND", [("J1", "1"), ("J1", "2"), ("J1", "14"),
+    ("GND", [("J1", "1"), ("J1", "5"), ("J1", "9"),
+             ("J6", "1"), ("J7", "4"),
              ("J2", "GND"), ("J3", "GND"), ("J4", "GND"), ("J5", "GND"),
-             ("U1", "VIN-"), ("U1", "OUT-"), ("U2", "OUT-"), ("U3", "GND"),
-             ("R1", "-"), ("C1", "2"), ("C2", "2"), ("C3", "2"),
-             ("C4", "2"), ("C5", "2"), ("C6", "2"), ("C7", "2"),
+             ("U3", "GND"),
+             ("C1", "2"), ("C2", "2"), ("C3", "2"), ("C4", "2"),
+             ("C5", "2"), ("C6", "2"), ("C7", "2"),
              ("TP5", "1")],
-     "system ground is the PROTECTED side, U2.OUT-. Pour both layers except under the PN532 coil"),
+     "one ground, poured both layers except under the PN532 coil. It arrives "
+     "on three J1 pins and on both cable connectors"),
 
-    # The protection MOSFETs on this module sit in the NEGATIVE line, between
-    # B- and OUT-. So the battery hangs off B+/B- and the whole system takes
-    # its supply and its ground from OUT+/OUT-. Wiring the load to B+ and
-    # putting BT1's negative on the common ground -- which is what this
-    # netlist did first -- runs the load around the protection entirely, and
-    # over-discharge cutoff silently stops existing.
-    ("VBAT",     [("BT1", "+"), ("U2", "B+")],
-     "battery positive into the protection, 1.0 mm trace"),
-    ("BATT_NEG", [("BT1", "-"), ("U2", "B-")],
-     "battery negative. ONLY these two nodes: it is not system ground"),
-    ("+VSYS",    [("U2", "OUT+"), ("U1", "VIN+")],
-     "protected battery rail feeding the boost, 1.0 mm trace"),
+    # Power in. P1's 5V is the CYD's 5 V INPUT node, not an output: measured
+    # 4.75 V at 92 mA with USB connected, and 0 V under the same load on
+    # battery alone. The carrier taps it and makes its own 3.3 V.
+    ("+5V_IN", [("J7", "1"), ("U3", "VIN"), ("C6", "1"), ("TP1", "1")],
+     "from P1 pin 1, about 260 mA at full load, 0.5 mm"),
 
-    # U3 is an MP2307 buck: it cannot step 3.0-4.2 V up to 3.3 V, and the
-    # module wants 4.75 V minimum anyway. It has to sit downstream of the
-    # boost, which puts the whole RF rail on the MT3608's back.
-    ("+5V_SW", [("U1", "OUT+"), ("J1", "3"), ("J4", "VCC"), ("U3", "VIN"),
-                ("C6", "1"), ("TP1", "1")],
-     "boost output, feeds the CYD, the PN532 and the 3V3 buck, 1.0 mm"),
-
-    ("+3V3_RF", [("U3", "VOUT"), ("J2", "VCC"), ("J3", "VCC"), ("J5", "VCC"),
-                 ("C1", "1"), ("C2", "1"), ("C3", "1"), ("C7", "1"),
-                 ("TP2", "1")],
-     "separate rail: the PA modules brown out sharing the CYD regulator"),
-
-    # No USB_VBUS net: the Type-C jack is on the TP4056 module itself, which
-    # the enclosure places with its short end against the right wall. The
-    # board only has to leave the cutout clear.
+    ("+3V3_RF", [("U3", "VOUT"), ("J2", "VCC"), ("J3", "VCC"), ("J4", "VCC"),
+                 ("J5", "VCC"),
+                 ("C1", "1"), ("C2", "1"), ("C3", "1"), ("C4", "1"),
+                 ("C5", "1"), ("C7", "1"), ("TP2", "1")],
+     "the one rail this board makes, and everything on it. Separate from the "
+     "CYD's 3.3 V because the radios' spikes brown that regulator out"),
 
     # SPI, with the series-resistor break between the connector and the bus.
-    ("SCK_J1",   [("J1", "4"), ("R2", "1")], "from CYD GPIO 18"),
-    ("MOSI_J1",  [("J1", "5"), ("R3", "1")], "from CYD GPIO 23"),
+    ("SCK_J1",   [("J1", "2"), ("R2", "1")], "from CYD GPIO 18"),
+    ("MOSI_J1",  [("J1", "3"), ("R3", "1")], "from CYD GPIO 23"),
     ("VSPI_SCK", [("R2", "2"), ("J2", "SCK"), ("J3", "SCK"), ("J4", "SCK"),
                   ("TP3", "1")],
      "daisy-chain along a spine, short stubs"),
     ("VSPI_MOSI", [("R3", "2"), ("J2", "MOSI"), ("J3", "MOSI"), ("J4", "MOSI")],
      "as above"),
-    ("VSPI_MISO", [("J1", "6"), ("J2", "MISO"), ("J3", "MISO"), ("J4", "MISO"),
+    ("VSPI_MISO", [("J1", "4"), ("J2", "MISO"), ("J3", "MISO"), ("J4", "MISO"),
                    ("TP4", "1")],
      "no series resistor: an input at the CYD end"),
 
     # Chip selects and control. Static during a transaction, so these are the
     # nets to route awkwardly if something has to be.
-    ("CC1101_CS",   [("J1", "7"),  ("J2", "CSN")],  "CYD GPIO 27"),
-    ("CC1101_GDO0", [("J1", "8"),  ("J2", "GDO0")], "CYD GPIO 22, TX"),
-    ("CC1101_GDO2", [("J1", "9"),  ("J2", "GDO2")], "CYD GPIO 35, RX, input-only"),
-    ("NRF_CSN",     [("J1", "10"), ("J3", "CSN")],  "CYD GPIO 4"),
-    ("NRF_CE",      [("J1", "11"), ("J3", "CE")],   "CYD GPIO 16"),
-    ("PN532_SS",    [("J1", "12"), ("J4", "SS")],   "CYD GPIO 17"),
+    ("NRF_CSN",  [("J1", "6"), ("J3", "CSN")], "CYD GPIO 25, a module pad"),
+    ("NRF_CE",   [("J1", "7"), ("J3", "CE")],  "CYD GPIO 16, an RGB LED pad"),
+    ("PN532_SS", [("J1", "8"), ("J4", "SS")],  "CYD GPIO 17, an RGB LED pad"),
 
-    # GPS, through the series resistor.
-    ("GPS_TX_RAW", [("J5", "TX"), ("R1", "1")],
-     "GPS module transmit"),
-    ("GPS_TX",     [("R1", "2"), ("J1", "13"), ("TP6", "1")],
-     "to CYD GPIO 1 through R1; both ends drive this net when GPS is closed"),
+    # The CC1101's three lines are the only signals with a header at the CYD
+    # end, so they leave on their own 4-way to P3 instead of through J1. J6's
+    # order is P3's order: GND, IO35, IO22, IO21.
+    ("CC1101_GDO2", [("J6", "2"), ("J2", "GDO2")], "CYD GPIO 35, input-only"),
+    ("CC1101_GDO0", [("J6", "3"), ("J2", "GDO0")], "CYD GPIO 22"),
+    ("CC1101_CS",   [("J6", "4"), ("J2", "CSN")],  "CYD GPIO 21"),
+
+    # GPS, through the series resistor, onto P1's pin marked TX.
+    ("GPS_TX_RAW", [("J5", "TX"), ("R1", "1")], "GPS module transmit"),
+    ("GPS_TX",     [("R1", "2"), ("J7", "2"), ("TP6", "1")],
+     "to CYD GPIO 1 through R1. The ESP32 drives that pin at boot and the GPS "
+     "drives it always, so R1 limits the contention. GPS_UART_TX is -1, so "
+     "nothing goes the other way"),
 ]
 
 # Signal nets whose GPIO must agree with the firmware: net -> macro in the
 # board header.
 FIRMWARE_CHECK = {
-    "CC1101_CS":   ("CC1101_CS", 27),
+    "CC1101_CS":   ("CC1101_CS", 21),
     "CC1101_GDO0": ("SUBGHZ_TX_PIN", 22),
     "CC1101_GDO2": ("SUBGHZ_RX_PIN", 35),
-    "NRF_CSN":     ("CSN_PIN_1", 4),
+    "NRF_CSN":     ("CSN_PIN_1", 25),
     "NRF_CE":      ("CE_PIN_1", 16),
     "PN532_SS":    ("PN532_SS", 17),
     "GPS_TX":      ("GPS_UART_RX", 1),
 }
 
 BOM = [
-    ("J1",  1, "Connector 14-way 1.25mm JST-GH", "lid harness to the CYD"),
+    ("J1",  1, "Connector 9-way 1.25mm MX1.25",
+     "lid harness: the six signals that have to be soldered, plus grounds"),
     ("J2",  1, "Header 2x4 2.54mm", "HW-863 CC1101 module [verify pinout]"),
     ("J3",  1, "Header 2x4 2.54mm", "NRF24L01+PA+LNA module [verify pinout]"),
     ("J4",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
     ("J5",  1, "Header 1x5 2.54mm", "ATGM336H GPS, VCC GND TX RX PPS"),
-    ("U1",  1, "MT3608 boost module, ~36x17mm",
-     "+VSYS -> 5V, 1 A continuous. OUTPUT IS A MULTI-TURN TRIMPOT: set to "
-     "5.00 V on the bench BEFORE connecting J1. Ships at an arbitrary "
-     "setting and goes to ~28 V. Its own micro-USB is unused and stays "
-     "inside the case [verify dimensions]"),
-    ("U2",  1, "TP4056 + DW01/FS8205 protection, 27x17mm",
-     "micro-USB, 1 A charge (module R3, typically 1.2k). Load on OUT+/OUT-, "
-     "not B+. Protection trips ~3 A, above the 1.6 A peak. IN+/IN- pads are "
-     "an alternate supply if USB is ever dropped"),
-    ("U3",  1, "3.3V buck module", "separate RF rail, 500 mA"),
-    ("BT1", 1, "1S LiPo, 2000 mAh", "~2 h at 600 mA average"),
+    ("J6",  1, "Connector 4-way 1.25mm MX1.25",
+     "straight to the CYD's P3, in P3's own order: GND, IO35, IO22, IO21"),
+    ("J7",  1, "Connector 4-way 1.25mm MX1.25",
+     "straight to the CYD's P1: 5V, TX, RX, GND. Pin 3 is unused, because "
+     "GPS_UART_TX is -1 and nothing is sent to the GPS"),
+    ("U3",  1, "Pololu S7V8F3 buck-boost, 11.4 x 16.5 mm",
+     "3.3 V from P1's 5 V, ~1 A. Fixed output: there is no trimpot to set "
+     "wrong, which is the whole reason it replaced an adjustable module"),
+    ("BT1", 1, "1S LiPo, optional",
+     "NOT wired to this board. A cell here runs to the CYD's own BAT1, and "
+     "the CYD will not start from it until SW1 is pressed"),
     ("R1",  1, "1k 0805", "GPS TX series, contention limit on GPIO 1"),
     ("R2",  1, "0R 0805", "SCK series; 22R footprint if it rings"),
     ("R3",  1, "0R 0805", "MOSI series; 22R footprint if it rings"),
@@ -184,9 +176,10 @@ BOM = [
     ("C3",  1, "100nF 0805", "NRF24 VCC"),
     ("C4",  1, "100nF 0805", "PN532 VCC"),
     ("C5",  1, "100nF 0805", "GPS VCC"),
-    ("C6",  1, "220uF electrolytic", "+5V_SW bulk, near J1"),
-    ("C7",  1, "100uF electrolytic", "+3V3_RF bulk at the buck"),
-    ("TP1", 1, "Test point", "+5V_SW"),
+    ("C6",  1, "220uF electrolytic",
+     "bulk at the converter input, where P1's 5 V arrives after a cable"),
+    ("C7",  1, "100uF electrolytic", "+3V3_RF bulk at the converter output"),
+    ("TP1", 1, "Test point", "+5V_IN"),
     ("TP2", 1, "Test point", "+3V3_RF"),
     ("TP3", 1, "Test point", "VSPI_SCK"),
     ("TP4", 1, "Test point", "VSPI_MISO"),
@@ -227,7 +220,8 @@ def write_netlist_txt(path):
         "Pueo carrier board - netlist",
         "",
         "Pin names are functional, not numbered: module pin numbers come from",
-        "the datasheets. J1 numbers are ours and match docs/pueo/pcb-design.md.",
+        "the datasheets. J1, J6 and J7 numbers are ours; J1 matches",
+        "docs/pueo/pcb-design.md and the two 4-ways follow the CYD header order.",
         "",
         "Generated by tools/gen_netlist.py from ESP32-DIV/board_pueo.h.",
         "",
@@ -275,9 +269,8 @@ def write_placement(path):
                 note = "board SMA must land at enclosure x=%.0f (kicad x=%.2f)" % (
                     sma, to_kicad(sma, 0)[0])
             elif ref == "BT1":
-                note = "battery pocket, no copper beneath"
-            elif ref == "U2":
-                note = "USB-C through the right wall at enclosure y=%.0f" % USBC_Y
+                note = ("battery pocket, no copper beneath. Not a net on this "
+                        "board: a cell here goes to the CYD's BAT1")
             w.writerow([ref, name, kx, ky, wd, ht, x, y, note])
 
 
@@ -290,6 +283,12 @@ def write_bom(path):
 
 
 def main():
+    """--check verifies and writes nothing, so the checks can run it.
+
+    This file drifted two design revisions precisely because its guard only
+    fired when somebody ran it by hand, and nothing ran it.
+    """
+    check_only = "--check" in sys.argv[1:]
     pins = read_firmware_pins()
     problems = verify(pins)
     if problems:
@@ -297,6 +296,11 @@ def main():
             print("  ! " + p, file=sys.stderr)
         print("netlist disagrees with the firmware; nothing written", file=sys.stderr)
         return 1
+
+    if check_only:
+        print("  netlist agrees with board_pueo.h: %d nets, %d parts"
+              % (len(NETS), len(BOM)))
+        return 0
 
     OUT.mkdir(parents=True, exist_ok=True)
     write_netlist_txt(OUT / "netlist.txt")

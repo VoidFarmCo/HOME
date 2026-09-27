@@ -63,40 +63,42 @@ committing. CYD revisions differ, and the silkscreen is the authority.
   LID                              BASE (this board)
   ┌──────────────┐                 ┌────────────────────────────┐
   │ CYD          │                 │  radios · power · SMAs     │
-  │  headers ────┼──── harness ────┤  J1  14-way                │
+  │  soldered ───┼──── J1  9-way ──┤                            │
+  │  P3 ─────────┼──── J6  4-way ──┤                            │
+  │  P1 ─────────┼──── J7  4-way ──┤                            │
   │  pigtail ────┤                 │                            │
   └──────────────┘                 └────────────────────────────┘
 ```
 
-One connector, J1.
+Three connectors, and nothing in the build needs crimping.
 
-**[decide] which part.** This said 14-way 1.25 mm JST-GH, on the grounds that
-GH is easier to hand-assemble than FFC and tolerates a lid opening and
-closing. The second half of that still holds. The first half does not, and it
-was written without checking what a 14-way GH actually costs to obtain.
+**[decided] 2026-09-26: three MX1.25 cables, all bought made up.** The split
+falls out of where the signals actually are. Only four of the ten reach a
+connector the CYD already has, three of them on `P3` and one on `P1`. The other
+six are soldered to pads, and a pre-crimped lead with one end cut, stripped and
+tinned serves those perfectly.
 
-`GHR-14V-S` is a catalogue part and distributors stock it. The hobby market
-does not: GH is stocked in 4, 6, 8 and 10 because those are the Pixhawk sizes,
-so a search turns up nothing at 14. That leaves buying a bare housing and a
-bag of `SSHL-002T-P0.2` contacts and hand-crimping fourteen of them at
-0.2 mm², which is the opposite of easier to hand-assemble. A crimp that grips
-insulation rather than conductor reads fine on a meter and fails under load,
-and fourteen chances at it on the one cable carrying the whole SPI bus is a
-poor trade for a connector choice nobody is committed to.
-
-Four ways out, none of them decided:
-
-| option | for | against |
+| | ways | carries |
 |---|---|---|
-| **GH 14-way** | one connector, good flex life, the pinout as drawn | hand-crimp only, awkward to source |
-| **GH 8 + 6** | both stock sizes, available pre-crimped | splits a multi-drop bus across two housings, and the grounds on 1, 2 and 14 were placed to bracket it |
-| **0.5 mm FFC** | any way count, trivially sourced, thinnest | flex life on a hinge is the original objection and still stands |
-| **PicoBlade 14-way** (`51021-1400`) | same 1.25 mm pitch, better availability at odd sizes | latches on top rather than the side, so it flexes differently from GH |
+| **J1** | 9 | the six soldered signals, plus three grounds. No power pin |
+| **J6** | 4 | straight to `P3`, in `P3`'s own order: GND, IO35, IO22, IO21 |
+| **J7** | 4 | straight to `P1`: 5V, TX, RX, GND. The 5 V in, and the GPS out |
 
-The deciding evidence is how the lid actually moves in the printed case, which
-is a thing to handle rather than to reason about. Until then this is open, and
-the pinout below is independent of it: whichever part wins, the fourteen nets
-and their order do not change.
+**The 14-way it replaced was the one part that needed a crimp tool.** That
+draft said 14-way 1.25 mm JST-GH, because GH is easier to hand-assemble than
+FFC and tolerates a lid opening and closing. The second half still holds. The
+first half was written without checking what a 14-way GH costs to obtain:
+`GHR-14V-S` is a catalogue part, but the hobby market stocks GH in 4, 6, 8 and
+10, because those are the Pixhawk sizes. Nothing turns up at 14. That left a
+bare housing, a bag of `SSHL-002T-P0.2` contacts, and fourteen hand crimps at
+0.2 mm² on the one cable carrying the whole SPI bus. A crimp that grips
+insulation rather than conductor reads fine on a meter and fails under load.
+
+So the connector question answered itself once the wires were counted rather
+than assumed: three stock sizes, pre-crimped, against one odd size that has to
+be made. An 0.5 mm FFC remains the alternative if height ever gets tight, with
+the objection it always had, which is flex life on a lid that comes off to
+reach the card.
 
 **Whatever it is, the wire is 28 AWG.** GH contacts take about 32 to 28 and
 are rated 1 A each, and 28 is what pre-crimped GH cable comes as. The same
@@ -117,20 +119,28 @@ second, which is what stopped it being found after fabrication.
 
 | pin | net | to CYD | note |
 |---|---|---|---|
-| 1 | GND | GND | |
-| 2 | GND | GND | two grounds, one at each end of the connector |
-| 3 | *(was +5V_SW)* | -- | **removed**: the CYD powers itself over its own USB-C |
-| 4 | VSPI_SCK | GPIO 18 | SD slot pad |
-| 5 | VSPI_MOSI | GPIO 23 | SD slot pad |
-| 6 | VSPI_MISO | GPIO 19 | SD slot pad |
-| 7 | CC1101_CS | GPIO 21 | P3 |
-| 8 | CC1101_GDO0 | GPIO 22 | P3 |
-| 9 | CC1101_GDO2 | GPIO 35 | P3, input-only on the ESP32 side |
-| 10 | NRF_CSN | GPIO 25 | module pad, not a header |
-| 11 | NRF_CE | GPIO 16 | LED pad |
-| 12 | PN532_SS | GPIO 17 | LED pad |
-| 13 | GPS_TX | GPIO 1 | **through R1, see below** |
-| 14 | GND | GND | |
+| 1 | GND | GND | a ground at each end, and one in the middle |
+| 2 | VSPI_SCK | GPIO 18 | microSD slot pad |
+| 3 | VSPI_MOSI | GPIO 23 | microSD slot pad |
+| 4 | VSPI_MISO | GPIO 19 | microSD slot pad |
+| 5 | GND | GND | between the clocked lines and the static ones |
+| 6 | NRF_CSN | GPIO 25 | module pad, not a header |
+| 7 | NRF_CE | GPIO 16 | RGB LED pad |
+| 8 | PN532_SS | GPIO 17 | RGB LED pad |
+| 9 | GND | GND | |
+
+Six signals and three grounds, which is every wire that has to be soldered at
+the CYD end and nothing else. The three CC1101 lines left for `J6` because
+`P3` already presents them, and the GPS left for `J7` because `P1` already
+presents the pin it needs. There is no supply here at all.
+
+`J7` pin 3 is `P1`'s RX and stays unconnected: `GPS_UART_TX` is `-1`, so
+nothing is ever sent to the GPS.
+
+| | |
+|---|---|
+| **J6** to `P3` | 1 GND, 2 CC1101_GDO2, 3 CC1101_GDO0, 4 CC1101_CS |
+| **J7** to `P1` | 1 +5V_IN, 2 GPS_TX, 3 *(unused)*, 4 GND |
 
 All three CC1101 control lines land on P3, which is the one place this board
 is easier than its predecessor: chip select, GDO0 and GDO2 reach a connector
