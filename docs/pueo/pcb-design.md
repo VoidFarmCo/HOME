@@ -154,6 +154,36 @@ This is the single change most worth having in copper rather than in a
 build note, because it is invisible, it is easy to forget, and forgetting it
 degrades a pin slowly rather than failing loudly.
 
+### The GPS is a 3.3 V part, and it feeds its own antenna
+
+From the ATGM336H-5N user manual, v1.2, which settles what was a [verify]:
+
+| | |
+|---|---|
+| supply | 2.7 / **3.3** / 3.6 V |
+| **absolute maximum** | **3.6 V** |
+| typical | <25 mA at 3.3 V |
+| peak, excluding antenna | **100 mA** |
+| backup, VBAT | 1.5 to 3.6 V, 10 uA |
+
+**5 V would destroy it.** 3.6 V is the absolute maximum on VCC, not a
+recommended ceiling, so this part belongs on +3V3_RF and nowhere else. It is
+on that rail in the tree below, which is correct, and the peak figure is four
+times what the estimate said.
+
+**The active antenna is not a separate supply problem.** Pin 14 VCC_RF is an
+*output*, +3.3 V, and the module biases the antenna from it through an
+inductor -- the datasheet's own application circuit does exactly that, with
+detection and short-circuit protection built in. Budget for it on +3V3_RF
+rather than anywhere else: 3 mA with the antenna open, 50 mA into a short,
+which the module limits rather than passing through.
+
+**[verify] the backup cell.** VBAT keeps the RTC and SRAM alive for 10 uA and
+is what separates a 1 s hot start from a 35 s cold one. Nothing in this design
+says where it comes from, and the breakout in hand has not been looked at. A
+GPS that cold-starts every time is a usability problem rather than a fault, so
+it would be easy to ship without noticing.
+
 ## Power tree
 
 **The carrier makes its own 5 V, and that is settled.** This was briefly open,
@@ -212,7 +242,7 @@ allocates a third power module at (-29, -48).
 | PN532 | +5V_SW | ~10 mA idle | ~100 mA field on | **[verify]** |
 | NRF24L01+PA+LNA | +3V3_RF | 45 mA RX | ~115 mA TX @ +20 dBm | **[verify]** |
 | CC1101 | +3V3_RF | 16 mA RX | ~34 mA TX @ +10 dBm | **[verify]** |
-| ATGM336H | +3V3_RF | ~25 mA tracking | ~40 mA acquiring | **[verify]** |
+| ATGM336H | +3V3_RF | <25 mA @3.3 V | **100 mA peak** | datasheet |
 
 With the buck downstream of the boost, the 3.3 V loads no longer draw from
 the battery in parallel with the CYD — they are reflected onto +5V_SW,
