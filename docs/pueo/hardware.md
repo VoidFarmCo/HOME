@@ -67,6 +67,18 @@ under the `BAT-` marking is the one that conducts. The silkscreen and the
 meter agree, which is worth saying because four other things this board was
 supposed to be turned out to describe somebody else's hardware.
 
+**5 V on BAT1 does nothing, and did no harm once.** Tried on 2026-09-26 with a
+bench supply: the board stayed dark, and booted normally on USB straight
+afterwards. It runs from BAT1 at 3.7 V, so the path works; something between
+4.2 and 5 V refuses, which is what a charger with battery over-voltage
+protection does when it sees a cell out of range.
+
+Do not read that as a rating. One survival is not a specification, the
+threshold is unknown, and the protection that refused over-voltage is not the
+protection that is missing. **If you want to run the board off a bench supply,
+feed it 5 V through the USB-C socket**, which is the input the design uses
+anyway. BAT1 wants 3.0 to 4.2 V and nothing else.
+
 Check it on your own board anyway. The FM5324GA has no reverse protection on
 its cell input, so the cost of being wrong is the charger, and a label three
 millimetres from the pin it refers to is exactly the kind of thing that reads
