@@ -68,9 +68,51 @@ committing. CYD revisions differ, and the silkscreen is the authority.
   └──────────────┘                 └────────────────────────────┘
 ```
 
-One connector, J1. Suggested: 14-way 1.25 mm JST-GH or a 0.5 mm FFC. GH is
-easier to hand-assemble and tolerates the lid opening and closing; FFC is
-thinner. Lid hinge/flex cycles argue for GH.
+One connector, J1.
+
+**[decide] which part.** This said 14-way 1.25 mm JST-GH, on the grounds that
+GH is easier to hand-assemble than FFC and tolerates a lid opening and
+closing. The second half of that still holds. The first half does not, and it
+was written without checking what a 14-way GH actually costs to obtain.
+
+`GHR-14V-S` is a catalogue part and distributors stock it. The hobby market
+does not: GH is stocked in 4, 6, 8 and 10 because those are the Pixhawk sizes,
+so a search turns up nothing at 14. That leaves buying a bare housing and a
+bag of `SSHL-002T-P0.2` contacts and hand-crimping fourteen of them at
+0.2 mm², which is the opposite of easier to hand-assemble. A crimp that grips
+insulation rather than conductor reads fine on a meter and fails under load,
+and fourteen chances at it on the one cable carrying the whole SPI bus is a
+poor trade for a connector choice nobody is committed to.
+
+Four ways out, none of them decided:
+
+| option | for | against |
+|---|---|---|
+| **GH 14-way** | one connector, good flex life, the pinout as drawn | hand-crimp only, awkward to source |
+| **GH 8 + 6** | both stock sizes, available pre-crimped | splits a multi-drop bus across two housings, and the grounds on 1, 2 and 14 were placed to bracket it |
+| **0.5 mm FFC** | any way count, trivially sourced, thinnest | flex life on a hinge is the original objection and still stands |
+| **PicoBlade 14-way** (`51021-1400`) | same 1.25 mm pitch, better availability at odd sizes | latches on top rather than the side, so it flexes differently from GH |
+
+The deciding evidence is how the lid actually moves in the printed case, which
+is a thing to handle rather than to reason about. Until then this is open, and
+the pinout below is independent of it: whichever part wins, the fourteen nets
+and their order do not change.
+
+**Whatever it is, the wire is 28 AWG.** GH contacts take about 32 to 28 and
+are rated 1 A each, and 28 is what pre-crimped GH cable comes as. The same
+figure applies to PicoBlade. So a contact is the limit here, not the copper.
+
+**[decide] whether one 5 V pin is enough**, and this depends on the power tree
+above rather than on the connector. J1 has three grounds and one supply: GND on
+1, 2 and 14, `+5V_SW` on 3. The return is split three ways and the feed is not.
+
+At 1 A that is comfortable while the carrier feeds the CYD, which draws around
+200 mA rising to 500 on WiFi transmit. It is not comfortable the other way
+round. If the CYD ends up owning the battery and feeding the carrier from P1,
+pin 3 carries three radios, the PN532 and the 3.3 V buck through one contact,
+and that wants a second 5 V pin paralleled the way the grounds already are.
+Deciding the power tree first and the pin count second keeps that from being
+discovered after fabrication.
 
 ### J1 pinout
 
