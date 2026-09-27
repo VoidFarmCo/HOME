@@ -313,6 +313,45 @@ The separate 3.3 V rail itself is not optional. The PA/LNA modules brown out
 if they share the CYD's regulator, which is why the enclosure already
 allocates a third power module at (-29, -48).
 
+### Where the 5 V rail came from
+
+Worth recording, because with it deleted the old tree reads as though somebody
+put a converter in for no reason. They did not. The project's original notes
+say:
+
+> Tap 5V from USB and step it down to 3.3V independently -- do not share the
+> CYD's 3.3V rail or you'll get brownouts, random resets, and failed radio
+> init.
+
+Both halves were right when written, and one still is.
+
+**The second half is still law.** The radios get their own rail and never
+touch the display's. Every version of this design has obeyed it and this one
+does too.
+
+**The first half described a tethered device.** Tapping 5 V from USB and
+bucking it down is correct, and P1's `5V` pin really does deliver it: measured
+4.75 V at 92 mA with USB attached. Nothing about that instruction was wrong.
+
+What broke it was the battery, which those notes predate. On a cell that pin
+is an input with nothing behind it, so the 5 V the instruction assumed to be
+free stopped existing. The design then did the faithful thing and added a
+boost to manufacture it, so the buck could go on stepping it down as
+specified:
+
+    original, tethered      USB 5V ------------------> buck ------> 3.3V
+    once a battery arrived  cell ---> boost to 5V ---> buck ------> 3.3V
+    what it actually needs  cell ---> buck-boost -------------> 3.3V
+
+The middle row is the top row carried forward after its premise expired. Every
+part that followed descends from that one line: the MT3608 to remake the 5 V,
+the MP2307's 4.75 V minimum that made it unusable from a cell, and the TP4056
+to charge a battery the notes never anticipated.
+
+The lesson is not that the old design was careless. It is that a premise can
+expire quietly while everything built on it goes on looking sound, and that
+what exposed it here was a datasheet and a resistor rather than a review.
+
 ### Budget
 
 | load | typical | peak | source |
