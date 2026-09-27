@@ -246,6 +246,38 @@ the GPS and the PN532 datasheets showed nothing else wanted 5 V, the whole
 stage was a conversion to nowhere. The MT3608 and the MP2307 are both in hand
 and both stay on the shelf.
 
+### The two-module path is back on the table, and it is 0.5 mm short
+
+The MT3608's height was measured on 2026-09-26: **6.0 mm**, against a
+CARRIER_HEADROOM of 13.9. It fits with 7.9 mm to spare, and the 14 mm figure
+that would have ruled it out was simply wrong for this module.
+
+That reopens an option Path A had closed. Cell to MT3608 to 5 V to MP2307 to
+3.3 V uses two modules already owned, costs nothing and waits for nothing. The
+price is efficiency, two switchers at about 90% each against a buck-boost's
+one, so roughly 10% more drain, and two trimmers to set instead of none.
+
+**The floorplan is what blocks it, by half a millimetre.** The power band runs
+from the wall at y = -68.5 to the LiPo pocket at y = -52, which is 16.5 mm
+deep, and the MP2307 sits in the middle of it leaving 29.5 mm each side:
+
+    MT3608 beside the MP2307    36 long into 29.5    no
+                                30 long into 29.5    no, by 0.5 mm
+    both side by side           56 or 50 of 79 wide  width is fine
+                                17 deep into 16.5    short by 0.5 mm
+
+The disputed footprint does not change the answer. 36 x 17 and 30 x 17 both
+fail the same way, because the binding dimension is the 17 mm depth against a
+16.5 mm band. Moving the LiPo pocket up a millimetre fixes it, and that is a
+SCAD edit and a reprint of the base rather than a redesign. The gap between
+the pocket and the PN532 above it is 1.5 mm, so there is room to take it from.
+
+**[decide] which of the two.** Buying a buck-boost keeps the printed case and
+the existing slot, costs a part and a wait, and is the more efficient and the
+safer of the two -- a fixed 3.3 V part cannot be set wrong, and +3V3_RF feeds
+three radios with nothing downstream to absorb a mistake. Using what is in
+hand costs a reprint and 10% of the runtime. Neither is wrong.
+
 **[decide] which buck-boost**, and whether it fits. The slot at 0, -60 is
 20 x 12 mm for a part that was 17.9 x 12, so there is 2.1 mm of slack in one
 axis and none in the other. Most off-the-shelf buck-boost breakouts are larger
@@ -523,8 +555,12 @@ heights are the gap, and heights are what the enclosure budget runs on.
 ```
 module           footprint mm    height mm    basis
 --------------   -------------   ----------   -----------------------------
-MT3608 boost     36 x 17  (?)    6.25 or 14   CONFLICT, and it now decides
-                 30 x 17  (?)                 whether the module fits at all
+MT3608 boost     36 x 17  (?)    6.0          MEASURED 2026-09-26, on the
+                 30 x 17  (?)                 module in hand. Neither figure
+                                              in circulation was right; 14 was
+                                              the one that would have ruled it
+                                              out. Footprint still unmeasured,
+                                              and it turns out not to matter
 TP4056 charger   27 x 17         ~4  (est)    micro-USB jack is the tallest
                                               thing on it, ~2.7 over ~1.0
 MP2307 buck      17.9 x 12       ~6  (est)    inductor and trimmer stand
@@ -809,7 +845,7 @@ Seven heights were open. Sorting them against the 13.90 mm budget collapses
 the list:
 
 ```
-  MT3608 boost     6.25 or 14      DECIDES IT -- 14 does not fit
+  MT3608 boost     6.0  MEASURED   7.9 mm spare -- it fits
   LiPo pack        6-10            structural, not a fit question
   NRF24 PA+LNA     ~8   est        ~6 mm clear at the estimate
   HW-863 CC1101    ~7   est        ~7 mm clear
