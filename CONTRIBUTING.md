@@ -72,6 +72,11 @@ because something specific went wrong and shipped:
   it.
 - `check_pinmap.py` runs inside the build, because two features claiming
   one pin is the failure this hardware makes easiest.
+- `check_svg_labels.py` exists because a hand-written diagram fails silently.
+  Rename a connector, gain a character, and the label now runs through its
+  neighbour or past the box it names. Nothing errors and nothing fails to
+  build. Four labels on the website's drawings were wrong that way at once,
+  and every one was found by eye.
 
 **If you fix a bug that a check would have caught, add the check.** Then
 break the fix on purpose and confirm the check fails. A check that has
