@@ -166,7 +166,7 @@ its cell input, so the cost of being wrong is the charger, and a label three
 millimetres from the pin it refers to is exactly the kind of thing that reads
 one way in a photograph and the other way on the bench.
 
-### P1's `5V` is an input. You cannot draw from it.
+### P1's `5V` is the board's 5 V input node, live only while USB is
 
 **Measured on the board on 2026-09-26, battery only, USB unplugged.**
 
@@ -177,10 +177,12 @@ Cell at 3.8 V, load 54.4 Ω, which draws 92 mA at 5 V:
 | **battery only** | ~4 V | **0 V** |
 | **USB connected** | ~4 V | **4.75 V** |
 
-The pin is the board's 5 V input node and nothing else. It is live when USB
-is, and dead when it is not. Sunton's own label said so and was believed too
-late: P1 is the **"4P 1.25 Power supply base"**, and a supply base is where
-you put power in.
+The pin is the board's 5 V input node. It is live when USB is and dead when it
+is not, and while it is live it will source current: 87 mA at 4.75 V is a
+measurement of it doing exactly that. Sunton's own label said so and was
+believed too late: P1 is the **"4P 1.25 Power supply base"**, and a supply base
+is where you put power in. Being an input is about which side of it decides the
+voltage, not about whether anything can be taken off it.
 
 On battery the 4 V is meaningless. Unpowered, `5V` to BAT+ measures **1.3 MΩ**,
 and 1.3 MΩ feeding 54 Ω divides to nothing, which is what the meter shows. A
@@ -191,9 +193,20 @@ On USB the 0.25 V below nominal across 92 mA is about 2.7 Ω of series
 resistance, which is cable and trace rather than a junction. A diode would
 have dropped more and held it flatter.
 
-**So the carrier cannot take 5 V from here.** A rail alive only while tethered
-to USB cannot feed the radios of a battery-powered device. Whatever the base
-needs, it makes from the cell.
+**The carrier does take 5 V from here, and that became true after this was
+written.** The conclusion here used to be the opposite, and it was right for
+the design it was written against: the base was meant to run from a cell, and a
+rail alive only while tethered to USB cannot feed the radios of a
+battery-powered device.
+
+The power tree then went the other way for reasons that had nothing to do with
+this pin. The device is powered over the CYD's own USB-C, so the condition that
+made this rail useless is the condition the design now runs in permanently, and
+the carrier taps P1 to feed one buck-boost. See pcb-design.md.
+
+Nothing measured here changed. What changed is what was being asked of it,
+which is worth saying plainly, because a conclusion that outlives its premise
+reads exactly like a fact.
 
 **And feeding 5 V into this pin puts a second source on a node USB also
 drives.** That is the designed direction -- it is an input -- but nothing here
