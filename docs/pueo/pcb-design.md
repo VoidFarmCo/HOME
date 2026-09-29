@@ -296,17 +296,44 @@ That the decision is deferrable at all is down to the converter. The S7V8F3
 spans 2.7 to 11.8 V, so both sources sit well inside its range and the same
 part in the same pocket serves either.
 
-**[verify] what P1's `5V` will actually deliver.** 4.75 V at 92 mA is the only
-loaded measurement there is, and the radios peak at 349 mA on +3V3_RF, which
-is roughly 250 mA drawn at 5 V. Two unknowns follow. If the 0.25 V below
-nominal is IR drop it implies about 2.7 Ω, which would put the pin near 4 V at
-full load -- harmless to a converter that starts at 2.7 V, but worth knowing.
-And nothing establishes what that pin and its trace are rated to carry
-continuously.
+**P1's `5V`, measured 2026-09-29.** Two points on one USB source, taken
+without unplugging anything between them:
 
-Two load points settle both, with 4 x 220 Ω and then 8: `V = Vsrc - I*R` gives
-the source voltage and the series resistance, and extrapolates to 350 mA
-without needing a 14 Ω load.
+```
+  open circuit          4.582 V
+  220 Ω                 4.534 V      20.6 mA
+```
+
+`V = Voc - I*R` gives **2.33 Ω**, and a millivolt of meter resolution on each
+reading puts it between 2.23 and 2.43.
+
+That is the whole path rather than the pin: the USB lead, the board's traces
+and the contact. A thin metre-long cable is an ohm on its own, so the share
+that belongs to this design is smaller than the figure looks, and a better
+cable moves it.
+
+| load | the pin sits at | dissipated in the path |
+|---|---|---|
+| 108 mA | 4.33 V | 0.03 W |
+| **256 mA**, the converter at worst case | **3.99 V** | **0.15 W** |
+| 500 mA | 3.42 V | 0.58 W |
+
+**So the tap is sound.** The S7V8F3 is specified from 2.7 V in, which makes 4 V
+comfortable rather than marginal, and 0.15 W spread across a cable, a trace and
+a contact heats nothing.
+
+**It also explains the reading that came before it.** 4.75 V at 87 mA on
+2026-09-26 looked incompatible with 4.534 V at 21 mA: voltage rising with
+current, which no passive source does. At 2.33 Ω it resolves, because that
+day's supply sat at 4.95 V and this one at 4.58. `Voc` belongs to the charger
+and `R` belongs to the board, and only the second is a property of this design.
+Two measurements 66 mA apart and three days apart agree on the half that
+matters.
+
+Linearity is still assumed. 2.33 Ω is what copper explains on its own, with no
+polyfuse needed to account for it, so the extrapolation is reasonable rather
+than proven. A third load point would settle that, and the cheap one is a
+second 220 Ω in parallel: 41 mA, and 0.09 W in each part.
 
 The cell lives in the base, in the pocket the floorplan already has at 0, -35,
 and its leads run up to BAT1 exactly as the enclosure comment says. The carrier
@@ -1231,11 +1258,16 @@ That is not a tweak to the budget, it is a different rail:
 
 And the input side is where it bites, because the supply is now a USB pin
 rather than a cell. 734 mA at 3.3 V is 2.4 W out, so about 2.7 W in at 90%,
-which is roughly **670 mA drawn through P1's `5V`** -- a pin that has been
-proven at 92 mA and nowhere near it.
+which is roughly **670 mA drawn through P1's `5V`**.
 
-The S7V8F3 is rated 1 A stepping down, so it would carry the load on paper
-with thin margin. P1 is the part nobody can vouch for.
+That is now a measured objection rather than an unknown. At 2.33 Ω the pin sits
+at **3.0 V** under 670 mA and the path burns **1.05 W**, against 0.15 W at the
+load this design actually asks for. The converter would still regulate, being
+specified from 2.7 V, but a watt in a USB lead and a 1.25 mm contact is not
+something to design in on purpose.
+
+The S7V8F3 is rated 1 A stepping down, so it would carry the load on paper with
+thin margin. The supply path is the part that would not.
 
 Ebyte also ask for **at least 100 µF** of decoupling on that module against
 the 10 µF specified here for the current one, which is its own evidence about
