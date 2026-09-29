@@ -18,7 +18,7 @@ Read off the board, connector by connector, on 2026-09-23.
 |---|---|---|---|
 | **P3** | 4 | Extended IO | `GND IO35 IO22 IO21` -- all three CC1101 control lines |
 | **CN1** | 4 | temperature/humidity (DHT11) | `GND IO22 IO21 3.3V` |
-| **P1** | 4 | "4P 1.25 Power supply base" | `5V TX RX GND` -- serial, and the GPS's TX |
+| **P1** | 4 | "4P 1.25 Power supply base" | `5V TX RX GND`, serial and the GPS's TX. **Pin 1 is 5V**, read off the silkscreen 2026-09-29 |
 | **SPEAK1** | 2 | Speak | speaker, GPIO 26 |
 | **BAT1** | 2 | *(not in the datasheet)* | battery, into the onboard charger |
 

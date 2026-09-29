@@ -54,8 +54,16 @@ one documented place** instead of thirty scattered across four modules — and
 an intermittent joint on MISO presents exactly like the bus faults that cost
 a week of firmware archaeology, so reducing their count is not cosmetic.
 
-**[verify]** Confirm the P3 and P1 pinouts against your actual board before
-committing. CYD revisions differ, and the silkscreen is the authority.
+**P1 pin 1 is 5V, confirmed against the silkscreen on 2026-09-29.** That
+matters more than it sounds. A second-hand answer consulted the same day gave
+the order as pin 1 TX, pin 2 RX, and the carrier's cable puts +5V_IN on pin 1:
+following it would have driven 5 V into GPIO 1 and taken the ESP32 with it.
+
+**[verify] the rest of P1, and P3 entirely**, against your actual board before
+committing. CYD revisions differ and the silkscreen is the authority, which is
+the whole lesson of the pin map in hardware.md. Confirm a ground by continuity
+to a known one rather than by position, because that is the other pin a load
+gets connected to.
 
 ## Architecture
 
