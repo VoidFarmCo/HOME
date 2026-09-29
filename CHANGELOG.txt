@@ -1,7 +1,7 @@
 Pueo - changelog
 ================
 
-Firmware for a handheld multi-radio field tool on the ESP32-2432S028R.
+Firmware for a handheld multi-radio field tool on the ESP32-3248S035R.
 Forked from CiferTech's ESP32-DIV at 90f7967, 2026-09-01.
 
 Features inherited from upstream are inherited, not audited. Where one has
@@ -9,6 +9,96 @@ been read closely it is said so in the entry that did it.
 
 Digests for every release, pruned ones included, are at the end of
 this file.
+
+
+0.4.15 - 2026-09-28
+-------------------
+
+  * NO FIRMWARE CHANGED. Twenty-eight commits and not one of them touched
+    ESP32-DIV/ or Libraries/, and the images agree: this merged image differs
+    from 0.4.14's in 70 bytes out of 1,849,696, in seven places. Five are
+    single bytes, a "4" becoming a "5" where the version string sits. The
+    other two are the ELF SHA-256 in the app descriptor at 0x0100B0 and
+    esptool's tail hash, which move whenever anything at all does.
+
+    So the status bar is the only place a difference shows. This release is
+    the documentation and the tooling, cut because the documentation is where
+    this project keeps its hardware findings, and those moved a long way.
+
+  * THE BOARD RUNS FROM A CELL ON BAT1, AND SW1 STARTS IT. A bench supply on
+    BAT1 at 3.8 V and again at 4.25 V did nothing and drew 0.000 A, which
+    reads like a dead path. It is not. The FM5324GA is a charger and a
+    power-bank boost in one, its output stays disabled until something
+    enables it, and the button beside the connector, silkscreened SW1, is
+    what enables it. Press it and the board comes up with no USB involved.
+
+    For a day this looked like the finding that sank an internal-battery
+    build, on the grounds that a handheld needing a USB cable plugged in and
+    pulled out before it will turn on is not a handheld. A button press is a
+    different proposition: that is how every power bank behaves and nobody
+    minds. The condition is that an enclosure has to reach SW1, which the
+    current model does not, because until now there was no reason to.
+
+  * THE FIRST MEASURED CURRENT, in a load budget that was estimates end to
+    end: 448 mA at 4.00 V, 1.787 W, running from BAT1 with the beacon
+    spammer transmitting. Converted to the USB socket, where the board's own
+    boost is not in the path, that is about 310 mA at 5 V against the 500 mA
+    the budget carried, so its largest line was high by about half.
+
+    It also explains an earlier drop-out better than the guess that followed
+    it. The same 1.787 W at 3.7 V is 483 mA, roughly 3% under a 500 mA supply
+    limit, and the whole load transfers in one step when USB leaves. The
+    supply was not set wrongly by a wide margin. It was set wrongly by a
+    hair, and the step did the rest.
+
+  * P1'S 5V IS AN INPUT, AND THE CONCLUSION PUBLISHED BEFORE IT WAS WRONG.
+    It was called a boost output here on the strength of an asymmetric
+    continuity reading. Under a 54.4 ohm load it holds 4.75 V with USB
+    connected and collapses to 0 V on battery alone, which is not a rail but
+    a high-impedance node flattered by a 10 Mohm meter. Sunton's own label
+    said so all along: P1 is the "4P 1.25 Power supply base", and a supply
+    base is where power goes in. The failure is recorded beside the fact,
+    because the theory was never checked against its own prediction, and a
+    body diode at 92 mA would have predicted 3.1 V rather than zero.
+
+  * THE CARRIER NETLIST DESCRIBED A BOARD NOBODY IS BUILDING: an MT3608, a
+    TP4056, a cell, a 14-way J1 and the PN532 on a 5 V rail, none of which
+    survive in the current design. It had also been refusing to run since the
+    pin corrections, its own guard catching CC1101_CS at 21 against an
+    assumed 27. The guard worked. Nothing ran it.
+
+    Rebuilt against the enclosure's own module list and the three-cable
+    harness, and two real defects fell out of the rewrite rather than the
+    renaming. R1 had a leg on ground as well as its two series pins, which
+    would have made the GPS series resistor a divider. The PN532's and GPS's
+    decoupling capacitors each had one leg on ground and the other on nothing
+    at all.
+
+  * TWO CHECKS THAT DID NOT EXIST. gen_netlist.py grew --check, so the suite
+    can run the thing that drifted for want of being run. check_svg_labels.py
+    is new: it reads the SVG out of a page or a standalone file and asks
+    whether every label fits the box it is anchored in and clears its
+    neighbours. Four labels were wrong that way at once and every one was
+    found by eye.
+
+  * THE DIGEST TABLE HAD NOT BEEN REGENERATED SINCE 0.4.9. Five releases were
+    missing from it, 0.4.10 through 0.4.14, and one of them is 0.4.13, which
+    is pinned precisely so that its digest outlives the file. The table says
+    it holds every release including pruned ones; for five releases it did
+    not. It does again.
+
+  * The pin map had GPIO 16 and 17's LED colours swapped, contradicting a
+    measurement three screens below it in the same file. check_pinmap.py had
+    them right all along.
+
+  * Second-hand pin maps describe lcdwiki's boards rather than Sunton's.
+    E32R28T and E32R35T are lcdwiki part numbers, and four wrong pins in this
+    tree came from advice scoped to them. The lesson is in hardware.md: a
+    note that names the board it applies to is doing its job, and the board
+    it names is the thing to check first.
+
+  * This file's own header named the ESP32-2432S028R, which is the 2.8" board
+    this project dropped in 0.4.14.
 
 
 0.4.14 - 2026-09-26
@@ -2603,6 +2693,35 @@ because a digest is the one thing about an old release that is
 still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.14
+  b01bef5c7f506cae914663998d48a39c29a11c0238c48372321cc7e7ca41e6ec  pueo-0.4.14-beacon-35-merged.bin
+  70df219c541ac6617d8aeca3996dd828693233eabddb5aa39206362a833f4c44  pueo-0.4.14-merged.bin
+  bc9962cbd3048c575e9312f54e4d1ff807d598f9a4b833926e67db46c0062511  pueo-0.4.14-src.zip
+
+0.4.13
+  a3ae32e760355c25d7d8487ac5098109f9db1975ac2daba3fd008218a046d0d9  pueo-0.4.13-35-merged.bin
+  8cbb2aa3e94cc77afcabd86a12d8dd738bd541ceace918b68a806d1213c61e45  pueo-0.4.13-beacon-35-merged.bin
+  d575db2d58b569cc1ca02e12426b046649b9532f8f2be09e6ede8f4d72e42f0c  pueo-0.4.13-merged.bin
+  5ca23355d8ff207c94352e2515467a07ec3ebe92cc05a762153f88fdc6d4060b  pueo-0.4.13-src.zip
+
+0.4.12
+  1f630bbcfcbabf76b52992683978a0860ed369511ff63efc58a710c45b181812  pueo-0.4.12-35-merged.bin
+  001250f4f03ac8a8d271a27b80bd5e9956d1514000df12bb571c099a4e2041d8  pueo-0.4.12-beacon-35-merged.bin
+  b293eb60370a562c81e17ec1583364af73b470aa5b4cfc17fe6d431d4e920376  pueo-0.4.12-merged.bin
+  b625b40070e0934ebc3a13eab79bec376d66adc95e4529c19aab996212a89be0  pueo-0.4.12-src.zip
+
+0.4.11
+  d6b117850500619f60094baaa4b3bfb29b144381abeb9434c1e90a1724bcbecd  pueo-0.4.11-35-merged.bin
+  34be23abde887984bd7045dc1147eb936b5191e193176dc5cc69a802f6d10af8  pueo-0.4.11-beacon-35-merged.bin
+  ce33561f69cd313202054e83c8f8bd4c676fb0f3fedde5a57490c8026e4c40e7  pueo-0.4.11-merged.bin
+  f308c58212d5a00f037a106364d3049671ff0c4dc0a5decdf357ae0779307711  pueo-0.4.11-src.zip
+
+0.4.10
+  3854a8950c6988380191bd4ba1aff9ff5a6950b334d65b78d463867a60235631  pueo-0.4.10-35-merged.bin
+  6a6803974af575114d10de2c5429976b304c46d004da64136211b0338ef5f644  pueo-0.4.10-beacon-35-merged.bin
+  cb20cdc9b9b26f3a4bd55b6b854043752c347b6a3b974963b2ac6bd188500a1a  pueo-0.4.10-merged.bin
+  a8f01f00c0537e6f4536c895fb1cdfd748d0a595b002c0659a10144d7b7b46c2  pueo-0.4.10-src.zip
 
 0.4.9
   a83935d1215733816d37b5f539b0c385807c90155e992c390fb104c5a07eb6ec  pueo-0.4.9-35-merged.bin
