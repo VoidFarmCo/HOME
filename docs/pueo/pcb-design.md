@@ -54,16 +54,22 @@ one documented place** instead of thirty scattered across four modules — and
 an intermittent joint on MISO presents exactly like the bus faults that cost
 a week of firmware archaeology, so reducing their count is not cosmetic.
 
-**P1 pin 1 is 5V, confirmed against the silkscreen on 2026-09-29.** That
-matters more than it sounds. A second-hand answer consulted the same day gave
-the order as pin 1 TX, pin 2 RX, and the carrier's cable puts +5V_IN on pin 1:
-following it would have driven 5 V into GPIO 1 and taken the ESP32 with it.
+**P1's two power pins are confirmed, 2026-09-29: pin 1 is 5V from the
+silkscreen, pin 4 is GND by continuity to a known ground.** Two ends, two
+methods, neither of them a document. That matters more than it sounds. A
+second-hand answer consulted the same day gave the order as pin 1 TX, pin 2 RX,
+and the carrier's cable puts `+5V_IN` on pin 1: following it would have driven
+5 V into GPIO 1 and taken the ESP32 with it. Corrected, the same source then
+explained itself by inventing a flipped board revision, which is worth knowing
+about because a phantom variant is the kind of thing that gets written down.
 
-**[verify] the rest of P1, and P3 entirely**, against your actual board before
-committing. CYD revisions differ and the silkscreen is the authority, which is
-the whole lesson of the pin map in hardware.md. Confirm a ground by continuity
-to a known one rather than by position, because that is the other pin a load
-gets connected to.
+Pins 2 and 3 are the serial pair by elimination and the firmware agrees, GPIO 1
+carrying `GPS_UART_RX` with `GPS_UART_TX` at `-1`. That is inference rather than
+a reading, which is fine for a pin nothing powers.
+
+**[verify] P3**, against your actual board before committing. CYD revisions
+differ and the silkscreen is the authority, which is the whole lesson of the pin
+map in hardware.md.
 
 ## Architecture
 
