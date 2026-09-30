@@ -30,6 +30,31 @@ connector and not for what is in your hand.
 For the order to wire it in, and which six of the ten signals need soldering
 rather than a header, see [build-guide.md](build-guide.md).
 
+
+### Datasheets
+
+Every link here was checked. The parts this design uses come first, then the two
+amplifier modules that were costed and turned down.
+
+| part | what it is here |
+|---|---|
+| [ESP32-WROOM-32](https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf) | the module on the CYD |
+| [ESP32](https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf) | the SoC inside it |
+| [CC1101](https://www.ti.com/lit/ds/symlink/cc1101.pdf) | sub-GHz radio |
+| [nRF24L01+](https://www.sparkfun.com/datasheets/Components/SMD/nRF24L01Pluss_Preliminary_Product_Specification_v1_0.pdf) | 2.4 GHz radio, on a PA/LNA module |
+| [PN532](https://www.nxp.com/docs/en/nxp/data-sheets/PN532_C1.pdf) | NFC, on an Elechouse V3 board |
+| [S7V8F3](https://www.pololu.com/product/2122) | the carrier's buck-boost, with its numbers |
+| [CH340](https://www.wch-ic.com/downloads/CH340DS1_PDF.html) | the USB serial bridge on the CYD |
+| [MP2307](https://www.monolithicpower.com/en/mp2307.html) | the buck that was rejected, and why |
+| [E07-433M20S](https://www.cdebyte.com/products/E07-433M20S) | sub-GHz PA, considered and not fitted |
+| [E01-2G4M27SX](https://www.cdebyte.com/products/E01-2G4M27SX) | 2.4 GHz PA, considered and not fitted |
+
+No manufacturer page is linked for **ST7796, XPT2046, FM5324GA, ATGM336H, TP4056, MT3608**. Their datasheets circulate as PDFs passed
+between vendors rather than living on a maker's site, and the ATGM336H's reached this
+project as a file rather than a URL. That is not a footnote: those are
+disproportionately the parts whose figures here are marked **[verify]**, and the two
+facts have the same cause.
+
 ## Connectors
 
 Read off the board, connector by connector, on 2026-09-23.
