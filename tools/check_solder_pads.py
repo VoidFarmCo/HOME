@@ -42,7 +42,7 @@ SVG = os.path.join(REPO, "docs", "pueo", "solder-pads.svg")
 NAME = r"(?:IO\d+|GND|NC|TXD0|RXD0|SD\d|CLK)"
 CELL = re.compile(r"\b(\d{1,2})\s+(%s)(?![\w])" % NAME)
 
-RIGHT_X, BOTTOM_X, LEFT_X = '582', '604', '307'
+RIGHT_X, BOTTOM_X, LEFT_X = '582', '628', '307'
 TEXT = re.compile(r'<text x="(\d+)"[^>]*fill="([^"]*)"[^>]*>([^<]*)</text>')
 RECT = re.compile(r'<rect x="([\d.]+)" y="([\d.]+)" width="(\d+)" height="(\d+)"')
 
