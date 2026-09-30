@@ -67,9 +67,11 @@ Pins 2 and 3 are the serial pair by elimination and the firmware agrees, GPIO 1
 carrying `GPS_UART_RX` with `GPS_UART_TX` at `-1`. That is inference rather than
 a reading, which is fine for a pin nothing powers.
 
-**[verify] P3**, against your actual board before committing. CYD revisions
-differ and the silkscreen is the authority, which is the whole lesson of the pin
-map in hardware.md.
+**P3 is confirmed too, 2026-09-30.** Its silkscreen is legible beside the
+connector in the photograph of the board in the printed lid: `GND`, `IO35`,
+`IO22`, `IO21`, which is what the pin map has said all along. Both connectors
+this design depends on are now read off the board rather than off a document,
+which is the whole lesson of the pin map in hardware.md.
 
 ## Architecture
 
