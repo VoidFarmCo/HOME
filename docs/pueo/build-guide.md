@@ -267,8 +267,14 @@ antenna up, the six targets in orange, and the five pads that end the board
 marked. Hold the board upright with the back toward you and the USB-C socket at
 the bottom, and the antenna is already pointing up.
 
-Counting castellations is how you break something. The right-hand edge, from
-the top with the antenna up:
+Counting castellations is how you break something. Start at the top of the
+right-hand edge with the antenna up and count down.
+
+**That edge has fifteen pads, not nineteen.** The module is the usual
+WROOM-32: fifteen down each long edge and eight across the bottom. So the count
+reaches 15 at the bottom-right corner, **turns it**, and 16 to 19 run leftwards
+along the bottom edge. All six targets are at 15 or below, so none of them is
+around that corner. Three of the pads that end the board are.
 
 ```
    1 GND       6 IO21      11 IO17  <- PN532 SS       16 IO15
@@ -277,6 +283,8 @@ the top with the antenna up:
    4 TXD0      9 IO18 <-   14 IO0    !!               19 CLK   !!
    5 RXD0     10 IO5   !!  15 IO2
 ```
+
+The last four in that list are the ones on the bottom edge.
 
 Three ways to lose a board there. **IO5 sits directly between IO18 and IO17**
 and is the SD chip select -- bridge it and you have broken the card slot from
