@@ -262,6 +262,11 @@ other side, and on the 3.5" that is GPIO 25, pin 10 down the left.
 
 ### Finding the pad
 
+[solder-pads.svg](solder-pads.svg) draws the table below: the module with its
+antenna up, the six targets in orange, and the five pads that end the board
+marked. Hold the board upright with the back toward you and the USB-C socket at
+the bottom, and the antenna is already pointing up.
+
 Counting castellations is how you break something. The right-hand edge, from
 the top with the antenna up:
 

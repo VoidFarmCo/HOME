@@ -189,9 +189,23 @@ and 1.3 MΩ feeding 54 Ω divides to nothing, which is what the meter shows. A
 10 MΩ meter on a megohm node reads most of the cell voltage and tells you
 nothing about whether anything can be drawn from it.
 
-On USB the 0.25 V below nominal across 92 mA is about 2.7 Ω of series
-resistance, which is cable and trace rather than a junction. A diode would
-have dropped more and held it flatter.
+On USB that 0.25 V below nominal across 92 mA suggested about 2.7 Ω of series
+resistance, cable and trace rather than a junction, because a diode would have
+dropped more and held it flatter.
+
+**Measured properly on 2026-09-29: 2.33 Ω.** Two points on one USB source,
+nothing unplugged between them, 4.582 V open circuit and 4.534 V across 220 Ω
+at 20.6 mA. A millivolt of meter resolution on each reading puts it between
+2.23 and 2.43.
+
+The inference above was close because it was doing the same arithmetic on one
+point, and it assumed the source was a round 5.0 V. It sat at 4.95 V that day,
+and putting that in gives 2.33 Ω exactly. Two readings 66 mA and three days
+apart agree on the resistance and disagree on the source voltage, which is the
+right way round: `Voc` belongs to the charger and `R` belongs to the board.
+
+At the 256 mA the carrier's converter draws, that puts the pin at **3.99 V**
+with **0.15 W** in the path. The workings are in pcb-design.md.
 
 **The carrier does take 5 V from here, and that became true after this was
 written.** The conclusion here used to be the opposite, and it was right for
