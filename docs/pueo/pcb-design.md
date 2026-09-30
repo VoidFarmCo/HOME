@@ -716,8 +716,14 @@ MT3608 boost     36 x 17  (?)    6.0          MEASURED 2026-09-26, on the
                                               and it turns out not to matter
 TP4056 charger   27 x 17         ~4  (est)    micro-USB jack is the tallest
                                               thing on it, ~2.7 over ~1.0
+S7V8F3 buck-boost 11.4 x 16.5    3.0          PUBLISHED, all three: Pololu
+                                              give 0.45 x 0.65 x 0.1 inch.
+                                              The only height in this table
+                                              that comes from the maker, and
+                                              the shortest part in the case
 MP2307 buck      17.9 x 12       ~6  (est)    inductor and trimmer stand
-                                              proud of a ~1.0 board
+                                              proud of a ~1.0 board. Rejected:
+                                              a buck cannot start at 2.7 V
 PN532 V3         43 x 41         ~3.5 (est)   flat board, no tall parts
 ATGM336H GPS     16 x 13         ~3.5 (est)   shield can over a ~1.0 board
 HW-863 CC1101    28 x 15         ~7  (est)    set by the SMA barrel, 6.35
@@ -726,6 +732,18 @@ NRF24 PA+LNA     41 x 15.5       ~8  (est)    SMA barrel plus the shield can
 LiPo pack        45 x 34         ?            depends on the cell; 6-10 for
                                               a 2000 mAh pouch
 ```
+
+**The S7V8F3 has four pins, not three.** `SHDN`, `VIN`, `GND`, `VOUT`, in a
+row along one edge at 0.1 inch spacing. The netlist connects three of them and
+that is correct electrically, because Pololu say `SHDN` may be tied to `VIN`
+or left disconnected to leave the board permanently enabled. It still needs a
+pad. A three-pad footprint for a four-pin part is the kind of thing that is
+free to fix now and a scalpel later.
+
+Worth knowing for a second spin: `SHDN` is how the RF rail could be switched
+off in software, which would take the radios' idle draw out of the budget
+entirely. There is no spare GPIO for it today, so the pad is the whole of the
+provision.
 
 **The five marked `(est)` are reasoned from the tallest visible component,
 not measured.** Listings for these parts publish footprint and almost never

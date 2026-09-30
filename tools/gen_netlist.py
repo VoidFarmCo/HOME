@@ -50,10 +50,11 @@ def to_kicad(x, y):
 # EXT_CHARGER variant puts an MT3608 and a TP4056 down here as well; this
 # netlist does not describe that board.
 MODULES = [
-    # The enclosure pocket is 20 x 12. The part chosen for it is a Pololu
-    # S7V8F3 at 11.4 x 16.5, which fits only turned 90 degrees, because 16.5
-    # will not go into 12. [verify] against the real part before the pocket
-    # is cut again.
+    # The enclosure pocket is 20 x 12. The part is a Pololu S7V8F3 at
+    # 11.4 x 16.5 x 3.0, so it fits only turned 90 degrees, because 16.5 will
+    # not go across 12. Turned, it clears the pocket in both directions and
+    # is smaller than the MP2307 this slot was cut for. At 3 mm it is also
+    # the shortest thing in the case.
     ("3.3V buck-boost", "U3",   0.0, -60.0, 20, 12),
     # Not wired to this board at all: a cell here runs to the CYD's own BAT1.
     # It is in this list because the enclosure reserves the pocket and the
@@ -164,9 +165,12 @@ BOM = [
     ("J5",  1, "Header 2x4 2.54mm", "NRF24L01+PA+LNA module [verify pinout]"),
     ("J6",  1, "Header 1x6 2.54mm", "PN532 V3, SPI mode, DIP CH1=OFF CH2=ON"),
     ("J7",  1, "Header 1x5 2.54mm", "ATGM336H GPS, VCC GND TX RX PPS"),
-    ("U3",  1, "Pololu S7V8F3 buck-boost, 11.4 x 16.5 mm",
-     "3.3 V from P1's 5 V, ~1 A. Fixed output: there is no trimpot to set "
-     "wrong, which is the whole reason it replaced an adjustable module"),
+    ("U3",  1, "Pololu S7V8F3 buck-boost, 11.4 x 16.5 x 3.0 mm",
+     "3.3 V from P1's 5 V, 2.7 to 11.8 V in, 1 A stepping down. Fixed output: "
+     "no trimpot to set wrong, which is why it replaced an adjustable module. "
+     "FOUR pins at 0.1 inch: SHDN VIN GND VOUT. Only three are netted; SHDN "
+     "is left disconnected, which Pololu give as permanently enabled, and it "
+     "still wants a pad"),
     ("BT1", 1, "1S LiPo, optional",
      "NOT wired to this board. A cell here runs to the CYD's own BAT1, and "
      "the CYD will not start from it until SW1 is pressed"),
