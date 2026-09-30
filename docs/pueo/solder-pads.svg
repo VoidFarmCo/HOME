@@ -92,7 +92,7 @@
 <line x1="448.0" y1="490" x2="448.0" y2="484" stroke="var(--text, #d7e0e6)" stroke-width="1.25"/>
 <line x1="534.0" y1="490" x2="534.0" y2="484" stroke="var(--text, #d7e0e6)" stroke-width="1.25"/>
 <text x="491.0" y="506" fill="var(--text, #d7e0e6)" font-size="10" text-anchor="middle">the count turns the corner here</text>
-<text x="604" y="502" fill="var(--text, #d7e0e6)" font-size="10" font-weight="bold">16  IO15  </text>
+<text x="604" y="502" fill="var(--text-dim, #9fb3bf)" font-size="10">16  IO15  </text>
 <text x="604" y="515" fill="var(--text, #d7e0e6)" font-size="10" font-weight="bold">17  SD1   flash  !!</text>
 <text x="604" y="528" fill="var(--text, #d7e0e6)" font-size="10" font-weight="bold">18  SD0   flash  !!</text>
 <text x="604" y="541" fill="var(--text, #d7e0e6)" font-size="10" font-weight="bold">19  CLK   flash  !!</text>
