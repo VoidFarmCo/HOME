@@ -7,6 +7,26 @@ inside. See [pueo-enclosure.scad](pueo-enclosure.scad).
 The reference build is the 3.5" Sunton ESP32-3248S035R, silkscreened
 `ESP32-035`, on a revision carrying **both micro-USB and USB-C**.
 
+### Is your board this one
+
+Turn it over. Five things identify the revision everything here was measured
+on, and Sunton's own back drawing in the specification PDF shows none of the
+last four:
+
+| | |
+|---|---|
+| `ESP32-035` | on the silkscreen, back of the board |
+| **two USB sockets** | micro-USB *and* USB-C, not one or the other |
+| an FFC socket | mid-board, for the panel ribbon |
+| `BAT1` | a 2-pin battery connector |
+| `SW1` | a button beside BAT1, which is what starts it from a cell |
+
+The second one is the quickest. A board with a single micro-USB and nothing
+else is an earlier revision, and the pin map here is not promised to hold on
+it. The specification sheet's back view is that earlier board: one micro-USB,
+no battery connector, no flat-flex socket. Read it for Sunton's names for each
+connector and not for what is in your hand.
+
 For the order to wire it in, and which six of the ten signals need soldering
 rather than a header, see [build-guide.md](build-guide.md).
 
