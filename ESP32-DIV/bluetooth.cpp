@@ -4794,6 +4794,70 @@ void exit() {
 }
 }
 
+/* ── Is the nRF24 actually there? ──────────────────────────────────────────
+ *
+ * It usually is not. The module is a separate board on flying leads, and
+ * every feature here read its registers without asking.
+ *
+ * An absent module leaves MISO floating, and the pull-up makes every
+ * register read as 0xFF. That is not a neutral failure. STATUS reads 0xFF,
+ * bit 6 is RX_DR, so "a packet is waiting" is permanently true; the FIFO
+ * read then returns 32 bytes of 0xFF and the sniffer writes it to the card.
+ * One row per millisecond, every row identical, and nothing on screen
+ * saying the radio is missing -- a capture that looks like data and is a
+ * picture of an unconnected pin.
+ *
+ * So the same gate subghz.cpp puts in front of the CC1101 goes in front of
+ * this one. Nrf24Raw::begin() does the probe: it writes 0x4C into RF_CH and
+ * reads it back, and a register that returns what was just put in it is a
+ * chip rather than a pull-up.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+static void nrfReportMissing(const char* feature) {
+  tft.fillScreen(TFT_BLACK);
+  drawStatusBar(readBatteryVoltage(), true);
+  tft.setTextFont(2);
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.drawString("No nRF24", 12, 46);
+  tft.setTextFont(1);
+  tft.setTextColor(UI_TEXT, TFT_BLACK);
+  tft.drawString(feature, 12, 72);
+  tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
+  tft.drawString("needs the 2.4 GHz module, and", 12, 90);
+  tft.drawString("nothing answered on the SPI bus.", 12, 102);
+  tft.drawString("Check the module is fitted and", 12, 122);
+  tft.drawString("that MISO, CSN, CE, SCK and", 12, 134);
+  tft.drawString("MOSI are wired.", 12, 146);
+  tft.setTextColor(UI_ICON, TFT_BLACK);
+  tft.drawString("SELECT / tap to go back", 12, PUEO_SCREEN_H - 24);
+}
+
+static bool nrfReady(const char* feature) {
+  if (Nrf24Raw::begin()) {
+    return true;
+  }
+  nrfReportMissing(feature);
+
+  /* Modal, for the reason cc1101Ready is: setting the exit flag and
+   * returning puts the message on screen for one frame, which reads as the
+   * feature refusing to open for no reason. */
+  delay(250);
+  for (;;) {
+    int x, y;
+    if (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT) ||
+        readTouchXY(x, y)) {
+      break;
+    }
+    delay(20);
+  }
+  while (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
+    delay(10);
+  }
+
+  feature_exit_requested = true;
+  return false;
+}
+
 namespace Scanner {
 
 #define CE  NRF24_SCAN_CE
@@ -5682,7 +5746,11 @@ void display() {
   scannerUpdateStatusPanel(s_smoothValues, N);
 }
 
+
+
 void scannerSetup() {
+  if (!nrfReady("Scanner")) return;
+
   setTouchButtonInputEnabled(true);
   bleSetScannerNavLabels();
   bleClearBody(TFT_BLACK);
@@ -6028,6 +6096,8 @@ void checkModeChange() {
 
 void prokillSetup() {
   if (Stealth::refuse("Proto Kill")) return;
+
+  if (!nrfReady("Proto Kill")) return;
 
   setTouchButtonInputEnabled(true);
   bleSetJammerNavLabels();
@@ -6910,6 +6980,8 @@ void runUI() {
 }
 
 void esbSnifferSetup() {
+  if (!nrfReady("ESB Sniffer")) return;
+
   setTouchButtonInputEnabled(true);
   bleSetEsbNavLabels();
   bleClearBody(TFT_BLACK);
@@ -7754,6 +7826,8 @@ void runUI() {
 
 void esbReplaySetup() {
   if (Stealth::refuse("ESB Replay")) return;
+
+  if (!nrfReady("ESB Replay")) return;
 
   setTouchButtonInputEnabled(true);
   bleSetEsbReplayNavLabels();
@@ -8648,6 +8722,8 @@ void runUI() {
 }
 
 void mouseJackSetup() {
+  if (!nrfReady("MouseJack Scan")) return;
+
   setTouchButtonInputEnabled(true);
   bleSetMouseJackNavLabels();
   bleClearBody(TFT_BLACK);
@@ -9504,6 +9580,8 @@ void runUI() {
 
 void mouseJackInjectSetup() {
   if (Stealth::refuse("MouseJack Inject")) return;
+
+  if (!nrfReady("MouseJack Inject")) return;
 
   setTouchButtonInputEnabled(true);
   bleSetMjInjectNavLabels();
