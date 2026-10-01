@@ -72,6 +72,9 @@ void exit();
  * Spotter.cpp about what a capture of the air around you contains. */
 bool        captureActive();
 uint32_t    captureRows();
+/* Frames the ring lost because the card could not keep up. Non-zero means
+ * the capture is incomplete, and by how much. */
+uint32_t    captureDropped();
 
 /* Exposed for the UI and for logging. */
 int         hitCount();

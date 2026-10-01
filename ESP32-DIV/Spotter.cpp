@@ -773,7 +773,7 @@ constexpr int kMaxVisRows = 16;
 char s_shownRow[kMaxVisRows][3][48];
 char s_shownStar[kMaxVisRows];
 char s_shownHdr[48];
-char s_shownTag[16];
+char s_shownTag[28];   // REC, rows, and a drop count when there is one
 
 void forgetDrawn() {
   memset(s_shownRow, 0, sizeof(s_shownRow));
@@ -947,10 +947,23 @@ void drawHeader() {
   uiShowLine(s_shownHdr, sizeof(s_shownHdr), buf, 8, 24, 18,
              TFT_WHITE, TFT_BLACK);
 
-  char tag[16] = "";
+  /* 28 is what two %lu plus "REC  !" can need in the worst case, which is
+   * what keeps -Wformat-truncation quiet without the number being capped. */
+  char tag[28] = "";
   uint16_t tagColour = TFT_RED;
   if (s_logging) {
-    snprintf(tag, sizeof(tag), "REC %lu", (unsigned long)s_logRows);
+    /* The drop count appears only when it is not zero, and turns the tag
+     * orange when it does. A capture that is quietly incomplete is worse than
+     * one that says so: the ring fills when the card cannot keep up, and
+     * until now the only evidence was rows that did not add up to what the
+     * radio saw. */
+    if (s_capDropped) {
+      snprintf(tag, sizeof(tag), "REC %lu !%lu",
+               (unsigned long)s_logRows, (unsigned long)s_capDropped);
+      tagColour = ORANGE;
+    } else {
+      snprintf(tag, sizeof(tag), "REC %lu", (unsigned long)s_logRows);
+    }
   } else if (s_logBlocked) {
     snprintf(tag, sizeof(tag), "log off");
     tagColour = ORANGE;
@@ -1289,5 +1302,6 @@ uint32_t   framesSeen()      { return s_frames; }
 uint8_t    currentChannel()  { return s_chan; }
 bool       captureActive()   { return s_logging; }
 uint32_t   captureRows()     { return s_logRows; }
+uint32_t   captureDropped()  { return s_capDropped; }
 
 }  // namespace Spotter
