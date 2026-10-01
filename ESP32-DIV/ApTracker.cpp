@@ -27,6 +27,11 @@ constexpr uint32_t kRedrawMs = 60;
 constexpr int kRowH     = 40;
 constexpr int kRowLine2 = 20;
 constexpr int kRowRight = 6;
+/* The right-hand column of a picker row. The MAC on the line below is
+ * seventeen characters from x=8 and ends at 212 px, so this is as far left
+ * as the column can start on a 320 px panel. */
+constexpr int kRightX = PUEO_SCREEN_W - 104;
+
 
 struct Ap {
   uint8_t  bssid[6];
@@ -187,8 +192,11 @@ void drawPicker() {
 
   if (s_count == 0) {
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.drawString("nothing heard. 2.4 GHz only,", 8, top + 24);
-    tft.drawString("a 5 GHz AP will not appear.", 8, top + 24 + 12 * PUEO_BODY_SIZE);
+    tft.drawString("nothing heard.", 8, top + 24);
+    tft.drawString("2.4 GHz only, so a 5 GHz", 8,
+                   top + 24 + 12 * PUEO_BODY_SIZE);
+    tft.drawString("AP will not appear.", 8,
+                   top + 24 + 24 * PUEO_BODY_SIZE);
     return;
   }
 
@@ -221,11 +229,17 @@ void drawPicker() {
     tft.setTextColor(sel ? ORANGE : TFT_DARKGREY, sel ? 0x2124 : TFT_BLACK);
     tft.drawString(mac, 8, y + kRowLine2);
 
-    char right[24];
-    snprintf(right, sizeof(right), "%4d dBm  ch%2u",
-             (int)a.rssi, (unsigned)a.channel);
+    /* Two lines and a size down. One line of "-45 dBm  ch11" wanted 156 px
+     * starting 224 px into a 320 px panel, so the channel was never drawn.
+     * TFT_eSPI does not clip; it just stops. */
+    char dbm[12], ch[12];
+    snprintf(dbm, sizeof(dbm), "%4d dBm", (int)a.rssi);
+    snprintf(ch, sizeof(ch), "ch %2u", (unsigned)a.channel);
+    tft.setTextSize(1);
     tft.setTextColor(sel ? ORANGE : TFT_WHITE, sel ? 0x2124 : TFT_BLACK);
-    tft.drawString(right, PUEO_SCREEN_W - 96, y + kRowRight);
+    tft.drawString(dbm, kRightX, y + kRowRight);
+    tft.drawString(ch, kRightX, y + kRowLine2 + 2);
+    tft.setTextSize(PUEO_BODY_SIZE);
 
     y += kRowH;
   }

@@ -52,6 +52,11 @@ constexpr uint32_t kRedrawMs = 60;
 constexpr int      kRowH     = 40;
 constexpr int      kRowLine2 = 20;
 constexpr int      kRowRight = 6;
+/* The right-hand column of a picker row. The MAC on the line below is
+ * seventeen characters from x=8 and ends at 212 px, so this is as far left
+ * as the column can start on a 320 px panel. */
+constexpr int kRightX = PUEO_SCREEN_W - 104;
+
 
 /* ── State ───────────────────────────────────────────────────────────────── */
 
@@ -299,11 +304,18 @@ void drawPicker() {
     tft.setTextColor(sel ? ORANGE : TFT_DARKGREY, sel ? 0x2124 : TFT_BLACK);
     tft.drawString(mac, 8, y + kRowLine2);
 
-    char right[24];
-    snprintf(right, sizeof(right), "%4d dBm  %2lus",
-             (int)t.rssi, (unsigned long)((now - t.lastSeen) / 1000));
+    /* Two lines and a size down, for the reason in ApTracker's picker: one
+     * line of "-45 dBm  12s" ran 48 px past the right edge and the age was
+     * the part that fell off. */
+    char dbm[12], age[12];
+    snprintf(dbm, sizeof(dbm), "%4d dBm", (int)t.rssi);
+    snprintf(age, sizeof(age), "%2lus",
+             (unsigned long)((now - t.lastSeen) / 1000));
+    tft.setTextSize(1);
     tft.setTextColor(sel ? ORANGE : TFT_WHITE, sel ? 0x2124 : TFT_BLACK);
-    tft.drawString(right, PUEO_SCREEN_W - 96, y + kRowRight);
+    tft.drawString(dbm, kRightX, y + kRowRight);
+    tft.drawString(age, kRightX, y + kRowLine2 + 2);
+    tft.setTextSize(PUEO_BODY_SIZE);
 
     y += kRowH;
   }
