@@ -754,6 +754,30 @@ bool isButtonPressed(int buttonPin) {
   return isTouchNavButtonPressed(buttonPin);
 }
 
+/* Wait for a button to be let go, with a way out.
+
+   The bare form of this, while (isButtonPressed(b)) {}, was in 55 places. It
+   spins without yielding, so a button that never reads as released takes the
+   device with it: no repaint, no input, and nothing to feed the watchdog.
+
+   A physically stuck button is rare. A touch controller that reports a press
+   it never clears is not, on a bus this project has already watched touch lose
+   once -- and isButtonPressed falls through to the touch nav when no physical
+   button is down, so the touch path is the one that can wedge here.
+
+   Returns false if it gave up. Most callers do not care and should not: the
+   point is that the device carries on either way. */
+bool waitForButtonRelease(int buttonPin, uint32_t timeoutMs) {
+  const uint32_t start = millis();
+  while (isButtonPressed(buttonPin)) {
+    if ((uint32_t)(millis() - start) >= timeoutMs) {
+      return false;
+    }
+    delay(10);                          // vTaskDelay: yields, unlike a spin
+  }
+  return true;
+}
+
 bool isTouchNavButtonPressedEdge(int buttonPin) {
   if (!feature_active || !touchButtonInputEnabled) {
     return false;
@@ -814,9 +838,7 @@ static void showFeatureUnavailable(const char* featureName, const char* requirem
   }
   /* Drain, so the press that dismissed this does not immediately reopen
    * whatever row is under it. */
-  while (isButtonPressed(BTN_SELECT)) {
-    delay(10);
-  }
+  waitForButtonRelease(BTN_SELECT);
 
   hideNotification();
   submenu_initialized = false;
@@ -1274,8 +1296,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1308,8 +1329,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1342,8 +1362,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1376,8 +1395,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1410,8 +1428,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1444,8 +1461,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1477,8 +1493,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1510,8 +1525,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1543,8 +1557,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1576,8 +1589,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1609,8 +1621,7 @@ void handleWiFiSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -1713,8 +1724,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1745,8 +1755,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1777,8 +1786,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1809,8 +1817,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1841,8 +1848,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1873,8 +1879,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1905,8 +1910,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1937,8 +1941,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -1969,8 +1972,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2001,8 +2003,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2033,8 +2034,7 @@ void handleWiFiSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2128,8 +2128,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2163,8 +2162,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2198,8 +2196,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2233,8 +2230,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2268,8 +2264,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2303,8 +2298,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2338,8 +2332,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2376,8 +2369,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2415,8 +2407,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2450,8 +2441,7 @@ void handleBluetoothSubmenuButtons() {
                     feature_exit_requested = false;
                     displaySubmenu();
                     delay(200);
-                    while (isButtonPressed(BTN_SELECT)) {
-                    }
+                    waitForButtonRelease(BTN_SELECT);
                     break;
                 }
             }
@@ -2535,8 +2525,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2568,8 +2557,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2601,8 +2589,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2634,8 +2621,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2667,8 +2653,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2700,8 +2685,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2733,8 +2717,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2768,8 +2751,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2801,8 +2783,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2834,8 +2815,7 @@ void handleBluetoothSubmenuButtons() {
                             feature_exit_requested = false;
                             displaySubmenu();
                             delay(200);
-                            while (isButtonPressed(BTN_SELECT)) {
-                            }
+                            waitForButtonRelease(BTN_SELECT);
                             break;
                         }
                     }
@@ -2901,8 +2881,7 @@ static void runSubmenuFeature(int idx, void (*setup)(), void (*loop)(),
             feature_exit_requested = false;
             displaySubmenu();
             delay(200);
-            while (isButtonPressed(BTN_SELECT)) {
-            }
+            waitForButtonRelease(BTN_SELECT);
             break;
         }
     }
@@ -3109,8 +3088,7 @@ static void runToolsFeatureExitCleanup() {
     resetTouchNavHeldState();
     displaySubmenu();
     delay(200);
-    while (isButtonPressed(BTN_SELECT)) {
-    }
+    waitForButtonRelease(BTN_SELECT);
 }
 
 static void runToolsFeature(int idx, void (*setupFn)(), void (*loopFn)()) {

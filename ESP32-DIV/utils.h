@@ -98,6 +98,9 @@ extern bool feature_exit_requested;
 
 extern void setBrightness(uint8_t value);
 bool isButtonPressed(int buttonPin);
+/* Spin-free wait for release. Gives up after timeoutMs rather than
+ * hanging the device on a button that never clears. */
+bool waitForButtonRelease(int buttonPin, uint32_t timeoutMs = 5000);
 /** True while the PCF8574 button for this pin is held (no touch nav). */
 bool isPhysicalButtonPressed(int buttonPin);
 /** True while a touch nav slot for this pin is held (ignores physical buttons). */

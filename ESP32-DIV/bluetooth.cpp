@@ -290,9 +290,7 @@ static void bleSetMjInjectNavLabels() {
 static constexpr unsigned long kBleNavDebounceMs = 200;
 
 static void bleWaitButtonRelease(int pin) {
-  while (isButtonPressed(pin)) {
-    delay(10);
-  }
+  waitForButtonRelease(pin);
   delay(kBleNavDebounceMs);
 }
 

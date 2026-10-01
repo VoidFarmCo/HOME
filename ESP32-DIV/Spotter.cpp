@@ -1243,8 +1243,7 @@ void spotterLoop() {
     }
     s_dirty = true;
     delay(200);
-    while (isButtonPressed(BTN_RIGHT)) {
-    }
+    waitForButtonRelease(BTN_RIGHT);
   }
 
   captureFlush();

@@ -318,29 +318,25 @@ void loop() {
       rescan();
       s_dirty = true;
       delay(200);
-      while (isButtonPressed(BTN_LEFT)) {
-      }
+      waitForButtonRelease(BTN_LEFT);
     } else if (isButtonPressed(BTN_RIGHT)) {
       if (s_count > 0) {
         enterGauge();
       }
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
     }
   } else {
     if (isButtonPressed(BTN_LEFT)) {
       enterPicker();
       rescan();
       delay(200);
-      while (isButtonPressed(BTN_LEFT)) {
-      }
+      waitForButtonRelease(BTN_LEFT);
     } else if (isButtonPressed(BTN_RIGHT)) {
       SignalGauge::resetPeak((int8_t)s_lockRssi);
       s_dirty = true;
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
     }
 
     /* Samples arrive on the Wi-Fi task. Fold them in here so the smoothing

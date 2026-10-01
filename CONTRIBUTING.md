@@ -72,6 +72,10 @@ because something specific went wrong and shipped:
   it.
 - `check_pinmap.py` runs inside the build, because two features claiming
   one pin is the failure this hardware makes easiest.
+- `check_button_waits.py` exists because `while (isButtonPressed(b)) {}` was
+  the obvious way to wait for a release and was in 55 places. It never yields,
+  so a button that does not read as released hangs the device and looks exactly
+  like a crash.
 - `check_log_fields.py` exists because the Spotter writes one record in two
   formats now, and two spellings of one thing drift. A field added to the CSV
   header and not to the JSON object is invisible to the compiler: both are

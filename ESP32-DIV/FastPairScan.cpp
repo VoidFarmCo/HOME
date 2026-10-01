@@ -566,8 +566,7 @@ void fastPairLoop() {
         drawConfirm();
       }
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
     }
 
     if (s_dirty && (uint32_t)(now - s_lastDraw) >= kRedrawMs) {
@@ -579,8 +578,7 @@ void fastPairLoop() {
   } else if (s_view == View::Confirm) {
     if (isButtonPressed(BTN_RIGHT)) {
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
       s_view = View::Running;
       drawRunning();
       /* The scan has to stop: NimBLE will not open a connection while it
@@ -599,8 +597,7 @@ void fastPairLoop() {
     if (isButtonPressed(BTN_UP) || isButtonPressed(BTN_DOWN) ||
         isButtonPressed(BTN_RIGHT)) {
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
       s_view = View::List;
       scanStart();
       redraw(true);

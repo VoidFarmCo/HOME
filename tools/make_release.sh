@@ -115,6 +115,7 @@ INCLUDE=(
   "tools/check_svg_labels.py"
   "tools/check_solder_pads.py"
   "tools/check_log_fields.py"
+  "tools/check_button_waits.py"
   "tools/trace_logo.py"
   "tools/inline_logo.py"
   "tools/check_logo_scale.py"

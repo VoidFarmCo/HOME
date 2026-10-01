@@ -1698,9 +1698,7 @@ void beaconSpamLoop() {
     spamUpdateNavLabels();
     beaconSpam();
     // Wait for Select release so exiting flood doesn't exit the feature.
-    while (isButtonPressed(BTN_SELECT)) {
-      delay(10);
-    }
+    waitForButtonRelease(BTN_SELECT);
     delay(150);
     spamClearBody();
     spamDrawIdleHint();
@@ -3625,9 +3623,7 @@ static void cpCloneWaitNavRelease() {
 }
 
 static void cportalWaitButtonRelease(int pin) {
-  while (isButtonPressed(pin)) {
-    delay(10);
-  }
+  waitForButtonRelease(pin);
   delay(cportalDebounceMs);
 }
 

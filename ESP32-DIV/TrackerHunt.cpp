@@ -409,8 +409,7 @@ void loop() {
         enterGauge();
       }
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
     }
     forgetStale();
     sortByRssi();
@@ -418,14 +417,12 @@ void loop() {
     if (isButtonPressed(BTN_LEFT)) {
       enterPicker();
       delay(200);
-      while (isButtonPressed(BTN_LEFT)) {
-      }
+      waitForButtonRelease(BTN_LEFT);
     } else if (isButtonPressed(BTN_RIGHT)) {
       SignalGauge::resetPeak(s_lastRssi);
       s_dirty = true;
       delay(200);
-      while (isButtonPressed(BTN_RIGHT)) {
-      }
+      waitForButtonRelease(BTN_RIGHT);
     }
     s_dirty = true;         // the needle is live; redraw on the timer
   }
