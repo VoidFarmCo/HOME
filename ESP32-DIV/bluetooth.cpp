@@ -6180,6 +6180,7 @@ static bool s_hopping = false;
 static bool s_logEnabled = true;
 static bool s_sdReady = false;
 static bool s_logFileOpen = false;
+static bool s_logJson     = false;   // fixed when the file opens
 static String s_logPath;
 static File s_logFile;
 static uint32_t s_packetTotal = 0;
@@ -6364,8 +6365,11 @@ static bool esbEnsureDir() {
 
 static bool esbMakeNextPath(String& outPath) {
   char buf[40];
+  /* The extension follows the format, so a directory of captures says which
+   * is which without opening one. */
+  const char* ext = settings().logJson ? "jsonl" : "log";
   for (uint16_t i = 0; i < 10000; i++) {
-    snprintf(buf, sizeof(buf), "%s%04u.log", kEsbFilePrefix, (unsigned)i);
+    snprintf(buf, sizeof(buf), "%s%04u.%s", kEsbFilePrefix, (unsigned)i, ext);
     if (!SD.exists(buf)) {
       outPath = String(buf);
       return true;
@@ -6394,8 +6398,13 @@ static bool esbOpenLogFile() {
     esbConfigureRadio();
     return false;
   }
-  s_logFile.println("# ESP32-DIV ESB Sniffer");
-  s_logFile.println("# format: ms,ch,len,hex");
+  /* Read once, here. A file must not be half one format because the setting
+   * moved while it was open. */
+  s_logJson = settings().logJson;
+  if (!s_logJson) {
+    s_logFile.println("# ESP32-DIV ESB Sniffer");
+    s_logFile.println("# format: ms,ch,len,hex");
+  }
   s_logFile.flush();
   s_logFileOpen = true;
   esbInitRadioSpi();
@@ -6612,13 +6621,26 @@ static void esbWritePacketToSd(uint32_t ts, uint8_t ch, const uint8_t* payload, 
     return;
   }
   if (s_logFile) {
-    s_logFile.print(ts);
-    s_logFile.print(',');
-    s_logFile.print(ch);
-    s_logFile.print(',');
-    s_logFile.print(len);
-    s_logFile.print(',');
-    s_logFile.println(esbPayloadHex(payload, len));
+    if (s_logJson) {
+      /* The same four fields the header names, and hex stays a string: it is
+       * an identifier of bytes, not a quantity, and it has leading zeros that
+       * a number would lose. */
+      char head[48];
+      snprintf(head, sizeof(head),
+               "{\"ms\":%lu,\"ch\":%u,\"len\":%u,\"hex\":\"",
+               (unsigned long)ts, (unsigned)ch, (unsigned)len);
+      s_logFile.print(head);
+      s_logFile.print(esbPayloadHex(payload, len));
+      s_logFile.println("\"}");
+    } else {
+      s_logFile.print(ts);
+      s_logFile.print(',');
+      s_logFile.print(ch);
+      s_logFile.print(',');
+      s_logFile.print(len);
+      s_logFile.print(',');
+      s_logFile.println(esbPayloadHex(payload, len));
+    }
     s_lastFlushMs = millis();
   }
   esbInitRadioSpi();

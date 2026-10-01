@@ -3969,11 +3969,25 @@ static void logEvent(uint32_t whenMs, uint32_t durMs, int peakDbm, int dutyPct) 
   restoreSdAfterSharedSpi();
   if (jdMountSD()) {
     if (!SD.exists(LOG_DIR)) SD.mkdir(LOG_DIR);
-    File f = SD.open(LOG_DIR "/jamdet.csv", FILE_APPEND);
+    /* Two filenames rather than one, because this appends across sessions:
+     * a single name would end up holding both formats. */
+    const bool json = settings().logJson;
+    File f = SD.open(json ? LOG_DIR "/jamdet.jsonl" : LOG_DIR "/jamdet.csv",
+                     FILE_APPEND);
     if (f) {
-      f.printf("%lu,%s,JAM,%d,%lu,%d\n",
-               (unsigned long)whenMs, kFreqLabel[freqIdx], peakDbm,
-               (unsigned long)durMs, dutyPct);
+      if (json) {
+        /* The CSV here never had a header, so these names are new rather than
+         * a translation of existing ones. JAM is the event type: the column
+         * was a literal in every row and is a field now. */
+        f.printf("{\"ms\":%lu,\"freq\":\"%s\",\"event\":\"JAM\","
+                 "\"peak_dbm\":%d,\"dur_ms\":%lu,\"duty_pct\":%d}\n",
+                 (unsigned long)whenMs, kFreqLabel[freqIdx], peakDbm,
+                 (unsigned long)durMs, dutyPct);
+      } else {
+        f.printf("%lu,%s,JAM,%d,%lu,%d\n",
+                 (unsigned long)whenMs, kFreqLabel[freqIdx], peakDbm,
+                 (unsigned long)durMs, dutyPct);
+      }
       f.close();
     }
   }
