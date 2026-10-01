@@ -100,6 +100,11 @@ TRANSMITTERS = [
     ("wifi.cpp",      "void wpsScannerSetup()",        "WPS Scanner"),
     ("wifi.cpp",      "void arpScannerSetup()",        "ARP Scanner"),
     ("wifi.cpp",      "void karmaSetup()",             "Karma Attack"),
+    # Not an attack, and still a transmitter: a SoftAP beacons every 100 ms
+    # with this device's AP MAC in it, which is the one thing stealth is for.
+    # It is not in TX_NAMESPACES because it injects nothing -- it asks the
+    # stack for an access point and serves HTTP over it.
+    ("FileServer.cpp", "void setup()",                 "File Transfer"),
     ("bluetooth.cpp", "void blejamSetup()",            "BLE Jammer"),
     ("bluetooth.cpp", "void spooferSetup()",           "BLE Spoofer"),
     ("bluetooth.cpp", "void sourappleSetup()",         "Sour Apple"),
@@ -218,12 +223,91 @@ def main():
        "settings().stealthMode" in read("Stealth.cpp") + st
        and "feature_exit_requested = true" in st)
 
+    print("\nand the docs list the same tools the code gates:")
+    check_docs()
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS))
         return 1
     print("%d checks passed" % CHECKS)
     return 0
+
+
+# ── the list, written out three more times ──────────────────────────────────
+#
+# TRANSMITTERS above is the list. The user guide prints it as a box and
+# counts it in words, and the README counts it in words again. Three copies,
+# and the docs are the two that nobody compiles.
+#
+# This is not hypothetical here: the box said nineteen through the whole of
+# the AP Tracker work, and AP Tracker does not transmit, so the number
+# happened to stay right by luck rather than by anything noticing. A feature
+# that does transmit would have left the guide telling somebody that their
+# device goes quiet when it does not.
+#
+# The box abbreviates to fit four columns, so the names are matched as
+# subsequences rather than literally: "Probe Req Flood" against "Probe
+# Request Flood", "Hidden SSID Rev." against "Hidden SSID Revealer". Loose
+# enough to survive the layout, strict enough that a name not in the code at
+# all matches nothing, and the match has to be one to one.
+
+WORDS = {19: "Nineteen", 20: "Twenty", 21: "Twenty-one", 22: "Twenty-two",
+         23: "Twenty-three", 24: "Twenty-four", 25: "Twenty-five"}
+
+
+def squash(s):
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def is_subseq(short, long):
+    it = iter(long)
+    return all(c in it for c in short)
+
+
+def check_docs():
+    labels = [t[2] for t in TRANSMITTERS]
+    n = len(labels)
+    word = WORDS.get(n)
+
+    guide = (REPO / "docs" / "pueo" / "user-guide.md").read_text(
+        encoding="utf-8", errors="replace")
+    readme = (REPO / "README.md").read_text(encoding="utf-8", errors="replace")
+
+    ok("the count has a word for it", word is not None,
+       "%d gated features and no spelling in WORDS" % n)
+    if word is None:
+        return
+
+    # The box is the fenced block right after "What it refuses:".
+    m = re.search(r"What it refuses:\s*\n+```\n(.*?)```", guide, re.S)
+    ok("found the box in the user guide", m is not None)
+    if m:
+        # Columns are runs of two or more spaces.
+        entries = [e for line in m.group(1).strip().splitlines()
+                   for e in re.split(r"\s{2,}", line.strip()) if e]
+        ok("  it lists %d tools" % n, len(entries) == n,
+           "the box has %d: %s" % (len(entries), entries))
+
+        unmatched_box, pool = [], list(labels)
+        for e in entries:
+            hit = next((l for l in pool if is_subseq(squash(e), squash(l))),
+                       None)
+            if hit is None:
+                unmatched_box.append(e)
+            else:
+                pool.remove(hit)
+        ok("  every name in it is a tool the code gates", not unmatched_box,
+           "no gated feature matches %s" % unmatched_box)
+        ok("  and every gated tool is in it", not pool,
+           "gated and not listed: %s" % [l for l in pool])
+
+    ok("the user guide's count is right", ("%s tools" % word) in guide,
+       "it does not say %r" % ("%s tools" % word))
+    ok("the README's count is right",
+       ("%s\nfeatures that transmit" % word) in readme
+       or ("%s features that transmit" % word) in readme,
+       "it does not say %r" % ("%s features that transmit" % word))
 
 
 if __name__ == "__main__":
