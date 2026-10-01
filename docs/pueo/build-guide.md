@@ -387,13 +387,23 @@ boot screen and menu come up and touch responds, you have a known-good
 starting point — and you will want one.
 
 ```bash
-esptool.py --chip esp32 -p COM7 write_flash 0x0 pueo-0.3.4-merged.bin
+esptool.py --chip esp32 -b 921600 write_flash 0x0 pueo-0.4.19-merged.bin
 ```
 
-On a 3.5" board flash `pueo-0.3.4-35-merged.bin` instead. If the screen stays
-dark, that is the first thing to check -- it is what the wrong image looks
-like, and it is not a soldering fault because you have not soldered anything
-yet.
+`-b 921600` because esptool defaults to 115200, and the write is about 19
+seconds at the fast rate against two and a half minutes at the slow one.
+The rate changes the upload and not the result: esptool verifies a SHA-256
+of every region it writes, so a rate the cable cannot carry fails during
+the handshake rather than corrupting anything. If it will not sync, try
+`-b 115200` before suspecting the board.
+
+Add `-p COM7`, or whichever port the board came up on, if esptool does not
+find it by itself.
+
+There is one image and it is the 3.5" one. Up to 0.4.13 that plain filename
+meant the 2.8" board and the 3.5" carried a `-35` suffix; it is the other
+way round now, and there is no 2.8" image at all. `pueo-X.Y.Z-beacon-35-merged.bin`
+is the bench transmitter rather than Pueo, so it is not what you want here.
 
 **3. The three bus lines, then the SD card.** Solder SCK, MOSI and MISO to
 the ESP32 module's pads -- 9R, 2R and 8R -- identifying each by beeping it
