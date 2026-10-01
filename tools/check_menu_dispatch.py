@@ -225,6 +225,56 @@ def main():
             print(f"  FAIL  {fn:<20} called {n_calls} time(s), expected 2")
             failed += 1
 
+    # ---- System dispatches on named constants, not on positions ---------
+    #
+    # launchToolsFeature switches on TOOLS_IDX_*, so its coverage cannot be
+    # read off the case labels the way NRF24's and SubGHz's can. The numbers
+    # live in a separate block of constexprs, and inserting a row means
+    # renumbering every one below it -- which is the edit that silently
+    # points a case at the row underneath.
+    #
+    # Three things have to hold. The constants are a permutation of the
+    # positions, Back is the last of them (handleListSubmenuButtons compares
+    # the highlighted row against backIdx and nothing else), and the switch
+    # has a case for every row that is not Back.
+    idx = {m.group(1): int(m.group(2)) for m in re.finditer(
+        r"constexpr int (TOOLS_IDX_\w+)\s*=\s*(\d+);", text)}
+    m = re.search(r"const int tools_NUM_SUBMENU_ITEMS = (\d+);", text)
+    body = re.search(r"static void launchToolsFeature\(int idx\) \{(.*?)\n\}",
+                     text, re.S)
+
+    checks += 1
+    if not idx or not m or not body:
+        print("  FAIL  launchToolsFeature, its TOOLS_IDX_* constants or the "
+              "System item count is missing")
+        failed += 1
+    else:
+        n = int(m.group(1))
+        problems = []
+        if sorted(idx.values()) != list(range(n)):
+            problems.append("TOOLS_IDX_* are %s, not one per row of %d"
+                            % (sorted(idx.values()), n))
+        if idx.get("TOOLS_IDX_BACK") != n - 1:
+            problems.append("TOOLS_IDX_BACK is %s, not the last row (%d)"
+                            % (idx.get("TOOLS_IDX_BACK"), n - 1))
+        cased = {idx[name] for name in re.findall(r"case (TOOLS_IDX_\w+):",
+                                                  body.group(1))
+                 if name in idx}
+        want = {v for name, v in idx.items() if name != "TOOLS_IDX_BACK"}
+        if cased != want:
+            missing = sorted(want - cased)
+            stray = sorted(cased - want)
+            problems.append("switch covers %s; missing %s, stray %s"
+                            % (sorted(cased), missing, stray))
+        if problems:
+            print("  FAIL  launchToolsFeature")
+            for p in problems:
+                print("          " + p)
+            failed += 1
+        else:
+            print(f"  ok    launchToolsFeature    covers all {len(want)} "
+                  f"System rows, Back last")
+
     print()
     if failed:
         print(f"FAILED: {failed} of {checks}")

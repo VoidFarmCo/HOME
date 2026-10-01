@@ -11,6 +11,7 @@
 #include "DroneScan.h"
 #include "Spotter.h"
 #include "ApTracker.h"
+#include "FileServer.h"
 #include "TrackerHunt.h"
 #include "ducky.h"
 #include "Branding.h"
@@ -158,12 +159,16 @@ const char *subghz_submenu_items[subghz_NUM_SUBMENU_ITEMS] = {
  * whole tiles of an eight tile grid, both of them things nobody opens in the
  * middle of a session, sitting at the same visual weight as the radios. The
  * two slots they free are what RFID/NFC and GPS were promoted into. */
-const int tools_NUM_SUBMENU_ITEMS = 7;
+const int tools_NUM_SUBMENU_ITEMS = 8;
 const char *tools_submenu_items[tools_NUM_SUBMENU_ITEMS] = {
     "Serial Monitor",
     "Update Firmware",
     "Touch Calibrate",
     "SD File Manager",
+    /* Next to the file manager rather than under WiFi. The radio is how it
+     * works, not what it is for: somebody looking for a way to get a capture
+     * off the card looks where the card is. */
+    "File Transfer",
     "Settings",
     "About",
     "Back to Main Menu"};
@@ -291,6 +296,7 @@ const unsigned char *tools_submenu_icons[tools_NUM_SUBMENU_ITEMS] = {
     bitmap_icon_follow,
     bitmap_icon_undo,
     bitmap_icon_sdcard,
+    bitmap_icon_wifi2,
     bitmap_icon_setting,
     bitmap_icon_question,
     bitmap_icon_go_back
@@ -3073,9 +3079,10 @@ constexpr int TOOLS_IDX_TERMINAL = 0;
 constexpr int TOOLS_IDX_UPDATE   = 1;
 constexpr int TOOLS_IDX_TOUCH    = 2;
 constexpr int TOOLS_IDX_SD_FILES = 3;
-constexpr int TOOLS_IDX_SETTINGS = 4;
-constexpr int TOOLS_IDX_ABOUT    = 5;
-constexpr int TOOLS_IDX_BACK     = 6;
+constexpr int TOOLS_IDX_XFER     = 4;
+constexpr int TOOLS_IDX_SETTINGS = 5;
+constexpr int TOOLS_IDX_ABOUT    = 6;
+constexpr int TOOLS_IDX_BACK     = 7;
 
 static void runToolsFeatureExitCleanup() {
     in_sub_menu = true;
@@ -3091,7 +3098,12 @@ static void runToolsFeatureExitCleanup() {
     waitForButtonRelease(BTN_SELECT);
 }
 
-static void runToolsFeature(int idx, void (*setupFn)(), void (*loopFn)()) {
+/* exitFn is optional because most of these have nothing to put back. The one
+ * that does owns a radio: File Transfer raises an access point, and an
+ * access point that outlives its screen is a device still beaconing from a
+ * menu that says it is not. */
+static void runToolsFeature(int idx, void (*setupFn)(), void (*loopFn)(),
+                            void (*exitFn)() = nullptr) {
     const bool useTouchNav = (idx != TOOLS_IDX_TOUCH);
     current_submenu_index = idx;
     in_sub_menu = true;
@@ -3111,6 +3123,14 @@ static void runToolsFeature(int idx, void (*setupFn)(), void (*loopFn)()) {
         if (!useTouchNav && isButtonPressed(BTN_SELECT)) {
             break;
         }
+    }
+    /* Before the cleanup, not after: the cleanup repaints the submenu, and a
+     * teardown that runs behind the menu it is leaving has already handed the
+     * screen to whoever comes next. Called even when setup() refused, which
+     * is why every exit() here has to be safe on a feature that never
+     * started. */
+    if (exitFn != nullptr) {
+        exitFn();
     }
     runToolsFeatureExitCleanup();
 }
@@ -3141,6 +3161,10 @@ static void launchToolsFeature(int idx) {
             break;
         case TOOLS_IDX_SD_FILES:
             runToolsFeature(idx, SdFileManager::setup, SdFileManager::loop);
+            break;
+        case TOOLS_IDX_XFER:
+            runToolsFeature(idx, FileServer::setup, FileServer::loop,
+                            FileServer::exit);
             break;
         case TOOLS_IDX_SETTINGS:
             handleSettingsSubmenuButtons();
