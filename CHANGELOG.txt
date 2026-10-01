@@ -11,6 +11,157 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.19 - 2026-09-30
+-------------------
+
+  * FILE TRANSFER. System > File Transfer raises a WPA2 access point, serves
+    the SD card read only over HTTP, and shows the network name, an eight digit
+    password and a URL on screen. Join it from a phone, open the page, tap a
+    file. Exit takes the access point down. All of that is verified on the
+    board, including a .jsonl capture pulled off intact.
+
+    The ask was Bluetooth, which does not survive contact with the stack. There
+    is no standard BLE profile for sending a file; what phones actually speak is
+    OBEX over Classic Bluetooth, which needs Bluedroid, and this firmware is
+    built on NimBLE because Bluedroid will not fit beside the rest of it. A
+    custom GATT service would transfer files to an app nobody has written. Every
+    phone already has an HTTP client.
+
+    Read only on purpose: SD File Manager is four lines away in the same menu
+    and does the writing, with the panel in your hand rather than a password.
+    The password is generated when the screen opens, shown, and stored nowhere.
+    A SoftAP beacons, so this refuses under Stealth Mode like any other
+    transmitter, which makes twenty.
+
+    The WebServer is on the heap. As a third file-scope instance it took
+    .dram0.bss 128 bytes past the segment and the link failed; DRAM is what is
+    scarce in this image, and it now exists for as long as the screen does.
+
+    check_file_server.py asserts the three sentences the screen makes -- nothing
+    writes, the AP carries the generated password, exit takes it down -- plus
+    the hole underneath them, that every client path goes through pathOk before
+    SD.open. Ten mutations, all caught, including WiFi.softAP(s_ssid): one
+    token, compiles, works better, and serves the captures to the street.
+
+  * EVERYTHING ON THE CARD LIVES IN /pueo. It was nine things in the root:
+    /logs, /captures, /config, /esb, /subghz, /captive_portal, /ducky,
+    /ssids.txt and a /wd_wigle_upload.csv. On a card that also holds somebody's
+    photographs those are nine entries scattered among their files with nothing
+    saying which program they belong to. The card is theirs.
+
+    Four paths are reads rather than writes and are handled differently, because
+    moving them silently would break cards that already work. ssids.txt, ducky/
+    and firmware.bin read /pueo first and the old root second. settings.json is
+    the same with worse consequences -- reading only the new location would
+    reset every setting on the first boot after this, stealth off, logging off,
+    backlight back to default, with nothing on screen saying why -- so it reads
+    either and writes the new one, and the first save migrates it.
+
+    Captures already on a card are left alone. Moving somebody's files is not
+    this change's business.
+
+    That shipped broken for one commit and is worth recording. SD.mkdir does one
+    level, so mkdir("/pueo/config") fails when /pueo is not there, and under
+    PUEO_DIR every directory is nested by definition: no /pueo folder appeared
+    and settings would not save. There were four copies of ensureDir -- in
+    SettingsStore, subghz, and twice in wifi.cpp -- all one level short in the
+    same way, which is why the fix had to be made in four places and was made in
+    none. One sdEnsureDir walks the path now.
+
+  * THREE LOGGERS WERE WRITING TO THE CARD ROOT and always had: Surveillance's
+    captures, and the wardriver's in both its foreground and background paths.
+    They go to /pueo/logs with the rest.
+
+    check_sd_paths.py did not see them, and the reason is the lesson. Its
+    literal pattern had no % in its character class, so "/spotter_%lu.jsonl"
+    matched nothing at all -- a check whose entire job is finding files written
+    to the root, blind to every filename built by snprintf, which is the
+    ordinary way to name a log. It was written in the same sitting, declared
+    green, and was green over three existing bugs.
+
+  * THE nRF24 FEATURES WERE READING A PULL-UP AND LOGGING IT. With no module
+    fitted, MISO floats high and every register reads 0xFF. That is a confident
+    failure rather than a neutral one: STATUS reads 0xFF, bit 6 is RX_DR, so "a
+    packet is waiting" is permanently true. The FIFO read clocks out 32 bytes of
+    0xFF, esbTrimPayloadLen only trims trailing zeros so it reports a full
+    payload, and the ESB sniffer wrote it to the card. One row per millisecond,
+    which is what the SD write path costs rather than what a radio delivers,
+    every row byte-for-byte identical, nothing on screen saying the radio was
+    missing.
+
+    Found by reading a downloaded .jsonl, not by anything on the device.
+
+    None of the six nRF24 features checked. Scanner presented the same floating
+    reads as channel occupancy and MouseJack Scan presented them as devices; the
+    three transmitters keyed into nothing and reported success. The three that
+    read are the ones that matter, because fabricated data does not announce
+    itself -- it goes in a file, gets downloaded, and is read as a measurement.
+
+    The probe already existed and five of the six never called it.
+    Nrf24Raw::begin() writes 0x4C into RF_CH and reads it back, which is the one
+    answer a floating line cannot give. nrfReady() is subghz.cpp's cc1101Ready()
+    with a different chip in it, in the same order: stealth first, because that
+    is a question about intent, then the hardware, because that is a question
+    about the board.
+
+  * A CHECK FOR LEFT-ALIGNED TEXT THAT RUNS OFF THE RIGHT EDGE, and the four
+    places it was already happening. check_text_fits.py measured the centred
+    lines; nothing measured tft.drawString at a fixed x, which is the quieter
+    failure. Centred text loses both ends and looks obviously wrong. Left
+    aligned text loses only the tail, so "http://192.168" is a perfectly
+    plausible thing for a screen to say.
+
+    That was File Transfer's own URL, laid out as though the panel were 480 wide
+    when it is 320. The other three had shipped: AP Tracker's picker never
+    showed the channel, Hunt's never showed the age, and AP Tracker's empty-list
+    message lost the end of both its lines. All in features somebody had used.
+
+    Getting the check to see any of it took four passes and each was the same
+    mistake. Skipping calls whose own function set no text size measured 14 of
+    188 and reported green over the bug it was written for, because drawRow()
+    draws and draw() sets the size. Requiring x to be a literal skipped exactly
+    the four lines just moved to a PUEO_SCREEN_W - 104 column. Requiring the
+    text to be a literal skipped the three rows that go through a row helper,
+    which is most of a screen. And one widening introduced a false positive
+    within the minute, then matched nothing once narrowed back to correctness,
+    so it is gone. What it still cannot see is a %s of a runtime string, which
+    the docstring says, along with the skip counts on every run.
+
+  * JSON LOGGING, as an option rather than a replacement. Settings > Logging
+    gains a JSON format switch beside the per-app toggles. Surveillance, the ESB
+    sniffer and the jamming detector honour it; the wardriver keeps WiGLE's CSV
+    because WiGLE's upload accepts nothing else, and the packet monitor keeps
+    PCAP because that is what Wireshark reads. Neither format is this project's
+    to choose.
+
+    NDJSON, one object per line, because a capture is append-only and a
+    truncated file should lose one row rather than being invalid. The format is
+    read once when a file opens, so a setting changed mid-capture cannot produce
+    a file that is half one thing. SSIDs are escaped properly, which the CSV
+    never did -- it substituted dots.
+
+    check_log_fields.py asserts the two spellings of a row agree, since a field
+    added to a header and not to an object is two files disagreeing about what a
+    row is, and both are string literals as far as the compiler is concerned.
+
+  * THE SPOTTER SHOWS ITS DROPPED-FRAME COUNT, which nothing ever did. The REC
+    tag turns orange and carries the count when the capture ring overflows, so a
+    capture with holes in it says so while it is running rather than after.
+
+  * BUTTON WAITS THAT CAN GIVE UP. while (isButtonPressed(b)) {} was in 55
+    places with no yield in it: a button that does not read as released takes
+    the device with it, with no repaint, no input and nothing feeding the
+    watchdog, indistinguishable from a crash. A stuck button is rare, which is
+    why it survived; the path that makes it worth fixing is the touch
+    controller, which isButtonPressed falls through to and which has lost the
+    shared SPI bus once already. 59 call sites converted.
+
+  * AND THE DOCS NOW HAVE TO AGREE WITH THE CODE about what Stealth Mode
+    refuses. The user guide prints that list as a box and counts it in words,
+    the README counts it again, and nothing joined the three. The box said
+    nineteen through the whole of AP Tracker, which happened to stay right only
+    because AP Tracker does not transmit.
+
 0.4.18 - 2026-09-30
 -------------------
 
@@ -2857,11 +3008,16 @@ Digests, every release
 
 SHA-256 of every artefact this project has published, including
 releases that have since been pruned from the download page. The
-page keeps the newest two plus 0.2.1; this keeps all of them,
-because a digest is the one thing about an old release that is
-still worth having after the file itself is gone.
+page keeps the newest two plus 0.2.1 and 0.4.13; this keeps all
+of them, because a digest is the one thing about an old release
+that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.18
+  90a5fa94bfe13d9a3effdd4d422eb61d617d6a2d9e44a572ab421060ab3f1585  pueo-0.4.18-beacon-35-merged.bin
+  b510882bb64e24757f3f7936b01279664570f0290dd784f8732aa107b7f42f54  pueo-0.4.18-merged.bin
+  54e0c4577c37127cb297dfe2840813d85b6788656b0efaa4cff89f2428cd8d77  pueo-0.4.18-src.zip
 
 0.4.17
   b824de798e90bcb717d9ebdffe41ceecba3df9af729d7b6dbec7114583c5ac2c  pueo-0.4.17-beacon-35-merged.bin
