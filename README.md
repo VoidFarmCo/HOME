@@ -22,12 +22,11 @@ a printed enclosure zoned to keep the radios apart.
             standing off the top edge.">
 </p>
 
-Two panels, one image each. The **3.5" ESP32-3248S035R** is the reference
-board: it is the one this has run on and the one with a dimensioned
-enclosure. Neither panel breaks out the SPI bus, so six of the ten signals
-get soldered to the ESP-WROOM-32 module's own castellations either way; the
-3.5" is ahead because all three CC1101 control lines land on one 4-pin
-connector rather than two.
+One panel. The **3.5" ESP32-3248S035R** is the board this runs on, the one
+it has run on, and the one with a dimensioned enclosure. It does not break
+out the SPI bus, so six of the ten signals get soldered to the ESP-WROOM-32
+module's own castellations; what put it ahead of the 2.8" was that all three
+CC1101 control lines land on one 4-pin connector rather than two.
 
 The 2.8" **ESP32-2432S028R** was supported up to **0.4.13** and is not any
 more. It was built every release and never booted, so what shipped for it was
