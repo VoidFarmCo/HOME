@@ -1083,7 +1083,12 @@ static const int kBuiltinCount = sizeof(kBuiltinSsids) / sizeof(kBuiltinSsids[0]
  * round-trip wants anyway. */
 static constexpr int kMaxFileSsids = 64;
 static constexpr int kSsidMaxLen   = 32;
-static const char*   kSsidFilePath = "/ssids.txt";
+/* The owner's file, not ours, so both locations are read. A card that
+ * already has /ssids.txt on it keeps working; a new one can put it under
+ * /pueo with everything else. Beacon Spammer says which list it loaded, so
+ * the fallback is visible rather than silent. */
+static const char*   kSsidFilePath       = PUEO_DIR "/ssids.txt";
+static const char*   kSsidFileLegacyPath = "/ssids.txt";
 
 /* Heap, not .bss. At 64 x 33 this is 2112 bytes and the link fails:
  * `dram0_0_seg' overflowed by 1808. Static space here is spent, heap is
@@ -1118,10 +1123,12 @@ static int loadSsidsFromSd() {
   freeSsidBuffer();
 
   SpiBus::claim(SpiBus::Dev::Sd);
-  if (!SD.exists(kSsidFilePath)) {
+  const char* ssidPath = SD.exists(kSsidFilePath) ? kSsidFilePath
+                                                  : kSsidFileLegacyPath;
+  if (!SD.exists(ssidPath)) {
     return 0;
   }
-  File f = SD.open(kSsidFilePath, FILE_READ);
+  File f = SD.open(ssidPath, FILE_READ);
   if (!f) {
     return 0;
   }
@@ -3206,8 +3213,8 @@ static bool cpAppendLineToFile(const char* path, const String& line) {
 }
 
 static bool cpAppendCaptureToSD(const String& remoteIp, const String& username, const String& passwordStr, const String& ssid) {
-  const char* dir = "/captive_portal";
-  const char* path = "/captive_portal/captured.csv";
+  const char* dir = CPORTAL_DIR;
+  const char* path = CPORTAL_DIR "/captured.csv";
   if (!cpEnsureDir(dir)) return false;
 
   bool exists = SD.exists(path);
@@ -3232,8 +3239,8 @@ static bool cpAppendCaptureToSD(const String& remoteIp, const String& username, 
 
 static bool cpDumpAllCredentialsToSD(int* outCount) {
   if (outCount) *outCount = 0;
-  const char* dir  = "/captive_portal";
-  const char* path = "/captive_portal/eeprom_dump.csv";
+  const char* dir  = CPORTAL_DIR;
+  const char* path = CPORTAL_DIR "/eeprom_dump.csv";
   if (!cpEnsureDir(dir)) return false;
 
   int count = EEPROM.read(COUNT_ADDR);
@@ -9467,7 +9474,11 @@ void karmaLoop() {
 
 namespace FirmwareUpdate {
 
-#define FIRMWARE_FILE "/firmware.bin"
+/* Also the owner's file. This path refuses on huge_app anyway -- see
+ * performSDUpdate -- but it reads both so the refusal is about the
+ * partition table rather than about a file it could not find. */
+#define FIRMWARE_FILE PUEO_DIR "/firmware.bin"
+#define FIRMWARE_FILE_LEGACY "/firmware.bin"
 
 const char* host = "esp32";
 
@@ -10267,7 +10278,9 @@ void performSDUpdate() {
     tft.setCursor(10, 40 + yshift);
     tft.println("SD card OK");
 
-    if (!SD.exists(FIRMWARE_FILE)) {
+    const char* fwPath = SD.exists(FIRMWARE_FILE) ? FIRMWARE_FILE
+                                                  : FIRMWARE_FILE_LEGACY;
+    if (!SD.exists(fwPath)) {
       tft.setTextColor(UI_WARN, TFT_BLACK);
       tft.setCursor(10, 30 + yshift);
       tft.println("X Firmware not found!");
@@ -10289,7 +10302,7 @@ void performSDUpdate() {
       continue;
     }
 
-    File firmwareFile = SD.open(FIRMWARE_FILE, FILE_READ);
+    File firmwareFile = SD.open(fwPath, FILE_READ);
     if (!firmwareFile) {
       tft.setTextColor(UI_WARN, TFT_BLACK);
       tft.setCursor(10, 30 + yshift);

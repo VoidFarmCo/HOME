@@ -787,6 +787,25 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #endif
 
 /*──────────────────── Filesystem ────────────────────*/
+/* One folder on the card, and everything Pueo writes lives in it.
+ *
+ * These used to be seven directories and two loose files in the root, which
+ * makes the card Pueo's rather than its owner's: somebody who also keeps
+ * photographs or a Flipper's dumps on there got /logs, /captures, /config,
+ * /esb, /subghz, /captive_portal and a wd_wigle_upload.csv scattered among
+ * them, with nothing saying which program they belonged to.
+ *
+ * Every write path is built from PUEO_DIR so there is one place to change
+ * it, and check_sd_paths.py asserts that nothing escapes it -- a bare
+ * "/something" passed to SD.open is the whole of what went wrong before.
+ *
+ * The three paths that are NOT writes are named there as exceptions:
+ * ssids.txt, /ducky and firmware.bin are files the owner puts on the card
+ * for Pueo to read, and each reads PUEO_DIR first and the old root second,
+ * so a card that already works keeps working. */
+#ifndef PUEO_DIR
+#define PUEO_DIR "/pueo"
+#endif
 #ifndef FS_MOUNT_OK_MSG
 #define FS_MOUNT_OK_MSG "SD OK"
 #endif
@@ -794,10 +813,22 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define FS_MOUNT_FAIL_MSG "SD Fail"
 #endif
 #ifndef LOG_DIR
-#define LOG_DIR "/logs"
+#define LOG_DIR PUEO_DIR "/logs"
 #endif
 #ifndef CAPTURE_DIR
-#define CAPTURE_DIR "/captures"
+#define CAPTURE_DIR PUEO_DIR "/captures"
+#endif
+#ifndef CONFIG_DIR
+#define CONFIG_DIR PUEO_DIR "/config"
+#endif
+#ifndef CPORTAL_DIR
+#define CPORTAL_DIR PUEO_DIR "/captive_portal"
+#endif
+#ifndef ESB_DIR
+#define ESB_DIR PUEO_DIR "/esb"
+#endif
+#ifndef SUBGHZ_SD_DIR
+#define SUBGHZ_SD_DIR PUEO_DIR "/subghz"
 #endif
 
 /*──────────────────── Battery ────────────────────*/
@@ -882,7 +913,15 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 enum class Theme : uint8_t { Dark = 0, Light = 1 };
 
 #ifndef SETTINGS_PATH
-#define SETTINGS_PATH "/config/settings.json"
+#define SETTINGS_PATH CONFIG_DIR "/settings.json"
+#endif
+/* Where settings.json lived before PUEO_DIR. Read when the new one is not
+ * there, never written, so the first save after the update migrates it.
+ * Without this every setting resets on the first boot after the change --
+ * stealth off, logging off, backlight back to default -- and nothing on
+ * screen says why. */
+#ifndef SETTINGS_LEGACY_PATH
+#define SETTINGS_LEGACY_PATH "/config/settings.json"
 #endif
 
 void displaySubmenu();

@@ -2576,10 +2576,12 @@ static void wardDrawSettingsPage() {
 }
 
 #ifndef WARD_WIGLE_CFG_PATH
-#define WARD_WIGLE_CFG_PATH "/config/wigle.txt"
+#define WARD_WIGLE_CFG_PATH CONFIG_DIR "/wigle.txt"
 #endif
 #ifndef WARD_WIGLE_TMP_CSV
-#define WARD_WIGLE_TMP_CSV "/wd_wigle_upload.csv"
+/* A working file, so it belongs with the rest of them rather than loose in
+ * the root where it looked like something the owner had left behind. */
+#define WARD_WIGLE_TMP_CSV CONFIG_DIR "/wigle_upload.csv"
 #endif
 
 static void wardTrimEnd(char* s) {
@@ -2680,10 +2682,10 @@ static bool wardWigleEnsureConfigDir() {
   if (!isSDCardAvailable()) {
     return false;
   }
-  if (SD.exists("/config")) {
+  if (SD.exists(CONFIG_DIR)) {
     return true;
   }
-  return SD.mkdir("/config");
+  return SD.mkdir(CONFIG_DIR);
 }
 
 static bool wardWigleSaveCfgToSd() {

@@ -95,7 +95,7 @@ than reading a list.
 
 **Beacon Spammer** broadcasts a list of network names. By default that is a
 list built into the firmware, which is the same in every copy. Put your own
-in `/ssids.txt` on the card and it uses those instead, and the screen tells
+in `/pueo/ssids.txt` on the card and it uses those instead, and the screen tells
 you which list it loaded when it starts.
 
 ### Bluetooth
@@ -184,7 +184,8 @@ browses the card on the device, which saves pulling it out to check whether
 a capture landed.
 
 **File Transfer** is how you get a capture off without pulling the card. It
-raises its own WiFi access point and serves the card over HTTP, read only.
+raises its own WiFi access point and serves the card over HTTP, read only,
+opening on `/pueo/` where the captures are.
 The screen shows three things: a network name, an eight digit password and a
 URL. Join the network from a phone or a laptop, open the URL, tap a file.
 
@@ -226,28 +227,41 @@ open and then tell you the module is missing.
 FAT32, inserted in the slot in the side of the lid. The card can go in and
 out without opening the case.
 
+Everything lives in one folder, `/pueo/`. The card is yours, and a tool
+that scatters nine directories through your root has made it its own.
+
 **What Pueo reads:**
 
 | Path | What it is |
 |---|---|
-| `/ssids.txt` | your own network names for Beacon Spammer, one per line |
-| `/config/settings.json` | your settings, written by the device |
-| `/config/wigle.txt` | WiGLE upload credentials, if you use that |
-| `/ducky/` | DuckyScript files |
-| `/subghz/` | saved sub-GHz captures and profiles |
+| `/pueo/ssids.txt` | your own network names for Beacon Spammer, one per line |
+| `/pueo/config/settings.json` | your settings, written by the device |
+| `/pueo/config/wigle.txt` | WiGLE upload credentials, if you use that |
+| `/pueo/ducky/` | DuckyScript files |
+| `/pueo/firmware.bin` | an image for Update Firmware, if you use it |
 
 **What Pueo writes:**
 
 | Path | What lands there |
 |---|---|
-| `/logs/` | feature logs |
-| `/captures/` | packet captures |
-| `/wd_wigle_upload.csv` | wardriving output, WiGLE format |
-| `/jamdet.csv` | jamming detector events |
-| `/esb/` | ESB sniffer captures |
-| `/captive_portal/captured.csv` | captive portal results |
+| `/pueo/logs/` | feature logs, including the jamming detector's |
+| `/pueo/captures/` | packet captures |
+| `/pueo/esb/` | ESB sniffer captures |
+| `/pueo/subghz/` | saved sub-GHz captures and profiles |
+| `/pueo/config/` | settings, and the WiGLE upload working file |
+| `/pueo/captive_portal/` | captive portal results |
 
-For `/ssids.txt`: one name per line, blank lines and lines starting with `#`
+**If your card already works, it keeps working.** The four things you put
+there yourself are read from `/pueo/` first and the old location second:
+`ssids.txt`, `ducky/`, `firmware.bin` and `config/settings.json`. Nothing
+moves your files. Settings are read from wherever they are and saved to the
+new path, so the first time you change a setting they migrate themselves.
+
+Captures already on the card stay where they are, in `/logs`, `/captures`
+and so on. Only new ones go under `/pueo`. Move the old folders in yourself
+if you want them together.
+
+For `ssids.txt`: one name per line, blank lines and lines starting with `#`
 ignored, 32 characters maximum per name, first 64 used. There is a starter
 list in [ssids.txt](ssids.txt) you can copy to the card.
 
@@ -272,7 +286,7 @@ only when both say yes. Turning the master off leaves the card alone
 entirely. It does not affect files you ask for by name, such as saving a
 capture or a profile: those happen because you pressed the button.
 
-Settings are saved to the card at `/config/settings.json`. Without a card
+Settings are saved to the card at `/pueo/config/settings.json`. Without a card
 they last until reboot.
 
 ---

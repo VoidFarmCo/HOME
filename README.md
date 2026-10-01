@@ -186,7 +186,7 @@ refused under Stealth Mode. What it is for is the question an advertisement neve
 not what a device is, but which build it is running, which is the question
 underneath whether something has been patched.
 
-**Beacon Spammer** takes its network names from `/ssids.txt` on the card when
+**Beacon Spammer** takes its network names from `/pueo/ssids.txt` on the card when
 there is one, and falls back to the list built into the firmware, which is
 the same in every copy. The screen says which list it loaded.
 

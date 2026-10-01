@@ -6238,8 +6238,8 @@ static constexpr int kEsbLogStartY = kEsbLogBoxTop + kEsbBoxHeaderH;
 static constexpr int kEsbLogBottomPad = 4;
 static constexpr uint32_t kEsbFlushIntervalMs = 2000;
 static constexpr uint32_t kEsbHopIntervalMs = 80;
-static constexpr const char* kEsbDir = "/esb";
-static constexpr const char* kEsbFilePrefix = "/esb/esb_";
+static constexpr const char* kEsbDir = ESB_DIR;
+static constexpr const char* kEsbFilePrefix = ESB_DIR "/esb_";
 
 static bool uiDrawn = false;
 static volatile bool sniffing = false;

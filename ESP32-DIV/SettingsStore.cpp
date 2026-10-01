@@ -129,14 +129,20 @@ bool settingsLoad() {
     g_lastLoad = SettingsLoadResult::NoCard;
     return false;
   }
-  if (!SD.exists(SETTINGS_PATH)) {
+  /* Either location. Writing the new one and reading only the new one
+   * would reset every setting on the first boot after this change, with
+   * nothing on screen saying why: stealth off, logging off, backlight back
+   * to default. The first save moves it. */
+  const char* path = SD.exists(SETTINGS_PATH) ? SETTINGS_PATH
+                                              : SETTINGS_LEGACY_PATH;
+  if (!SD.exists(path)) {
     /* Not a failure. It is what a card looks like before anything has been
      * saved, and the caller has every right to carry on with defaults. */
     g_lastLoad = SettingsLoadResult::NoFile;
     return true;
   }
 
-  File f = SD.open(SETTINGS_PATH, FILE_READ);
+  File f = SD.open(path, FILE_READ);
   if (!f) {
     g_lastLoad = SettingsLoadResult::Unreadable;
     return false;
@@ -189,9 +195,9 @@ bool settingsLoad() {
 bool settingsSave() {
   sdRetryMount();
 
-  if (!ensureDir("/config")) {
+  if (!ensureDir(CONFIG_DIR)) {
     sd_mounted = false;
-    if (!ensureDir("/config")) return false;
+    if (!ensureDir(CONFIG_DIR)) return false;
   }
 
   File f = SD.open(SETTINGS_PATH, FILE_WRITE);

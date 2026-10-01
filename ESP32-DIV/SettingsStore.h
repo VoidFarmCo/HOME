@@ -3,8 +3,13 @@
 #include <Arduino.h>
 #include "shared.h"
 
+/* shared.h owns this now, built from PUEO_DIR along with every other path
+ * on the card. It was defined in both places behind its own #ifndef, so
+ * whichever header came first won and the other was dead code that looked
+ * authoritative. */
+#include "shared.h"
 #ifndef SETTINGS_PATH
-#define SETTINGS_PATH "/config/settings.json"
+#error "shared.h should have defined SETTINGS_PATH"
 #endif
 
 struct AppSettings {

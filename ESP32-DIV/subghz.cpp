@@ -31,9 +31,10 @@ namespace {
   constexpr size_t kSubghzFreqCount =
       sizeof(subghz_frequency_list) / sizeof(subghz_frequency_list[0]);
 
-  static constexpr const char* SUBGHZ_DIR = "/subghz";
-  static constexpr const char* SUBGHZ_EXPORT_PREFIX = "/subghz/profiles_";
-  static constexpr const char* SUBGHZ_CURRENT_PATH = "/subghz/profiles_current.bin";
+  static constexpr const char* SUBGHZ_DIR = SUBGHZ_SD_DIR;
+  static constexpr const char* SUBGHZ_EXPORT_PREFIX = SUBGHZ_SD_DIR "/profiles_";
+  static constexpr const char* SUBGHZ_CURRENT_PATH =
+      SUBGHZ_SD_DIR "/profiles_current.bin";
   static constexpr uint32_t SUBGHZ_EXPORT_MAGIC = 0x315A4753;
 
   struct __attribute__((packed)) SubGhzProfile {

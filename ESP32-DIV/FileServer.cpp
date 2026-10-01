@@ -216,7 +216,12 @@ void sendError(int code, const char* msg) {
 }
 
 void handleList() {
-  String dirPath = s_server->hasArg("d") ? s_server->arg("d") : String("/");
+  /* Opens on Pueo's own folder rather than the root. The whole card is
+   * still reachable -- ".." from here goes up, and it is a read-only view of
+   * somebody's own card -- but the directory they came for is the one with
+   * the captures in it. */
+  String dirPath = s_server->hasArg("d") ? s_server->arg("d")
+                                         : String(PUEO_DIR);
   if (dirPath.length() == 0) {
     dirPath = "/";
   }

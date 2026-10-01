@@ -46,7 +46,15 @@ extern TFT_eSPI tft;
 
 namespace Ducky {
 
-static const char* DUCKY_DIR = "/ducky";
+/* The owner's scripts. Both locations, for the reason ssids.txt has both:
+ * a card with /ducky on it already works and should keep working. */
+static const char* DUCKY_DIR        = PUEO_DIR "/ducky";
+static const char* DUCKY_DIR_LEGACY = "/ducky";
+
+/* Whichever one is there, preferring ours. */
+static const char* duckyDir() {
+  return SD.exists(DUCKY_DIR) ? DUCKY_DIR : DUCKY_DIR_LEGACY;
+}
 static const char* DEV_NAME  = "ESP32S3 Ducky";
 
 #define COL_BG     TFT_BLACK
@@ -339,7 +347,8 @@ static bool mountSD() {
 }
 static bool ensureDuckyDir() {
   if (!mountSD()) return false;
-  if (!SD.exists(DUCKY_DIR)) return SD.mkdir(DUCKY_DIR);
+  if (SD.exists(DUCKY_DIR) || SD.exists(DUCKY_DIR_LEGACY)) return true;
+  return SD.mkdir(DUCKY_DIR);
   return true;
 }
 static void parseMeta(File& f, ScriptItem& it) {
@@ -361,11 +370,12 @@ static void parseMeta(File& f, ScriptItem& it) {
 static void reloadList() {
   items.clear();
   if (!ensureDuckyDir()) return;
-  File d = SD.open(DUCKY_DIR); if (!d) return;
+  const char* dir = duckyDir();
+  File d = SD.open(dir); if (!d) return;
   for (;;) {
     File f = d.openNextFile(); if (!f) break;
     if (f.isDirectory()) { f.close(); continue; }
-    String p = String(DUCKY_DIR) + "/" + f.name();
+    String p = String(dir) + "/" + f.name();
     String ext = p.substring(p.lastIndexOf('.') + 1); ext.toLowerCase();
     if (!(ext == "duck" || ext == "txt")) { f.close(); continue; }
     ScriptItem it; it.path = p; it.size = f.size();
