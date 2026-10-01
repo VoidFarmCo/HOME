@@ -2682,10 +2682,7 @@ static bool wardWigleEnsureConfigDir() {
   if (!isSDCardAvailable()) {
     return false;
   }
-  if (SD.exists(CONFIG_DIR)) {
-    return true;
-  }
-  return SD.mkdir(CONFIG_DIR);
+  return sdEnsureDir(CONFIG_DIR);
 }
 
 static bool wardWigleSaveCfgToSd() {
@@ -3602,8 +3599,11 @@ static void wardBgTask(void* /*param*/) {
   WiFi.disconnect();
   delay(80);
 
-  char path[48];
-  snprintf(path, sizeof(path), "/wd_%lu.csv", (unsigned long)millis());
+  /* LOG_DIR, not the root, where these have always gone. */
+  sdEnsureDir(LOG_DIR);
+  char path[64];
+  snprintf(path, sizeof(path), LOG_DIR "/wd_%lu.csv",
+           (unsigned long)millis());
   strncpy(s_bgPath, path, sizeof(s_bgPath));
 
   /* A wardrive is a log; there is nothing left of it with the log removed.
@@ -3816,7 +3816,9 @@ void session() {
     WiFi.disconnect();
     delay(80);
 
-    snprintf(path, sizeof(path), "/wd_%lu.csv", (unsigned long)millis());
+    sdEnsureDir(LOG_DIR);
+    snprintf(path, sizeof(path), LOG_DIR "/wd_%lu.csv",
+             (unsigned long)millis());
     logf = sdLoggingAllowed(LogApp::Wardriver) ? SD.open(path, FILE_WRITE) : File();
     if (!logf) {
       if (wardWaitStartupFailureDismiss(

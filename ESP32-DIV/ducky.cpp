@@ -348,7 +348,7 @@ static bool mountSD() {
 static bool ensureDuckyDir() {
   if (!mountSD()) return false;
   if (SD.exists(DUCKY_DIR) || SD.exists(DUCKY_DIR_LEGACY)) return true;
-  return SD.mkdir(DUCKY_DIR);
+  return sdEnsureDir(DUCKY_DIR);
   return true;
 }
 static void parseMeta(File& f, ScriptItem& it) {

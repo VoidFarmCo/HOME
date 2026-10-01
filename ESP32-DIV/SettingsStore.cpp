@@ -111,15 +111,7 @@ static bool mountSD() {
 
 static bool ensureDir(const char* dirPath) {
   if (!mountSD()) return false;
-  if (!SD.exists(dirPath)) {
-    if (SD.mkdir(dirPath)) return true;
-
-    if (dirPath && dirPath[0] == '/') {
-      return SD.mkdir(dirPath + 1);
-    }
-    return false;
-  }
-  return true;
+  return sdEnsureDir(dirPath);
 }
 
 bool settingsLoad() {

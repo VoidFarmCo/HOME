@@ -86,10 +86,7 @@ namespace {
 
   static bool subghzEnsureDir(const char* dirPath) {
     if (!subghzMountSD()) return false;
-    if (SD.exists(dirPath)) return true;
-    if (SD.mkdir(dirPath)) return true;
-    if (dirPath && dirPath[0] == '/') return SD.mkdir(dirPath + 1);
-    return false;
+    return sdEnsureDir(dirPath);
   }
 
   static void clearProfilesInEeprom() {
@@ -3969,7 +3966,7 @@ static void logEvent(uint32_t whenMs, uint32_t durMs, int peakDbm, int dutyPct) 
 
   restoreSdAfterSharedSpi();
   if (jdMountSD()) {
-    if (!SD.exists(LOG_DIR)) SD.mkdir(LOG_DIR);
+    if (!sdEnsureDir(LOG_DIR)) return;
     /* Two filenames rather than one, because this appends across sessions:
      * a single name would end up holding both formats. */
     const bool json = settings().logJson;

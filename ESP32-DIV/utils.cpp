@@ -1035,6 +1035,54 @@ static int8_t s_sdLastGoodCs = -1;
 /** After a failed mount on classic ESP32, do not keep retrying (SD.begin can WDT). */
 static bool s_sdMountGaveUp = false;
 
+/* Create `path` and every parent it needs.
+ *
+ * SD.mkdir does one level. That was fine while every directory sat in the
+ * root, and stopped being fine the moment they moved under /pueo: mkdir
+ * "/pueo/config" returns false when /pueo is not there, and nothing was
+ * creating /pueo. Settings would not save, and each feature failed on its
+ * own directory with its own error, which made it look like four bugs.
+ *
+ * There were four copies of this, in SettingsStore, subghz and twice in
+ * wifi.cpp, all one level short in the same way. They delegate here now.
+ *
+ * The retry without the leading slash is inherited from those copies and
+ * kept: some cards answer mkdir("/x") with false and mkdir("x") with true.
+ */
+bool sdEnsureDir(const char* path) {
+  if (path == nullptr || path[0] != '/') {
+    return false;
+  }
+  char buf[96];
+  const size_t n = strlen(path);
+  if (n == 0 || n >= sizeof(buf)) {
+    return false;
+  }
+  memcpy(buf, path, n + 1);
+
+  /* A trailing slash would make the last component an empty name. */
+  size_t end = n;
+  while (end > 1 && buf[end - 1] == '/') {
+    buf[--end] = '\0';
+  }
+
+  for (size_t i = 1; i <= end; i++) {
+    if (buf[i] != '/' && buf[i] != '\0') {
+      continue;
+    }
+    const char saved = buf[i];
+    buf[i] = '\0';
+    if (!SD.exists(buf) && !SD.mkdir(buf) && !SD.mkdir(buf + 1)) {
+      return false;
+    }
+    buf[i] = saved;
+    if (saved == '\0') {
+      break;
+    }
+  }
+  return SD.exists(buf);
+}
+
 void sdRetryMount() {
   s_sdMountGaveUp = false;
 }

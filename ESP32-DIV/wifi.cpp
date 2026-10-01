@@ -227,10 +227,7 @@ static bool pcapMountSD() {
 
 static bool pcapEnsureDir(const char* dirPath) {
   if (!pcapMountSD()) return false;
-  if (SD.exists(dirPath)) return true;
-  if (SD.mkdir(dirPath)) return true;
-  if (dirPath && dirPath[0] == '/') return SD.mkdir(dirPath + 1);
-  return false;
+  return sdEnsureDir(dirPath);
 }
 
 static bool pcapMakeNextPath(String& outPath) {
@@ -3168,13 +3165,7 @@ static bool cpMountSD() {
 
 static bool cpEnsureDir(const char* dirPath) {
   if (!cpMountSD()) return false;
-  if (!SD.exists(dirPath)) {
-    if (SD.mkdir(dirPath)) return true;
-
-    if (dirPath && dirPath[0] == '/') return SD.mkdir(dirPath + 1);
-    return false;
-  }
-  return true;
+  return sdEnsureDir(dirPath);
 }
 
 static String cpCsvEscape(const String& s) {

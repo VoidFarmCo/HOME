@@ -74,7 +74,15 @@ ROUTES = {
 }
 
 # A path-shaped literal: a leading slash and no spaces.
-LITERAL = re.compile(r'"(/[A-Za-z0-9_./-]*)"')
+#
+# The % matters. The first version of this pattern had no % in its character
+# class, so "/spotter_%lu.jsonl" matched nothing at all and three loggers
+# writing to the card root were invisible to a check whose entire job was
+# finding exactly that: Surveillance's captures, and the wardriver's in both
+# its foreground and background paths. All three had gone to the root since
+# they were written. A filename built by snprintf is the ordinary way to
+# write a log, which made it the worst possible thing to leave out.
+LITERAL = re.compile(r'"(/[A-Za-z0-9_.%/-]*)"')
 
 # An all-caps macro immediately before the quote means the literal is a
 # suffix being concatenated onto a directory, not a path of its own:
@@ -87,6 +95,8 @@ CONCAT = re.compile(r'\b[A-Z][A-Z0-9_]*\s*$')
 # Things that are plainly not card paths.
 def interesting(lit):
     if lit in ROUTES:
+        return False
+    if lit.startswith("/%"):          # a format, not a path
         return False
     if lit.startswith("//"):          # a URL that lost its scheme in the regex
         return False
@@ -184,6 +194,36 @@ def main():
                     FAILED.append("%s:%d writes a legacy path" % (path.name, i))
                     print("  FAIL  %s:%d writes to %s" % (path.name, i, lit))
     ok("no write or mkdir touches a legacy path", True)
+
+    print("\nnothing nested reaches a one-level mkdir:")
+    # SD.mkdir does one level. mkdir("/pueo/config") fails when /pueo is not
+    # there, and under PUEO_DIR every directory is nested by definition, so
+    # moving the paths broke every one of them at once: no /pueo folder, and
+    # settings that would not save.
+    #
+    # There were four copies of ensureDir -- SettingsStore, subghz, and two
+    # in wifi.cpp -- and all four were one level short in the same way,
+    # which is why the fix had to be made in four places and was made in
+    # none. sdEnsureDir walks the path and they delegate to it.
+    utils = (SKETCH / "utils.cpp").read_text(encoding="utf-8",
+                                             errors="replace")
+    ok("sdEnsureDir exists", "bool sdEnsureDir(const char* path)" in utils)
+    ok("  and it walks the path rather than taking one level",
+       "for (size_t i = 1; i <= end; i++)" in utils,
+       "a non-recursive sdEnsureDir is the same bug with a better name")
+
+    raw_mkdir = []
+    for path in sorted(SKETCH.glob("*.cpp")):
+        if path.name == "utils.cpp":
+            continue              # sdEnsureDir itself, the one that may
+        src = path.read_text(encoding="utf-8", errors="replace")
+        for i, line in enumerate(src.splitlines(), 1):
+            if line.lstrip().startswith(("*", "//")):
+                continue
+            if "SD.mkdir(" in line:
+                raw_mkdir.append("%s:%d" % (path.name, i))
+    ok("no feature calls SD.mkdir directly", not raw_mkdir,
+       "; ".join(raw_mkdir))
 
     print()
     if FAILED:

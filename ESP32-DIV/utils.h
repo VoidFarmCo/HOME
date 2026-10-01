@@ -93,6 +93,9 @@ bool ensureBleStackReady();
 
 /** Allow another SD mount attempt (clears v1 boot "gave up" latch). */
 void sdRetryMount();
+/** Create a directory and every parent it needs. SD.mkdir does one level,
+ *  which stopped being enough when every path moved under PUEO_DIR. */
+bool sdEnsureDir(const char* path);
 
 extern bool feature_exit_requested;
 

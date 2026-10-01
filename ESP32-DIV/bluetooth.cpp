@@ -6422,13 +6422,7 @@ static bool esbEnsureDir() {
   if (!esbMountSd()) {
     return false;
   }
-  if (SD.exists(kEsbDir)) {
-    return true;
-  }
-  if (SD.mkdir(kEsbDir)) {
-    return true;
-  }
-  return SD.mkdir("esb");
+  return sdEnsureDir(kEsbDir);
 }
 
 static bool esbMakeNextPath(String& outPath) {

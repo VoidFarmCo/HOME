@@ -386,9 +386,16 @@ bool captureStart() {
   /* Read once, here, and not again until the next file. Toggling the setting
    * mid-capture must not produce a file that is half one format. */
   s_logJson = settings().logJson;
-  char path[40];
-  snprintf(path, sizeof(path), s_logJson ? "/spotter_%lu.jsonl"
-                                         : "/spotter_%lu.csv",
+  /* LOG_DIR, not the root. These went straight into the card's top level
+   * from the beginning, which is how a Surveillance capture ended up beside
+   * somebody's photographs. */
+  if (!sdEnsureDir(LOG_DIR)) {
+    s_logFailed = true;
+    return false;
+  }
+  char path[64];
+  snprintf(path, sizeof(path), s_logJson ? LOG_DIR "/spotter_%lu.jsonl"
+                                         : LOG_DIR "/spotter_%lu.csv",
            (unsigned long)millis());
   s_logFile = SD.open(path, FILE_WRITE);
   if (!s_logFile) {
