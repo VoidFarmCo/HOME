@@ -251,10 +251,15 @@ def main():
         ok("  kLogApps -> AppSettings::%s" % fld, fld in field_names,
            "no such field")
     ok("the page sizes itself from the table",
-       "kLogRows = 1 + (int)LogApp::kCount" in ui,
+       "kLogRows = kLogFixedRows + (int)LogApp::kCount" in ui,
        "a hand-counted row list drops the feature you just added")
+    ok("and the rows above them are a table too",
+       "static const SwitchRow kLogFixed[]" in ui
+       and "kLogFixedRows = (int)(sizeof(kLogFixed)" in ui,
+       "a row written as an if is a row the next one can be written beside")
     ok("and reads its rows from it",
-       "kLogApps[i - 1].label" in ui and "kLogApps[i - 1].field" in ui)
+       "kLogApps[i - kLogFixedRows].label" in ui
+       and "kLogApps[i - kLogFixedRows].field" in ui)
 
     print("\nevery log-open site asks before it writes:")
     sites = [

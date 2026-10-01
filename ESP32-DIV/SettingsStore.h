@@ -45,6 +45,24 @@ struct AppSettings {
   bool     logEsb         = true;
   bool     logWardrive    = true;
 
+  /* Write log rows as JSON, one object per line, instead of CSV.
+   *
+   * Off by default. CSV is what every release so far has written and what
+   * anything already parsing these files expects, so this is a thing you turn
+   * on rather than a change that arrives under you.
+   *
+   * One object per line, not one document per file. A capture is append-only
+   * and can run for hours: a document would mean holding it all in memory or
+   * hand-writing the brackets, and a card pulled mid-write would leave a file
+   * that parses as nothing at all rather than one short row.
+   *
+   * It does not reach the wardriver. That file is POSTed to WiGLE's upload
+   * API, which takes their CSV and nothing else, so this leaves it alone
+   * rather than producing something the upload would reject. The row on the
+   * screen says so, because a format switch that one app quietly disobeys is
+   * worse than no switch. */
+  bool     logJson        = false;
+
   uint16_t touchXMin = TOUCH_X_MIN;
   uint16_t touchXMax = TOUCH_X_MAX;
   uint16_t touchYMin = TOUCH_Y_MIN;

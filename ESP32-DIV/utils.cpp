@@ -1825,14 +1825,24 @@ static const int kMainRows        = kBootRow + 1;
 /* Master switch, then one row per LogApp. The per-app rows are generated
  * from kLogApps, so a feature added to that table appears here without this
  * file being touched -- and, more to the point, cannot fail to. */
-static const int kLogRows = 1 + (int)LogApp::kCount;
+/* The rows above the per-app ones. They are switches like the rest, so the
+ * page stays one list read from tables rather than a list with exceptions in
+ * it -- which is what check_settings.py is asserting when it says the page
+ * sizes itself from the table. */
+static const SwitchRow kLogFixed[] = {
+  {"Log to SD",   &AppSettings::logToSd, nullptr},
+  {"JSON format", &AppSettings::logJson, nullptr},
+};
+static const int kLogFixedRows = (int)(sizeof(kLogFixed) / sizeof(kLogFixed[0]));
+static const int kLogRows = kLogFixedRows + (int)LogApp::kCount;
 static const int kMaxRows = (kMainRows > kLogRows) ? kMainRows : kLogRows;
 
 static int rowCount() { return (page == Page::Main) ? kMainRows : kLogRows; }
 
 static const char* rowLabel(int i) {
   if (page == Page::Logging) {
-    return (i == 0) ? "Log to SD" : kLogApps[i - 1].label;
+    return (i < kLogFixedRows) ? kLogFixed[i].label
+                               : kLogApps[i - kLogFixedRows].label;
   }
   if (i < kFirstSwitch) return kFixedRows[i];
   if (i < kLinkRow)     return kMainSwitches[i - kFirstSwitch].label;
@@ -1846,8 +1856,9 @@ static bool rowIsSwitch(int i) {
 
 static SwitchRow rowSwitch(int i) {
   if (page == Page::Logging) {
-    if (i == 0) return SwitchRow{"Log to SD", &AppSettings::logToSd, nullptr};
-    return SwitchRow{kLogApps[i - 1].label, kLogApps[i - 1].field, nullptr};
+    if (i < kLogFixedRows) return kLogFixed[i];
+    return SwitchRow{kLogApps[i - kLogFixedRows].label,
+                     kLogApps[i - kLogFixedRows].field, nullptr};
   }
   return kMainSwitches[i - kFirstSwitch];
 }
@@ -1872,8 +1883,15 @@ static void loggingSummary(char* out, size_t outSz) {
   for (int i = 0; i < (int)LogApp::kCount; i++) {
     if (s.*(kLogApps[i].field)) on++;
   }
-  if (on == (int)LogApp::kCount) snprintf(out, outSz, "on");
-  else snprintf(out, outSz, "%d of %d", on, (int)LogApp::kCount);
+  /* Appended rather than formatted in. %d is up to eleven characters as far
+   * as the compiler is concerned, so a trailing %s in the same call is a
+   * truncation warning it cannot see past, and -Wall -Wextra stays clean. */
+  const int n = (on == (int)LogApp::kCount)
+                  ? snprintf(out, outSz, "on")
+                  : snprintf(out, outSz, "%d of %d", on, (int)LogApp::kCount);
+  if (s.logJson && n > 0 && (size_t)n < outSz) {
+    snprintf(out + n, outSz - (size_t)n, " json");
+  }
 }
 
 /* The list scrolls, so the number of settings is no longer capped by the

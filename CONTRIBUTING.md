@@ -72,6 +72,10 @@ because something specific went wrong and shipped:
   it.
 - `check_pinmap.py` runs inside the build, because two features claiming
   one pin is the failure this hardware makes easiest.
+- `check_log_fields.py` exists because the Spotter writes one record in two
+  formats now, and two spellings of one thing drift. A field added to the CSV
+  header and not to the JSON object is invisible to the compiler: both are
+  string literals.
 - `check_solder_pads.py` exists because solder-pads.svg is a picture of a
   table in build-guide.md, and a picture of a table is a copy that drifts. It
   drifted on the first try: nineteen pads drawn in a line when the module has

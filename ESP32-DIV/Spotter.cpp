@@ -97,6 +97,7 @@ CapRec   s_cap[kCapRing];
 uint8_t  s_capHead = 0;
 uint8_t  s_capTail = 0;
 uint32_t s_capDropped = 0;
+bool     s_logJson    = false;   // fixed when the file opens
 
 /* Direct-mapped rather than searched: this runs in the promiscuous callback
  * inside the critical section, so it is one compare rather than 128. Two
@@ -275,29 +276,65 @@ void captureFlush() {
   SpiBus::claim(SpiBus::Dev::Sd);
   for (int i = 0; i < n; i++) {
     const CapRec& r = batch[i];
-    char head[80];
-    snprintf(head, sizeof(head),
-             "%lu,%02X:%02X:%02X:%02X:%02X:%02X,%d,%08lX,%d,%u,",
-             (unsigned long)r.ms,
-             r.mac[0], r.mac[1], r.mac[2], r.mac[3], r.mac[4], r.mac[5],
-             (r.mac[0] & 0x02) ? 1 : 0,
-             (unsigned long)r.fp, (int)r.rssi, (unsigned)r.chan);
+    char head[160];
+    if (s_logJson) {
+      /* Same field names as the CSV header, so the two formats describe the
+       * same thing. rnd is a boolean here rather than 0 or 1, because JSON
+       * has booleans and CSV does not. */
+      snprintf(head, sizeof(head),
+               "{\"ms\":%lu,\"mac\":\"%02X:%02X:%02X:%02X:%02X:%02X\","
+               "\"rnd\":%s,\"fp\":\"%08lX\",\"rssi_dbm\":%d,"
+               "\"ch\":%u,\"ssid\":\"",
+               (unsigned long)r.ms,
+               r.mac[0], r.mac[1], r.mac[2], r.mac[3], r.mac[4], r.mac[5],
+               (r.mac[0] & 0x02) ? "true" : "false",
+               (unsigned long)r.fp, (int)r.rssi, (unsigned)r.chan);
+    } else {
+      snprintf(head, sizeof(head),
+               "%lu,%02X:%02X:%02X:%02X:%02X:%02X,%d,%08lX,%d,%u,",
+               (unsigned long)r.ms,
+               r.mac[0], r.mac[1], r.mac[2], r.mac[3], r.mac[4], r.mac[5],
+               (r.mac[0] & 0x02) ? 1 : 0,
+               (unsigned long)r.fp, (int)r.rssi, (unsigned)r.chan);
+    }
     s_logFile.print(head);
 
-    /* The SSID is arbitrary bytes off the air going into a text file. Quote
-     * it, and pass through only printable ASCII that cannot end the field
-     * early -- a network named with a quote and a newline should not be able
-     * to forge rows in somebody's capture. */
-    s_logFile.print('"');
-    for (uint8_t k = 0; k < r.ssidLen; k++) {
-      const char c = r.ssid[k];
-      if (c >= 32 && c < 127 && c != '"') {
-        s_logFile.print(c);
-      } else {
-        s_logFile.print('.');
+    /* The SSID is arbitrary bytes off the air going into a text file, and a
+     * network named with a quote and a newline must not be able to forge rows
+     * in somebody's capture.
+     *
+     * CSV has no escape, so it quotes the field and drops anything that could
+     * end it early. JSON does have one, so the bytes survive: a quote or a
+     * backslash is escaped and anything outside printable ASCII becomes
+     * \uXXXX. That is the one place this format is not merely a different
+     * spelling of the same row. */
+    if (s_logJson) {
+      for (uint8_t k = 0; k < r.ssidLen; k++) {
+        const uint8_t c = (uint8_t)r.ssid[k];
+        if (c == '"' || c == '\\') {
+          s_logFile.print('\\');
+          s_logFile.print((char)c);
+        } else if (c >= 0x20 && c < 0x7F) {
+          s_logFile.print((char)c);
+        } else {
+          char u[8];
+          snprintf(u, sizeof(u), "\\u%04X", (unsigned)c);
+          s_logFile.print(u);
+        }
       }
+      s_logFile.println("\"}");
+    } else {
+      s_logFile.print('"');
+      for (uint8_t k = 0; k < r.ssidLen; k++) {
+        const char c = r.ssid[k];
+        if (c >= 32 && c < 127 && c != '"') {
+          s_logFile.print(c);
+        } else {
+          s_logFile.print('.');
+        }
+      }
+      s_logFile.println('"');
     }
-    s_logFile.println('"');
     s_logRows++;
   }
   s_logFile.flush();
@@ -346,14 +383,21 @@ bool captureStart() {
   }
 
   SpiBus::claim(SpiBus::Dev::Sd);
-  char path[32];
-  snprintf(path, sizeof(path), "/spotter_%lu.csv", (unsigned long)millis());
+  /* Read once, here, and not again until the next file. Toggling the setting
+   * mid-capture must not produce a file that is half one format. */
+  s_logJson = settings().logJson;
+  char path[40];
+  snprintf(path, sizeof(path), s_logJson ? "/spotter_%lu.jsonl"
+                                         : "/spotter_%lu.csv",
+           (unsigned long)millis());
   s_logFile = SD.open(path, FILE_WRITE);
   if (!s_logFile) {
     s_logFailed = true;
     return false;
   }
-  s_logFile.println("ms,mac,rnd,fp,rssi_dbm,ch,ssid");
+  if (!s_logJson) {
+    s_logFile.println("ms,mac,rnd,fp,rssi_dbm,ch,ssid");   // JSON names each row
+  }
   s_logFile.flush();
 
   portENTER_CRITICAL(&s_mux);

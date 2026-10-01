@@ -159,6 +159,7 @@ bool settingsLoad() {
   s.autoBleScan     = doc["autoBleScan"]     | s.autoBleScan;
   s.stealthMode     = doc["stealthMode"]     | s.stealthMode;
   s.logToSd         = doc["logToSd"]         | s.logToSd;
+  s.logJson         = doc["logJson"]         | s.logJson;
   s.logSpotter      = doc["logSpotter"]      | s.logSpotter;
   s.logJamDet       = doc["logJamDet"]       | s.logJamDet;
   s.logPcap         = doc["logPcap"]         | s.logPcap;
@@ -212,6 +213,7 @@ bool settingsSave() {
   doc["autoBleScan"]     = s.autoBleScan;
   doc["stealthMode"]     = s.stealthMode;
   doc["logToSd"]         = s.logToSd;
+  doc["logJson"]         = s.logJson;
   doc["logSpotter"]      = s.logSpotter;
   doc["logJamDet"]       = s.logJamDet;
   doc["logPcap"]         = s.logPcap;
