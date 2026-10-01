@@ -348,14 +348,34 @@ void handleNotFound() {
 
 /* ── Screen ───────────────────────────────────────────────────────────── */
 
+/* The panel is 320 wide and 480 tall. Font 1 at PUEO_BODY_SIZE advances
+ * 12 px a character whatever the glyph, so a line from kLabelX has room for
+ * 25 of them and nothing here may be wider. TFT_eSPI does not clip: the
+ * tail is simply not drawn, and a URL that stops reads like a URL rather
+ * than like an error. check_text_margins.py measures this now. */
 constexpr int kLabelX = 14;
-constexpr int kValueX = 150;
+
+/* Only the two counters use a value column, and their labels are six
+ * characters at most. The three credentials are stacked instead: each one
+ * is read off the screen and typed somewhere, so each gets the full width
+ * rather than what is left after a label. */
+constexpr int kValueX = 104;
 
 void drawRow(int y, const char* label, const char* value, uint16_t colour) {
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.drawString(label, kLabelX, y);
   tft.setTextColor(colour, TFT_BLACK);
   tft.drawString(value, kValueX, y);
+}
+
+/* A label above its value, for the things that have to be legible rather
+ * than compact. */
+void drawStacked(int y, const char* label, const char* value,
+                 uint16_t colour) {
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.drawString(label, kLabelX, y);
+  tft.setTextColor(colour, TFT_BLACK);
+  tft.drawString(value, kLabelX, y + 22);
 }
 
 void draw() {
@@ -378,33 +398,37 @@ void draw() {
     return;
   }
 
-  constexpr int kLine = 26;
-  int y = top + 6;
+  constexpr int kStack = 52;    // label, value, and a gap before the next
+  constexpr int kLine  = 26;
+  int y = top + 8;
 
-  drawRow(y, "Network", s_ssid, TFT_WHITE);
-  y += kLine;
-  drawRow(y, "Password", s_pass, ORANGE);
-  y += kLine;
-  drawRow(y, "Open", s_url, TFT_WHITE);
-  y += kLine + 10;
+  drawStacked(y, "Network", s_ssid, TFT_WHITE);
+  y += kStack;
+  drawStacked(y, "Password", s_pass, ORANGE);
+  y += kStack;
+  drawStacked(y, "Open", s_url, TFT_WHITE);
+  y += kStack + 10;
 
-  char buf[32];
+  char buf[24];
   snprintf(buf, sizeof(buf), "%d of %d", s_clients < 0 ? 0 : s_clients,
            kMaxClients);
   drawRow(y, "Joined", buf, s_clients > 0 ? ORANGE : TFT_DARKGREY);
   y += kLine;
 
-  if (s_files == 0) {
-    drawRow(y, "Sent", "nothing yet", TFT_DARKGREY);
-  } else {
-    snprintf(buf, sizeof(buf), "%lu file%s, %s", (unsigned long)s_files,
-             s_files == 1 ? "" : "s", humanSize(s_bytes).c_str());
-    drawRow(y, "Sent", buf, TFT_WHITE);
-  }
-  y += kLine + 10;
+  /* Count and total on separate rows. One row reading "9999 files, 999.9 MB"
+   * is twenty characters in a column that has seventeen, which is the bug
+   * this whole screen was just re-laid out for. */
+  snprintf(buf, sizeof(buf), "%lu", (unsigned long)s_files);
+  drawRow(y, "Files", buf, s_files > 0 ? TFT_WHITE : TFT_DARKGREY);
+  y += kLine;
+
+  snprintf(buf, sizeof(buf), "%s", humanSize(s_bytes).c_str());
+  drawRow(y, "Sent", buf, s_files > 0 ? TFT_WHITE : TFT_DARKGREY);
+  y += kLine + 14;
 
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawString("Read only. Exit shuts the AP down.", kLabelX, y);
+  tft.drawString("Read only.", kLabelX, y);
+  tft.drawString("Exit shuts the AP down.", kLabelX, y + 22);
 }
 
 void makeCredentials() {
@@ -456,8 +480,8 @@ void setup() {
      * would be a beacon with nothing behind it, which is worse than the
      * error message. */
     s_fail     = "No SD card";
-    s_failWhy1 = "There is nothing to serve, so";
-    s_failWhy2 = "the access point stayed down.";
+    s_failWhy1 = "Nothing to serve, so";
+    s_failWhy2 = "the AP stayed down.";
     draw();
     return;
   }
@@ -470,9 +494,9 @@ void setup() {
   makeCredentials();
 
   if (!WiFi.softAP(s_ssid, s_pass, kApChannel, 0, kMaxClients)) {
-    s_fail     = "The access point did not start";
-    s_failWhy1 = "The card is fine. The radio";
-    s_failWhy2 = "refused. Try leaving and re-entering.";
+    s_fail     = "The AP did not start";
+    s_failWhy1 = "The card is fine. Leave";
+    s_failWhy2 = "and come back in.";
     draw();
     return;
   }
@@ -484,8 +508,8 @@ void setup() {
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_STA);
     s_fail     = "Out of memory";
-    s_failWhy1 = "The web server would not fit.";
-    s_failWhy2 = "Reboot and open this first.";
+    s_failWhy1 = "The web server would";
+    s_failWhy2 = "not fit. Reboot.";
     draw();
     return;
   }
