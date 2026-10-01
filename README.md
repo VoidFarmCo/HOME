@@ -115,13 +115,13 @@ Inherited from ESP32-DIV unless marked.
 | Captive Portal | | | BLE Scanner | | Update Firmware |
 | Hidden SSID | | | BLE Rubber Ducky | | Touch Calibrate |
 | WPS Scanner | | | Skimmer Detect | | SD File Manager |
-| ARP Scanner | | | **Hunt** *(new)* | | Settings, About |
-| Karma Attack | | | **Fast Pair** *(new)* | | |
+| ARP Scanner | | | **Hunt** *(new)* | | **File Transfer** *(new)* |
+| Karma Attack | | | **Fast Pair** *(new)* | | Settings, About |
 | **AP Tracker** *(new)* | | | | | |
 
 ### What Pueo adds
 
-Five features are Pueo's own. Four of them only listen.
+Six features are Pueo's own. Four of them only listen.
 
 **Surveillance** (called Spotter until 0.4.0) is passive detection of
 surveillance and tracking hardware that announces itself: plate readers and
@@ -158,6 +158,17 @@ device had never looked at, plus a probe for CVE-2025-36911. The probe is
 the one feature here that transmits at a single named target, and it sits
 behind a confirm screen that names the address.
 
+**File Transfer** gets a capture off the card without pulling the card. It
+raises its own WPA2 access point with an eight digit password shown on
+screen, serves the card over HTTP read only, and takes the AP down on exit.
+The password is generated when the screen opens and stored nowhere.
+
+It began as a request for Bluetooth, which does not survive contact with the
+stack: there is no standard BLE profile for sending a file, the thing phones
+actually speak is OBEX over Classic Bluetooth, and Classic needs Bluedroid
+where this firmware is built on NimBLE. A custom GATT service would transfer
+files to an app nobody has written. Every phone already has an HTTP client.
+
 ### Additions to tools that were already there
 
 **BLE Scanner** reads its detail view rather than dumping it. Appearance is
@@ -181,7 +192,7 @@ the same in every copy. The screen says which list it loaded.
 
 ### Three settings the device did not have
 
-**Stealth Mode** makes it receive only across the whole device. Nineteen
+**Stealth Mode** makes it receive only across the whole device. Twenty
 features that transmit refuse to start and say so; scans that were quietly
 active, and there were twelve, are made passive instead of blocked. Two
 transmit paths have no menu entry to gate, the Fast Pair probe and the BLE

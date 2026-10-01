@@ -177,11 +177,31 @@ strengths, which is how you tell a fix is coming before it arrives.
 ### System
 
 **Serial Monitor**, **Update Firmware**, **Touch Calibrate**, **SD File
-Manager**, **Settings**, **About**.
+Manager**, **File Transfer**, **Settings**, **About**.
 
 **Touch Calibrate** is worth running once on a new unit. **SD File Manager**
 browses the card on the device, which saves pulling it out to check whether
 a capture landed.
+
+**File Transfer** is how you get a capture off without pulling the card. It
+raises its own WiFi access point and serves the card over HTTP, read only.
+The screen shows three things: a network name, an eight digit password and a
+URL. Join the network from a phone or a laptop, open the URL, tap a file.
+
+The password is new every time you open the screen and is not stored
+anywhere, so there is nothing to change later and nothing to leak. Exit
+takes the access point down.
+
+A few things worth knowing:
+
+- It transmits, so Stealth Mode refuses it like any other transmitter.
+- Nothing it serves can be written, renamed or deleted. That is SD File
+  Manager's job, and it wants the panel in your hand rather than a password.
+- A phone will usually warn you the network has no internet. That is
+  correct; there is no internet behind it.
+- Two devices at a time, and the screen stops updating while a file is going
+  out. One radio and one SPI card reader is the whole of the throughput here,
+  so expect a large PCAP to take a while. Nobody has timed one yet.
 
 ---
 
@@ -268,14 +288,14 @@ get a full-screen notice naming the feature rather than a silent failure.
 What it refuses:
 
 ```
-ARP Scanner        AirTag Spoofer      BLE Jammer          BLE Spoofer
-Beacon Spammer     Captive Portal      De Bruijn / Brute   ESB Replay
-Hidden SSID Rev.   Karma Attack        MouseJack Inject    Probe Req Flood
-Proto Kill         Replay Attack       Saved Profile       Sour Apple
-SubGHz Jammer      WPS Scanner         WiFi Deauther
+ARP Scanner         AirTag Spoofer      BLE Jammer          BLE Spoofer
+Beacon Spammer      Captive Portal      De Bruijn / Brute   ESB Replay
+File Transfer       Hidden SSID Rev.    Karma Attack        MouseJack Inject
+Probe Req Flood     Proto Kill          Replay Attack       Saved Profile
+Sour Apple          SubGHz Jammer       WPS Scanner         WiFi Deauther
 ```
 
-Nineteen tools, and with them the whole **RFID/NFC** menu. A PN532 reads a
+Twenty tools, and with them the whole **RFID/NFC** menu. A PN532 reads a
 card by energising a field and waiting for the card to answer, so even
 **Card Reader** transmits; stealth gates that menu as one rather than entry
 by entry, and nothing in it opens.
