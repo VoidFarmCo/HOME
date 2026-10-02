@@ -137,8 +137,11 @@ this file.
     Fieldwatch comparison, 60 fleets and some 400 of their rules collapsed to
     about 150 rows. NAME_CONTAINS "Dahua" and NAME_GLOB "Dahua*" are one
     assertion to nameContains, and fourteen Cradlepoint model numbers are one
-    vendor: an IBR1700 is a Cradlepoint and the model is not what makes it
-    interesting.
+    vendor. The vendor is the signal: a Cradlepoint IBR is a ruggedised
+    cellular router sold to police, EMS, utilities and commercial fleets and
+    to nobody else, so hearing one says a vehicle of that kind is parked
+    nearby. The model number says which modem generation it has, which says
+    nothing about who is driving.
 
     What arrives: roadside travel-time readers (BlipTrack, BlueTOAD, Iteris
     Vantage, TrafficCast), which sit on poles counting the addresses of
