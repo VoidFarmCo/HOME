@@ -11,6 +11,99 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.22 - 2026-10-02
+-------------------
+
+  * SIXTY VENDORS, AND EVERY OUI CHECKED AGAINST THE IEEE REGISTRY.
+
+    0.4.21 added the three primitives. This is what they were for: the
+    surveillance, law-enforcement, camera and vehicle entries from the
+    Fieldwatch comparison, 60 fleets and some 400 of their rules collapsed to
+    about 150 rows. NAME_CONTAINS "Dahua" and NAME_GLOB "Dahua*" are one
+    assertion to nameContains, and fourteen Cradlepoint model numbers are one
+    vendor: an IBR1700 is a Cradlepoint and the model is not what makes it
+    interesting.
+
+    What arrives: roadside travel-time readers (BlipTrack, BlueTOAD, Iteris
+    Vantage, TrafficCast), which sit on poles counting the addresses of
+    passing devices and are as squarely in scope as anything in this file;
+    intersection and pole cameras (Miovision, Pigvision, ShotSpotter, LVT
+    trailers); commercial CCTV (Dahua, Uniview, UniFi Protect); body-worn and
+    in-car video (Digital Ally, FirstVu, VuLink, EVO-HD); the routers that
+    ride with them (Cradlepoint, Sierra AirLink, Utility Inc); Flock-family
+    pole batteries; fixed home cameras; fleet telematics (Samsara, Motive,
+    PeopleNet); and tyre sensors.
+
+  * THE OUI CLAIMS WERE CHECKED, NOT TRUSTED. The blocks came from
+    Fieldwatch's catalog and were carried on its word, recorded in
+    check_spotter_oui.py's VENDOR_OWN as provenance rather than verification.
+    Asked whether they could be checked properly, which was the right
+    question to ask.
+
+    53 Strong blocks against the IEEE registry, 52 agreed outright. The one
+    that did not was a company rename rather than a wrong block: D4:11:D6 is
+    registered to ShotSpotter, Inc., who are now SoundThinking. Relabelled to
+    what the registry says. 28:80:A2 is the same shape, Novatel Wireless
+    having become Inseego.
+
+    check_oui_registry.py does that comparison on demand. "Fieldwatch says
+    00:0E:A5 is BLIP Systems" and "00:0E:A5 is BLIP Systems" are different
+    statements, and only the second is worth putting in front of somebody
+    using this to decide whether they are being followed.
+
+    It knows two things that would otherwise be noise. A locally administered
+    address is not in the registry by definition, and several rows here exist
+    precisely because a tool ships a made-up default. And a Weak label names
+    what hardware is probably in rather than who made it, so --all reports
+    those for reading while only Strong rows decide the exit code; six of the
+    FS battery blocks are Silicon Laboratories, which is why they are Weak.
+
+    The 3.8 MB registry is cached rather than committed.
+
+  * TYRE SENSORS ARE WORTH MORE THAN THEY LOOK. A TPMS broadcasts a stable
+    identifier for one wheel, continuously, and the owner did not choose it
+    and cannot switch it off. Following a car by its tyres is a known
+    technique, and this is the first release where the table can say so.
+
+  * TWO CURATION CALLS, STATED RATHER THAN BURIED, because transcribing
+    somebody else's catalog without making them is how a detector starts
+    crying wolf.
+
+    Handheld action cameras are out. Fieldwatch files GoPro, Insta360 and DJI
+    Osmo under CAMERA. They are cameras and they are not surveillance: they
+    point where somebody is holding them, they are everywhere, and a screen
+    that says SURVEILLANCE because a tourist walked past is a screen people
+    stop reading. Fixed home cameras stay, because an Arlo watches one place
+    continuously, and they are graded low.
+
+    The car population is in at Weak throughout and kept as one contiguous
+    block. BMW, Toyota, phone-as-key, factory hotspots: not surveillance,
+    just what a car park is made of. Weak reads as corroboration rather than
+    a finding, and contiguous means deleting the lot is one edit if it turns
+    out to drown the rows that matter in traffic. That is the part of this
+    release nobody has driven with yet.
+
+  * PWNAGOTCHI IS MATCHED ON ITS WHOLE ADDRESS. Reported from the outside:
+    de:ad:be looks like somebody spelling out deadbeef with a MAC. That is
+    exactly what it is, and this file already said so in a comment
+    apologising for the row, which is why it was graded Likely.
+
+    No vendor owns de:ad:be, or cafeba, or beefbe; the registry confirms it.
+    What collides is not a vendor but other people's jokes:
+    de:ad:be:ef:ca:fe on a dev board reads as a Pwnagotchi on three bytes and
+    does not on six. MacSig holds a whole address for the things that have
+    one hardcoded rather than assigned, and Pwnagotchi is Strong there and
+    means it. The prefix row stays at Weak, renamed "deadbeef MAC", which is
+    what is left once the identification moves out.
+
+    WiFi only, and the check asserts the invariant that rests on: every row
+    is locally administered, which is what makes a BLE pass pointless, since
+    the BLE cross-match only fires on public addresses. It also asserts six
+    bytes a row, because a three-byte row compiles -- mac[6] zero-fills, and
+    the signature then matches any address ending in three zero bytes.
+
+  * The gap this work opened with was 92 vendors. It is 27.
+
 0.4.21 - 2026-10-02
 -------------------
 
@@ -3160,6 +3253,11 @@ of them, because a digest is the one thing about an old release
 that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.21
+  f121fe7b0d6e369765b4c81425d6fef35ca9cc7e26dc4d840a578ed4b12f713f  pueo-0.4.21-beacon-35-merged.bin
+  a5fac79860429ec8b81c01643e5d539ce952a2fc4fba3ccf0a0e8a9686930370  pueo-0.4.21-merged.bin
+  32f423eeaa75bbe8e68dce26eb7f2588563625551de0eae3a290e14272095422  pueo-0.4.21-src.zip
 
 0.4.20
   97150ebdd0268ef88bf46ebb6607a953320cbb8d145c1413a0e9de93b5b7436b  pueo-0.4.20-beacon-35-merged.bin
