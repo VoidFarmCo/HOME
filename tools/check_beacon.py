@@ -79,6 +79,55 @@ def name_table(src):
     return out
 
 
+def mfg_table(src):
+    """kMfgSigs -> {(company, prefix0): (kind, conf, label)}
+
+    Only the first prefix byte, which is all any rule here uses and all any
+    decoy sets. A rule with a longer prefix would need this widened, and
+    would fail the lookup rather than pass it quietly."""
+    out = {}
+    body = src[src.index("kMfgSigs[]"):]
+    body = body[:body.index("};")]
+    for m in re.finditer(
+            r"\{(0x[0-9A-Fa-f]{4})\s*,\s*\{(0x[0-9A-Fa-f]{2})[^}]*\}\s*,"
+            r"\s*(\d+)\s*,\s*Kind::(\w+)\s*,\s*Conf::(\w+)\s*,"
+            r"\s*\"([^\"]*)\"", body):
+        out[(int(m.group(1), 16), int(m.group(2), 16))] = (
+            m.group(4), m.group(5), m.group(6))
+    return out
+
+
+def svc_table(src):
+    """kSvcDataSigs -> {(service, prefix0 or None): (kind, conf, label)}
+
+    prefix0 is None when prefixLen is 0, which is DULT: the service alone is
+    the signal and there is no frame byte to match."""
+    out = {}
+    body = src[src.index("kSvcDataSigs[]"):]
+    body = body[:body.index("};")]
+    for m in re.finditer(
+            r"\{(0x[0-9A-Fa-f]{4})\s*,\s*\{(0x[0-9A-Fa-f]{2}|0)[^}]*\}\s*,"
+            r"\s*(\d+)\s*,\s*Kind::(\w+)\s*,\s*Conf::(\w+)\s*,"
+            r"\s*\"([^\"]*)\"", body):
+        svc = int(m.group(1), 16)
+        pfx = None if int(m.group(3)) == 0 else int(m.group(2), 16)
+        out[(svc, pfx)] = (m.group(4), m.group(5), m.group(6))
+    return out
+
+
+def namein_table(src):
+    """kNameInSigs -> [(needle, minLen, kind, conf, label)]"""
+    out = []
+    body = src[src.index("kNameInSigs[]"):]
+    body = body[:body.index("};")]
+    for m in re.finditer(
+            r"\{\"([^\"]*)\"\s*,\s*(\d+)\s*,\s*Kind::(\w+)\s*,"
+            r"\s*Conf::(\w+)\s*,\s*\"([^\"]*)\"", body):
+        out.append((m.group(1), int(m.group(2)), m.group(3), m.group(4),
+                    m.group(5)))
+    return out
+
+
 def main():
     emit = (BEACON / "Emit.cpp").read_text(encoding="utf-8", errors="replace")
     emit_h = (BEACON / "Emit.h").read_text(encoding="utf-8", errors="replace")
@@ -148,6 +197,82 @@ def main():
            "%r matched nothing" % nm)
         ok("  classified Vehicle", bool(hits) and hits[0][2] == "Vehicle",
            str(hits[:1]))
+
+
+    # ── the four decoys this check did not know about ────────────────────
+    mfgs = mfg_table(sigs)
+    svcs = svc_table(sigs)
+    nameins = namein_table(sigs)
+
+    # Apple Find My. Always emitted, never checked until now: the beacon set
+    # body[0] = 0x12 and nothing confirmed Spotter had a rule for it. For
+    # most of this file's life it did not.
+    m = re.search(r"body\[0\]\s*=\s*(0x12)\s*;.*?mfgData\((0x[0-9A-Fa-f]{4})",
+                  emit, re.S)
+    ok("the Find My decoy sets a company and a type", m is not None)
+    if m:
+        key = (int(m.group(2), 16), int(m.group(1), 16))
+        hit = mfgs.get(key)
+        ok("  and the pair is in kMfgSigs as Tracker",
+           hit is not None and hit[0] == "Tracker",
+           "company %04X type %02X -> %s" % (key[0], key[1], hit))
+
+    # Google Find My Device: service plus frame type.
+    m = re.search(r"body\[0\]\s*=\s*(0x40)\s*;.*?serviceData16\((0x[0-9A-Fa-f]{4})",
+                  emit, re.S)
+    ok("the Find Hub decoy sets a service and a frame type", m is not None)
+    if m:
+        key = (int(m.group(2), 16), int(m.group(1), 16))
+        hit = svcs.get(key)
+        ok("  and the pair is in kSvcDataSigs as Tracker",
+           hit is not None and hit[0] == "Tracker",
+           "service %04X frame %02X -> %s" % (key[0], key[1], hit))
+        # Strong is the whole point: it has to outrank the Weak Eddystone row
+        # on the same service, which this decoy fires at the same time.
+        ok("  on a Strong signature, to outrank the Eddystone row",
+           hit is not None and hit[1] == "Strong", str(hit))
+
+    # DULT: the service with no frame type.
+    m = re.search(r"serviceData16\((0x FCB2|0xFCB2)", emit)
+    ok("the DULT decoy advertises the DULT service", m is not None)
+    if m:
+        hit = svcs.get((0xFCB2, None))
+        ok("  and the service is in kSvcDataSigs as Tracker",
+           hit is not None and hit[0] == "Tracker",
+           "0xFCB2 -> %s" % (hit,))
+        ok("  with no frame prefix, since the service is the signal",
+           hit is not None, str(hit))
+
+    # The pentest SSID carries a needle from kNameInSigs, in the middle.
+    m = re.search(r'kPentestSsid\[\]\s*=\s*"([^"]*)"', emit)
+    ok("the pentest decoy declares an SSID", m is not None)
+    if m:
+        ssid = m.group(1)
+        hits = [n for n in nameins if n[0].upper() in ssid.upper()]
+        ok("  and it contains a kNameInSigs needle",
+           bool(hits), "%r matches none of %d needles"
+           % (ssid, len(nameins)))
+        if hits:
+            ok("  classified Pentest",
+               any(h[2] == "Pentest" for h in hits),
+               str(hits[0]))
+        # The needle must NOT be at the start. A prefix would be caught by
+        # kBleNameSigs/kSsidSigs and the substring rule would go untested.
+        ok("  with the needle in the middle, not at the start",
+           bool(hits) and not any(
+               ssid.upper().startswith(h[0].upper()) for h in hits),
+           "a leading needle is a prefix match and tests the wrong rule")
+
+    # And the opposite assertion: its OUI must match nothing.
+    m = re.search(r"s_pentestMac\[6\]\s*=\s*\{(0x[0-9A-Fa-f]{2}),\s*"
+                  r"(0x[0-9A-Fa-f]{2}),\s*(0x[0-9A-Fa-f]{2})", emit)
+    ok("the pentest decoy declares a MAC", m is not None)
+    if m:
+        key = tuple(int(m.group(i), 16) for i in (1, 2, 3))
+        ok("  whose OUI matches no Spotter rule", ouis.get(key) is None,
+           "%02X:%02X:%02X is in kOuiSigs as %s, which would corroborate "
+           "the hit and hide whether the substring rule fired"
+           % (key + (ouis.get(key),)))
 
     print("\nthe scheduler actually sends everything it declares:")
     # `= 0` on the first enumerator is easy to leave out of this pattern, and

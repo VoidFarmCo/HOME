@@ -52,7 +52,23 @@ bool     s_wifiUp  = false;
 uint8_t s_alprMac[6]    = {0xB4, 0x1E, 0x52, 0xDE, 0xAD, 0x01};  // Flock Safety
 uint8_t s_bodycamMac[6] = {0x00, 0x25, 0xDF, 0xDE, 0xAD, 0x02};  // Axon
 
+/* Deliberately an OUI that matches nothing in SpotterSignatures.h.
+ *
+ * A real Pineapple often has an ALFA radio in it, and 00:C0:CA is in the
+ * table as a Weak "Pineapple radio?" guess, so using it here would be the
+ * more realistic decoy. It would also make the test useless: the hit would
+ * be corroborated by two signatures and there would be no way to tell from
+ * the screen whether the new substring rule fired at all. The locally
+ * administered 0x02 prefix matches nothing, so a hit here is the SSID rule
+ * or it is nothing. */
+uint8_t s_pentestMac[6] = {0x02, 0xDE, 0xAD, 0xDE, 0xAD, 0x03};
+
 constexpr char kTestSsid[] = "PUEO-TEST-DECOY";
+
+/* The needle has to be in the middle, because that is the rule being
+ * tested: NameSig would match this as a prefix and the point is that it
+ * cannot. Everything around it still says what this is. */
+constexpr char kPentestSsid[] = "PUEO-TEST-Pineapple_DECOY";
 
 /* ── Wi-Fi ────────────────────────────────────────────────────────────────
  *
@@ -250,6 +266,9 @@ const char* name(Signal s) {
     case GlassesBle:    return "Smart glasses";
     case VehicleBle:    return "Vehicle module";
     case TrackerBle:    return "Find My tracker";
+    case FindHubBle:    return "Find Hub tag";
+    case DultBle:       return "DULT tracker";
+    case PentestWifi:   return "Pineapple SSID";
     case FastPairBle:   return "Fast Pair";
     default:            return "?";
   }
@@ -264,6 +283,9 @@ const char* detectedBy(Signal s) {
     case GlassesBle:
     case VehicleBle:    return "Spotter";
     case TrackerBle:    return "Hunt / AirTag Sniffer";
+    case FindHubBle:
+    case DultBle:
+    case PentestWifi:   return "Spotter";
     case FastPairBle:   return "Fast Pair";
     default:            return "";
   }
@@ -365,6 +387,44 @@ void send(Signal s) {
       memcpy(body + 3, "PUEO-TEST-KEY", 13);
       bleAdvertise(mfgData(0x004C, body, sizeof(body)), s);
       s_bleLive = s;
+      break;
+    }
+
+    case FindHubBle: {
+      /* Google Find My Device network: service 0xFEAA, frame type 0x40.
+       *
+       * The frame type is the whole point. Pueo has 0xFEAA as a Weak
+       * "Eddystone beacon" and could not do better, so a Find Hub tag read
+       * as shop furniture. This decoy fires both rules at once, which is
+       * the useful case to watch: the Strong tracker label has to win. */
+      uint8_t body[18] = {0};
+      body[0] = 0x40;                    // Find My Device frame
+      memcpy(body + 1, "PUEO-TEST-KEY", 13);
+      bleAdvertise(serviceData16(0xFEAA, body, sizeof(body)), s);
+      s_bleLive = s;
+      break;
+    }
+
+    case DultBle: {
+      /* IETF DULT, service 0xFCB2: a tracker telling any phone in earshot
+       * that it is separated from its owner. No frame type, because the
+       * service alone is the declaration. */
+      uint8_t body[16] = {0};
+      memcpy(body, "PUEO-TEST-DULT", 14);
+      bleAdvertise(serviceData16(0xFCB2, body, sizeof(body)), s);
+      s_bleLive = s;
+      break;
+    }
+
+    case PentestWifi: {
+      /* A beacon whose SSID carries the vendor in the middle. s_pentestMac
+       * matches no OUI rule on purpose, so a hit is the substring rule. */
+      size_t at = hdr(0x80, s_pentestMac, (const uint8_t*)"\xFF\xFF\xFF\xFF\xFF\xFF");
+      at += 12;
+      s_frame[at - 4] = 0x64;
+      at = addSsid(at, kPentestSsid);
+      at = addRates(at);
+      if (!tx(s_frame, at)) return;
       break;
     }
 

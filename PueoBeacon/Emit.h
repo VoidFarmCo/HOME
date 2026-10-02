@@ -59,6 +59,9 @@ enum Signal : uint8_t {
   GlassesBle,         // Spotter, BLE company + service pair
   VehicleBle,         // Spotter, BLE advertised name
   TrackerBle,         // Hunt and AirTag Sniffer, Find My offline finding
+  FindHubBle,         // Spotter, service data 0xFEAA with a Find Hub frame
+  DultBle,            // Spotter, service data 0xFCB2
+  PentestWifi,        // Spotter, an SSID with the vendor in the middle
   FastPairBle,        // FastPairScan, service data 0xFE2C
   kSignalCount
 };

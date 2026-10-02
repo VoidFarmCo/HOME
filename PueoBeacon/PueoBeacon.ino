@@ -69,10 +69,11 @@ uint8_t  s_bleIdx    = 0;
 
 const Emit::Signal kWifiSignals[] = {
   Emit::RemoteIdWifi, Emit::AlprProbe, Emit::BodycamBeacon,
+  Emit::PentestWifi,
 };
 const Emit::Signal kBleSignals[] = {
   Emit::RemoteIdBle, Emit::GlassesBle, Emit::VehicleBle,
-  Emit::TrackerBle, Emit::FastPairBle,
+  Emit::TrackerBle, Emit::FindHubBle, Emit::DultBle, Emit::FastPairBle,
 };
 constexpr uint8_t kWifiCount = sizeof(kWifiSignals) / sizeof(kWifiSignals[0]);
 constexpr uint8_t kBleCount  = sizeof(kBleSignals) / sizeof(kBleSignals[0]);
