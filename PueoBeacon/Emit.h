@@ -62,6 +62,9 @@ enum Signal : uint8_t {
   FindHubBle,         // Spotter, service data 0xFEAA with a Find Hub frame
   DultBle,            // Spotter, service data 0xFCB2
   PentestWifi,        // Spotter, an SSID with the vendor in the middle
+  FleetBle,           // Spotter, a fleet telematics company ID
+  TpmsBle,            // Spotter, manufacturer data past the company ID
+  CarBle,             // Spotter, the Weak car population
   FastPairBle,        // FastPairScan, service data 0xFE2C
   kSignalCount
 };

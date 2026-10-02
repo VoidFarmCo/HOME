@@ -269,6 +269,9 @@ const char* name(Signal s) {
     case FindHubBle:    return "Find Hub tag";
     case DultBle:       return "DULT tracker";
     case PentestWifi:   return "Pineapple SSID";
+    case FleetBle:      return "Fleet tracker";
+    case TpmsBle:       return "TPMS sensor";
+    case CarBle:        return "Car (weak row)";
     case FastPairBle:   return "Fast Pair";
     default:            return "?";
   }
@@ -285,7 +288,10 @@ const char* detectedBy(Signal s) {
     case TrackerBle:    return "Hunt / AirTag Sniffer";
     case FindHubBle:
     case DultBle:
-    case PentestWifi:   return "Spotter";
+    case PentestWifi:
+    case FleetBle:
+    case TpmsBle:
+    case CarBle:        return "Spotter";
     case FastPairBle:   return "Fast Pair";
     default:            return "";
   }
@@ -425,6 +431,42 @@ void send(Signal s) {
       at = addSsid(at, kPentestSsid);
       at = addRates(at);
       if (!tx(s_frame, at)) return;
+      break;
+    }
+
+    case FleetBle: {
+      /* Samsara, company 0x0B6B. The company ID alone is the signature:
+       * nothing else uses it, which is why kBleSigs grades it Strong. */
+      const uint8_t body[] = {0x01, 0x00};
+      bleAdvertise(mfgData(0x0B6B, body, sizeof(body)), s);
+      s_bleLive = s;
+      break;
+    }
+
+    case TpmsBle: {
+      /* An aftermarket valve-cap sensor: company 0x0001 with a wheel
+       * position in the first payload byte. 0x0001 is Nordic's and is in
+       * half the BLE hardware ever made, so the 0x80 is the entire
+       * signature -- which makes this the decoy that proves mfgMatch reads
+       * from md[2] and not md[0]. Reading from md[0] would compare 0x80
+       * against the low half of the company ID and find nothing, so a
+       * silent failure here looks exactly like a missing sensor. */
+      uint8_t body[8] = {0};
+      body[0] = 0x80;                    // front left
+      memcpy(body + 1, "PUEO", 4);
+      bleAdvertise(mfgData(0x0001, body, sizeof(body)), s);
+      s_bleLive = s;
+      break;
+    }
+
+    case CarBle: {
+      /* Toyota, company 0x0977, from the Weak car population. One car is
+       * not a car park and this does not answer whether that group drowns
+       * the list in traffic; it answers the smaller question underneath,
+       * which is whether those rows fire at all. */
+      const uint8_t body[] = {0x02, 0x00};
+      bleAdvertise(mfgData(0x0977, body, sizeof(body)), s);
+      s_bleLive = s;
       break;
     }
 

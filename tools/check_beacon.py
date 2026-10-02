@@ -263,6 +263,49 @@ def main():
                ssid.upper().startswith(h[0].upper()) for h in hits),
            "a leading needle is a prefix match and tests the wrong rule")
 
+    # ── the vehicle decoys ───────────────────────────────────────────────
+    #
+    # 66 Kind::Vehicle rows arrived in 0.4.22 with nothing to trigger any of
+    # them. These three cover the three ways such a row can match, rather
+    # than three vendors, which is why they are checked by shape.
+    # Read the company out of the emitter rather than restating it here. The
+    # first version hardcoded 0x0B6B and so asserted only that the detector
+    # carries that signature, which stays true when the beacon is changed to
+    # emit something else: the decoy and the signature come apart and the
+    # check says nothing. That is the exact failure this whole section exists
+    # to prevent, reproduced inside the thing preventing it.
+    for case, what in (("FleetBle", "fleet"), ("CarBle", "car")):
+        m = re.search(r"case " + case + r": \{(.*?)\n    \}", emit, re.S)
+        ok("the %s decoy was found" % what, m is not None)
+        if not m:
+            continue
+        cm = re.search(r"mfgData\((0x[0-9A-Fa-f]{4})", m.group(1))
+        ok("  it advertises a company ID", cm is not None)
+        if cm:
+            cid = int(cm.group(1), 16)
+            hit = bles.get((cid, 0x0000))
+            ok("  and %04X is in kBleSigs as Vehicle" % cid,
+               hit is not None and hit[0] == "Vehicle",
+               "company %04X -> %s" % (cid, hit))
+
+    # The TPMS one is the interesting case: its company ID is Nordic's and is
+    # in half the BLE hardware ever made, so the payload byte is the entire
+    # signature. That makes it the decoy that proves mfgMatch reads from
+    # md[2] rather than md[0], and a wrong offset here looks exactly like a
+    # sensor that is not there.
+    m = re.search(r"body\[0\] = (0x80);.*?mfgData\((0x[0-9A-Fa-f]{4})",
+                  emit, re.S)
+    ok("the TPMS decoy sets a company and a wheel byte", m is not None)
+    if m:
+        key = (int(m.group(2), 16), int(m.group(1), 16))
+        hit = mfgs.get(key)
+        ok("  and the pair is in kMfgSigs as Vehicle",
+           hit is not None and hit[0] == "Vehicle",
+           "company %04X byte %02X -> %s" % (key[0], key[1], hit))
+        ok("  on a company ID that is not the signature",
+           key[0] == 0x0001,
+           "a vendor-own company ID would not exercise the data prefix")
+
     # And the opposite assertion: its OUI must match nothing.
     m = re.search(r"s_pentestMac\[6\]\s*=\s*\{(0x[0-9A-Fa-f]{2}),\s*"
                   r"(0x[0-9A-Fa-f]{2}),\s*(0x[0-9A-Fa-f]{2})", emit)

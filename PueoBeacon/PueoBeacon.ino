@@ -73,7 +73,8 @@ const Emit::Signal kWifiSignals[] = {
 };
 const Emit::Signal kBleSignals[] = {
   Emit::RemoteIdBle, Emit::GlassesBle, Emit::VehicleBle,
-  Emit::TrackerBle, Emit::FindHubBle, Emit::DultBle, Emit::FastPairBle,
+  Emit::TrackerBle, Emit::FindHubBle, Emit::DultBle,
+  Emit::FleetBle, Emit::TpmsBle, Emit::CarBle, Emit::FastPairBle,
 };
 constexpr uint8_t kWifiCount = sizeof(kWifiSignals) / sizeof(kWifiSignals[0]);
 constexpr uint8_t kBleCount  = sizeof(kBleSignals) / sizeof(kBleSignals[0]);
