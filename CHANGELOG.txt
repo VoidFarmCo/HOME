@@ -11,6 +11,91 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.21 - 2026-10-02
+-------------------
+
+  * SURVEILLANCE DID NOT FLAG AN AIRTAG. It had Tile, Samsung SmartTag and
+    Eddystone, a comment mentioning Find My Device, and no Find My rule at
+    all, so the most common tracker there is did not appear on the screen
+    whose job is passive detection of tracking hardware. AirTag Sniffer and
+    Hunt both see it. The one that exists to say "there is tracking gear
+    here" stayed quiet.
+
+    It does now, and on a bench test it immediately found a real one in the
+    room at -54 dBm alongside the decoy, which is the part that matters:
+    the rule works against hardware nobody set up for it.
+
+  * THE GAP WAS THREE PRIMITIVES, NOT NINETY SIGNATURES. Found by comparing
+    the five signature tables against Fieldwatch's catalog
+    (github.com/OffGridPete/Fieldwatch, MIT, so incorporation runs that way
+    and not the other). 92 of its in-scope entries had no label here, and
+    only 8 of those were expressible with what this file had. The rest were
+    gated on how the tables can match rather than on what they contain.
+
+    MfgSig reads the bytes past the company ID. kBleSigs could say "company
+    0x004C" and that is every Apple device in range; the Find My type byte
+    0x12 is what makes it a tracker. Likely rather than Strong, because an
+    iPhone relays Find My for other people's accessories: it says something
+    on the network is here, not that there is an AirTag here. Type 0x12 is
+    the separated-from-owner payload, so a tag beside its owner stays quiet,
+    which is correct for this screen.
+
+    SvcDataSig reads the bytes past a service UUID, which is what separates
+    a Find My Device tag from a shop's beacon. Both advertise 0xFEAA and the
+    frame type says which, so Google's 0x40 and 0x41 are Strong while
+    everything else on that service stays the Weak Eddystone guess it always
+    was. The Eddystone row did not need removing: record() keeps the higher
+    confidence, and the bench test confirmed the Strong label wins on an
+    advertisement that fires both.
+
+    It also brings DULT, service 0xFCB2, the IETF cross-vendor advertisement
+    for a tracker separated from its owner. One rule, every vendor that
+    implements it, including the ones that do not exist yet. The highest
+    value row in the file.
+
+    NameInSig matches a needle anywhere. NameSig matches a prefix and that
+    stays the default, because a prefix plus an exact length is what makes
+    "DR " usable. It cannot see a vendor in the middle of a name, which is
+    the shape the pentest kit takes: a Pineapple's management SSID has user
+    text in front of it. A separate table rather than a flag, because adding
+    a field means rewriting every row, and because a substring is a
+    different risk -- it has no anchor, so the table carrying that risk
+    should carry the rule about it too. Needles are four characters or more
+    or they declare a minimum name length.
+
+  * THE BEACON GREW DECOYS FOR ALL OF THEM, because a decoder can be correct
+    while the scan never hands it a byte, and the symptom is an empty list,
+    which is also what an empty room looks like. Find Hub on 0xFEAA with a
+    0x40 frame, DULT on 0xFCB2, and an SSID with the needle in the middle
+    rather than at the front, since a prefix would be caught by the old
+    table and leave the substring rule untested.
+
+    The pentest decoy's MAC is deliberately an OUI that matches nothing. A
+    real Pineapple often has an ALFA radio and 00:C0:CA is in the table as a
+    Weak guess, which would be the more realistic decoy and a useless test:
+    the hit would be corroborated by two signatures with no way to tell from
+    the screen whether the rule under test fired at all. check_beacon.py
+    asserts that in a direction it did not have before, that an OUI matches
+    nothing, because picking an unused OUI is a decision that rots silently
+    the first time somebody adds a rule covering it.
+
+    It also closes the loop on Apple Find My, emitted from the start and
+    never checked against the detector, because for most of this file's life
+    there was no rule to check it against. 41 checks to 55.
+
+  * ALL FOUR VERIFIED ON HARDWARE, two boards side by side: the Find My
+    decoy and a real device, Google Find My Device winning over Eddystone on
+    the same advertisement, DULT, and the Pineapple SSID on a frame whose
+    OUI matches nothing, so the substring rule is the only thing that could
+    have labelled it.
+
+  * check_spotter_prims.py guards the off-by-two, in both directions. NimBLE
+    leaves the company ID on the front of manufacturer data and strips the
+    UUID from service data, so one matcher reads from +2 and the other from
+    0. Getting either wrong does not crash and does not report nothing: it
+    reports a confident, wrongly-labelled hit on a screen somebody is
+    reading to decide whether they are being followed.
+
 0.4.20 - 2026-10-01
 -------------------
 
@@ -3075,6 +3160,11 @@ of them, because a digest is the one thing about an old release
 that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.20
+  97150ebdd0268ef88bf46ebb6607a953320cbb8d145c1413a0e9de93b5b7436b  pueo-0.4.20-beacon-35-merged.bin
+  2a2e290436293285cf541bdd6fa69894dbe8c8ca08c9ee625ec18d0bc4819817  pueo-0.4.20-merged.bin
+  7c6aed9ff2491a261fbd11aed9bb2e5e4ef6b817edb8a5ea1e01d5b31692d6a9  pueo-0.4.20-src.zip
 
 0.4.19
   f08ee592f3cfdc3c4424180603e7ee3b4cec31556104f19431d8eba261181c01  pueo-0.4.19-beacon-35-merged.bin
