@@ -649,6 +649,18 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
    * only worth capturing while it is still unknown. */
   captureNote(src, rssi, fp, ssidVal, ssidLen);
 
+/* The whole address, checked before the OUI table. Most specific first, as
+ * everywhere else here, and record() would keep the stronger label either
+ * way -- but a reader of this function should see them in the order that
+ * explains them. */
+  for (size_t i = 0; i < kMacSigCount; i++) {
+    if (memcmp(src, kMacSigs[i].mac, 6) == 0) {
+      record(src, rssi, kMacSigs[i].kind, kMacSigs[i].conf, kMacSigs[i].label,
+             false, fp);
+      break;
+    }
+  }
+
   for (size_t i = 0; i < kOuiSigCount; i++) {
     if (memcmp(src, kOuiSigs[i].oui, 3) == 0) {
       record(src, rssi, kOuiSigs[i].kind, kOuiSigs[i].conf, kOuiSigs[i].label,

@@ -186,6 +186,27 @@ struct SvcDataSig {
  * short needle hits far more than a short prefix does. Keeping them apart
  * means this table can carry the rule that enforces that, and the comment
  * explaining why, where neither would fit on the shared struct. */
+/* ── A whole address, where the whole address is the signature ───────────
+ *
+ * OuiSig matches three bytes, which is what an OUI is. Some things do not
+ * have an OUI: they have one hardcoded address, chosen as a joke, and the
+ * first three bytes of it are not a manufacturer claim at all.
+ *
+ * Matching half of such an address is a weaker signature than the thing it
+ * stands for, which is why the Pwnagotchi row lived at Conf::Likely with a
+ * comment apologising for it. With six bytes it can be Strong and mean it.
+ *
+ * WiFi only, deliberately. Every address this table can hold is locally
+ * administered -- that is what makes it a made-up address -- and the BLE
+ * cross-match only fires on public addresses, so a BLE pass would be dead
+ * code dressed as thoroughness. */
+struct MacSig {
+  uint8_t mac[6];
+  Kind kind;
+  Conf conf;
+  const char* label;
+};
+
 struct NameInSig {
   const char* needle;      // found anywhere in the name, case-insensitively
   uint8_t minNameLen;      // 0 = any; else the name must be at least this long
@@ -208,6 +229,19 @@ struct NameInSig {
  * action cameras under CAMERA and they are not here, because a GoPro is a
  * camera and is not surveillance.
  * ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Fixed full addresses ───────────────────────────────────────────────── */
+static const MacSig kMacSigs[] = {
+  /* de:ad:be:ef:de:ad, hardcoded in Pwnagotchi and the same on every unit.
+   *
+   * Strong, and it earns it here in a way the three-byte version could not:
+   * this is the entire address, not a prefix somebody else's test rig might
+   * share. The advertisement also carries JSON with name, version, pwnd_tot,
+   * policy.deauth and uptime; none of it is read here, because this table
+   * matches and does not parse. */
+  {{0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD}, Kind::Pentest, Conf::Strong,
+   "Pwnagotchi"},
+};
 
 /* ── WiFi: source MAC prefixes ─────────────────────────────────────── */
 /* The scan breaks on the first match, so anything that should outrank a
@@ -467,7 +501,12 @@ static const OuiSig kOuiSigs[] = {
    * policy.deauth and uptime. None of that is read here: this table matches,
    * it does not parse. Worth knowing it is there if the detail is ever
    * wanted. */
-  {{0xDE, 0xAD, 0xBE}, Kind::Pentest, Conf::Likely, "Pwnagotchi"},
+  /* The prefix stays, demoted and renamed. kMacSigs above carries the
+   * whole address and names Pwnagotchi; this is what is left over, which is
+   * "somebody set a deadbeef MAC". That is a real hint and it is not an
+   * identification, and the label now says which it is. A unit running the
+   * stock address hits both and comes out corroborated. */
+  {{0xDE, 0xAD, 0xBE}, Kind::Pentest, Conf::Weak,   "deadbeef MAC"},
 
   {{0xB8, 0x35, 0x32}, Kind::Alpr, Conf::Weak,    "unregistered OUI"},
 };
@@ -891,6 +930,7 @@ static const NameInSig kNameInSigs[] = {
 constexpr size_t kMfgSigCount     = sizeof(kMfgSigs) / sizeof(kMfgSigs[0]);
 constexpr size_t kSvcDataSigCount = sizeof(kSvcDataSigs) / sizeof(kSvcDataSigs[0]);
 constexpr size_t kNameInSigCount  = sizeof(kNameInSigs) / sizeof(kNameInSigs[0]);
+constexpr size_t kMacSigCount     = sizeof(kMacSigs) / sizeof(kMacSigs[0]);
 constexpr size_t kOuiSigCount     = sizeof(kOuiSigs) / sizeof(kOuiSigs[0]);
 constexpr size_t kBle128SigCount  = sizeof(kBle128Sigs) / sizeof(kBle128Sigs[0]);
 constexpr size_t kSsidSigCount    = sizeof(kSsidSigs) / sizeof(kSsidSigs[0]);

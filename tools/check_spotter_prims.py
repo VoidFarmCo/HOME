@@ -142,10 +142,37 @@ def main():
     ok("  none shorter than 4 characters without a minNameLen", not short,
        "%s would match on coincidence" % short)
 
+    print("\na whole-address signature is a whole address, and WiFi only:")
+    macs = table(sigs, "kMacSigs")
+    ok("kMacSigs has rows", len(macs) > 0)
+    # Six bytes. The entire point of this table over kOuiSigs is that it does
+    # not stop at three, and a row written with three would compile: MacSig's
+    # mac[6] would zero-fill, and the signature would match any address whose
+    # last three bytes happen to be zero.
+    short = [r for r in macs if len(re.findall(r"0x[0-9A-Fa-f]{2}", r)) != 6]
+    ok("  every row gives all six bytes", not short,
+       "a short row zero-fills and matches on the zeros: %s" % short)
+    # The design says WiFi only, on the grounds that these addresses are all
+    # locally administered and the BLE cross-match only fires on public ones.
+    # A public address here would make that reasoning false and the feature
+    # half-wired, silently.
+    bad = []
+    for r in macs:
+        first = re.search(r"0x([0-9A-Fa-f]{2})", r)
+        if first and not (int(first.group(1), 16) & 0x02):
+            bad.append(r.split("Kind::")[0].strip())
+    ok("  every row is a locally administered address", not bad,
+       "a public address here would belong on the BLE path too, which this "
+       "table deliberately does not have: %s" % bad)
+    a, b = src.find("kMacSigCount"), src.find("kOuiSigCount")
+    ok("  and the whole address is matched before the OUI", 0 <= a < b,
+       "most specific first, as everywhere else here")
+
     print("\nthe tables are wired in at all:")
     for t, n in (("kMfgSigs", "kMfgSigCount"),
                  ("kSvcDataSigs", "kSvcDataSigCount"),
-                 ("kNameInSigs", "kNameInSigCount")):
+                 ("kNameInSigs", "kNameInSigCount"),
+                 ("kMacSigs", "kMacSigCount")):
         ok("%-14s is iterated in Spotter.cpp" % t,
            re.search(r"i < " + n + r";", src) is not None
            and t + "[i]" in src,
