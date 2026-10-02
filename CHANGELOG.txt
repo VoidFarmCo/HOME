@@ -120,8 +120,9 @@ this file.
     and the signature come apart and the check says nothing. It reads the
     company out of the emitter now.
 
-    check_nav_labels.py was right the first time, for a reason I had not
-    expected: entering the filter painted the nav bar and then fell through
+    check_nav_labels.py was right the first time, and about something
+    subtler than it looked: entering the filter painted the nav bar and fell
+    through
     to the rest of the loop, which ends in redraw() on the dwell path, whose
     first act is fillScreen. The bar would have been wiped on any pass where
     a dwell alert fired.
@@ -151,9 +152,8 @@ this file.
 
   * THE OUI CLAIMS WERE CHECKED, NOT TRUSTED. The blocks came from
     Fieldwatch's catalog and were carried on its word, recorded in
-    check_spotter_oui.py's VENDOR_OWN as provenance rather than verification.
-    Asked whether they could be checked properly, which was the right
-    question to ask.
+    check_spotter_oui.py's VENDOR_OWN as provenance rather than
+    verification. They are checked against the registry now.
 
     53 Strong blocks against the IEEE registry, 52 agreed outright. The one
     that did not was a company rename rather than a wrong block: D4:11:D6 is
@@ -198,10 +198,10 @@ this file.
     out to drown the rows that matter in traffic. That is the part of this
     release nobody has driven with yet.
 
-  * PWNAGOTCHI IS MATCHED ON ITS WHOLE ADDRESS. Reported from the outside:
-    de:ad:be looks like somebody spelling out deadbeef with a MAC. That is
-    exactly what it is, and this file already said so in a comment
-    apologising for the row, which is why it was graded Likely.
+  * PWNAGOTCHI IS MATCHED ON ITS WHOLE ADDRESS. de:ad:be is not a vendor
+    block: it is the first half of somebody spelling out deadbeef with a
+    MAC. This file already said so in a comment apologising for the row,
+    which is why it was graded Likely.
 
     No vendor owns de:ad:be, or cafeba, or beefbe; the registry confirms it.
     What collides is not a vendor but other people's jokes:

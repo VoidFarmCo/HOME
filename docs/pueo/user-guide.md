@@ -156,6 +156,54 @@ use the CC1101.
 **Surveillance** and **Drone Detector**. Both are passive. Drone Detector
 watches for the Remote ID broadcasts drones are required to send.
 
+#### What Surveillance is looking at
+
+266 signatures across 9 kinds. A row appears when something in range
+announces itself in a way one of them recognises.
+
+The useful thing to know is not the list of vendors, which goes stale, but
+the kinds of question being asked, because that is what explains a row that
+is there and a row that is not:
+
+| It can see | What that catches |
+|---|---|
+| a whole MAC address | hardware with no vendor block, only a hardcoded one. A Pwnagotchi is `de:ad:be:ef:de:ad` on every unit |
+| the first three bytes of a MAC | the block IEEE assigned to a manufacturer |
+| a BLE or WiFi name, from the start | matched from the first character, optionally at an exact length |
+| a network name, anywhere in it | the same, in the middle. A Pineapple's SSID has whatever its owner typed in front of it |
+| a BLE company or service ID | who made it, or what protocol it speaks |
+| a 128-bit service UUID | somebody's own protocol rather than a shared allocation, so worth much more |
+| manufacturer data | the bytes *past* the company ID. Apple's `0x004C` is every iPhone in range; the `0x12` after it is an AirTag separated from its owner |
+| service data | the bytes past a service UUID. A Find My Device tag and a shop beacon both advertise `0xFEAA`, and the frame type says which |
+
+Every row is graded **strong**, **likely** or **weak**, and the colour on
+screen says which. A weak row is a hint and not a finding: a contract
+manufacturer's OUI, or a brand name that is also an ordinary English word. A
+second, differently-labelled match on the same device promotes a likely to a
+strong, because two independent fields agreeing is worth more than either.
+
+A detector that cries wolf is one you stop believing, which is why so many
+rows are deliberately weak.
+
+#### Filtering the list
+
+The **left button** opens a filter. Toggle any of the nine kinds, and set a
+confidence floor of everything, likely and up, or strong only.
+
+It is worth knowing exactly what it does and does not do.
+
+- **It only hides rows.** Everything is still detected, still counted, and
+  still written to the card if logging is on. The filter is a view.
+- **It resets when you leave the screen.** This is deliberate. A filter you
+  forget is on is one that shows you an empty street you never actually
+  looked at.
+- **While it is on, the header counts both ways:** `hits 4/13` rather than
+  `hits 13`. The second number is the one that has not changed.
+
+Turning **VEHICLE** off is the common case. Modern cars advertise constantly
+and most of those rows are graded weak for that reason, but in traffic there
+can be a lot of them.
+
 ### RFID/NFC
 
 **Card Reader**, **Card Clone**, **Erase**, **Dump**, **Decode Access**,
