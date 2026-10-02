@@ -179,6 +179,7 @@ INCLUDE=(
   "tools/check_tracker_follow.py"
   "tools/check_spotter_oui.py"
   "tools/check_spotter_prims.py"
+  "tools/check_spotter_filter.py"
   "tools/check_oui_registry.py"
   "tools/check_nrf24_rpd.py"
   "tools/render_screens.py"

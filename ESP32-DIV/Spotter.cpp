@@ -892,6 +892,76 @@ const char* kindText(Kind k) {
   }
 }
 
+/* ── The filter ───────────────────────────────────────────────────────────
+ *
+ * Display only. Nothing here changes what is detected, counted or written to
+ * the card: a filter that edits the capture makes the capture depend on what
+ * somebody had selected while it ran, and that is not readable later.
+ *
+ * Per session. s_kindMask and s_minConf are reset by setup() every time the
+ * screen opens, because the way a remembered filter fails is silent -- you
+ * conclude a street is clean when what happened is that Strong-only was left
+ * on weeks ago. The header says so whenever the filter is not showing
+ * everything, which is the other half of the same guard.
+ *
+ * One bit per Kind. Kind::Unknown is bit 0 and is never set by a signature,
+ * so it costs a bit and saves an offset. */
+constexpr uint16_t kAllKinds = 0x03FF;     // ten Kind values, bits 0..9
+uint16_t s_kindMask = kAllKinds;
+uint8_t  s_minConf  = 0;                   // 0 Weak and up, 1 Likely and up, 2 Strong
+bool     s_filtOpen = false;
+int      s_filtSel  = 0;                   // 0..8 kinds, 9 the confidence row
+
+/* The kinds the filter offers, in the order they are drawn. Kind::Unknown is
+ * not here: nothing in SpotterSignatures.h produces it, so a row for it
+ * would be a control that does nothing. */
+const Kind kFiltKinds[] = {
+  Kind::Alpr, Kind::Bodycam, Kind::Camera, Kind::Tracker, Kind::Glasses,
+  Kind::Vehicle, Kind::Accessory, Kind::Pentest, Kind::Mesh,
+};
+constexpr int kFiltKindCount = (int)(sizeof(kFiltKinds) / sizeof(kFiltKinds[0]));
+constexpr int kFiltRows = kFiltKindCount + 1;   // + the confidence row
+
+bool filterIsAll() {
+  return s_kindMask == kAllKinds && s_minConf == 0;
+}
+
+/* Whether a row is drawn. The only thing the filter does. */
+bool shown(const Hit& h) {
+  if ((uint8_t)h.conf < s_minConf) {
+    return false;
+  }
+  return (s_kindMask & (uint16_t)(1u << (uint8_t)h.kind)) != 0;
+}
+
+int shownCount() {
+  int n = 0;
+  for (int i = 0; i < s_hitCount; i++) {
+    if (shown(s_hits[i])) n++;
+  }
+  return n;
+}
+
+/* The nth row that passes the filter, or null. A linear walk over at most 48
+ * entries, run once per drawn row, which is nothing next to the SPI write
+ * that follows it. */
+const Hit* nthShown(int n) {
+  for (int i = 0; i < s_hitCount; i++) {
+    if (shown(s_hits[i]) && n-- == 0) {
+      return &s_hits[i];
+    }
+  }
+  return nullptr;
+}
+
+const char* confText(uint8_t c) {
+  switch (c) {
+    case 2:  return "Strong only";
+    case 1:  return "Likely and up";
+    default: return "everything";
+  }
+}
+
 uint16_t confColour(Conf c) {
   switch (c) {
     case Conf::Strong: return TFT_RED;
@@ -1073,12 +1143,24 @@ void drawHeader() {
    * real value here is two or three digits wide. */
   char buf[72];
   const int dwell = dwellCount();
-  if (dwell > 0) {
-    snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d  dwell %d",
-             (unsigned)s_chan, (unsigned long)s_frames, s_hitCount, dwell);
+
+  /* "hits 13" becomes "hits 4/13" while a filter is on, and the second
+   * number is the one that has not changed. That is the whole guard against
+   * the failure this feature could introduce: a filtered list looks exactly
+   * like a quiet street, and the only difference is here. */
+  char hits[20];
+  if (filterIsAll()) {
+    snprintf(hits, sizeof(hits), "%d", s_hitCount);
   } else {
-    snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %d",
-             (unsigned)s_chan, (unsigned long)s_frames, s_hitCount);
+    snprintf(hits, sizeof(hits), "%d/%d", shownCount(), s_hitCount);
+  }
+
+  if (dwell > 0) {
+    snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %s  dwell %d",
+             (unsigned)s_chan, (unsigned long)s_frames, hits, dwell);
+  } else {
+    snprintf(buf, sizeof(buf), "ch %2u  frames %lu  hits %s",
+             (unsigned)s_chan, (unsigned long)s_frames, hits);
   }
   /* The whole 18 px band is this line's, so clearing it here also clears
    * the recording tag, which is why the tag is repainted unconditionally
@@ -1137,6 +1219,91 @@ void drawHeader() {
   }
 }
 
+/* ── The filter screen ──────────────────────────────────────────────────── */
+void drawFilter() {
+  const int top = 42;
+  tft.fillRect(0, top - 18, PUEO_SCREEN_W, contentBottom() - top + 18,
+               TFT_BLACK);
+  tft.setTextFont(PUEO_BODY_FONT);
+  tft.setTextSize(1);
+
+  tft.setTextColor(ORANGE, TFT_BLACK);
+  tft.drawString("Filter  (display only)", 8, top - 16);
+
+  int y = top;
+  for (int i = 0; i < kFiltKindCount; i++) {
+    const bool on = (s_kindMask & (uint16_t)(1u << (uint8_t)kFiltKinds[i])) != 0;
+    const bool sel = (i == s_filtSel);
+    char line[40];
+    snprintf(line, sizeof(line), "%s %s  %s", sel ? ">" : " ",
+             on ? "[x]" : "[ ]", kindText(kFiltKinds[i]));
+    tft.setTextColor(sel ? ORANGE : (on ? TFT_WHITE : TFT_DARKGREY), TFT_BLACK);
+    tft.drawString(line, 8, y);
+    y += PUEO_BODY_H + 4;
+  }
+
+  y += 6;
+  const bool sel = (s_filtSel == kFiltKindCount);
+  char line[48];
+  snprintf(line, sizeof(line), "%s Confidence: %s", sel ? ">" : " ",
+           confText(s_minConf));
+  tft.setTextColor(sel ? ORANGE : TFT_WHITE, TFT_BLACK);
+  tft.drawString(line, 8, y);
+
+  y += PUEO_BODY_H + 10;
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.drawString("Nothing is hidden from the log.", 8, y);
+  tft.drawString("Everything is still recorded.", 8, y + PUEO_BODY_H + 2);
+}
+
+/* Entering and leaving are their own functions because of rule 4 in
+ * check_nav_labels.py: nothing may clear the screen between a nav-bar
+ * repaint and the end of the function that did it. spotterLoop ends in a
+ * redraw() on the dwell path, so the repaint cannot live there. */
+void enterFilter() {
+  s_filtOpen = true;
+  s_filtSel = 0;
+  setTouchNavLabels("Back", "Down", "Exit", "Up", "Toggle");
+  redrawTouchButtonBar();
+  s_dirty = true;
+  delay(160);
+  waitForButtonRelease(BTN_LEFT);
+}
+
+void leaveFilter() {
+  s_filtOpen = false;
+  s_scroll = 0;
+  forgetDrawn();
+  setTouchNavLabels("Filter", "Down", "Exit", "Up", "Log");
+  redrawTouchButtonBar();
+  s_dirty = true;
+  delay(160);
+  waitForButtonRelease(BTN_LEFT);
+}
+
+void filterButtons() {
+  if (isButtonPressed(BTN_UP)) {
+    s_filtSel = (s_filtSel + kFiltRows - 1) % kFiltRows;
+    s_dirty = true;
+    delay(140);
+  } else if (isButtonPressed(BTN_DOWN)) {
+    s_filtSel = (s_filtSel + 1) % kFiltRows;
+    s_dirty = true;
+    delay(140);
+  } else if (isButtonPressed(BTN_RIGHT)) {
+    if (s_filtSel == kFiltKindCount) {
+      s_minConf = (uint8_t)((s_minConf + 1) % 3);
+    } else {
+      s_kindMask ^= (uint16_t)(1u << (uint8_t)kFiltKinds[s_filtSel]);
+    }
+    s_dirty = true;
+    delay(160);
+    waitForButtonRelease(BTN_RIGHT);
+  } else if (isButtonPressed(BTN_LEFT)) {
+    leaveFilter();
+  }
+}
+
 void drawList() {
   const int top = 42;
   const int bottom = contentBottom();
@@ -1145,16 +1312,20 @@ void drawList() {
   tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
-  if (s_hitCount == 0) {
+  const int visible = shownCount();
+
+  if (visible == 0) {
     uiShowLine(s_shownRow[0][0], sizeof(s_shownRow[0][0]), "listening...",
            8, top + 6, PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
-    uiShowLine(s_shownRow[0][1], sizeof(s_shownRow[0][1]), "nothing matched yet",
+    uiShowLine(s_shownRow[0][1], sizeof(s_shownRow[0][1]),
+           (s_hitCount == 0) ? "nothing matched yet"
+                             : "everything here is filtered out",
            8, top + 6 + kLine2, PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
     return;
   }
 
-  if (s_scroll > s_hitCount - rows) {
-    s_scroll = s_hitCount - rows;
+  if (s_scroll > visible - rows) {
+    s_scroll = visible - rows;
   }
   if (s_scroll < 0) {
     s_scroll = 0;
@@ -1170,8 +1341,12 @@ void drawList() {
   }
 
   int i = 0;
-  for (; i < rows && i < kMaxVisRows && (s_scroll + i) < s_hitCount; i++) {
-    const Hit& h = s_hits[s_scroll + i];
+  for (; i < rows && i < kMaxVisRows && (s_scroll + i) < visible; i++) {
+    const Hit* hp = nthShown(s_scroll + i);
+    if (hp == nullptr) {
+      break;
+    }
+    const Hit& h = *hp;
     const int y = top + i * kRowH;
 
     char line[48];
@@ -1300,7 +1475,17 @@ void spotterSetup() {
   memset(s_capSeen, 0, sizeof(s_capSeen));
 
   setTouchButtonInputEnabled(true);
-  setTouchNavLabels(nullptr, "Down", "Exit", "Up", "Log");
+  /* The left slot used to be null, which draws the dots icon meaning the
+   * button does nothing. It opens the filter now. */
+  setTouchNavLabels("Filter", "Down", "Exit", "Up", "Log");
+
+  /* Per session. See the note on s_kindMask: a filter that survives the
+   * screen is one somebody forgets is on, and the way that fails is a clean
+   * street that was never looked at. */
+  s_kindMask = kAllKinds;
+  s_minConf  = 0;
+  s_filtOpen = false;
+  s_filtSel  = 0;
 
   // Radio up in station mode, unassociated, purely to listen.
   WiFi.mode(WIFI_STA);
@@ -1368,6 +1553,29 @@ void spotterLoop() {
 
   if (s_scan && !s_scan->isScanning()) {
     s_scan->start(kBleWindowMs / 1000, nullptr, false);
+  }
+
+  if (s_filtOpen) {
+    filterButtons();
+    if (s_dirty && (uint32_t)(now - s_lastDraw) >= kRedrawMs) {
+      s_lastDraw = now;
+      s_dirty = false;
+      drawHeader();
+      drawFilter();
+    }
+    delay(4);
+    return;
+  }
+
+  if (isButtonPressed(BTN_LEFT)) {
+    enterFilter();
+    /* Nothing else this pass. The screen has just changed, and the dwell
+     * alert below ends in redraw(), whose first act is fillScreen: it would
+     * wipe the nav bar enterFilter just painted and leave the filter screen
+     * with no labels on it. check_nav_labels.py is the reason this is a
+     * return rather than a fall-through, and it is the fourth time that
+     * check has been right about this exact sequence. */
+    return;
   }
 
   if (isButtonPressed(BTN_UP)) {
