@@ -43,8 +43,42 @@ CONF_ENUM = re.compile(
 # the radio; on BLE that claim is only worth acting on when it comes from a
 # block IEEE assigned to the vendor whose product is being reported, not to
 # whoever assembled it.
+#
+# The batch added in 0.4.22 came from Fieldwatch's catalog rather than from a
+# reading of the IEEE registry. That is the source and it is stated here
+# rather than implied: each line below is Fieldwatch's claim about who holds
+# the block, carried over because the catalog is specific about it and
+# specific is easy to disprove. If one turns out to be a module vendor, the
+# fix is to grade that row Likely and delete its line here.
 VENDOR_OWN = {
     "B4:1E:52": "Flock Safety",
+    # roadside and municipal
+    "00:0E:A5": "BLIP Systems",
+    "00:14:7B": "Iteris",
+    "D4:11:D6": "SoundThinking",
+    "14:BA:88": "Uniview",
+    "48:EA:63": "Uniview",
+    "6C:F1:7E": "Uniview",
+    "88:26:3F": "Uniview",
+    "C4:79:05": "Uniview",
+    # body-worn and in-car video
+    "00:23:BD": "Digital Ally",
+    # the boxes that ride with them
+    "00:30:44": "Cradlepoint",
+    "00:E0:1C": "Cradlepoint",
+    "00:14:3E": "Sierra Wireless",
+    "00:A0:D5": "Sierra Wireless",
+    "28:A3:31": "Sierra Wireless",
+    "50:13:9D": "Sierra Wireless",
+    "64:CE:6E": "Sierra Wireless",
+    "84:DB:2F": "Sierra Wireless",
+    "CC:93:4A": "Sierra Wireless",
+    "00:09:BC": "Utility Inc",
+    "00:16:ED": "Utility Inc",
+    # fixed home cameras
+    "48:62:64": "Arlo",
+    "A4:11:62": "Arlo",
+    "FC:9C:98": "Arlo",
     "00:25:DF": "Axon Enterprise",
     "AC:9F:C3": "Ring",
     "18:7F:88": "Ring",

@@ -194,10 +194,80 @@ struct NameInSig {
   const char* label;
 };
 
+/* ── Where a batch of these came from ────────────────────────────────────
+ *
+ * The surveillance, law-enforcement and camera entries below were found by
+ * comparing this file against the signature catalog in
+ * github.com/OffGridPete/Fieldwatch (catalog 88), which is MIT licensed.
+ * MIT into GPL-3.0-or-later works; the reverse does not, so nothing here
+ * goes back the other way.
+ *
+ * What was taken is which vendors are worth naming and what they put in a
+ * name. The grading is this project's own, and so is the decision about
+ * what belongs on a surveillance screen at all: Fieldwatch files handheld
+ * action cameras under CAMERA and they are not here, because a GoPro is a
+ * camera and is not surveillance.
+ * ───────────────────────────────────────────────────────────────────────── */
+
 /* ── WiFi: source MAC prefixes ─────────────────────────────────────── */
 /* The scan breaks on the first match, so anything that should outrank a
  * generic block has to sit above it. */
 static const OuiSig kOuiSigs[] = {
+  /* ── Roadside and municipal surveillance ─────────────────────────────── */
+  /* Vendor-own IEEE blocks, so Strong, which also allows them on the BLE
+   * path. See the note at the head of this table. */
+  {{0x00, 0x0E, 0xA5}, Kind::Alpr, Conf::Strong,  "BLIP Systems"},
+  {{0x00, 0x14, 0x7B}, Kind::Alpr, Conf::Strong,  "Iteris (BlueTOAD)"},
+  {{0xD4, 0x11, 0xD6}, Kind::Alpr, Conf::Strong,  "SoundThinking"},
+
+  /* Uniview, five blocks. Commercial CCTV that also turns up on poles. */
+  {{0x14, 0xBA, 0x88}, Kind::Camera, Conf::Strong, "Uniview"},
+  {{0x48, 0xEA, 0x63}, Kind::Camera, Conf::Strong, "Uniview"},
+  {{0x6C, 0xF1, 0x7E}, Kind::Camera, Conf::Strong, "Uniview"},
+  {{0x88, 0x26, 0x3F}, Kind::Camera, Conf::Strong, "Uniview"},
+  {{0xC4, 0x79, 0x05}, Kind::Camera, Conf::Strong, "Uniview"},
+
+  /* ── Body-worn and in-car video ──────────────────────────────────────── */
+  {{0x00, 0x23, 0xBD}, Kind::Bodycam, Conf::Strong, "Digital Ally"},
+
+  /* ── The boxes that sit in the car with them ─────────────────────────── */
+  /* Not cameras, so Kind::Accessory rather than a camera kind: a fleet
+   * router is the support gear a surveillance vehicle carries, which is the
+   * same thing Flock's accessory service and the pole batteries are. */
+  {{0x00, 0x30, 0x44}, Kind::Accessory, Conf::Strong, "Cradlepoint"},
+  {{0x00, 0xE0, 0x1C}, Kind::Accessory, Conf::Strong, "Cradlepoint"},
+  {{0x00, 0x14, 0x3E}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0x00, 0xA0, 0xD5}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0x28, 0xA3, 0x31}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0x50, 0x13, 0x9D}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0x64, 0xCE, 0x6E}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0x84, 0xDB, 0x2F}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0xCC, 0x93, 0x4A}, Kind::Accessory, Conf::Strong, "Sierra AirLink"},
+  {{0x00, 0x09, 0xBC}, Kind::Accessory, Conf::Strong, "Utility Inc"},
+  {{0x00, 0x16, 0xED}, Kind::Accessory, Conf::Strong, "Utility Inc"},
+
+  /* Weak, and for the reason the Liteon blocks above are weak: the hardware
+   * is not exclusive to the use. Novatel's prefix is also on consumer MiFi
+   * hotspots, and Compex sells the same boards to everyone. */
+  {{0x28, 0x80, 0xA2}, Kind::Accessory, Conf::Weak,   "Novatel (MiFi?)"},
+  {{0x00, 0x40, 0x29}, Kind::Accessory, Conf::Weak,   "Compex (shared board?)"},
+  {{0x00, 0x80, 0x48}, Kind::Accessory, Conf::Weak,   "Compex (shared board?)"},
+  {{0x04, 0xF0, 0x21}, Kind::Accessory, Conf::Weak,   "Compex (shared board?)"},
+
+  /* Flock-family pole batteries. Weak on the OUI by Fieldwatch's own note
+   * that the name is the stronger signal, which kNameInSigs carries. */
+  {{0x04, 0x0D, 0x84}, Kind::Accessory, Conf::Weak,   "FS battery?"},
+  {{0x1C, 0x34, 0xF1}, Kind::Accessory, Conf::Weak,   "FS battery?"},
+  {{0x38, 0x5B, 0x44}, Kind::Accessory, Conf::Weak,   "FS battery?"},
+  {{0x94, 0x34, 0x69}, Kind::Accessory, Conf::Weak,   "FS battery?"},
+  {{0xB4, 0xE3, 0xF9}, Kind::Accessory, Conf::Weak,   "FS battery?"},
+  {{0xF0, 0x82, 0xC0}, Kind::Accessory, Conf::Weak,   "FS battery?"},
+
+  /* ── Fixed home cameras ──────────────────────────────────────────────── */
+  {{0x48, 0x62, 0x64}, Kind::Camera, Conf::Strong, "Arlo"},
+  {{0xA4, 0x11, 0x62}, Kind::Camera, Conf::Strong, "Arlo"},
+  {{0xFC, 0x9C, 0x98}, Kind::Camera, Conf::Strong, "Arlo"},
+
   /* Flock Safety's own block. Strong on its own. */
   {{0xB4, 0x1E, 0x52}, Kind::Alpr, Conf::Strong,  "Flock Safety"},
 
@@ -420,6 +490,10 @@ static const NameSig kSsidSigs[] = {
 
 /* ── BLE: advertisement contents ─────────────────────────────────────────── */
 static const BleSig kBleSigs[] = {
+  /* XUNTONG, the BLE manufacturer ID on Penguin's Flock-family pole
+   * battery. Likely on its own; the name beside it makes it Strong. */
+  {0x09C8, 0x0000, Kind::Accessory, Conf::Likely, "Penguin battery"},
+
   /* Company and service together. Two independent fields agreeing is about
    * as good as passive identification gets. */
   {0x0D53, 0xFD5F, Kind::Glasses, Conf::Strong, "Meta Ray-Ban"},
@@ -603,6 +677,79 @@ static const SvcDataSig kSvcDataSigs[] = {
  * hunting trip. It is a weak guard and it is honest about that in Conf.
  */
 static const NameInSig kNameInSigs[] = {
+  /* ── Roadside travel-time readers ────────────────────────────────────────
+   *
+   * These sit on poles counting Bluetooth and Wi-Fi addresses as they pass,
+   * to work out how long a journey took. Not cameras, and squarely what this
+   * screen is for: they exist to track the device in your pocket. */
+  {"BlipTrack",      0, Kind::Alpr,   Conf::Strong, "BlipTrack"},
+  {"BLIP-Track",     0, Kind::Alpr,   Conf::Strong, "BlipTrack"},
+  {"BlueTOAD",       0, Kind::Alpr,   Conf::Strong, "BlueTOAD"},
+  {"BlueARGUS",      0, Kind::Alpr,   Conf::Strong, "Iteris BlueARGUS"},
+  {"VantageARGUS",   0, Kind::Alpr,   Conf::Strong, "Iteris VantageARGUS"},
+  {"VantageVelocity", 0, Kind::Alpr,  Conf::Strong, "Iteris Vantage"},
+  {"Vantage Velocity", 0, Kind::Alpr, Conf::Strong, "Iteris Vantage"},
+  {"TrafficCast",    0, Kind::Alpr,   Conf::Strong, "TrafficCast"},
+
+  /* ── Intersection and pole cameras ───────────────────────────────────── */
+  {"Miovision",      0, Kind::Alpr,   Conf::Strong, "Miovision"},
+  {"Pigvision",      0, Kind::Camera, Conf::Strong, "Pigvision"},
+  {"ShotSpotter",    0, Kind::Alpr,   Conf::Strong, "ShotSpotter"},
+  {"Shot Spotter",   0, Kind::Alpr,   Conf::Strong, "ShotSpotter"},
+  {"SoundThinking",  0, Kind::Alpr,   Conf::Strong, "SoundThinking"},
+
+  /* LiveView Technologies solar trailers. "LiveView" on its own is two
+   * ordinary words, so the hyphenated forms carry the confidence. */
+  {"LVT-",           0, Kind::Alpr,   Conf::Strong, "LVT trailer"},
+  {"LVT_",           0, Kind::Alpr,   Conf::Strong, "LVT trailer"},
+  {"LiveView",       0, Kind::Alpr,   Conf::Likely, "LVT trailer?"},
+
+  /* Commercial CCTV. Likely rather than Strong: these are on shops and
+   * warehouses as often as on anything municipal. */
+  {"Dahua",          0, Kind::Camera, Conf::Likely, "Dahua"},
+  {"Uniview",        0, Kind::Camera, Conf::Likely, "Uniview"},
+  {"Uniarch",        0, Kind::Camera, Conf::Likely, "Uniview Uniarch"},
+  {"UNV-",           0, Kind::Camera, Conf::Likely, "Uniview"},
+
+  /* UniFi Protect cameras in BLE setup mode, which is the only time they
+   * advertise. Not a UniFi access point, which is a different thing wearing
+   * the same brand. */
+  {"UVC G3 Instant", 0, Kind::Camera, Conf::Strong, "UniFi Protect"},
+  {"UVC G4 Instant", 0, Kind::Camera, Conf::Strong, "UniFi Protect"},
+  {"UVC G6 Instant", 0, Kind::Camera, Conf::Strong, "UniFi Protect"},
+
+  /* ── Pole support gear ───────────────────────────────────────────────── */
+  {"FS Ext",         0, Kind::Accessory, Conf::Likely, "FS pole battery"},
+  {"PENGUIN",        0, Kind::Accessory, Conf::Weak,   "Penguin battery?"},
+
+  /* ── Body-worn and in-car video ──────────────────────────────────────── */
+  {"Digital Ally",   0, Kind::Bodycam, Conf::Strong, "Digital Ally"},
+  {"DigitalAlly",    0, Kind::Bodycam, Conf::Strong, "Digital Ally"},
+  {"FirstVu",        0, Kind::Bodycam, Conf::Strong, "Digital Ally FirstVu"},
+  {"VuLink",         0, Kind::Bodycam, Conf::Strong, "Digital Ally VuLink"},
+  {"EVO-HD",         0, Kind::Bodycam, Conf::Likely, "Digital Ally EVO-HD"},
+
+  /* The routers that ride with them. Fourteen Cradlepoint model numbers
+   * collapse to the brand: an IBR1700 is a Cradlepoint and the model is not
+   * what makes it interesting. */
+  {"Cradlepoint",    0, Kind::Accessory, Conf::Strong, "Cradlepoint"},
+  {"AirLink",        0, Kind::Accessory, Conf::Likely, "Sierra AirLink"},
+
+  /* ── Fixed home cameras ──────────────────────────────────────────────────
+   *
+   * A camera watching one place continuously, which is the thing this
+   * screen is about, and also the thing on half the porches in the country.
+   * Graded accordingly. The distinctive spelling carries the confidence and
+   * the bare brand word does not. */
+  {"ARLO_VMB_",      0, Kind::Camera, Conf::Strong, "Arlo base station"},
+  {"Arlo",           0, Kind::Camera, Conf::Weak,   "Arlo?"},
+  {"EufyCam",        0, Kind::Camera, Conf::Likely, "eufy"},
+  {"Nest Cam",       0, Kind::Camera, Conf::Likely, "Nest Cam"},
+  {"Nestcam",        0, Kind::Camera, Conf::Likely, "Nest Cam"},
+  {"Nest-Hello",     0, Kind::Camera, Conf::Likely, "Nest doorbell"},
+  {"Reolink",        0, Kind::Camera, Conf::Likely, "Reolink"},
+  {"Tapo",           0, Kind::Camera, Conf::Weak,   "TP-Link Tapo?"},
+
   /* Pentest kit. Pueo had ALFA's OUI as a Weak "Pineapple radio?" guess,
    * with a long comment on why that is nearly worthless: the block covers
    * every ALFA adapter, and a Pineapple wearing a randomised MAC does not
