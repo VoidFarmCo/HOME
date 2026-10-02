@@ -1220,40 +1220,81 @@ void drawHeader() {
 }
 
 /* ── The filter screen ──────────────────────────────────────────────────── */
+/* The filter borrows the list's cache rather than keeping its own.
+ *
+ * It needs thirteen lines -- nine kinds, the confidence row, a title and two
+ * of footer -- and a 13 x 44 array of its own costs 572 bytes of DRAM, which
+ * this image does not have: adding one overflowed .dram0.bss by 456 bytes and
+ * the link failed. DRAM is the scarce thing here and has been since the
+ * WebServer had to go on the heap.
+ *
+ * Borrowing is safe because the two screens are mutually exclusive -- one of
+ * them is drawing or the other is, never both -- and because clearBody()
+ * wipes the cache on every transition between them, so neither can ever read
+ * a line the other wrote. s_shownRow is 16 rows of 3, which is 48 slots for
+ * the 13 this wants.
+ *
+ * FILT(n) is a slot, not a row: the filter does not care about the row/column
+ * shape the list imposes on that array. */
+#define FILT(n) s_shownRow[(n) / 3][(n) % 3]
+
+/* Clear the band the filter and the list share, and forget both caches.
+ * Called on the way in and on the way out, because the two screens are
+ * different heights: the filter draws past the end of a short list, so
+ * returning to the list repaints its rows and leaves the filter's lower
+ * ones underneath. A cache reset fixes what will be drawn and not what is
+ * already on the glass. */
+void clearBody() {
+  const int top = 42;
+  tft.fillRect(0, top - 18, PUEO_SCREEN_W, contentBottom() - (top - 18),
+               TFT_BLACK);
+  forgetDrawn();
+}
+
 void drawFilter() {
   const int top = 42;
-  tft.fillRect(0, top - 18, PUEO_SCREEN_W, contentBottom() - top + 18,
-               TFT_BLACK);
   tft.setTextFont(PUEO_BODY_FONT);
   tft.setTextSize(1);
 
-  tft.setTextColor(ORANGE, TFT_BLACK);
-  tft.drawString("Filter  (display only)", 8, top - 16);
+  int n = 0;
+  uiShowLine(FILT(n), sizeof(FILT(n)),
+             "Filter  (display only)", 8, top - 16, PUEO_BODY_H,
+             ORANGE, TFT_BLACK);
+  n++;
 
   int y = top;
-  for (int i = 0; i < kFiltKindCount; i++) {
+  for (int i = 0; i < kFiltKindCount; i++, n++) {
     const bool on = (s_kindMask & (uint16_t)(1u << (uint8_t)kFiltKinds[i])) != 0;
     const bool sel = (i == s_filtSel);
-    char line[40];
+    char line[44];
+    /* The marker and the box are in the string, not only in the colour.
+     * uiShowLine compares text and nothing else, so a row that changed
+     * state while its text stayed the same would keep the pixels it had. */
     snprintf(line, sizeof(line), "%s %s  %s", sel ? ">" : " ",
              on ? "[x]" : "[ ]", kindText(kFiltKinds[i]));
-    tft.setTextColor(sel ? ORANGE : (on ? TFT_WHITE : TFT_DARKGREY), TFT_BLACK);
-    tft.drawString(line, 8, y);
+    uiShowLine(FILT(n), sizeof(FILT(n)), line, 8, y,
+               PUEO_BODY_H, sel ? ORANGE : (on ? TFT_WHITE : TFT_DARKGREY),
+               TFT_BLACK);
     y += PUEO_BODY_H + 4;
   }
 
   y += 6;
   const bool sel = (s_filtSel == kFiltKindCount);
-  char line[48];
+  char line[44];
   snprintf(line, sizeof(line), "%s Confidence: %s", sel ? ">" : " ",
            confText(s_minConf));
-  tft.setTextColor(sel ? ORANGE : TFT_WHITE, TFT_BLACK);
-  tft.drawString(line, 8, y);
+  uiShowLine(FILT(n), sizeof(FILT(n)), line, 8, y,
+             PUEO_BODY_H, sel ? ORANGE : TFT_WHITE, TFT_BLACK);
+  n++;
 
   y += PUEO_BODY_H + 10;
-  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.drawString("Nothing is hidden from the log.", 8, y);
-  tft.drawString("Everything is still recorded.", 8, y + PUEO_BODY_H + 2);
+  uiShowLine(FILT(n), sizeof(FILT(n)),
+             "Nothing is hidden from the log.", 8, y, PUEO_BODY_H,
+             TFT_DARKGREY, TFT_BLACK);
+  n++;
+  uiShowLine(FILT(n), sizeof(FILT(n)),
+             "Everything is still recorded.", 8, y + PUEO_BODY_H + 2,
+             PUEO_BODY_H, TFT_DARKGREY, TFT_BLACK);
 }
 
 /* Entering and leaving are their own functions because of rule 4 in
@@ -1263,6 +1304,7 @@ void drawFilter() {
 void enterFilter() {
   s_filtOpen = true;
   s_filtSel = 0;
+  clearBody();
   setTouchNavLabels("Back", "Down", "Exit", "Up", "Toggle");
   redrawTouchButtonBar();
   s_dirty = true;
@@ -1273,7 +1315,7 @@ void enterFilter() {
 void leaveFilter() {
   s_filtOpen = false;
   s_scroll = 0;
-  forgetDrawn();
+  clearBody();
   setTouchNavLabels("Filter", "Down", "Exit", "Up", "Log");
   redrawTouchButtonBar();
   s_dirty = true;
