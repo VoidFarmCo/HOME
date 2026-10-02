@@ -125,6 +125,75 @@ struct Ble128Sig {
   const char* label;
 };
 
+/* ── Manufacturer data, past the company ID ─────────────────────────────
+ *
+ * BleSig can say "company 0x004C", which is every Apple device in range.
+ * What distinguishes an AirTag is the byte after the company ID: Find My
+ * advertisements carry type 0x12, and nothing in the five tables above
+ * could look at it.
+ *
+ * So this is the company ID plus a prefix of the bytes that follow it.
+ * Four bytes is the widest any rule here needs and keeps the row small;
+ * prefixLen says how many of them count, so a one-byte type and a
+ * three-byte header are the same mechanism.
+ *
+ * Offsets are from the start of the manufacturer data INCLUDING the two
+ * company bytes, which is how NimBLE hands it over. prefix[0] is therefore
+ * md[2]. Getting that wrong matches a company ID against a payload byte,
+ * which is the kind of mistake that produces a plausible-looking hit. */
+struct MfgSig {
+  uint16_t company;
+  uint8_t  prefix[4];
+  uint8_t  prefixLen;      // 1..4, how much of prefix[] is significant
+  Kind kind;
+  Conf conf;
+  const char* label;
+};
+
+/* ── Service data, past the UUID ────────────────────────────────────────
+ *
+ * The same shape for the other place a vendor hides a type byte. This is
+ * what separates a Find My Device tag from a shop's beacon: both advertise
+ * service 0xFEAA, and the first byte of the service data says which.
+ *
+ * Pueo had 0xFEAA as "Eddystone beacon, Weak" and could not do better,
+ * because seeing the service is all it could see. With the prefix, 0x40 and
+ * 0x41 are Google's Find My Device network and get to be Strong, while
+ * everything else on 0xFEAA stays the weak beacon guess it always was. */
+struct SvcDataSig {
+  uint16_t service;        // the 16-bit service UUID carrying the data
+  uint8_t  prefix[2];
+  uint8_t  prefixLen;      // 1..2
+  Kind kind;
+  Conf conf;
+  const char* label;
+};
+
+/* ── Names matched anywhere, not just at the start ──────────────────────
+ *
+ * NameSig matches a prefix. That is the right default and most of the
+ * table depends on it: a prefix plus an exact length is what makes "DR "
+ * usable without claiming every name beginning with those characters.
+ *
+ * It cannot see a vendor in the middle of a name, and the names that matter
+ * most here are exactly that shape. A Pineapple's management SSID is
+ * "Pineapple_XXXX" but people rename the front of it; a Marauder shows up
+ * as "MarauderAP" or with a user string in front.
+ *
+ * A separate table rather than a mode flag on NameSig, for two reasons.
+ * Adding a field would mean rewriting every existing row, and more
+ * importantly a substring match is a different risk: it has no anchor, so a
+ * short needle hits far more than a short prefix does. Keeping them apart
+ * means this table can carry the rule that enforces that, and the comment
+ * explaining why, where neither would fit on the shared struct. */
+struct NameInSig {
+  const char* needle;      // found anywhere in the name, case-insensitively
+  uint8_t minNameLen;      // 0 = any; else the name must be at least this long
+  Kind kind;
+  Conf conf;
+  const char* label;
+};
+
 /* ── WiFi: source MAC prefixes ─────────────────────────────────────── */
 /* The scan breaks on the first match, so anything that should outrank a
  * generic block has to sit above it. */
@@ -470,6 +539,103 @@ static const Ble128Sig kBle128Sigs[] = {
    Kind::Accessory, Conf::Strong, "Flock accessory"},
 };
 
+/* ── BLE: manufacturer data ──────────────────────────────────────────────
+ *
+ * Ordered most specific first, like every other table here: the scan stops
+ * at the first hit.
+ */
+static const MfgSig kMfgSigs[] = {
+  /* Apple Find My, company 0x004C, advertisement type 0x12.
+   *
+   * This is the rule whose absence meant Surveillance never flagged an
+   * AirTag. Likely rather than Strong, and the reason matters: an iPhone
+   * relays Find My for other people's accessories, so this says "something
+   * here is on the Find My network", not "there is an AirTag here". A phone
+   * in a pocket sets it off and that is correct behaviour, not a false
+   * positive. Walking it down is Hunt's job.
+   *
+   * 0x12 is the separated-from-owner payload. An accessory near its owner
+   * advertises type 0x07 instead and is not interesting to this screen:
+   * somebody's own tag beside them is not a tracker on you. */
+  {0x004C, {0x12, 0, 0, 0}, 1, Kind::Tracker, Conf::Likely,
+   "Apple Find My (separated)"},
+
+  /* Tile, company 0x00B1 but the useful part is the service, which kBleSigs
+   * already has on 0xFEED/0xFEEC. Nothing to add here. */
+};
+
+/* ── BLE: service data ───────────────────────────────────────────────────── */
+static const SvcDataSig kSvcDataSigs[] = {
+  /* Google Find My Device network, service 0xFEAA with frame type 0x40 or
+   * 0x41. Strong, unlike the bare 0xFEAA row in kBleSigs, because the frame
+   * type is Google's and a retail Eddystone beacon does not use it.
+   *
+   * This pair is why SvcDataSig exists. Pueo already saw 0xFEAA and could
+   * only call it "Eddystone beacon, Weak", so a Chipolo, a Pebblebee or a
+   * moto tag read as shop furniture. */
+  {0xFEAA, {0x40, 0}, 1, Kind::Tracker, Conf::Strong,
+   "Google Find My Device"},
+  {0xFEAA, {0x41, 0}, 1, Kind::Tracker, Conf::Strong,
+   "Google Find My Device"},
+
+  /* IETF DULT, Detecting Unwanted Location Trackers, service 0xFCB2.
+   *
+   * The cross-vendor standard for this exact problem: a tracker separated
+   * from its owner is supposed to advertise here so that any phone can warn
+   * about it. One rule covers every vendor that implements it, present and
+   * future, which makes it the highest-value row in this file.
+   *
+   * No prefix. The service alone is the signal, because nothing advertises
+   * 0xFCB2 except something declaring itself a location tracker. */
+  {0xFCB2, {0, 0}, 0, Kind::Tracker, Conf::Strong, "DULT tracker"},
+};
+
+/* ── BLE and WiFi: names matched anywhere ─────────────────────────────────
+ *
+ * The needles here are deliberately long. A substring has no anchor, so the
+ * cost of a short one is paid in every unrelated device that happens to
+ * contain those characters, and this table is checked after the prefix table
+ * precisely so an anchored match wins first.
+ *
+ * minNameLen is the other guard, for needles that are a whole name on their
+ * own: "Marauder" as an entire name is a deauther, and "Marauder" inside a
+ * 40-character name is somebody who named their speaker after a Pineapple
+ * hunting trip. It is a weak guard and it is honest about that in Conf.
+ */
+static const NameInSig kNameInSigs[] = {
+  /* Pentest kit. Pueo had ALFA's OUI as a Weak "Pineapple radio?" guess,
+   * with a long comment on why that is nearly worthless: the block covers
+   * every ALFA adapter, and a Pineapple wearing a randomised MAC does not
+   * show it at all. The management SSID is a much better signature, and
+   * people put their own text in front of it, which is why this needs a
+   * substring rather than a prefix. */
+  {"Pineapple_",   0, Kind::Pentest, Conf::Strong, "Hak5 Pineapple"},
+  {"WiFi Pineapple", 0, Kind::Pentest, Conf::Strong, "Hak5 Pineapple"},
+  {"MarauderAP",   0, Kind::Pentest, Conf::Strong, "ESP32 Marauder"},
+  {"Marauder",     0, Kind::Pentest, Conf::Likely, "ESP32 Marauder"},
+  {"GhostESP",     0, Kind::Pentest, Conf::Strong, "GhostESP"},
+  {"Deauther",     0, Kind::Pentest, Conf::Likely, "ESP8266 Deauther"},
+
+  /* Plate readers and municipal cameras whose names carry the vendor in the
+   * middle rather than at the front. These are the ones from the Fieldwatch
+   * comparison that the prefix table could not express. */
+  {"Rekor",        0, Kind::Alpr,    Conf::Likely, "Rekor (ALPR)"},
+  {"Hayden",       0, Kind::Alpr,    Conf::Likely, "Hayden AI (ALPR)"},
+  {"Avigilon",     0, Kind::Camera,  Conf::Likely, "Avigilon"},
+  {"Wisenet",      0, Kind::Camera,  Conf::Likely, "Hanwha Wisenet"},
+  {"Rhombus",      0, Kind::Camera,  Conf::Likely, "Rhombus"},
+  {"i-PRO",        0, Kind::Camera,  Conf::Likely, "Panasonic i-PRO"},
+
+  /* Body cameras. Axon is already a Strong OUI match; these three are the
+   * other vendors in that market and have no OUI here. */
+  {"Wolfcom",      0, Kind::Bodycam, Conf::Likely, "Wolfcom"},
+  {"WatchGuard",   0, Kind::Bodycam, Conf::Likely, "WatchGuard Video"},
+  {"Reveal",       8, Kind::Bodycam, Conf::Weak,   "Reveal Media?"},
+};
+
+constexpr size_t kMfgSigCount     = sizeof(kMfgSigs) / sizeof(kMfgSigs[0]);
+constexpr size_t kSvcDataSigCount = sizeof(kSvcDataSigs) / sizeof(kSvcDataSigs[0]);
+constexpr size_t kNameInSigCount  = sizeof(kNameInSigs) / sizeof(kNameInSigs[0]);
 constexpr size_t kOuiSigCount     = sizeof(kOuiSigs) / sizeof(kOuiSigs[0]);
 constexpr size_t kBle128SigCount  = sizeof(kBle128Sigs) / sizeof(kBle128Sigs[0]);
 constexpr size_t kSsidSigCount    = sizeof(kSsidSigs) / sizeof(kSsidSigs[0]);

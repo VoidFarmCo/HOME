@@ -151,6 +151,64 @@ bool nameMatch(const char* s, const NameSig& sig) {
   return sig.exactLen == 0 || strlen(s) == sig.exactLen;
 }
 
+/* A needle found anywhere in the name, case-insensitively.
+ *
+ * Written out rather than strcasestr, which is not in this toolchain's
+ * libc. O(n*m) over names of at most 31 characters and needles of at most
+ * fifteen, so the loop is the clear way to write it.
+ *
+ * minNameLen is checked first because it is the cheap half, and because a
+ * needle that is the whole name is the case it exists for: "Marauder" alone
+ * is a deauther and "Marauder" inside a long name is somebody's speaker. */
+bool nameContains(const char* s, const NameInSig& sig) {
+  if (!s || !sig.needle || !*sig.needle) {
+    return false;
+  }
+  const size_t n = strlen(s);
+  if (sig.minNameLen != 0 && n < sig.minNameLen) {
+    return false;
+  }
+  const size_t m = strlen(sig.needle);
+  if (m > n) {
+    return false;
+  }
+  for (size_t i = 0; i + m <= n; i++) {
+    if (strncasecmp(s + i, sig.needle, m) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* The bytes after the company ID match this signature's prefix.
+ *
+ * md is the whole manufacturer data as NimBLE hands it over, company ID
+ * included, so the payload starts at md[2]. A signature's prefix[0] is
+ * md[2]; reading from md[0] instead would compare a company byte against a
+ * payload byte and produce a hit that looks entirely plausible. */
+bool mfgMatch(const uint8_t* md, size_t len, const MfgSig& sig) {
+  if (!md || sig.prefixLen == 0 || sig.prefixLen > sizeof(sig.prefix)) {
+    return false;
+  }
+  if (len < (size_t)2 + sig.prefixLen) {
+    return false;
+  }
+  return memcmp(md + 2, sig.prefix, sig.prefixLen) == 0;
+}
+
+/* The first bytes of a service's data match. prefixLen 0 means the service
+ * carrying any data at all is the signal, which is what DULT is: nothing
+ * advertises 0xFCB2 except something saying it is a location tracker. */
+bool svcDataMatch(const uint8_t* sd, size_t len, const SvcDataSig& sig) {
+  if (sig.prefixLen == 0) {
+    return true;
+  }
+  if (!sd || sig.prefixLen > sizeof(sig.prefix) || len < sig.prefixLen) {
+    return false;
+  }
+  return memcmp(sd, sig.prefix, sig.prefixLen) == 0;
+}
+
 /* Find or create the row for this MAC. Returns null when the table is full,
  * which is deliberate: dropping new devices is better than evicting one the
  * operator is currently looking at. */
@@ -611,6 +669,17 @@ void IRAM_ATTR onPacket(void* buf, wifi_promiscuous_pkt_type_t type) {
         break;
       }
     }
+
+    /* And the substring table, which the prefix table above cannot express.
+     * Second on purpose: an anchored match is the better answer when both
+     * would fire, and it has already had its turn. */
+    for (size_t i = 0; i < kNameInSigCount; i++) {
+      if (nameContains(ssid, kNameInSigs[i])) {
+        record(src, rssi, kNameInSigs[i].kind, kNameInSigs[i].conf,
+               kNameInSigs[i].label, false, fp);
+        break;
+      }
+    }
   }
 }
 
@@ -672,6 +741,53 @@ class SpotterAdvCallbacks : public BLEAdvertisedDeviceCallbacks {
       if (md.size() >= 2) {
         // Company ID is little-endian in the first two bytes.
         company = (uint16_t)((uint8_t)md[0] | ((uint8_t)md[1] << 8));
+
+        /* The bytes past the ID, which is where an AirTag lives. kBleSigs
+         * can say "company 0x004C" and that is every Apple device in range;
+         * the Find My type byte is what makes it a tracker. */
+        const uint8_t* raw = (const uint8_t*)md.data();
+        for (size_t i = 0; i < kMfgSigCount; i++) {
+          if (kMfgSigs[i].company != company) {
+            continue;
+          }
+          if (mfgMatch(raw, md.size(), kMfgSigs[i])) {
+            record(mac, rssi, kMfgSigs[i].kind, kMfgSigs[i].conf,
+                   kMfgSigs[i].label, true);
+            break;
+          }
+        }
+      }
+    }
+
+    /* Service data, before the bare-service table below. More specific
+     * first, as everywhere else here: 0xFEAA with a 0x40 frame type is
+     * Google's tracker network, and 0xFEAA on its own is a shop beacon.
+     *
+     * Both can fire for one advertisement. That is harmless -- record()
+     * keeps the higher confidence, so the Strong tracker label wins over the
+     * Weak beacon guess -- and it is why the Eddystone row did not need
+     * removing. It still says what it always said about everything else on
+     * that service. */
+    if (dev->haveServiceData()) {
+      const uint8_t nsd = dev->getServiceDataCount();
+      for (uint8_t d = 0; d < nsd; d++) {
+        const NimBLEUUID su = dev->getServiceDataUUID(d);
+        if (su.bitSize() != 16) {
+          continue;
+        }
+        const uint16_t svc = (uint16_t)su.getNative()->u16.value;
+        const std::string sd = dev->getServiceData(d);
+        for (size_t i = 0; i < kSvcDataSigCount; i++) {
+          if (kSvcDataSigs[i].service != svc) {
+            continue;
+          }
+          if (svcDataMatch((const uint8_t*)sd.data(), sd.size(),
+                           kSvcDataSigs[i])) {
+            record(mac, rssi, kSvcDataSigs[i].kind, kSvcDataSigs[i].conf,
+                   kSvcDataSigs[i].label, true);
+            break;
+          }
+        }
       }
     }
 
@@ -725,6 +841,14 @@ class SpotterAdvCallbacks : public BLEAdvertisedDeviceCallbacks {
         if (nameMatch(name.c_str(), kBleNameSigs[i])) {
           record(mac, rssi, kBleNameSigs[i].kind, kBleNameSigs[i].conf,
                  kBleNameSigs[i].label, true);
+          break;
+        }
+      }
+
+      for (size_t i = 0; i < kNameInSigCount; i++) {
+        if (nameContains(name.c_str(), kNameInSigs[i])) {
+          record(mac, rssi, kNameInSigs[i].kind, kNameInSigs[i].conf,
+                 kNameInSigs[i].label, true);
           break;
         }
       }
