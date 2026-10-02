@@ -63,9 +63,59 @@ for arg in "$@"; do
     --force)    FORCE=1 ;;
     --publish-only) PUBLISH_ONLY=1 ;;
     --no-publish) NO_PUBLISH=1 ;;
+    --allow-branch) ALLOW_BRANCH=1 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
+
+# ── Releases come off the release branch ────────────────────────────────────
+#
+# A release is three things that have to agree: the tag, the GitHub release,
+# and the source archive somebody downloads. Nothing here reads git, so this
+# script will happily cut and publish from whatever is checked out, and the
+# result is a pueo-x.y.z-src.zip whose contents are not what the tag points
+# at. That is not a failure anybody sees. The archive builds, reproduces its
+# own digest, and is wrong only in the sense that matters: it is not the
+# source the release claims to ship.
+#
+# It became reachable the moment a dev branch existed, which is why the guard
+# arrives with it rather than after the first time it happens.
+#
+# --allow-branch is the deliberate case: a release cut from somewhere else on
+# purpose, which should be a sentence somebody typed rather than a default.
+RELEASE_BRANCH="${PUEO_RELEASE_BRANCH:-pueo}"
+branch_guard() {
+  # No .git is not an error. This script is inside its own archive, so
+  # somebody verifying a release extracts the zip and runs it from a plain
+  # directory. Refusing there would break the one workflow that proves a
+  # release is what it says it is.
+  git rev-parse --git-dir >/dev/null 2>&1 || return 0
+
+  local on
+  on=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
+  [ "$on" = "$RELEASE_BRANCH" ] && return 0
+
+  if [ "${ALLOW_BRANCH:-0}" = "1" ]; then
+    echo "== cutting from '$on', not '$RELEASE_BRANCH' (--allow-branch) =="
+    return 0
+  fi
+
+  cat >&2 <<EOF
+refusing to cut: on branch '$on', not '$RELEASE_BRANCH'
+
+A release is a tag, a GitHub release and a source archive that have to agree.
+Cutting here would publish a pueo-*-src.zip holding this branch's source under
+a version number pointing somewhere else, and nothing downstream would notice:
+it would build, and it would reproduce its own digest.
+
+  git switch $RELEASE_BRANCH          and cut from there
+  tools/make_release.sh --allow-branch   if this is deliberate
+
+PUEO_RELEASE_BRANCH overrides which branch counts as the release branch.
+EOF
+  exit 1
+}
+branch_guard
 
 VERSION=$(sed -n 's/^#define PUEO_VERSION *"\(.*\)"/\1/p' ESP32-DIV/Branding.h | head -1)
 [ -n "$VERSION" ] || { echo "could not read PUEO_VERSION from Branding.h" >&2; exit 1; }
