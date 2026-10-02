@@ -185,6 +185,48 @@ strong, because two independent fields agreeing is worth more than either.
 A detector that cries wolf is one you stop believing, which is why so many
 rows are deliberately weak.
 
+#### Finding a tracker you did not put there
+
+Surveillance finds, Hunt locates, and the step between them is yours.
+
+1. **Leave Surveillance running.** It is passive, so nothing announces you.
+   The device can be in a bag or face down: the dwell alarm is audible, which
+   is what the speaker is for. Filter to **TRACKER** if the list is busy.
+
+2. **Wait for the dwell alarm.** Ten minutes of continuous presence turns a
+   row into an alert.
+
+3. **Separate "with me" from "near me" by moving.** Pueo has no position of
+   its own. It knows it heard a radio and for how long, and from inside the
+   device a tag in your coat and a beacon by the till are the same
+   observation. Walk somewhere a fixed beacon cannot follow, wait, and see
+   what came along.
+
+4. **Walk it down with Hunt.** Pick the row and the gauge opens: smoothed
+   signal strength, a green tick at the best reading so far, and WARMER or
+   COLDER in letters you can read at arm's length.
+
+   It is not distance. An unobstructed tag across a room can read stronger
+   than one under a seat two feet away. Turn slowly on the spot and watch
+   where the needle peaks rather than staring at one number, and let each
+   reading settle. Your own body between the device and the tag costs about
+   10 dB, which you can use: block it deliberately, and the direction the
+   signal drops is the direction the tag is in.
+
+**A quiet screen is not proof.** None of these announce themselves, and none
+of them are unusual:
+
+| Invisible to Pueo | Why |
+|---|---|
+| a tag still with its owner | Apple's separated broadcast is type `0x12`; a tag near its owner sends `0x07`, and that is deliberately ignored |
+| cellular-only trackers | no BLE advertisement to hear |
+| anything switched off | including a tag between periodic wakes |
+| 5 GHz-only WiFi | the ESP32 is 2.4 GHz |
+| recording-only devices | a dashcam writing to a card transmits nothing |
+
+So an empty list honestly means *nothing that announces itself is here*. That
+is useful and it is narrower than *nothing is here*.
+
 #### Filtering the list
 
 The **left button** opens a filter. Toggle any of the nine kinds, and set a
