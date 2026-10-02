@@ -31,6 +31,17 @@ Four rules, one per way this has actually broken:
      per-call: several features set labels in a helper and repaint in the
      caller, and a line-window rule would fail those for no reason.
 
+  5. a full-repaint helper puts the bar back. Rule 4 catches a repaint that
+     is wiped afterwards; this catches the opposite, a wipe with no repaint
+     at all. Two features had a redraw(bool full) that fillScreens and did
+     not restore the bar, and both relied on every caller remembering.
+     Spotter's dwell alert did not: the first time a device dwelled long
+     enough to alert, the buttons vanished for the rest of the session, and
+     it was reported from the board rather than caught here. Fast Pair had
+     it too, reachable by backing out of a view. Asserting it on the helper
+     rather than at each call site is what makes it stay true as callers are
+     added.
+
   4. nothing clears the screen between the repaint and the end of its
      function. A clear is tft.fillScreen(), or a call to redraw() -- this
      tree's idiom for a full repaint, and the one that hid the bug, because
@@ -148,6 +159,28 @@ def main():
                     "again before the function returns"
                     % (path.name, line_of(src, m.start()),
                        cm.group(0).rstrip("( ").strip()))
+
+        # Rule 5: a full-repaint helper puts the bar back.
+        #
+        # The opposite of rule 4, and the one that was reported from the
+        # board instead of caught here. A redraw(bool full) that fillScreens
+        # and does not repaint leaves every caller responsible for
+        # remembering, and the callers that forget are the ones that run
+        # rarely: a dwell alert, backing out of a result view. Those are
+        # exactly the paths nobody exercises while developing.
+        if "setTouchNavLabels" not in src:
+            continue
+        rm = re.search(r"void redraw\(bool \w+\) \{", src)
+        if rm is None:
+            continue
+        checks += 1
+        close = src.find("\n}", rm.end())
+        body = src[rm.end():close if close != -1 else len(src)]
+        if CLEAR.search(body) and not REPAINT.search(body):
+            failures.append(
+                "%s:%d: redraw() clears the screen and never repaints the "
+                "nav bar, so every caller has to remember and the rare ones "
+                "will not" % (path.name, line_of(src, rm.start())))
 
     for f in failures:
         print("  FAIL  " + f)

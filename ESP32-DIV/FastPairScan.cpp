@@ -488,6 +488,13 @@ void redraw(bool full) {
   }
   drawHeader();
   drawList();
+
+  if (full) {
+    /* See the note in Spotter's redraw(): the same bug was here, reachable
+     * by backing out of the confirm or result view rather than by waiting
+     * for a dwell alert. */
+    redrawTouchButtonBar();
+  }
 }
 
 void scanStart() {

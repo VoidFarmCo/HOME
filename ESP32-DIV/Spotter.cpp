@@ -1482,6 +1482,19 @@ void redraw(bool full) {
   }
   drawHeader();
   drawList();
+
+  if (full) {
+    /* fillScreen took the nav bar with it, so every caller of redraw(true)
+     * needs it back. setup() knew that and did it by hand; the dwell alert
+     * did not, and the first time a device dwelled long enough to alert, the
+     * buttons vanished for the rest of the session. Reported from the board
+     * as "the bottom menu disappeared after it was running a while".
+     *
+     * Putting it here rather than at the call sites means a caller cannot
+     * forget, which is the only version of this that stays true as callers
+     * are added. */
+    redrawTouchButtonBar();
+  }
 }
 
 void hopChannel() {

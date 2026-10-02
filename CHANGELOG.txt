@@ -11,6 +11,121 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.23 - 2026-10-02
+-------------------
+
+  * A FILTER ON SURVEILLANCE, by kind and by confidence.
+
+    0.4.22 solved the noise problem by curating: handheld action cameras left
+    out, the car population graded Weak. That is a decision made once, at
+    compile time, for everybody, by somebody who is not in the room. Whether a
+    car park full of Weak vehicle rows is noise or is the answer depends on
+    where you are standing, and the person standing there is the one who
+    knows.
+
+    The left nav slot used to be null, which draws the dots icon meaning the
+    button does nothing. It opens the filter now: nine kinds to toggle, and a
+    confidence floor of everything, Likely and up, or Strong only.
+
+    Display only, and per session. Both are load-bearing, both are asserted,
+    and the reason is the same: a filtered list and a quiet street look
+    identical.
+
+    Display only, because a filter that stops recording edits the evidence.
+    The capture on the card would depend on what the list happened to be
+    showing while it ran, which is not readable six months later. record(),
+    captureNote() and the SD writer do not know the filter exists, and
+    check_spotter_filter.py fails if any of them learns.
+
+    Per session, because the way a remembered filter fails is silent.
+    Somebody sets Strong-only in a car park, walks somewhere that matters,
+    reads an empty screen and concludes there is nothing there. It resets
+    every time the screen opens.
+
+    And the header carries the difference: "hits 13" becomes "hits 4/13"
+    whenever the filter is not showing everything, and the second number is
+    the one that has not changed. An empty list now also says which empty it
+    is, "nothing matched yet" against "everything here is filtered out".
+
+  * TWO FAULTS IN THE FIRST VERSION, both reported from the board and both
+    with one cause: the filter screen was written as a full repaint rather
+    than in this file's idiom.
+
+    It flashed. Every pass it cleared its whole area and drew ten rows into
+    the hole, at the redraw rate. uiShowLine exists to avoid exactly that:
+    everything else here compares the line it is about to draw against the
+    one already there and does nothing when they match. The selection marker
+    and the [x] are inside the string, so a text comparison sees every change
+    that matters.
+
+    And leaving it left itself on the list. The filter draws more rows than a
+    short list does, so backing out repainted the list over the top and left
+    the filter's lower rows underneath. forgetDrawn() was being called, which
+    fixes what will be drawn and not what is already on the glass.
+
+    The cache is borrowed rather than new. Thirteen lines of its own cost 572
+    bytes and overflowed .dram0.bss by 456; DRAM is the scarce thing in this
+    image and has been since File Transfer's WebServer had to go on the heap.
+    The list's cache is 48 slots for the 13 this wants, the two screens are
+    mutually exclusive, and the transition wipes it. Net cost of the whole
+    feature is 24 bytes.
+
+  * DECOYS FOR THE VEHICLE BLOCK, which arrived in 0.4.22 with 66 rows and
+    nothing to trigger any of them. The beacon emitted one vehicle signal,
+    "QT 12345678", which is the KARR BT module and predates all of this.
+
+    Three, chosen to cover the three ways a vehicle row can match rather than
+    three vendors: a company ID alone, manufacturer data past the company ID,
+    and one of the Weak car rows.
+
+    The TPMS one earns its place. Its company ID is Nordic's 0x0001, which is
+    in half the BLE hardware ever made, so the wheel-position byte is the
+    entire signature -- which makes it the decoy that proves mfgMatch reads
+    from md[2] and not md[0]. A wrong offset produces no match at all, and a
+    sensor that is not detected looks exactly like a sensor that is not
+    there. All three verified on two boards.
+
+  * THE NAV BAR DISAPPEARED AFTER A WHILE, in Surveillance and in Fast Pair.
+    Reported from the board, and older than any of this.
+
+    redraw(true) starts with fillScreen, which takes the nav bar with it, and
+    it never put the bar back. Every caller was responsible for remembering.
+    setup() did -- its comment explains the ordering in detail -- and the
+    callers that forgot are the ones that run rarely: Spotter's dwell alert,
+    which fires the first time a device has been present long enough to be
+    worth mentioning, and backing out of Fast Pair's confirm or result view.
+    Those are exactly the paths nobody exercises while writing the code.
+
+    The repaint lives inside redraw() now, so a caller cannot forget. That is
+    the only version of this that stays true as callers are added.
+
+    check_nav_labels.py gains a fifth rule, which is the inverse of its
+    fourth. Rule 4 catches a repaint that is wiped afterwards; this catches a
+    wipe with no repaint at all. It had four rules, each written after that
+    exact failure had happened, and this is the fifth.
+
+  * AND TWO CHECKS CAUGHT THEMSELVES BEING WRONG, which is worth recording
+    because both are the failure the check existed to prevent, reproduced
+    inside the thing preventing it.
+
+    check_spotter_filter.py passed with the per-session reset commented out,
+    because every assertion in it is a substring search and a commented-out
+    line still contains its own substring. check_menu_dispatch.py learned
+    that about a commented-out call. Comments are stripped before searching
+    now.
+
+    And check_beacon.py's new vehicle assertions hardcoded the company ID,
+    so they asserted only that the detector carries that signature -- which
+    stays true when the beacon is changed to emit something else. The decoy
+    and the signature come apart and the check says nothing. It reads the
+    company out of the emitter now.
+
+    check_nav_labels.py was right the first time, for a reason I had not
+    expected: entering the filter painted the nav bar and then fell through
+    to the rest of the loop, which ends in redraw() on the dwell path, whose
+    first act is fillScreen. The bar would have been wiped on any pass where
+    a dwell alert fired.
+
 0.4.22 - 2026-10-02
 -------------------
 
@@ -3253,6 +3368,11 @@ of them, because a digest is the one thing about an old release
 that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.22
+  04730d45cfee65d7b95670537c476ef1e68bc837fb473e2e733d5633a4fcc99f  pueo-0.4.22-beacon-35-merged.bin
+  486a8fbe17708c7176aee3a7f85df8e7c5f3100c0e6594a58399ace6a41cfc9f  pueo-0.4.22-merged.bin
+  3a948bb24938aa0756f2544c879c699bab4b691b96a6b7d7e7a35ec33deb5785  pueo-0.4.22-src.zip
 
 0.4.21
   f121fe7b0d6e369765b4c81425d6fef35ca9cc7e26dc4d840a578ed4b12f713f  pueo-0.4.21-beacon-35-merged.bin
