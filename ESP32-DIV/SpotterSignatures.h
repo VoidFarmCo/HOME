@@ -213,12 +213,23 @@ struct NameInSig {
 /* The scan breaks on the first match, so anything that should outrank a
  * generic block has to sit above it. */
 static const OuiSig kOuiSigs[] = {
+  /* ── Fleet telematics and RV kit ─────────────────────────────────────── */
+  {{0x28, 0xEA, 0x5B}, Kind::Vehicle, Conf::Strong, "Samsara fleet"},
+  {{0xFC, 0xDB, 0x21}, Kind::Vehicle, Conf::Strong, "Samsara fleet"},
+  {{0x98, 0x5D, 0x46}, Kind::Vehicle, Conf::Strong, "PeopleNet ELD"},
+  {{0x00, 0x17, 0x1A}, Kind::Vehicle, Conf::Strong, "Winegard RV"},
+
+  /* Aftermarket CarPlay dongles. Weak: the same boards are sold under many
+   * names, which is the Liteon problem in a different market. */
+  {{0xCC, 0x57, 0x63}, Kind::Vehicle, Conf::Weak,   "CarPlay dongle?"},
+  {{0x68, 0x8F, 0xC9}, Kind::Vehicle, Conf::Weak,   "CarPlay dongle?"},
+
   /* ── Roadside and municipal surveillance ─────────────────────────────── */
   /* Vendor-own IEEE blocks, so Strong, which also allows them on the BLE
    * path. See the note at the head of this table. */
   {{0x00, 0x0E, 0xA5}, Kind::Alpr, Conf::Strong,  "BLIP Systems"},
   {{0x00, 0x14, 0x7B}, Kind::Alpr, Conf::Strong,  "Iteris (BlueTOAD)"},
-  {{0xD4, 0x11, 0xD6}, Kind::Alpr, Conf::Strong,  "SoundThinking"},
+  {{0xD4, 0x11, 0xD6}, Kind::Alpr, Conf::Strong,  "ShotSpotter"},
 
   /* Uniview, five blocks. Commercial CCTV that also turns up on poles. */
   {{0x14, 0xBA, 0x88}, Kind::Camera, Conf::Strong, "Uniview"},
@@ -249,7 +260,7 @@ static const OuiSig kOuiSigs[] = {
   /* Weak, and for the reason the Liteon blocks above are weak: the hardware
    * is not exclusive to the use. Novatel's prefix is also on consumer MiFi
    * hotspots, and Compex sells the same boards to everyone. */
-  {{0x28, 0x80, 0xA2}, Kind::Accessory, Conf::Weak,   "Novatel (MiFi?)"},
+  {{0x28, 0x80, 0xA2}, Kind::Accessory, Conf::Weak,   "Inseego (MiFi?)"},
   {{0x00, 0x40, 0x29}, Kind::Accessory, Conf::Weak,   "Compex (shared board?)"},
   {{0x00, 0x80, 0x48}, Kind::Accessory, Conf::Weak,   "Compex (shared board?)"},
   {{0x04, 0xF0, 0x21}, Kind::Accessory, Conf::Weak,   "Compex (shared board?)"},
@@ -490,6 +501,66 @@ static const NameSig kSsidSigs[] = {
 
 /* ── BLE: advertisement contents ─────────────────────────────────────────── */
 static const BleSig kBleSigs[] = {
+  /* ── Fleet telematics ────────────────────────────────────────────────── */
+  /* A camera-and-tracking box in a commercial truck. Surveillance gear that
+   * happens to be bolted to a vehicle. */
+  {0x0B6B, 0x0000, Kind::Vehicle, Conf::Strong, "Samsara fleet"},
+
+  /* ── Tyre sensors ────────────────────────────────────────────────────────
+   *
+   * Worth more than they look. A TPMS broadcasts a stable identifier for one
+   * wheel, continuously, and the owner did not choose it and cannot switch
+   * it off. Following a car by its tyres is a known technique and this is
+   * the table that can say so.
+   *
+   * Strong on the vendor-own company IDs, because nothing else uses them.
+   * These are the BLE sensors; the 315 and 433 MHz valve-stem kind are the
+   * CC1101's problem, not this one. */
+  {0x0601, 0x0000, Kind::Vehicle, Conf::Strong, "Schrader TPMS"},
+  {0x0B99, 0x0000, Kind::Vehicle, Conf::Strong, "Goodyear tyre"},
+  {0x0E32, 0x0000, Kind::Vehicle, Conf::Strong, "Pacific TPMS"},
+  {0x070A, 0x0000, Kind::Vehicle, Conf::Strong, "Huf tyre/PEPS"},
+  {0x0127, 0x0000, Kind::Vehicle, Conf::Strong, "FOBO TPMS"},
+  {0x0BA2, 0x0000, Kind::Vehicle, Conf::Strong, "TireCheck TPMS"},
+  {0x0000, 0x00EE, Kind::Vehicle, Conf::Likely, "FOBO TPMS"},
+  {0x0000, 0x27A5, Kind::Vehicle, Conf::Likely, "SYTPMS sensor"},
+  {0x0000, 0xFBB0, Kind::Vehicle, Conf::Likely, "Aftermarket TPMS"},
+  /* The SIG's own Tyre Pressure Monitoring service. Allocated rather than
+   * vendor-assigned, so anything implementing the standard lands here and
+   * the grade says as much. */
+  {0x0000, 0x1860, Kind::Vehicle, Conf::Weak,   "TPMS service"},
+
+  /* ── The car population ──────────────────────────────────────────────────
+   *
+   * Everything from here to the end of this block is a car rather than
+   * something watching you: phone-as-key, factory hotspots, infotainment.
+   * Weak throughout, which is the grade that reads as corroboration rather
+   * than as a finding, because a car park full of Strong hits would drown
+   * the rows that matter.
+   *
+   * Kept contiguous on purpose. If this turns out to be noise in traffic it
+   * is one block to delete. */
+  {0x022B, 0x0000, Kind::Vehicle, Conf::Weak, "Tesla"},
+  {0x0000, 0xFE96, Kind::Vehicle, Conf::Weak, "Tesla"},
+  {0x0000, 0xFE97, Kind::Vehicle, Conf::Weak, "Tesla"},
+  {0x05EB, 0x0000, Kind::Vehicle, Conf::Weak, "BMW"},
+  {0x0723, 0x0000, Kind::Vehicle, Conf::Weak, "Ford/Lincoln"},
+  {0x0977, 0x0000, Kind::Vehicle, Conf::Weak, "Toyota/Lexus"},
+  {0x0915, 0x0000, Kind::Vehicle, Conf::Weak, "Honda/Acura"},
+  {0x0826, 0x0000, Kind::Vehicle, Conf::Weak, "Hyundai/Genesis"},
+  {0x0BA6, 0x0000, Kind::Vehicle, Conf::Weak, "Nissan/Infiniti"},
+  {0x0A10, 0x0000, Kind::Vehicle, Conf::Weak, "Subaru"},
+  {0x011F, 0x0000, Kind::Vehicle, Conf::Weak, "Volkswagen"},
+  {0x0000, 0xFE30, Kind::Vehicle, Conf::Weak, "Volkswagen"},
+  {0x0000, 0xFE31, Kind::Vehicle, Conf::Weak, "Volkswagen"},
+  {0x010E, 0x0000, Kind::Vehicle, Conf::Weak, "Audi"},
+  {0x0120, 0x0000, Kind::Vehicle, Conf::Weak, "Porsche"},
+  {0x017C, 0x0000, Kind::Vehicle, Conf::Weak, "Mercedes"},
+  {0x020B, 0x0000, Kind::Vehicle, Conf::Weak, "Jaguar/Land Rover"},
+  {0x0068, 0x0000, Kind::Vehicle, Conf::Weak, "GM"},
+  {0x0941, 0x0000, Kind::Vehicle, Conf::Weak, "Rivian"},
+  {0x0C34, 0x0000, Kind::Vehicle, Conf::Weak, "BYD"},
+
   /* XUNTONG, the BLE manufacturer ID on Penguin's Flock-family pole
    * battery. Likely on its own; the name beside it makes it Strong. */
   {0x09C8, 0x0000, Kind::Accessory, Conf::Likely, "Penguin battery"},
@@ -619,6 +690,14 @@ static const Ble128Sig kBle128Sigs[] = {
  * at the first hit.
  */
 static const MfgSig kMfgSigs[] = {
+  /* Aftermarket BLE valve-cap TPMS, company 0x0001 with a wheel-position
+   * byte. Company 0x0001 is Nordic's, so the prefix is doing all the work
+   * and the grade says so. */
+  {0x0001, {0x80, 0, 0, 0}, 1, Kind::Vehicle, Conf::Likely, "TPMS (front L)"},
+  {0x0001, {0x81, 0, 0, 0}, 1, Kind::Vehicle, Conf::Likely, "TPMS (front R)"},
+  {0x0001, {0x82, 0, 0, 0}, 1, Kind::Vehicle, Conf::Likely, "TPMS (rear L)"},
+  {0x0001, {0x83, 0, 0, 0}, 1, Kind::Vehicle, Conf::Likely, "TPMS (rear R)"},
+
   /* Apple Find My, company 0x004C, advertisement type 0x12.
    *
    * This is the rule whose absence meant Surveillance never flagged an
@@ -677,6 +756,35 @@ static const SvcDataSig kSvcDataSigs[] = {
  * hunting trip. It is a weak guard and it is honest about that in Conf.
  */
 static const NameInSig kNameInSigs[] = {
+  /* ── Fleet telematics ────────────────────────────────────────────────── */
+  {"Samsara",       0, Kind::Vehicle, Conf::Strong, "Samsara fleet"},
+  {"KeepTruckin",   0, Kind::Vehicle, Conf::Strong, "Motive ELD"},
+  {"Motive Hotspot", 0, Kind::Vehicle, Conf::Strong, "Motive ELD"},
+  {"Motive_",       0, Kind::Vehicle, Conf::Strong, "Motive ELD"},
+  {"PNet",          0, Kind::Vehicle, Conf::Likely, "PeopleNet ELD"},
+
+  /* ── Tyre sensors ────────────────────────────────────────────────────── */
+  {"tsTPMS",        0, Kind::Vehicle, Conf::Strong, "Tesla tyre sensor"},
+  {"TireCheck",     0, Kind::Vehicle, Conf::Strong, "TireCheck TPMS"},
+  {"TPMS",          0, Kind::Vehicle, Conf::Likely, "TPMS sensor"},
+  {"FOBO",          0, Kind::Vehicle, Conf::Likely, "FOBO TPMS"},
+
+  /* ── The car population, Weak throughout. See the BleSig block. ──────── */
+  {"TeslaWallConnector", 0, Kind::Vehicle, Conf::Weak, "Tesla charger"},
+  {"Cybertruck",    0, Kind::Vehicle, Conf::Weak, "Tesla"},
+  {"TeslaGW",       0, Kind::Vehicle, Conf::Weak, "Tesla"},
+  {"myChevrolet",   0, Kind::Vehicle, Conf::Weak, "Chevrolet"},
+  {"myCadillac",    0, Kind::Vehicle, Conf::Weak, "Cadillac"},
+  {"myBuick",       0, Kind::Vehicle, Conf::Weak, "Buick"},
+  {"myGMC",         0, Kind::Vehicle, Conf::Weak, "GMC"},
+  {"Uconnect",      0, Kind::Vehicle, Conf::Weak, "Stellantis Uconnect"},
+  {"Porsche_WLAN",  0, Kind::Vehicle, Conf::Weak, "Porsche"},
+  {"Audi_MMI_",     0, Kind::Vehicle, Conf::Weak, "Audi MMI"},
+  {"MBUX",          0, Kind::Vehicle, Conf::Weak, "Mercedes MBUX"},
+  {"CARLINK-",      0, Kind::Vehicle, Conf::Weak, "CarPlay adapter"},
+  {"CarPlay",       0, Kind::Vehicle, Conf::Weak, "CarPlay head unit"},
+  {"Winegard",      0, Kind::Vehicle, Conf::Weak, "Winegard RV"},
+
   /* ── Roadside travel-time readers ────────────────────────────────────────
    *
    * These sit on poles counting Bluetooth and Wi-Fi addresses as they pass,

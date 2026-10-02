@@ -79,6 +79,11 @@ VENDOR_OWN = {
     "48:62:64": "Arlo",
     "A4:11:62": "Arlo",
     "FC:9C:98": "Arlo",
+    # fleet telematics: a camera-and-tracking box in a commercial vehicle
+    "28:EA:5B": "Samsara",
+    "FC:DB:21": "Samsara",
+    "98:5D:46": "PeopleNet",
+    "00:17:1A": "Winegard",
     "00:25:DF": "Axon Enterprise",
     "AC:9F:C3": "Ring",
     "18:7F:88": "Ring",

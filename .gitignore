@@ -21,3 +21,7 @@ render/
 # deliberately never in the archive's include list: a path from one machine
 # would otherwise be published to everyone who downloads the source.
 .publish.local
+
+# IEEE registry cache for check_oui_registry.py: 3.8 MB, not ours,
+# and one command to fetch again.
+tools/.oui-cache.csv
