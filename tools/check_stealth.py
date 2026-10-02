@@ -265,6 +265,23 @@ def is_subseq(short, long):
     return all(c in it for c in short)
 
 
+def site_pages():
+    """The published pages, via .publish.local. Empty when the site is not
+    on this machine, which is the case inside the source archive."""
+    pub = REPO / ".publish.local"
+    if not pub.is_file():
+        return []
+    m = re.search(r"PUEO_PUBLISH_DIR\s*=\s*['\"]?([^'\"\n]+)",
+                  pub.read_text(encoding="utf-8", errors="replace"))
+    if not m:
+        return []
+    raw = m.group(1).strip()
+    if re.match(r"^/[a-zA-Z]/", raw):
+        raw = raw[1] + ":" + raw[2:]
+    d = Path(raw)
+    return sorted(d.glob("*.html")) if d.is_dir() else []
+
+
 def check_docs():
     labels = [t[2] for t in TRANSMITTERS]
     n = len(labels)
@@ -304,6 +321,23 @@ def check_docs():
 
     ok("the user guide's count is right", ("%s tools" % word) in guide,
        "it does not say %r" % ("%s tools" % word))
+    # And the website, which said Nineteen for two releases after it became
+    # twenty. The firmware's two copies were swept and the site's third was
+    # not, because nothing here knew the site existed.
+    site = site_pages()
+    if not site:
+        print("  --    the site is not reachable, skipping it")
+    else:
+        html = "".join(p.read_text(encoding="utf-8", errors="replace")
+                       for p in site)
+        ok("the website's count is right",
+           re.search(r"%s features" % word, html) is not None,
+           "no page says %r" % ("%s features" % word))
+        stale = [w for k, w in WORDS.items() if k != n
+                 and re.search(r"%s features" % w, html)]
+        ok("  and no page says an older one", not stale,
+           "a page also says %s" % stale)
+
     ok("the README's count is right",
        ("%s\nfeatures that transmit" % word) in readme
        or ("%s features that transmit" % word) in readme,

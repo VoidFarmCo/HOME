@@ -75,8 +75,14 @@ def count_rows():
     return out, len(kinds)
 
 
-def site_added():
-    """added.html, if .publish.local says where the site is."""
+def site_pages():
+    """Every published page, if .publish.local says where the site is.
+
+    Every page, not added.html alone. The first version checked that one
+    because that is where the signature section lives, and firmware.html
+    went on saying "108 signatures over nine kinds" with nothing looking at
+    it. A number copied onto one page is usually copied onto two.
+    """
     if not PUBLISH.is_file():
         return None
     m = re.search(r"PUEO_PUBLISH_DIR\s*=\s*[\"']?([^\"'\n]+)",
@@ -87,8 +93,8 @@ def site_added():
     # .publish.local is read by a bash script and holds an MSYS path.
     if re.match(r"^/[a-zA-Z]/", raw):
         raw = raw[1] + ":" + raw[2:]
-    p = Path(raw) / "added.html"
-    return p if p.is_file() else None
+    d = Path(raw)
+    return sorted(d.glob("*.html")) if d.is_dir() else None
 
 
 def main():
@@ -151,16 +157,29 @@ def main():
            else "no table row says %r" % phrase)
 
     print()
-    added = site_added()
-    if added is None:
-        print("added.html not reachable; skipping the website "
+    pages = site_pages()
+    if not pages:
+        print("the site is not reachable; skipping it "
               "(no .publish.local, or no site there)")
     else:
-        html = added.read_text(encoding="utf-8", errors="replace")
         word = WORDS.get(total, "")
-        ok("added.html states the count",
+        html = "".join(p.read_text(encoding="utf-8", errors="replace")
+                       for p in pages)
+        print("checking %d published pages" % len(pages))
+        ok("the site states the count",
            word and re.search(word, html, re.I) is not None,
-           "it does not say %r" % word)
+           "no page says %r" % word)
+
+        # And the digits, which is the spelling firmware.html uses. A number
+        # written one way on one page and another way on another is still
+        # one number, and both go stale together.
+        for pg in pages:
+            t = pg.read_text(encoding="utf-8", errors="replace")
+            m2 = re.search(r"(\d+) signatures over", t)
+            if m2:
+                ok("  %s states %s" % (pg.name, total),
+                   int(m2.group(1)) == total,
+                   "it says %s signatures" % m2.group(1))
         # "two hundred" is a prefix of "two hundred and sixty-six", so a
         # plain substring search finds the shorter spelling inside the
         # correct one and reports the page as carrying two counts. The
