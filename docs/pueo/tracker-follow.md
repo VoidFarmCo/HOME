@@ -3,8 +3,8 @@
 `AirTagSniffer` keys its rows on the BLE address. That is fine against a
 real AirTag and useless against a clone.
 
-The published ESP32 clone — [Fabian Bräunlein's, from
-2022](https://positive.security/blog/find-you) — cycles a couple of thousand
+The published ESP32 clone, [Fabian Bräunlein's, from
+2022](https://positive.security/blog/find-you), cycles a couple of thousand
 public keys so no identity ever persists. Against an address-keyed detector
 that means a fresh row per rotation, the hit count resetting to 1, and after
 32 identities the list quietly evicting the oldest. **The harder something
@@ -19,8 +19,8 @@ wearing a succession of names*.
 
 One thing, narrowly: **identity rotation from a stable distance.**
 
-Sightings of the long form of Continuity `0x12` — a separated tag carrying a
-key, which is what a clone emits — go into RSSI lanes 6 dB wide. A lane that
+Sightings of the long form of Continuity `0x12` (a separated tag carrying a
+key, which is what a clone emits) go into RSSI lanes 6 dB wide. A lane that
 is held without a long gap, while collecting persistent identities fast
 enough, is the finding.
 
@@ -62,13 +62,13 @@ and three was the old threshold. **Sitting at your own desk long enough
 would eventually have reported itself.**
 
 A count accumulates; a rate does not. A qualifying lane must average a new
-persistent identity at least every four minutes — 0.25 a minute. Apple
+persistent identity at least every four minutes. 0.25 a minute. Apple
 rotates at about 0.07 a minute. The clone rotates at 2.0. Thirty times
 apart, with the line between them.
 
 ## The measured margins
 
-Not estimates — these come out of the scenarios:
+Not estimates. These come out of the scenarios:
 
 | scenario | verdict | rate | vs the 0.25/min line |
 |---|---|---|---|
@@ -88,7 +88,7 @@ inside its enum, churn inside its ring, and lanes inside their array.
 ## On screen
 
 The tail line sits between the header and the column titles and is **always**
-shown — `No tail  3 new/min` when quiet. An answer that only appears when it
+shown, `No tail  3 new/min` when quiet. An answer that only appears when it
 is bad teaches you nothing the rest of the time, and this is a feature whose
 entire job is telling you whether you are being followed. It costs the list
 one row, ten down to nine.
@@ -98,7 +98,7 @@ The left edge is the selection bar, so the two cannot be confused. That is as
 specific as this can honestly get: there is no identity to point at, that
 being the whole problem.
 
-Churn — new identities a minute — is on the line. Above 20 the verdict draws
+Churn, new identities a minute, is on the line. Above 20 the verdict draws
 orange instead of red. A crowd, or you moving through one, degrades every
 signal here at once; the reading is still shown, marked as one to take with
 salt rather than silently suppressed.
@@ -109,8 +109,8 @@ this feature holds a list of who was near you.
 ## What it does not do
 
 **A plain AirTag following you.** It rotates too slowly to clear the rate
-gate, by design. That case is already visible — the sniffer shows it as one
-row with a rising hit count — and Apple's own detection covers it. This is
+gate, by design. That case is already visible (the sniffer shows it as one
+row with a rising hit count), and Apple's own detection covers it. This is
 aimed at the thing that defeats both.
 
 **Anything useful while you move through a crowded place.** Lanes fragment,
@@ -126,9 +126,9 @@ signal does not support.
 
 ## Prior art, and the weakness it names
 
-**AirCatch: Effectively tracing advanced tag-based trackers** — Mishra
+**AirCatch: Effectively tracing advanced tag-based trackers**: Mishra
 (Inria), Swadeep and Noubir (Northeastern), Cunche (Lyon/Inria),
-[arXiv:2602.07656](https://arxiv.org/abs/2602.07656) — attacks the same
+[arXiv:2602.07656](https://arxiv.org/abs/2602.07656), attacks the same
 problem and states the premise more sharply than this document does:
 identifier-based defences *fundamentally* break down against a tracker that
 rotates every transmission.
@@ -137,7 +137,7 @@ Their answer is better than this one, and it is worth saying so plainly.
 They fingerprint the **transmitter**, not the transmission. A radio's
 carrier frequency offset comes from its crystal, so while the logical
 identifiers change arbitrarily fast, the analog imprint does not. They
-detect a "persistently occupied, abnormally compact CFO core" — structurally
+detect a "persistently occupied, abnormally compact CFO core", structurally
 the same idea as a persistently occupied RSSI lane here, but in a space the
 adversary does not control.
 
@@ -146,7 +146,7 @@ RSSI is a function of transmit power, and transmit power is the adversary's
 to choose. A clone that randomises its output level alongside its keys
 smears itself across lanes, never holds one, and this reports nothing at
 all. Nothing here can see through that. Carrier frequency offset cannot be
-varied the same way — it is a property of the part.
+varied the same way. It is a property of the part.
 
 It cannot be implemented on this hardware. A NimBLE advertisement report
 carries `event_type`, the address, `rssi`, and the payload; there is no
@@ -166,8 +166,8 @@ does anything else built on an identifier or on RSSI.
 
 The maturity gate is the thing keeping the concourse quiet, and it rests on
 transient devices producing one or two sightings. If a passing device gets
-picked up on several advertising channels in quick succession — three
-channels, three callbacks, one walk past — it matures, counts, and the crowd
+picked up on several advertising channels in quick succession (three
+channels, three callbacks, one walk past) it matures, counts, and the crowd
 starts feeding the lanes again.
 
 Nothing in Python can settle that. It needs a capture in a real crowd with

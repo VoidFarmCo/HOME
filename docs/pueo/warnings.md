@@ -90,8 +90,8 @@ three separate ways: it ran off the end of the array, it never reached the air
 because the send only transmits 26 bytes, and the reason code it was trying to
 set stayed at the template's value of 1 the whole time.
 
-It was firing on every frame — twice per captive-portal send, once per
-deauther send, both in hot loops — and getting away with it on alignment
+It was firing on every frame (twice per captive-portal send, once per
+deauther send, both in hot loops), and getting away with it on alignment
 padding:
 
 ```
@@ -109,8 +109,8 @@ declaration or change compiler flags and the stray byte starts landing on a
 live timing variable belonging to the same feature.
 
 **Fixed** by removing the writes, which preserves what actually goes on the
-air. If you want the reason code the author clearly intended — 7, class-3
-frame from a nonassociated station — that is `cp_deauth_frame[24] = 7;`. That
+air. If you want the reason code the author clearly intended (7, class-3
+frame from a nonassociated station) that is `cp_deauth_frame[24] = 7;`. That
 is a real change to transmitted frames, so it is left as your call rather than
 made silently.
 
@@ -151,7 +151,7 @@ scopes, which is a refactor, not a warning cleanup.
 
 **`-Wclass-memaccess` x2**, `bluetooth.cpp:5400` and `:7671`:
 `memset(&s_devices[idx], 0, sizeof(MjDevice))` on a struct with default member
-initializers. Formally UB, harmless here — both structs hold only scalars and
+initializers. Formally UB, harmless here, both structs hold only scalars and
 arrays, and all-zero matches their defaults. `s_devices[idx] = MjDevice{};`
 would be correct.
 
@@ -160,7 +160,7 @@ would be correct.
 over 255 was already truncated at the call boundary.
 
 **`-Wformat-truncation=` x14** (fixed): `snprintf` into buffers a wide `%d`
-could overflow. Twelve were buffer sizing -- six identical `char page_buf[20]`
+could overflow. Twelve were buffer sizing, six identical `char page_buf[20]`
 holding `"Page %d/%d"`, which needs 29 bytes worst case; `char buf[48]` for
 `"[!] cred %s / %s"` over two `char[32]`, which needs 75. Widened to the worst
 case the format can produce. `snprintf` was truncating safely, so nothing
@@ -199,7 +199,7 @@ the linked image. Deleting them would buy zero bytes and cost a conflict on
 every `git merge upstream/main`, which this fork is built to keep cheap.
 (C++11 here, so `__attribute__((unused))` rather than `[[maybe_unused]]`.)
 
-The unused **variables** are deleted outright -- locals and file-scope
+The unused **variables** are deleted outright, locals and file-scope
 statics, small self-contained edits.
 
 Two things are worth knowing about that script. Its edits are pinned to line
@@ -207,8 +207,8 @@ numbers *and* an expected substring, because matching on line text alone
 silently breaks the build: `int rssi;`, `int right = r.x + r.w - 6;` and
 `static unsigned long lastSpamTime = 0;` each appear verbatim in other
 functions where the variable is read. And `PacketMonitor::draw()` turned out
-to be dead in full -- nothing calls it, and every line of its body wrote to a
-local that was then discarded -- so its body is now empty.
+to be dead in full (nothing calls it, and every line of its body wrote to a
+local that was then discarded), so its body is now empty.
 
 ## What is still in the way of turning -w off
 
@@ -222,7 +222,7 @@ local that was then discarded -- so its body is now empty.
 | lambda capture of static | 1 | always on |
 
 The distinction matters. The 23 "always on" warnings are not produced by
-`-Wall` at all -- they appear at *any* warning level the moment `-w` comes
+`-Wall` at all. They appear at *any* warning level the moment `-w` comes
 out. They are the real blocker to dropping `-w`, and `-Wall` is not what is
 holding things up.
 
@@ -245,7 +245,7 @@ default because 52 `-Wmissing-field-initializers` remain.
 The 22 redefinition warnings are gone, along with the `MAX_LINES` hazard.
 
 Every one of the 154 definitions already sat inside a namespace or a function
-body -- these macros were being used as scoped constants by people who had no
+body. These macros were being used as scoped constants by people who had no
 scoped constants. So the fix was a straight swap:
 
 ```c
@@ -268,9 +268,9 @@ point still see the header's 0, exactly as before.
 A refactor that can silently resize an array needs more than "it compiles".
 Three gates:
 
-`tools/macro_value_check.py` recomputes every derived-macro use twice -- with
+`tools/macro_value_check.py` recomputes every derived-macro use twice (with
 the operand values in effect at the use, and with those in effect at the
-definition -- and compares. 13 uses, no differences. Had any differed, that
+definition), and compares. 13 uses, no differences. Had any differed, that
 would have been a live bug the macros were hiding rather than a reason not to
 proceed.
 
@@ -278,7 +278,7 @@ proceed.
 block and checks that every use it governs falls inside. 511 uses, no escapes.
 Worth noting its first run reported three, all false: two were the macro names
 appearing in a comment (`subghz.cpp` has one that reads "Avoid jammer/replay
-macros (SCREEN_WIDTH, ICON_NUM, …) leaking into this scope" -- someone hit
+macros (SCREEN_WIDTH, ICON_NUM, …) leaking into this scope". Someone hit
 this before and worked around it with `k`-prefixed locals), and one was brace
 drift, verified by hand to be inside `namespace FirmwareUpdate`.
 
@@ -312,7 +312,7 @@ static bool applyBrightness(uint8_t v){
   if (v > 255) v = 255;
 ```
 
-`v` is a `uint8_t`, so the clamp can never fire -- that is all the warning
+`v` is a `uint8_t`, so the clamp can never fire. That is all the warning
 says. The reason it is there is the interesting part:
 
 ```c
@@ -320,7 +320,7 @@ if (sel==0 && s.brightness<255) { applyBrightness(s.brightness+8); }
 ```
 
 `s.brightness` is a `uint8_t`. `s.brightness + 8` promotes to `int`, and the
-`uint8_t` parameter truncated it mod 256 at the call boundary -- before the
+`uint8_t` parameter truncated it mod 256 at the call boundary, before the
 clamp could see it. So brightness 248..254, all of which pass the caller's
 `< 255` guard, arrived as 0..6, and pressing "brighter" near maximum dropped
 the backlight to almost off.
@@ -354,21 +354,21 @@ IDF 5, the replacement is not a straight substitution, and it sits in the WiFi
 bring-up path with no way to test it yet. On the list for any move to core
 3.x.
 
-The normal build filters warnings from TFT_eSPI and the ESP-IDF headers -- 40
-of them, repeated per translation unit -- and prints the count instead. They
+The normal build filters warnings from TFT_eSPI and the ESP-IDF headers (40
+of them, repeated per translation unit), and prints the count instead. They
 are not ours to fix, and a build that always prints noise is a build nobody
 reads. `tools/build.sh warnings` shows everything unfiltered.
 
 ## -Wunused-const-variable: tried, and not kept
 
-Two constants in `bluetooth.cpp` -- `SAMSUNG_COMPANY_ID` and
-`GOOGLE_FAST_PAIR_ID` -- were definitions with no readers, and `-Wall
+Two constants in `bluetooth.cpp`, `SAMSUNG_COMPANY_ID` and
+`GOOGLE_FAST_PAIR_ID`, were definitions with no readers, and `-Wall
 -Wextra` said nothing, because `-Wunused-const-variable` is in neither for
 C++. Adding it looked like a free win. It is not, and the reason is worth
 writing down so the experiment is not repeated.
 
-**At level 1 it catches nothing here.** The flag reaches the compile line --
-verified by reading the actual command rather than the report -- and it
+**At level 1 it catches nothing here.** The flag reaches the compile line,
+verified by reading the actual command rather than the report, and it
 works on a standalone translation unit compiled with the identical flag
 list, warning on all four shapes of unused const. Put `SAMSUNG_COMPANY_ID`
 back in `bluetooth.cpp` and rebuild, and it is silent. The same file warns
@@ -388,7 +388,7 @@ So the build stays `-Wall -Wextra`. The lesson is not about this flag:
 
 **A warning-clean build is not a build with nothing unused in it.** Unused
 `const` at namespace scope is invisible to it in C++, and an array written
-through subscripts and never read -- which is what the three spoofers do
-with their randomised addresses, see `docs/pueo/spoofers.md` -- is invisible
+through subscripts and never read, which is what the three spoofers do
+with their randomised addresses, see `docs/pueo/spoofers.md`. Is invisible
 to `-Wunused-but-set-variable`. Both were found by reading, and reading is
 still the thing that finds them.

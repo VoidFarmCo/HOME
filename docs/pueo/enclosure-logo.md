@@ -1,6 +1,6 @@
 # The owl on the lid
 
-Yes, and it is in `pueo-enclosure.scad` now — debossed into the chin of the
+Yes, and it is in `pueo-enclosure.scad` now, debossed into the chin of the
 lid, below the screen window. `LOGO = false` turns it off.
 
 The interesting part is not getting a logo onto a box. It is that this
@@ -27,14 +27,14 @@ Scaling the 5th percentile to a printed height, against a 0.4 mm nozzle:
 
 | logo height | 5th pct stroke | |
 |---|---|---|
-| 20 mm | 0.34 mm | below the nozzle — the wifi arcs and eye rings stop existing |
+| 20 mm | 0.34 mm | below the nozzle, the wifi arcs and eye rings stop existing |
 | 25 mm | 0.42 mm | single trace, fragile |
-| **30 mm** | **0.51 mm** | single trace — the shipped size |
+| **30 mm** | **0.51 mm** | single trace, the shipped size |
 | 40 mm | 0.68 mm | single trace |
 | 60 mm | 1.01 mm | two perimeters, comfortable |
 
 So 30 mm is a compromise forced by the lid, not a free choice. Below roughly
-25 mm the answer is different artwork — a simplified mark — rather than a
+25 mm the answer is different artwork, a simplified mark, rather than a
 smaller copy of this one.
 
 ## Why debossed
@@ -59,7 +59,7 @@ bands are 36.25 mm at each end. The logo goes in the lower one, centred at
 `LOGO_Y = -64`.
 
 At 30 mm tall it is about 29 mm wide, spanning x ±14.6. The screw pillars
-are at x ±36.5, so they are never in the way — which is worth stating
+are at x ±36.5, so they are never in the way, which is worth stating
 because it is the constraint that would bite first if `LOGO_H` were raised.
 Raising it past about 34 mm runs into the window edge at y = −46.25.
 
@@ -70,14 +70,14 @@ nicer-looking bottom.
 
 ## Getting the artwork into OpenSCAD
 
-OpenSCAD cannot usefully extrude a bitmap — `surface()` would give a 512×512
-stepped mesh — so the PNG has to become outlines. There is no potrace or
+OpenSCAD cannot usefully extrude a bitmap (`surface()` would give a 512×512
+stepped mesh), so the PNG has to become outlines. There is no potrace or
 Inkscape on this machine, and taking on a toolchain dependency for one file
 is worse than a short tracer.
 
 `tools/trace_logo.py` binarises the PNG, walks marching squares over the 0.5
 isocontour, simplifies each loop with Douglas-Peucker, and writes
-`docs/pueo/pueo-owl.svg` as one path with `fill-rule="evenodd"` — which is
+`docs/pueo/pueo-owl.svg` as one path with `fill-rule="evenodd"`, which is
 what keeps the pupils, the eye rings and the counters in **PUEO** as holes
 instead of filling them.
 
@@ -89,7 +89,7 @@ hole produces an SVG that looks fine in a viewer and prints wrong, and
 nobody would find out until a part came off the bed.
 
 That check earned its place immediately: the first run reported 4.15% and
-refused. The fault was in the checking rasteriser, not the trace — the
+refused. The fault was in the checking rasteriser, not the trace. The
 contour lives in pixel-**centre** coordinates and the rasteriser sampled on
 pixel corners, putting a half-pixel error band along every edge. On line art
 with this much perimeter that is several percent, and it looks exactly like
@@ -100,7 +100,7 @@ The SVG is generated. Re-run the tracer rather than editing it.
 
 ## Rendering
 
-The OpenSCAD is not published and is not in the source archive — the STLs at
+The OpenSCAD is not published and is not in the source archive. The STLs at
 [pueo.magikh0e.pl/enclosure.html](https://pueo.magikh0e.pl/enclosure.html)
 are what is offered. Inside the repository, where the file lives:
 
@@ -126,7 +126,7 @@ translate, written in pixels, landed in millimetres too, so the owl also sat
 11 mm off centre.
 
 Rendered at lid scale it looked completely plausible. A small owl in the
-chin of a 170 mm lid is just a small owl — nothing in the picture says it is
+chin of a 170 mm lid is just a small owl. Nothing in the picture says it is
 a quarter of its intended size. Two renders were inspected and both passed.
 
 What caught it was arithmetic: 108,773 ink px at 30 mm tall and 0.6 mm deep
@@ -135,7 +135,7 @@ without the logo showed **18**.
 
 The fix is `resize([0, height], auto=true)`, which measures the bounding box
 that actually turned up rather than assuming one. Passing `dpi=25.4` to
-`import()` does *not* work — the SVG's explicit `width="462px"` wins.
+`import()` does *not* work. The SVG's explicit `width="462px"` wins.
 
 `tools/check_logo_scale.py` now renders the artwork at three sizes and
 asserts height, width, centring and area against figures derived from the
@@ -161,7 +161,7 @@ It has been printed. The owl reads at the 30 mm the lid allows, in PLA on a
 by measuring the artwork.
 
 That is one printer and one filament, so it is evidence rather than a
-guarantee. The stroke widths are still what they were — about 0.51 mm at the
-thinnest, one extrusion wide — so a printer that lays a wider line, or a
+guarantee. The stroke widths are still what they were, about 0.51 mm at the
+thinnest, one extrusion wide, so a printer that lays a wider line, or a
 filament that squashes more on the first layer, can still lose them. If
 yours does, the artwork is the thing to thicken, not the depth.

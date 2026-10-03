@@ -7,8 +7,8 @@ against a meter are marked **[verify]**.
 
 ## What this board is
 
-The CYD lives in the **lid** — the enclosure cuts a 55.5 × 92 window for its
-bezel — and everything else sits in the 85 × 170 × 20 base. So a harness
+The CYD lives in the **lid**: the enclosure cuts a 55.5 × 92 window for its
+bezel, and everything else sits in the 85 × 170 × 20 base. So a harness
 between the two halves already exists in the hand-wired build. This board
 replaces that harness and the loose modules with one PCB in the base, joined
 to the CYD by a single connector.
@@ -50,7 +50,7 @@ Of the ten signals the firmware needs, only four reach a CYD header:
 The SPI bus itself is not exposed. Six of ten signals require soldering to
 pads or module pins on the CYD, so any carrier board needs a short pigtail
 from those pads to a connector. The gain is that it becomes **six joints in
-one documented place** instead of thirty scattered across four modules — and
+one documented place** instead of thirty scattered across four modules, and
 an intermittent joint on MISO presents exactly like the bus faults that cost
 a week of firmware archaeology, so reducing their count is not cosmetic.
 
@@ -229,7 +229,7 @@ times what the estimate said.
 
 **The active antenna is not a separate supply problem.** Pin 14 VCC_RF is an
 *output*, +3.3 V, and the module biases the antenna from it through an
-inductor -- the datasheet's own application circuit does exactly that, with
+inductor. The datasheet's own application circuit does exactly that, with
 detection and short-circuit protection built in. Budget for it on +3V3_RF
 rather than anywhere else: 3 mA with the antenna open, 50 mA into a short,
 which the module limits rather than passing through.
@@ -275,7 +275,7 @@ recess is cut for.
 
 Power comes in on the CYD's own USB-C, from a power bank for portable use or a
 charger on the bench. The carrier taps P1's `5V`, which is the board's 5 V
-input node and is live whenever USB is -- measured 4.75 V at 92 mA. That is
+input node and is live whenever USB is, measured 4.75 V at 92 mA. That is
 what the project's original notes meant by "tap 5V from USB VBUS, before the
 CYD's regulator", and it is the pin they meant.
 
@@ -383,7 +383,7 @@ the pocket and the PN532 above it is 1.5 mm, so there is room to take it from.
 
 **[decide] which of the two.** Buying a buck-boost keeps the printed case and
 the existing slot, costs a part and a wait, and is the more efficient and the
-safer of the two -- a fixed 3.3 V part cannot be set wrong, and +3V3_RF feeds
+safer of the two. A fixed 3.3 V part cannot be set wrong, and +3V3_RF feeds
 three radios with nothing downstream to absorb a mistake. Using what is in
 hand costs a reprint and 10% of the runtime. Neither is wrong.
 
@@ -398,7 +398,7 @@ on its own.
 
 **[verify] where over-discharge protection comes from.** This matters more
 than it looks. The TP4056 module carried a DW01 and an FS8205 in the cell's
-negative line, and an earlier netlist wired the load around them -- charging
+negative line, and an earlier netlist wired the load around them. Charging
 would have worked, over-current would have worked, and over-discharge cutoff
 would silently not have existed. That module is gone now, so the protection
 went with it. What is left is whatever the pouch's own PCM does and whatever
@@ -428,7 +428,7 @@ Worth recording, because with it deleted the old tree reads as though somebody
 put a converter in for no reason. They did not. The project's original notes
 say:
 
-> Tap 5V from USB and step it down to 3.3V independently -- do not share the
+> Tap 5V from USB and step it down to 3.3V independently. Do not share the
 > CYD's 3.3V rail or you'll get brownouts, random resets, and failed radio
 > init.
 
@@ -506,7 +506,7 @@ is short, the lever is the backlight, not the radios.
 - 100 µF bulk on +3V3_RF at the buck-boost output.
 - 220 µF bulk at the converter's input, close to where P1's 5 V arrives. This
   was specified at the boost's output on +5V_SW; there is no +5V_SW and no
-  boost now, but the reason survives -- the input is at the far end of a USB
+  boost now, but the reason survives. The input is at the far end of a USB
   cable and a connector, and the converter's draw steps with the radios.
 
 ### Trace widths
@@ -517,7 +517,7 @@ is short, the lever is the backlight, not the radios.
 |---|---|---|
 | P1's 5 V in, to the converter | up to 260 mA | **0.5 mm** |
 | +3V3_RF | up to 500 mA | **0.5 mm** |
-| signals | — | 0.25 mm |
+| signals | n/a | 0.25 mm |
 
 ## SPI signal integrity
 
@@ -559,14 +559,14 @@ Constraints that follow:
   pocket floor, through the top wall. The radio footprints must put their
   board SMAs exactly there.
 - **PN532 needs a 1.4 mm floor window** under its coil at (0, 18). Keep
-  copper — especially ground pour — out of that footprint's area on both
+  copper, especially ground pour, out of that footprint's area on both
   layers, or the field is attenuated by your own board. Now confirmed at the full
   43 x 41 extent, so the keepout and the floor window are both correctly
-  sized -- the module is exactly as large as the design assumed.
+  sized. The module is exactly as large as the design assumed.
 - **USB-C on the right wall** at y = −62, 20 × 7 cutout.
 - **GPS antenna** is a separate 20 x 6 mm board on a 90 mm u.FL pigtail, not
   a patch on the module. It needs a flat spot with sky view and a thinned
-  wall, but it is no longer tied to where the module sits -- and the 90 mm
+  wall, but it is no longer tied to where the module sits, and the 90 mm
   is a hard limit. See the GPS section below; the top-centre slot the
   enclosure cuts today is out of reach from the module's current position.
 - Battery pocket at (−16, -23) is 45 × 34 and must stay clear of copper.
@@ -613,7 +613,7 @@ overlap, and the SMA positions land exactly on the J4 and J5 centres. The
 tightest gaps are 2 mm (PN532 to NRF24, and the buck to the battery), so
 there is little room to move anything without revisiting the enclosure.
 
-**The KiCad `.net` file has never been opened in KiCad** — it is not installed
+**The KiCad `.net` file has never been opened in KiCad**. It is not installed
 on the machine that generated it. `netlist.txt` is the deliverable; the
 `.net` is a convenience that may need hand-fixing.
 
@@ -641,7 +641,7 @@ mattered. On these boards the DW01/FS8205 protection MOSFETs sit in the
 negative on the common ground net and took the converters off `B+`, which
 runs the entire load around the protection. Charging would have worked,
 over-current would have worked, and **over-discharge cutoff would silently
-not exist** — the failure mode being a flat lithium cell taken below 2.5 V
+not exist**, the failure mode being a flat lithium cell taken below 2.5 V
 because nothing was watching.
 
 Now `VBAT`/`BATT_NEG` reach only the battery and the module, and everything
@@ -690,7 +690,7 @@ A test point on the boost's output exists for exactly this. Worth a line of silk
 the pot saying `SET 5V FIRST`, because the person who assembles the second
 one in a year will not remember.
 
-**It has its own micro-USB jack**, which this design does not use — the boost
+**It has its own micro-USB jack**, which this design does not use. The boost
 is fed from `+VSYS`. The enclosure cuts only one USB opening, at the TP4056,
 so the boost's connector ends up inside the case. That is the right outcome
 (two identical micro-USB sockets, one charging and one backfeeding the boost
@@ -749,7 +749,7 @@ provision.
 
 **The five marked `(est)` are reasoned from the tallest visible component,
 not measured.** Listings for these parts publish footprint and almost never
-publish height -- I went looking and it is simply not there. They are good
+publish height. I went looking and it is simply not there. They are good
 enough to answer the question below, and not good enough to cut plastic to.
 
 One number got confirmed rather than estimated: an SMA coupling barrel is
@@ -764,8 +764,8 @@ pocket lengths (40 and 41) hold too, and the CC1101's 38 mm overall leaves
 
 The CC1101 drawing confirms something the enclosure was already built
 around: **the SMA jack is soldered to the module**, edge-mounted, with the
-2x4 pin header at the opposite end. The comment in the enclosure --
-"radios: vertical, board SMA against the top wall" -- had this right. It
+2x4 pin header at the opposite end. The comment in the enclosure
+("radios: vertical, board SMA against the top wall") had this right. It
 means the radio SMAs are not free to move: they sit wherever the module
 sits, which is the constraint the next section runs into.
 
@@ -781,8 +781,8 @@ axis that matters.**
 
 Width agrees. Length differs by 6 mm, height by more than double. The
 likely reading is that 6.25 mm is the bare PCB plus low components while
-14 mm is the overall height with the trimpot and inductor standing proud --
-the blue 3296-style multi-turn pot is tall on its own -- and that 30 vs 36
+14 mm is the overall height with the trimpot and inductor standing proud
+(the blue 3296-style multi-turn pot is tall on its own), and that 30 vs 36
 is a variant difference. But that is a guess, and the conclusion flips on
 it, so it wants a caliper rather than a listing.
 
@@ -817,7 +817,7 @@ makes the MT3608 conflict decisive rather than academic:
   MT3608 at 14.00 mm   ->  -0.10 mm
 ```
 
-At 14 mm it does not fit. Not "fits tightly" -- over by a tenth of a
+At 14 mm it does not fit. Not "fits tightly", over by a tenth of a
 millimetre, before any tolerance on the standoff or the print.
 
 This corrects what this document said one revision ago, which was that at
@@ -854,14 +854,14 @@ The part in hand is an **ATGM336H** on a GOOUUU breakout, 16 x 13 mm, with a
 **The footprint collapses.** 28 x 27 was budgeted; 16 x 13 is what turned
 up. That is roughly 550 mm2 of floor handed back, in the middle of the
 board, next to the battery. It also resolves the `[verify pinout]` note on
-J7 -- the silkscreen matches the assumed order exactly, so the netlist
+J7, the silkscreen matches the assumed order exactly, so the netlist
 stands.
 
 Firmware is unaffected: `GPS_UART_BAUD` is 9600 and the ATGM336H defaults to
 9600 NMEA, same as the GT-U7 would have.
 
 **The antenna moves off the module**, onto a 20 x 6 mm board on a 90 mm u.FL
-pigtail. This is mostly good -- a patch soldered to the module has to sit
+pigtail. This is mostly good. A patch soldered to the module has to sit
 wherever the module sits, and this one does not. But 90 mm is short, and it
 is measured through whatever path the cable can actually take:
 
@@ -880,7 +880,7 @@ so treat anything past about 75 mm as doubtful.
 **J7 moved from (24, -21) to (0, 52).** The antenna slot the enclosure
 already cuts sits hard against the inside of the top wall, centred, so the
 antenna lands at about (0, 80). From the new position the run is **28 mm**
-against 90 mm of cable -- comfortable even after routing around things, with
+against 90 mm of cable, comfortable even after routing around things, with
 enough left over that the excess has to be coiled somewhere.
 
 The two radios leave a corridor between them:
@@ -902,7 +902,7 @@ the clearances evenly:
 
 All three beat the 2 mm that is the tightest gap elsewhere on the board.
 Biasing left, toward the CC1101 and away from the 2.4 GHz PA, was the
-obvious temptation -- but it buys about a millimetre of separation while
+obvious temptation, but it buys about a millimetre of separation while
 cutting the CC1101 gap to 2.5 mm, which is a bad trade. Centred is better.
 
 This leaves 28 x 27 of floor free at the old position, next to the battery.
@@ -910,8 +910,8 @@ Nothing needs it yet.
 
 One thing the move does not fix: the antenna still ends up between the two
 SMA bulkheads, so a -130 dBm L1 receiver sits between a 433 MHz transmitter
-and a 2.4 GHz PA. The pigtail means it *could* go elsewhere -- flat against
-a side wall or the inside of the lid -- which is a freedom the patch-antenna
+and a 2.4 GHz PA. The pigtail means it *could* go elsewhere, flat against
+a side wall or the inside of the lid, which is a freedom the patch-antenna
 assumption never had. That is an enclosure decision rather than a board one,
 and it can be made later without moving J7 again: 90 mm of cable reaches
 most of the upper half of the case from (0, 52).
@@ -922,7 +922,7 @@ out, none free:
 
 1.  **Solder it down** and accept 1.6 mm. Cheapest, loses the ability to
     swap a module whose counterfeit rate is not low.
-2.  **Cut it out of the carrier entirely** -- leave it on the floor in its
+2.  **Cut it out of the carrier entirely**: leave it on the floor in its
     existing pocket and run a short flying lead to the board. Keeps the
     range, adds a cable and an assembly step.
 3.  **Window the carrier** so the PN532 hangs through a cutout at floor
@@ -930,7 +930,7 @@ out, none free:
     most work to get right.
 
 Option 3 is the interesting one because the board already needs a keepout
-over that area -- turning a copper keepout into an actual hole costs
+over that area, turning a copper keepout into an actual hole costs
 nothing in routing terms. It does mean the 43 x 41 region stops carrying
 structure, which matters for a board that is 80 mm wide. The NRF24 with its PA/LNA can and its SMA is taller, and
 the SMA axis is fixed at 5 mm above the pocket floor by the case wall. That
@@ -993,7 +993,7 @@ now match the netlist (`ATGM336H GPS`, `MP2307 buck`).
 Pockets left deliberately oversized, with a comment saying so: MT3608 36 x 17
 for a part that may be 30 mm, CC1101 15 x 40 for a 15 x 38, NRF24 16 x 41 for
 a 15.5 x 41, buck 20 x 12 for a 17.9 x 12. `pockets()` adds a further 0.6 mm
-to each dimension, which is worth knowing -- the NRF24's length clearance is
+to each dimension, which is worth knowing. The NRF24's length clearance is
 0.6 mm rather than the zero the nominal numbers imply. Still tight for FDM,
 so still worth a test print, but not the interference it looked like.
 
@@ -1007,7 +1007,7 @@ ends up once the module is stacked on a carrier board.
 SMA_Z = STANDOFF_H + PCB_T + SOCKET_H + MOD_PCB_T + SMA_AXIS_H
 ```
 
-`MOD_PCB_T` (1.0) and `SMA_AXIS_H` (2.5) are marked `[VERIFY]` -- they need
+`MOD_PCB_T` (1.0) and `SMA_AXIS_H` (2.5) are marked `[VERIFY]`. They need
 the radio modules in hand. With the current values and the radios soldered
 down, OpenSCAD echoes **SMA_Z = 7.6 mm**, against the 5.0 the case was cut
 for. The bulkheads move up 2.6 mm.
@@ -1049,7 +1049,7 @@ and that is already a formula in the enclosure rather than a constant.
 **So two measurements are blocking, and neither can be looked up:**
 
 1.  **MT3608 overall height**, trimmer and inductor included. Over 13.90 mm
-    and it cannot be soldered to the carrier at all -- which means a shorter
+    and it cannot be soldered to the carrier at all, which means a shorter
     boost module, a thinner standoff, or a taller base.
 2.  **Battery thickness.** Not a fit question but a structural one; see
     below.
@@ -1064,8 +1064,8 @@ parameter does not solve.
 
 The interior is 80 x 165, which is exactly the carrier outline. So a
 full-span board covers the battery pocket at (-16, -23) completely. The
-battery is a physical object with a thickness nobody has measured yet -- a
-2000 mAh 1S pouch is typically 6 to 10 mm -- and it has to be either under
+battery is a physical object with a thickness nobody has measured yet (a
+2000 mAh 1S pouch is typically 6 to 10 mm), and it has to be either under
 the board, on top of it, or through it.
 
 Under it means the standoff grows to the battery's thickness, and everything
@@ -1081,12 +1081,12 @@ above rises with it:
 ```
 
 A 6 mm cell under the board works only with the radios soldered down. A
-10 mm cell does not work at all -- the SMA holes run out through the top of
+10 mm cell does not work at all, the SMA holes run out through the top of
 the base.
 
 Which is the same shape of problem as the PN532: two things want to be at
 floor level and the board is in the way. One answer covers both. **The
-carrier wants to be a frame, not a plane** -- cut out the battery footprint
+carrier wants to be a frame, not a plane**, cut out the battery footprint
 and the PN532 footprint, let both sit on the floor where the case already
 has pockets and a thinned NFC window for them, and keep the standoff at the
 2.5 mm that through-hole leads need. That holds SMA_Z at 7.6 and keeps NFC
@@ -1098,7 +1098,7 @@ lid is a question for the layout, not for the enclosure.
 
 This needs a decision and a measured battery before the base geometry
 changes. Until then the per-module pockets stay, which is the conservative
-state -- they are correct if the modules sit on the floor, and harmless
+state. They are correct if the modules sit on the floor, and harmless
 extra clearance if they do not.
 
 MT3608 keeps its 36 x 17 pocket: if the board is really 30 mm the pocket is
@@ -1106,7 +1106,7 @@ MT3608 keeps its 36 x 17 pocket: if the board is really 30 mm the pocket is
 the safe direction to be wrong in until it can be measured.
 
 Both radio pockets stand as cut. CC1101 15 x 40 against a 15 x 38 module,
-NRF24 16 x 41 against 15.5 x 41 -- tight on the NRF24's length with no
+NRF24 16 x 41 against 15.5 x 41, tight on the NRF24's length with no
 slack at all, so that one is worth a test print before committing.
 
 ### The NRF24 fit test
@@ -1120,7 +1120,7 @@ out. The smallest pocket the module seats into flat, without forcing, is
 what this printer needs. Print this one first; it is flat and quick and it
 answers the question on its own.
 
-For reference, the pocket as currently cut is 16.6 x 41.6 -- `pockets()`
+For reference, the pocket as currently cut is 16.6 x 41.6, `pockets()`
 adds 0.6 to the 16 x 41 in `MODULES`. Against a 15.5 x 41 module that is
 1.1 mm of clearance across the width and 0.6 along the length, so the
 ladder's 0.6 rung is the closest thing to the shipping geometry. If even
@@ -1133,7 +1133,7 @@ it cannot drift from the real part. It carries the top wall with the SMA
 bulkhead bore at its derived height, the corner boss at (36.5, 70), and
 slivers of the GPS and PN532 pockets where they cross the cut. Print it
 second, to check that the module's edge-mounted SMA actually lines up with
-the bulkhead hole -- which is the half of "does the NRF24 fit" that the
+the bulkhead hole, which is the half of "does the NRF24 fit" that the
 ladder cannot answer.
 
 Neither coupon changes the enclosure. Whatever the ladder says still has
@@ -1147,7 +1147,7 @@ three things could still move it:
 1. The **GPIO 1 GPS handover** is reasoned from the core source and the
    datasheet, with nothing measured. If it does not work, the GPS moves to a
    different pin and J1 changes.
-2. The **SpiBus prediction** — that touch loses the bus to the radios — is
+2. The **SpiBus prediction** (that touch loses the bus to the radios) is
    likewise untested. If the fix is wrong, the arrangement changes.
 3. `Spotter`'s OUI signatures come from public research, not captured
    packets.

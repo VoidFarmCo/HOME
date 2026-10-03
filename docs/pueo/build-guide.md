@@ -3,9 +3,9 @@
 Wiring a CYD and four modules into a working unit, in the order that makes a
 fault easy to find.
 
-**Nothing in this guide has been wired yet.** Step 2 is done -- a board was
+**Nothing in this guide has been wired yet.** Step 2 is done (a board was
 flashed and run on 2026-09-20, and the display, the menus, touch, the WiFi
-scanner, the packet monitor, Spotter and Hunt all work -- but no module has
+scanner, the packet monitor, Spotter and Hunt all work), but no module has
 been soldered to anything, so steps 3 onward remain untested. The rest is
 derived from the pin map in [hardware.md](hardware.md), which
 `tools/check_pinmap.py` verifies against each board's own wiring, from the
@@ -21,7 +21,7 @@ than none, so they are gone with it.
 of the actual board, which is Sunton's and has Sunton's two breakout headers
 rather than the four JSTs this guide had been promising off an lcdwiki
 render. It went from three solder joints to six. The same look found the
-backlight sitting on GPIO 27 while the sketch had been driving 21 — which is
+backlight sitting on GPIO 27 while the sketch had been driving 21, which is
 why the Brightness setting had never worked on that panel, and is fixed.
 
 There is no PCB. [pcb-design.md](pcb-design.md) is design input for one, and
@@ -35,7 +35,7 @@ pulls on the order of 115 mA on transmit and the CC1101 around 34 mA, against
 a regulator already carrying an ESP32, a backlight and a display controller.
 Sharing it browns out the main rail, and a brownout on an ESP32 looks like a
 random reboot, a corrupt SD write, or a touch controller that has stopped
-answering — that is, like four different bugs rather than one power problem.
+answering: that is, like four different bugs rather than one power problem.
 
 Two rails, from one 5 V bus:
 
@@ -58,10 +58,10 @@ The PN532 runs from 5 V, not from either 3.3 V rail.
 
 | | |
 |---|---|
-| Base | CYD, either panel — see below |
+| Base | CYD, either panel, see below |
 | Sub-GHz | CC1101 on an HW-863 breakout, 300–439 MHz, board SMA |
 | 2.4 GHz | NRF24L01+PA+LNA, board SMA |
-| NFC | PN532 V3 — **SPI mode, DIP CH1=OFF, CH2=ON** |
+| NFC | PN532 V3, **SPI mode, DIP CH1=OFF, CH2=ON** |
 | GPS | ATGM336H, 9600 baud, IPEX with an active antenna |
 | Power | 1S LiPo, TP4056 with protection, MT3608 boost to 5 V, buck for +3V3_RF |
 
@@ -83,21 +83,21 @@ this build's board; the rest are here to be told apart from it.
 | GPIO 4 is | the LED's red | **amp enable** | the LED's red | **amp enable** |
 | Backlight | **27** | 27 | 21 | 21 |
 | Breakouts | **P3, CN1, P1** | SPI / I2C / UART JSTs | P3, CN1, P5 | 1.25 mm JST |
-| Outline | — | 55.50 × 101.50 | ~56 × 92.5 mm | 50.00 × 86.00 |
+| Outline | n/a | 55.50 × 101.50 | ~56 × 92.5 mm | 50.00 × 86.00 |
 
 **The 3.5" board this was built against is Sunton's, silkscreened
-`ESP32-035`** — the short form of `ESP32-3248S035R`, which is the part the
+`ESP32-035`**. The short form of `ESP32-3248S035R`, which is the part the
 code has named all along. The panel identification was never wrong. What was
 wrong was this guide's description of its *connectors*: it has the same two
-breakouts as Sunton's 2.8" — P3 and CN1 — and none of lcdwiki's `SPI` /
+breakouts as Sunton's 2.8", P3 and CN1, and none of lcdwiki's `SPI` /
 `I2C` / `UART` JSTs, which the table below used to promise.
 
 It has a `SPEAK1` connector, a two-pin 1.25 mm JST for an 8 ohm speaker
-driven from GPIO 26 -- DAC2, the same pin Sunton's 2.8" uses. It also has
+driven from GPIO 26. DAC2, the same pin Sunton's 2.8" uses. It also has
 `BAT1` for a battery, into a charger already on the board.
 
 **GPIO 4 on it is the RGB LED's red channel**, measured on 2026-09-23 by
-driving each candidate low in turn — the LED is common anode, so a pin sinks
+driving each candidate low in turn. The LED is common anode, so a pin sinks
 its own channel. GPIO 4 red, 16 blue, 17 green, 22 nothing. Both Sunton
 boards agree, and the "two vendors disagree about GPIO 4" warning above is
 about lcdwiki's parts rather than about the two panels this tree builds for.
@@ -110,10 +110,10 @@ done to dodge an amplifier that is not on this board; 25 is free there and it
 stays, but the reason in the commit is not the reason in the hardware.
 
 **The lcdwiki 4.0" E32R40T should run the 3.5" image unchanged.** Every pin
-lcdwiki lists for it is the same as the E32R35T's -- display SPI on
+lcdwiki lists for it is the same as the E32R35T's (display SPI on
 14/13/12 with CS 15 and DC 2, touch on that bus behind CS 33 with IRQ 36,
 backlight 27, SD on 5/18/23/19, RGB on 22/16/17, amplifier on 4 and 26,
-battery on 34 -- and the resolution is the same 320x480. The only entry
+battery on 34), and the resolution is the same 320x480. The only entry
 that differs at all is the controller's suffix, ST7796S against the 3.5"'s
 ST7796U, and TFT_eSPI drives the family with one `ST7796_DRIVER`.
 
@@ -125,14 +125,14 @@ One exception, as of 2026-09-23: **sound would not work on it.** The 3.5"
 image used to assert GPIO 4 as an audio amplifier's enable, which is exactly
 right for an lcdwiki board and was doing nothing but blinking an LED on the
 Sunton one it is actually built for. That assert is gone. On an E32R40T the
-amplifier would now never be enabled — a one-line fix for anyone who has one,
+amplifier would now never be enabled. A one-line fix for anyone who has one,
 and a good illustration of why the pin map should not be carrying a second
 board's datasheet in the first place.
 
 What does not carry over is the enclosure. The 4.0" is 60.88 x 111.11 x
 5.65 mm against the 3.5"'s 55.50 x 101.50 x 5.80, and there is no outline
-drawing here for it -- no aperture, no module outline, no mounting-hole
-pattern -- so a lid for it would be guesswork. [verify] and measure before
+drawing here for it (no aperture, no module outline, no mounting-hole
+pattern), so a lid for it would be guesswork. [verify] and measure before
 cutting one.
 
 None of this has been on a 4.0" board. It is two datasheets agreeing, which
@@ -169,7 +169,7 @@ An iron with a small **chisel** tip, 1.0-1.6 mm; gel flux; thin solder, leaded
 multimeter with a continuity beep; solder wick; and magnification with light
 on it. Six of the ten joints land on the ESP32 module's castellations, at
 1.27 mm pitch with pads either side you must not bridge. The continuity beep
-is not optional -- it is how you tell which pad you are on.
+is not optional. It is how you tell which pad you are on.
 
 Stranded silicone rather than solid Kynar wire-wrap wire. Kynar places more
 easily because it stays where you put it, and solid wire work-hardens and
@@ -182,7 +182,7 @@ go well is dexterity.
 
 **Flux is the whole game.** Gel flux, no-clean, on the pad before the iron
 goes near it. Most of "I cannot solder things this small" is really "I
-soldered without flux" -- the rosin core in the solder is not enough for a
+soldered without flux". The rosin core in the solder is not enough for a
 joint you are reflowing rather than making from scratch.
 
 **Tin the wire off the board.** Strip about 1.5 mm, tin it, then trim the
@@ -192,7 +192,7 @@ one-second touch instead of a three-handed juggle.
 
 **Use the solder that is already there.** These castellations were reflowed
 at the factory and carry a fillet. Flux, the tinned wire laid into it, one
-second of heat -- usually with no added solder at all. Feeding solder off the
+second of heat, usually with no added solder at all. Feeding solder off the
 roll while making the joint is exactly how the blob that bridges to IO5
 happens.
 
@@ -208,7 +208,7 @@ Both hands free and the wire cannot spring away mid-joint. This matters more
 than any tool on the list above.
 
 **Strain relief, or the joint fails later.** 30 AWG on a castellation is a
-cantilever. Anchor the wire to the board within about 5 mm of the joint --
+cantilever. Anchor the wire to the board within about 5 mm of the joint,
 hot glue, UV resin, more kapton. The joint that survives the bench is the one
 that fails in a bag.
 
@@ -248,7 +248,7 @@ driver polls) and **GPS RX** (the module only ever talks).
 
 **The SPI bus is not brought out, but do not solder to the microSD slot.** Earlier versions of this guide sent you to the card slot's own
 pins for SCK, MOSI and MISO, and called those three joints the whole
-difficulty of the build, because the slot still has to work afterwards —
+difficulty of the build, because the slot still has to work afterwards,
 Spotter's capture log and the wardriver both write to it.
 
 They reach the slot *through the ESP32*, so the module's own castellated pads
@@ -287,7 +287,7 @@ around that corner. Three of the pads that end the board are.
 The last four in that list are the ones on the bottom edge.
 
 Three ways to lose a board there. **IO5 sits directly between IO18 and IO17**
-and is the SD chip select -- bridge it and you have broken the card slot from
+and is the SD chip select. Bridge it and you have broken the card slot from
 the one direction you were trying to avoid. **SD1, SD0 and CLK** at the bottom
 are the module's internal flash; bridge those and it will not boot. **IO0** is
 the boot strap.
@@ -299,7 +299,7 @@ pad without soldering to it. IO16 and IO17 are the RGB LED's blue and green
 channels on these boards, so beep those to the LED's cathodes.
 
 If you would rather not probe blind, drive the pin low from firmware and sweep
-the edge with a meter on DC volts -- the pad reading 0 V is the one. That is
+the edge with a meter on DC volts. The pad reading 0 V is the one. That is
 how GPIO 4/16/17/22 were identified in the first place.
 
 **What the 3.5" does give you is all three CC1101 lines on one connector.**
@@ -312,7 +312,7 @@ solder pad: it was describing a different board.
 of P3's signals and adds 3.3 V, which makes it useful for powering something
 small rather than for a new signal.
 
-**The 3.5" board also has an audio amplifier** — there is a two-pin `SPEAK`
+**The 3.5" board also has an audio amplifier**. There is a two-pin `SPEAK`
 connector on it. Nothing in the pin map touches the amp, and `NRF24 CSN` is
 25 on this panel rather than 4 for exactly that kind of reason, but it is
 worth knowing it is there before you go looking for spare pins.
@@ -325,7 +325,7 @@ connector. The version before it was not, and it was wrong twice.
 Two lessons out of that. The first is that "cheap yellow display" names at
 least four boards, and a render of one is not a description of another. The
 second is that this guide and [hardware.md](hardware.md) disagreed about where
-GDO0 lands — hardware.md had P3 and was right — and neither of them noticed,
+GDO0 lands. Hardware.md had P3 and was right, and neither of them noticed,
 because prose does not get checked the way the pin map does.
 
 **The serial connector is P1**, beside the USB-C socket, carrying
@@ -333,17 +333,17 @@ because prose does not get checked the way the pin map does.
 P5 for a while, which is what Sunton's smaller board calls its equivalent.
 
 Get that order off your own silkscreen before you crimp. The GPS's transmit
-line goes to the pin marked `TX` -- the ESP32's own UART0 transmit, GPIO 1 --
+line goes to the pin marked `TX` (the ESP32's own UART0 transmit, GPIO 1),
 and the reasoning for that is in [hardware.md](hardware.md). Reversed, it puts
 two push-pull drivers on one net.
 
-The four-pin connectors -- P3, CN1 and P1 -- are **1.25 mm pitch**. P1 carries
+The four-pin connectors (P3, CN1 and P1) are **1.25 mm pitch**. P1 carries
 that label on Sunton's own drawing, and a photogrammetric check of CN1 agreed
 with it independently.
 
 **SPEAK1 and BAT1 are two-pin and were never measured.** BAT1 reads 1.36 mm
-against P1 in one frame, which rules out JST PH 2.0 -- the connector most
-hobby cells ship with -- but does not separate 1.25 from 1.50. See
+against P1 in one frame, which rules out JST PH 2.0, the connector most
+hobby cells ship with, but does not separate 1.25 from 1.50. See
 [hardware.md](hardware.md). Check by fit before you rely on it.
 
 **Ask for MX1.25 or Molex PicoBlade. Do not buy JST GH.** Both are 1.25 mm
@@ -353,7 +353,7 @@ so it dominates listings aimed at drone builders, and plenty of those say
 "PicoBlade" and "for Pixhawk" in the same title. Searching `MX1.25 2P` and
 leaving "Pixhawk" out of the query drops the GH parts from the results.
 
-Do not crimp 1.25 mm yourself -- it needs the proper tool, and a bad crimp is
+Do not crimp 1.25 mm yourself. It needs the proper tool, and a bad crimp is
 an intermittent you will chase for hours. Either buy assembled pigtails, or
 buy a kit of **pre-crimped wires with loose housings**, which is better here:
 the terminals push in with tweezers, so you choose the polarity at assembly
@@ -384,7 +384,7 @@ about the board.
 **2. Flash the stock firmware and boot the bare CYD.** Display, backlight and
 touch all work before you have introduced a single joint of your own. If the
 boot screen and menu come up and touch responds, you have a known-good
-starting point — and you will want one.
+starting point, and you will want one.
 
 ```bash
 esptool.py --chip esp32 -b 921600 write_flash 0x0 pueo-0.4.23-merged.bin
@@ -406,7 +406,7 @@ way round now, and there is no 2.8" image at all. `pueo-X.Y.Z-beacon-35-merged.b
 is the bench transmitter rather than Pueo, so it is not what you want here.
 
 **3. The three bus lines, then the SD card.** Solder SCK, MOSI and MISO to
-the ESP32 module's pads -- 9R, 2R and 8R -- identifying each by beeping it
+the ESP32 module's pads (9R, 2R and 8R) identifying each by beeping it
 against the matching microSD slot pin first. Then insert a card and confirm it
 still mounts.
 
@@ -415,14 +415,14 @@ from everything that follows. The card is also the check on the joints
 themselves: it shares all three nets, so if it still mounts, all three are
 sound, and if it does not, you have three suspects and no other variable.
 Nothing here touches the slot, so a card that stopped mounting means a bridge
-on the module -- look at IO5 first, which is the SD chip select and sits
+on the module. Look at IO5 first, which is the SD chip select and sits
 between two of the pads you just worked on.
 
 **4. CC1101.** Four wires, three of them to headers, plus power and ground
 from +3V3_RF. Then the jamming detector: activity on screen is enough to say
 the bus and the chip select both work.
 
-**CSN is GPIO 25, not GPIO 4.** Not because GPIO 4 is dangerous — it is the
+**CSN is GPIO 25, not GPIO 4.** Not because GPIO 4 is dangerous. It is the
 RGB LED's red channel on this board, measured rather than read off a
 datasheet. The assignment came from believing 4 was an audio amplifier's
 enable, which is true of lcdwiki's E32R35T and not of this one. It stays on 25
@@ -441,13 +441,13 @@ on the bus.
 switches to SPI before wiring it**: CH1=OFF, CH2=ON. In the wrong mode the
 module is silent and looks like a bad joint.
 
-**7. GPS.** One signal — module TX to GPIO 1 — plus power from +3V3_RF and an
+**7. GPS.** One signal, module TX to GPIO 1, plus power from +3V3_RF and an
 active antenna with sky view. Give it minutes, not seconds, for a first fix.
 
 **Do not take its VCC from P1's 5V pin.** That pin sits on the same four-way
 connector as the TX line you are wiring, one position away, which is the whole
-reason this needs saying. The ATGM336H's **absolute maximum VCC is 3.6 V** —
-a destruction limit, not a recommendation — and P1 carries 5 V whenever USB
+reason this needs saying. The ATGM336H's **absolute maximum VCC is 3.6 V**
+(a destruction limit, not a recommendation), and P1 carries 5 V whenever USB
 does.
 
 Wiring diagrams in circulation show GPS `VCC` going to `VIN` on this connector,
@@ -458,7 +458,7 @@ breakout with a regulator will run from it too, and one without passes it
 straight to a part that wants exactly that.
 
 Leave the module's RX open as well. Those same diagrams land it on GPIO 3,
-which is UART0 receive and is driven by the USB-UART bridge — so console
+which is UART0 receive and is driven by the USB-UART bridge, so console
 output would arrive at the GPS's command input, and that input accepts
 configuration commands.
 
@@ -499,10 +499,10 @@ silently half-working, which is a useful accident.
 MISO on GPIO 39 while everything else reads GPIO 19, and only one pad can
 drive that input at a time. `SpiBus` re-points the matrix on every handover.
 If this appears, it is a real bug and worth reporting with the feature you
-were in — see [spi-bus.md](spi-bus.md).
+were in, see [spi-bus.md](spi-bus.md).
 
 **Flakiness that follows CC1101 use.** LSatan's driver calls `SPI.end()`
-after every register access, which resets the whole peripheral — including
+after every register access, which resets the whole peripheral, including
 for the SD card and the touch controller that are also on it. Pueo works
 around this, but if the symptom returns it points here first.
 

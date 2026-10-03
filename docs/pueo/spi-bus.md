@@ -1,7 +1,7 @@
 # SPI bus arbitration
 
 The handoff put this first: *"Four devices on VSPI with different clock
-requirements. Get the abstraction right before anything else — retrofitting it
+requirements. Get the abstraction right before anything else. Retrofitting it
 is painful."*
 
 It is five devices, not four, and the thing that actually conflicts is not the
@@ -53,7 +53,7 @@ pin. Nothing about that appears in a build log.
 All verified by reading the 2.0.10 core, not inferred.
 
 **Both SPIClass objects are the same peripheral.** `spiStartBus()` ends with
-`return &_spi_bus_array[spi_num];` — a static, per-bus-number, with no
+`return &_spi_bus_array[spi_num];`, a static, per-bus-number, with no
 refcount. On CYD `touchscreenSPI` is `SPIClass(VSPI)` and the global `SPI` is
 `SPIClass(VSPI)`, so they hand out the *same* `spi_t*`. `SPI.end()` therefore
 calls `spiStopBus()` on the peripheral touch is using, and touch's own
@@ -69,7 +69,7 @@ SPI.begin(NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI, NRF24_SPI_SS);
 on feature entry does nothing whenever the bus is already started. The pin
 routing it appears to establish may never happen. This also defeats
 `ensureTouchSpiReady()`, which calls `touchscreenSPI.begin(...)` before every
-touch sample and looks exactly like a guard against this problem — it cannot
+touch sample and looks exactly like a guard against this problem. It cannot
 re-attach anything after the first call.
 
 **Clock settings outlive `end()`.** `SPIClass::end()` clears `_spi` but not
@@ -87,7 +87,7 @@ The first `SPI.begin(...)` or `reclaimSharedSpiBus()` re-points MISO at GPIO 19
 and touch is reading a pin nothing answers on. `ensureTouchSpiReady()` cannot
 recover it.
 
-Touch is the only input on a CYD — no PCF8574 buttons — so this would make the
+Touch is the only input on a CYD, no PCF8574 buttons, so this would make the
 device unusable until power-cycled. That is severe enough that it is probably
 untested territory rather than a regression, which fits: the stock `BOARD_CYD`
 pin map also lands the PN532 chip select on the touch clock, and upstream's own
@@ -98,7 +98,7 @@ bus").
 **Observed in the source: the CC1101 runs at whatever clock the last feature
 left.** The ELECHOUSE driver issues bare `SPI.transfer()` with no transaction,
 so it never sets its own speed. Most SubGHz entry points call
-`reclaimSharedSpiBus()` first, which ends at 4 MHz. Two do not —
+`reclaimSharedSpiBus()` first, which ends at 4 MHz. Two do not,
 `saveSetup()` (`subghz.cpp:2210`) and `subjammerSetup()` (`subghz.cpp:2738`)
 reach `setSpiPin()`/`Init()` with no reclaim on the path. Arriving there from
 an NRF feature leaves the bus at 10 MHz, above the CC1101's 6.5 MHz
@@ -141,8 +141,8 @@ hardware to run it on.
 
 ## What changed at the call sites
 
-The four legacy helpers — `sdReleaseOtherChipSelects`, `reclaimSharedSpiBus`,
-`restoreSdAfterSharedSpi`, `holdSdInactiveOnSharedSpi` — were re-expressed on
+The four legacy helpers (`sdReleaseOtherChipSelects`, `reclaimSharedSpiBus`,
+`restoreSdAfterSharedSpi`, `holdSdInactiveOnSharedSpi`) were re-expressed on
 top of `SpiBus` and kept their names and signatures, so all 29 existing call
 sites are untouched. That keeps the diff reviewable and the upstream merge
 cheap.
@@ -182,7 +182,7 @@ void ELECHOUSE_CC1101::SpiEnd(void) {
 `SPI.end()` calls `spiStopBus()`, which resets the peripheral. The touch
 controller and the SD card are on that same peripheral and hold the same
 `spi_t*`, so **every CC1101 register read tore the bus down for both of
-them**. That is the cause behind upstream's symptom comments -- "leaves the
+them**. That is the cause behind upstream's symptom comments, "leaves the
 SD card dead until something else re-inits the bus", "Mounting SD here is
 what broke SubGHz". It now ends the transaction and nothing more.
 
@@ -197,8 +197,8 @@ See `libs/SmartRC-CC1101-Driver-Lib/VENDORED.md`.
 
 It does not touch `sdTryBeginOrder()`, which still configures the bus inline.
 Its comments describe carefully tuned mount-retry ordering ("Do not
-`SPI.end()`/gpio_reset here — that tears down CC1101 after SubGHz Init") and
+`SPI.end()`/gpio_reset here, that tears down CC1101 after SubGHz Init") and
 rearranging it blind, with no card to test against, is not worth the risk.
 
-`sdSpiInit()` in `utils.cpp` is dead — nothing calls it. Left in place to keep
+`sdSpiInit()` in `utils.cpp` is dead. Nothing calls it. Left in place to keep
 the merge surface small; it is misleading if you are reading that file.

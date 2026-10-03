@@ -44,7 +44,7 @@ return (value & 0xC0) == 0xC0;
 Top bits `11` is a *static random* address: random, then fixed for the life
 of the device. It is the one random class that does not rotate. The
 addresses that do rotate are resolvable private addresses, top bits `01`,
-which phones and tags use precisely so they cannot be followed — and this
+which phones and tags use precisely so they cannot be followed, and this
 test misses them entirely.
 
 **The counter does not count address changes.**
@@ -62,7 +62,7 @@ the lookup and gets a **fresh row with the counter at zero**, so the one
 event the feature is named for is the one it can never observe.
 
 With `maxRandomizedMacChanges = 5`, the alert means "six advertisements from
-a static random address" — well under a second of normal traffic.
+a static random address", well under a second of normal traffic.
 
 Detecting rotation needs something that survives the address changing. That
 is the same problem Spotter has with ALPR cameras, and the answer there was
@@ -80,7 +80,7 @@ Nothing calls `esp_bt_gap_register_callback` or
 `esp_bt_gap_start_discovery` anywhere in the tree, and nothing could: NimBLE
 has no Classic support, and `ensureBleStackReady()` hands the Classic
 controller RAM back with `esp_bt_controller_mem_release` before the stack
-comes up, to reclaim about 30 KB. Same wall the skimmer hunter runs into —
+comes up, to reclaim about 30 KB. Same wall the skimmer hunter runs into,
 see `docs/pueo/skimmer-hunter.md`.
 
 Kept rather than deleted, because it is one design with `isBLE` and the
@@ -92,7 +92,7 @@ menu and believes this scans Classic.
 
 `setActiveScan(true)`. Worth stating because three features in this menu
 listen and only Spotter is passive. For a general sniffer, active scanning
-at least buys something — scan responses carry names — unlike in AirTag
+at least buys something (scan responses carry names) unlike in AirTag
 Sniffer, where it bought nothing and has been turned off.
 
 ## What it is actually good for
@@ -128,7 +128,7 @@ Scanner had two rendering bugs of its own, now fixed:
 **Manufacturer and service data were drawn as text.**
 `String((char*)device.getManufacturerData().c_str())` stops at the first
 zero byte. Apple's company identifier is `4C 00`, so **every Apple device
-displayed as the single letter `L`** and nothing else -- and Apple devices
+displayed as the single letter `L`** and nothing else, and Apple devices
 are most of what is interesting in a BLE scan. Microsoft's `06 00` fared no
 better. Both fields are hex now, capped at eleven bytes with a `..` marker,
 which is what the row holds.

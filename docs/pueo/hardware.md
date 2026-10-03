@@ -1,6 +1,6 @@
 # Pueo hardware
 
-A CYD with four external peripherals, in a custom 84 x 142 x 20 enclosure --
+A CYD with four external peripherals, in a custom 84 x 142 x 20 enclosure,
 85 x 170 if your board has no onboard charger and the power stack has to ride
 inside. See [pueo-enclosure.scad](pueo-enclosure.scad).
 
@@ -61,13 +61,13 @@ Read off the board, connector by connector, on 2026-09-23.
 
 | | Pins | Vendor's name for it | Signals |
 |---|---|---|---|
-| **P3** | 4 | Extended IO | `GND IO35 IO22 IO21` -- all three CC1101 control lines |
+| **P3** | 4 | Extended IO | `GND IO35 IO22 IO21`, all three CC1101 control lines |
 | **CN1** | 4 | temperature/humidity (DHT11) | `GND IO22 IO21 3.3V` |
 | **P1** | 4 | "4P 1.25 Power supply base" | `5V TX RX GND`, serial and the GPS's TX. **Pin 1 is 5V** off the silkscreen and **pin 4 is GND** by continuity, both 2026-09-29 |
 | **SPEAK1** | 2 | Speak | speaker, GPIO 26 |
 | **BAT1** | 2 | *(not in the datasheet)* | battery, into the onboard charger |
 
-The middle column comes from Sunton's own datasheet -- *3.5 inch ESP32
+The middle column comes from Sunton's own datasheet, *3.5 inch ESP32
 module ESP32-3248S035R/C*, Shenzhen Jingcai Intelligent, six pages, with a
 labelled render of the board on page 5. It explains CN1, which this file
 listed as four pins with no stated purpose: `GND IO22 IO21 3.3V` is a
@@ -82,7 +82,7 @@ independently.
 This file used to say "all of them are 1.25 mm pitch" and close with *Sunton's
 own documentation puts SPEAK and the battery connector at 1.25 as well.*
 That sentence was wrong twice. The datasheet's render shows six connectors
-and **BAT1 is not among them** -- nor is the USB-C socket -- so it documents
+and **BAT1 is not among them** (nor is the USB-C socket), so it documents
 an earlier revision than the board in hand and says nothing about either.
 And the pitch was never measured on a two-pin connector at all.
 
@@ -98,7 +98,7 @@ across 500 px of a macro shot is ordinary perspective. Settle it by fit: if a
 2-pin MX1.25 housing seats, it is 1.25.
 
 **Buy MX1.25 or Molex PicoBlade, never JST GH.** Both are 1.25 mm pitch and
-they do not mate -- GH latches on the side, PicoBlade on top. GH is the
+they do not mate: GH latches on the side, PicoBlade on top. GH is the
 Pixhawk standard, so listings aimed at drone builders are full of it, and
 several of them say "PicoBlade" and "for Pixhawk" in the same title.
 
@@ -172,7 +172,7 @@ at.
 
 That is ordinary behaviour for the part. The FM5324GA is a charger and a
 power-bank boost in one, and boost stages of that kind sit disabled until
-something enables them -- a key press, or a load-detect event. Once enabled
+something enables them: a key press, or a load-detect event. Once enabled
 they stay on, which is exactly the asymmetry seen here: it will not start from
 a cell, and it will not stop when USB goes away.
 
@@ -268,7 +268,7 @@ which is worth saying plainly, because a conclusion that outlives its premise
 reads exactly like a fact.
 
 **And feeding 5 V into this pin puts a second source on a node USB also
-drives.** That is the designed direction -- it is an input -- but nothing here
+drives.** That is the designed direction (it is an input), but nothing here
 knows what arbitrates the two, and the charger is on the same side of it.
 
 #### How this was got wrong first, which is the useful part
@@ -279,7 +279,7 @@ sitting at cell voltage through the high-side FET's body diode, waking under
 load. Everything fitted. It was wrong.
 
 Two things should have killed it earlier. The forward resistance was never
-asked for -- "not open" was read as "low", when a diode and a megohm leak both
+asked for, "not open" was read as "low", when a diode and a megohm leak both
 answer to that description, and only one of them is a diode. And the
 prediction was never taken seriously enough to be checked against: a silicon
 body diode passing 92 mA drops about 0.7 V, so the theory predicted roughly
@@ -301,7 +301,7 @@ Two things in it are not. It gives the module as 101.5 x 54.9 where the
 dimensioned drawing the enclosure uses says 55.50 wide, which would have made
 `BEZEL_W`'s 56.0 a 1.1 mm clearance rather than the 0.5 its comment claims.
 **Settled on 2026-09-24 by printing the lid: the board fits it.** Looser, not
-tighter, so nothing bound -- and that is why a drawing of the wrong board
+tighter, so nothing bound, and that is why a drawing of the wrong board
 (QDtech's E32R35T, lcdwiki's, not Sunton's) still produced a part that works.
 
 And page 3 says "The display resolution is 240x320" in prose and "320X480
@@ -361,8 +361,8 @@ NRF24 CSN was moved to GPIO 25, to avoid a hazard that does not exist on this
 board.
 
 **Where it comes from is second-hand pin maps.** CYD advice in circulation
-tends to name lcdwiki part numbers -- `E32R35T` for the 3.5", `E32R28T` for
-the 2.8" -- and to close with some form of "all other pins identical". The
+tends to name lcdwiki part numbers, `E32R35T` for the 3.5", `E32R28T` for
+the 2.8", and to close with some form of "all other pins identical". The
 first half is often right about the pin it is discussing. The second half is
 the trap: those two boards may well match each other, and neither of them is
 this one.
@@ -405,8 +405,8 @@ to GPIO 22. Nothing here has been built for it, and this image would drive
 that amplifier as a chip select.
 
 **On the Sunton board GPIO 4 is the RGB LED's red channel.** Measured on
-2026-09-23, by driving each candidate low in turn -- the LED is common anode,
-so a pin sinks its own channel -- and watching which colour came up. GPIO 4
+2026-09-23, by driving each candidate low in turn (the LED is common anode,
+so a pin sinks its own channel), and watching which colour came up. GPIO 4
 red, 16 blue, 17 green, and 22 nothing at all. The table above said 16 green
 and 17 blue until 2026-09-26: the measurement corrected the prose here and
 never reached the pin map three screens up, where a reader is more likely to
@@ -420,8 +420,8 @@ nothing in this build. The pin map had been following a datasheet for a board
 nobody here owns.
 
 It cost less than it might have. **NRF24 CSN is 25**, and the reason it was
-moved off GPIO 4 -- that keying an amplifier enable at chip-select rates
-clicks and draws off the display's rail -- was about a hazard that is not
+moved off GPIO 4, that keying an amplifier enable at chip-select rates
+clicks and draws off the display's rail, was about a hazard that is not
 there. It stays on 25 anyway: 25 is free, the assignment is published and
 built against, and what reverting would buy is one pin.
 
@@ -434,7 +434,7 @@ is the touch IRQ.
 
 **The lcdwiki 4.0" E32R40T is pin-identical to the 3.5"** on every line
 lcdwiki publishes, at the same 320x480, differing only in the controller's
-suffix -- which TFT_eSPI covers with one driver. The 3.5" image should run
+suffix, which TFT_eSPI covers with one driver. The 3.5" image should run
 on it unchanged. Untried here: two datasheets agreeing is a reason to
 expect it to work, not a report that it did. GPIO 26 is the
 amplifier's DAC output rather than a plain speaker pin.
@@ -463,7 +463,7 @@ and 27, and TFT_eSPI drives it HIGH at `begin()`. But `shared.h` also has
 `BACKLIGHT_PIN`, which the sketch attaches a PWM channel to for the
 Brightness setting, and it kept the `BOARD_CYD` default of 21 on both
 panels. `board_pueo.h` argued in a comment that 27 was the backlight on the
-3.5" -- and moved `CC1101_CS` onto 21 on that basis -- without ever saying
+3.5", and moved `CC1101_CS` onto 21 on that basis, without ever saying
 it in code.
 
 So on the 3.5" build, `BACKLIGHT_PIN` and `CC1101_CS` were both GPIO 21, and
@@ -530,7 +530,7 @@ Worth reporting upstream.
 
 The handoff flagged this as the first thing to fix. It is already correct on
 upstream main. `subghz.cpp` calls `setGDO(CC1101_GDO0, CC1101_GDO2)`, which
-resolves to `setGDO(22, 35)` — GDO0 on the output pin, GDO2 on the input-only
+resolves to `setGDO(22, 35)`, GDO0 on the output pin, GDO2 on the input-only
 pin. RCSwitch's `enableTransmit`/`enableReceive` agree. Nothing to change.
 
 GPIO 35 being input-only is a useful accident here: the assignment physically
@@ -541,7 +541,7 @@ cannot be made backwards without the transmit path silently failing.
 Done, and it turned out to be five devices rather than four: the XPT2046 touch
 controller is on the same peripheral as the radios and the SD card, and on a
 CYD it is the only input device. The conflict that matters is the GPIO matrix
-rather than the clock — MISO can only be sourced from one pad, and touch reads
+rather than the clock. MISO can only be sourced from one pad, and touch reads
 GPIO 39 while everything else reads GPIO 19.
 
 `SpiBus` now owns the bus. See [spi-bus.md](spi-bus.md).

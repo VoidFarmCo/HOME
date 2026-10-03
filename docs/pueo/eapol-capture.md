@@ -3,7 +3,7 @@
 Scope for recognising WPA handshakes in frames this firmware can already
 record. Steps 1 to 4 are built. Step 5, forcing a reassociation, is built as
 far as the decision and stops there: **nothing transmits**, and the reason is
-a blocker rather than a choice -- see the end.
+a blocker rather than a choice, see the end.
 
 Split deliberately into a passive half and an active one, because they are
 different decisions and only the first is in the spirit of what Spotter
@@ -51,7 +51,7 @@ Both found while scoping, both invisible until looked for.
 a callback and enabled promiscuous mode without touching the filter, so it
 inherited whatever the last feature left behind. Enter the captive portal or
 the probe sniffer, leave, then enter Packet Monitor, and it silently saw
-management frames only -- no data frames, no EAPOL, no error.
+management frames only: no data frames, no EAPOL, no error.
 
 Every feature that reads frames now states what it wants each time it
 starts. Packet Monitor asks for `MASK_ALL`; the deauth detector, the
@@ -62,8 +62,8 @@ callback, so the filter does not reach them.
 
 **The snapshot length is 512 on this board.** `ESP32DIV_PCAP_SNAP_LEN` is
 2324 on the ESP32-S3 and 512 everywhere else, and Pueo is a CYD. That is
-comfortably enough for EAPOL -- the largest key message runs to roughly 200
-bytes including headers -- but it is a ceiling worth knowing about before
+comfortably enough for EAPOL (the largest key message runs to roughly 200
+bytes including headers), but it is a ceiling worth knowing about before
 someone concludes frames are being mangled.
 
 It is also not a snapshot length in the usual sense. `wifi_promiscuous` does
@@ -87,7 +87,7 @@ else if (snifferPacket->payload[32] == 0x88 && snifferPacket->payload[33] == 0x8
   eapol_offset = 34;
 ```
 
-Two problems. There is **no length guard** -- those four bytes are read
+Two problems. There is **no length guard**. Those four bytes are read
 without checking that `sig_len` reaches 34, so a runt frame reads past the
 buffer. And 30 and 32 are the only two header layouts it knows: a 24-byte
 header plus LLC/SNAP, or a 26-byte QoS header plus the same. Anything else
@@ -105,7 +105,7 @@ The header length is computable from the frame control field, so compute it:
 Then LLC/SNAP is 8 bytes, with the ethertype in the last 2: the check is at
 `hdr + 6`, and the 802.1X payload starts at `hdr + 8`. Every step bounded
 against `sig_len` before it is read, the same discipline as the information
-element walk, and for the same reason -- this is a buffer off the air.
+element walk, and for the same reason. This is a buffer off the air.
 
 Only type Data (frame control type bits `0b10`) needs considering. Null-data
 subtypes carry no payload and can be dropped early.
@@ -156,7 +156,7 @@ filter them out in the name of tidiness.
 
 Handshakes happen at association, so waiting for one passively means waiting
 for somebody to connect. Every tool in this space forces the issue by
-deauthenticating a client so it reconnects -- Marauder sends five deauth
+deauthenticating a client so it reconnects, Marauder sends five deauth
 frames each time it sees a beacon of the target.
 
 Pueo already has a deauther, so the capability is not new. What would be new
@@ -216,8 +216,8 @@ The same approach as `tools/fuzz_ie_walk.py`, and for the same reason: the
 malformed frames that matter here are far easier to synthesise than to
 capture.
 
-- synthesise frames for each header layout -- 3-address, 4-address, QoS,
-  QoS with HT Control -- and assert the ethertype is found at the right
+- synthesise frames for each header layout (3-address, 4-address, QoS,
+  QoS with HT Control), and assert the ethertype is found at the right
   offset in each
 - synthesise the four key messages and assert each classifies correctly
 - fuzz truncated and malformed frames through a buffer that refuses any read
@@ -245,7 +245,7 @@ say so in a way that is easy to fix and hard to guess.
    A live hazard fixed whether or not the rest is built. 72 bytes.
 2. **Done.** `ESP32-DIV/Eapol.{h,cpp}`: header-length parsing and the
    ethertype check, bounds-checked, with `tools/check_eapol_locate.py`
-   holding it to account -- 80,134 checks, every header layout, every
+   holding it to account, 80,134 checks, every header layout, every
    truncation, and 80,000 random frames, with no read outside a frame.
    Payload offsets come out 32, 34, 38 and 38 for 3-address, QoS,
    4-address and QoS-with-HT-Control; the fixed-offset version knows the
@@ -260,7 +260,7 @@ say so in a way that is easy to fix and hard to guess.
    is the part that says so. 1,224 bytes of flash and 392 of RAM, the latter
    being sixteen rows of twenty-four bytes.
 
-   The tracker has no locking of its own, deliberately -- that is what lets
+   The tracker has no locking of its own, deliberately. That is what lets
    the checker run it on a host. The promiscuous callback and the UI are
    different tasks, so the critical section lives in `wifi.cpp` around both,
    with the counting done under it and the drawing outside.

@@ -6,7 +6,7 @@ each actually puts on the air, which is not quite what the names suggest and
 is not the same story for both radios.
 
 Documented to the same standard as `fast-pair-probe.md` because they belong
-to the same category — the features that transmit — and that half of the
+to the same category, the features that transmit, and that half of the
 device should be as legible as the listening half.
 
 ## What they transmit
@@ -20,7 +20,7 @@ writeReg(REG_RF_SETUP, RF_CONT_WAVE | RF_PLL_LOCK | RF_DR_HIGH | RF_PWR_MAX);
 ```
 
 `RF_CONT_WAVE` is the chip's constant-carrier bit. So this is **an
-unmodulated carrier at maximum output** — not packets, not noise, not
+unmodulated carrier at maximum output**, not packets, not noise, not
 malformed frames. Pure RF energy on one channel at a time, and on a PA+LNA
 module that is roughly +20 dBm.
 
@@ -28,7 +28,7 @@ They differ only in which channels they walk:
 
 | | channels |
 |---|---|
-| BLE Jammer, BLE mode | 3 — 2, 26, 80, the BLE advertising channels |
+| BLE Jammer, BLE mode | 3: 2, 26, 80, the BLE advertising channels |
 | BLE Jammer, Bluetooth mode | 21 across the band |
 | Proto Kill | 8 selectable sets: BLE, Bluetooth, WiFi, video TX, RC, USB wireless, Zigbee, NRF24 |
 
@@ -44,7 +44,7 @@ modules. It was neither: Pueo maps all three chip selects onto the one
 module, and the old `configureRadio()` called `startConstCarrier()` once per
 channel, each call replacing the last, so only the final entry of each group
 survived. The hopping that actually happened was in the feature loop, and
-still is — done once now instead of three times to the same chip.
+still is, done once now instead of three times to the same chip.
 
 ### SubGHz Jammer — CC1101, and this part is **not** established
 
@@ -58,8 +58,8 @@ ELECHOUSE_cc1101.SetTx();
 ```
 
 `SetTx()` puts the chip in TX. **Nothing is ever fed to it.** There is no
-payload written to the FIFO, and `TX_PIN` — the GDO0 line that would carry
-data in an asynchronous-serial setup — is only ever driven LOW, on stop. It
+payload written to the FIFO, and `TX_PIN` (the GDO0 line that would carry
+data in an asynchronous-serial setup) is only ever driven LOW, on stop. It
 is never toggled while jamming.
 
 So what radiates is an open question. A CC1101 in TX with an empty FIFO
@@ -80,7 +80,7 @@ swept every 1000 ms in auto mode.
 
 None of the three can tell you whether they worked. A jammer transmits and
 watches nothing; the screen shows only that the feature is running. That is
-not an omission to be fixed — to know you had suppressed a link you would
+not an omission to be fixed. To know you had suppressed a link you would
 have to be receiving it, which is a different radio configuration and a
 different feature.
 
@@ -94,8 +94,8 @@ and is not a companion to this.
 Worth stating once because it is genuinely different from the rest of the
 device, not as a warning.
 
-Every other transmitting feature here — the spoofers, the Fast Pair probe,
-the deauth logic that is deliberately not wired up — is a thing where
+Every other transmitting feature here (the spoofers, the Fast Pair probe,
+the deauth logic that is deliberately not wired up) is a thing where
 consent is a real defence. Test your own devices, or ones you have
 permission to test, and you are doing authorised security work.
 

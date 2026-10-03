@@ -1,12 +1,12 @@
 # Pueo
 
 Open-source firmware for a handheld multi-radio field tool built on a
-"cheap yellow display" — a touchscreen ESP32 carrying a CC1101 for sub-GHz,
+"cheap yellow display", a touchscreen ESP32 carrying a CC1101 for sub-GHz,
 an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and an ATGM336H for GPS, in
 a printed enclosure zoned to keep the radios apart.
 
 Two panels, one flash image each. The 3.5" ESP32-3248S035R is the reference
-board — the one this has run on, the one with a dimensioned enclosure, and
+board. The one this has run on, the one with a dimensioned enclosure, and
 the one that brings its SPI bus out on a connector rather than asking for
 three joints on a microSD slot.
 
@@ -30,7 +30,7 @@ clean under `-Wall -Wextra` rather than suppressing its own warnings.
 > are verified at the symbol level, and the parsers carry model-based tests
 > that run on a host. No radio module is soldered to a board yet, so the
 > features that need one are compiled rather than exercised. Features inherited from upstream are
-> inherited, not audited — where one has been read closely, the changelog
+> inherited, not audited. Where one has been read closely, the changelog
 > entry that did it says so.
 
 Lineage: forked from [CiferTech's ESP32-DIV](https://github.com/cifertech/ESP32-DIV)
@@ -109,11 +109,16 @@ tools/build.sh upload COM7
 `setup` is a one-time ~1 GB download. It installs everything into its own root
 rather than a global Arduino install, so it cannot disturb other projects.
 
-Current size: **1690265 bytes, 85% of the app partition**, 33% of RAM.
+Current size at 0.4.23: **1,805,632 bytes, 57% of the app partition**,
+measured off the published merged image rather than remembered.
 
-It was at 93% before the IR module came out. Pueo has no IR LED and no IR
-receiver, so `ir.cpp` and the IRremoteESP8266 protocol tables it pulled in
-were 140 KB of code that could never run on this board. Trimming upstream
+The partition is a single 3.00 MB slot. 0.4.2 moved to it from the pair of
+1.88 MB slots an over-the-air update needs, which nothing here uses, so a
+percentage quoted from before that release is against a partition this build
+no longer has. It was at 93% of the old slot before the IR module came out.
+Pueo has no IR LED and no IR receiver, so `ir.cpp` and the IRremoteESP8266
+protocol tables it pulled in were 140 KB of code that could never run on this
+board. Trimming upstream
 modules this hardware cannot reach is the cheapest headroom available, and
 there is more of it: Ducky/BadUSB is the next-largest piece with no
 corresponding hardware.
@@ -135,20 +140,20 @@ assert failed: do_core_init startup.c:328 (flash_ret == ESP_OK)
 
 That is `esp_flash_init_default_chip()` rejecting QEMU's emulated flash. The
 QEMU shipped with the current IDF installer is built against the IDF 5/6 line
-while this firmware is Arduino core 2.0.10, which is IDF 4.4 -- the flash chip
+while this firmware is Arduino core 2.0.10, which is IDF 4.4. The flash chip
 detection does not line up. Nothing to do with the firmware: the ROM loader,
 the second-stage bootloader and the app image all load correctly first.
 
 Worth being clear about the ceiling even if that were fixed. QEMU models the
 CPU, RAM, UART and timers. It does not model the ILI9341, the XPT2046, the
-CC1101, the NRF24, the PN532 or the WiFi radio -- which is to say, all of the
+CC1101, the NRF24, the PN532 or the WiFi radio, which is to say, all of the
 things actually worth testing here. A perfect boot under QEMU would prove
 `setup()` reaches the point where it touches hardware, and nothing beyond it.
 
 ### Things that will bite you
 
 **esp32 core 2.0.10, exactly.** Upstream documents this and means it. The 3.x
-line is IDF 5, which dropped `esp_event_loop.h` — `config.h` includes it, so
+line is IDF 5, which dropped `esp_event_loop.h`, `config.h` includes it, so
 3.x fails on the first file.
 
 **Library versions are pinned, and not for neatness.** Library Manager hands
@@ -165,7 +170,7 @@ customised both. `User_Setup cyd.h` has to land as TFT_eSPI's `User_Setup.h`.
 **Windows MAX_PATH.** The toolchain deliberately lives at `~/.pueo-esp32`, not
 inside the repo. The esp32 core compiles with `-fno-rtti`, which selects the
 `no-rtti` libstdc++ multilib, and with the core inside this repo the path to
-`.../xtensa-esp32-elf/no-rtti/bits/error_constants.h` came to 259 characters —
+`.../xtensa-esp32-elf/no-rtti/bits/error_constants.h` came to 259 characters,
 one under the 260 limit. The compiler reported the header as missing while it
 sat right there, and only that one multilib was affected, so the default build
 worked and `-fno-rtti` did not. Override the location with `PUEO_ARDUINO_ROOT`
@@ -177,7 +182,7 @@ if you must, but keep it short.
 frames can be injected, which is load-bearing and cannot be done with
 `--wrap`. It was also swallowing 30 unrelated duplicate symbols, one of them a
 real bug; those are fixed during setup. See
-[docs/pueo/zmuldefs.md](docs/pueo/zmuldefs.md). `-w` is **gone** --
+[docs/pueo/zmuldefs.md](docs/pueo/zmuldefs.md). `-w` is **gone**,
 `setup` strips it and the build runs `-Wall -Wextra`, which the sketch is
 clean under. See [docs/pueo/warnings.md](docs/pueo/warnings.md).
 
@@ -216,7 +221,7 @@ longer showing every Apple device as the letter `L`; the skimmer signatures
 marked with the radio they actually speak; and one sub-GHz frequency list
 where there were two. See `CHANGELOG.txt`.
 
-New in 0.2.3, tooling and documentation only — the compiled image is
+New in 0.2.3, tooling and documentation only. The compiled image is
 identical to 0.2.2 apart from the version string: `CHANGELOG.txt` ships in
 the archive and sits beside the downloads; `tools/make_release.sh` takes
 `PUEO_PUBLISH_DIR` to copy artifacts where they are served and verifies the
@@ -279,7 +284,7 @@ its address, and the end of a licence conflict the project inherited.
 New in 0.2.1, the first release since 0.1.0 whose compiled image actually
 differs in something other than the version string:
 
-- `SpotterSignatures.h` — Axon body cameras, and the community Flock OUI
+- `SpotterSignatures.h`: Axon body cameras, and the community Flock OUI
   collections. `00:25:DF` is Axon Enterprise's own IEEE block, so it lands
   on `Strong` under a new `Bodycam` kind; it means Axon hardware in range
   rather than a camera specifically, since the same block covers their
@@ -295,11 +300,11 @@ differs in something other than the version string:
   the registry names rather than the word "Flock", and earns its place by
   corroborating a Flock SSID or a Penguin advertisement rather than by
   firing alone. 688 bytes of flash, no RAM.
-- `docs/pueo/nrf24-fit-test.scad` — a test print for the one enclosure
+- `docs/pueo/nrf24-fit-test.scad`: a test print for the one enclosure
   pocket with no nominal slack: a clearance ladder, and a slice of the base
   taken as an `intersection()` with `base()` so it cannot drift from the
   real part
-- `tools/build.sh` — stopped shipping the build machine's home directory
+- `tools/build.sh`: stopped shipping the build machine's home directory
   inside the firmware. NimBLE's assert macros bake `__FILE__` in, so the
   absolute path of every asserting source file was in the image: seventeen
   strings of `C:\Users\<name>\...` in the published 0.1.0 and 0.2.0
@@ -310,48 +315,48 @@ differs in something other than the version string:
   otherwise leak one checkout's path into another's build. Side effect
   worth having: the merged image no longer depends on where it was built,
   so a rebuild at any path matches the published digest byte for byte. The
-  macro form of the flag is not enough for that -- it cleans `__FILE__` but
+  macro form of the flag is not enough for that. It cleans `__FILE__` but
   leaves the paths in the ELF's debug info, and the app descriptor carries
   a SHA-256 of that ELF
 
-New in 0.2.0, all of it design work rather than firmware — the compiled
+New in 0.2.0, all of it design work rather than firmware. The compiled
 image was unchanged from 0.1.0 apart from the version string:
 
-- `docs/pueo/pcb-design.md` — grew from a sketch into the carrier-board
+- `docs/pueo/pcb-design.md`: grew from a sketch into the carrier-board
   design: netlist, power tree, load budget, placement and the module
   dimensions as datasheets arrived
-- `docs/pueo/pueo-enclosure.scad` — the enclosure, which until now was an
+- `docs/pueo/pueo-enclosure.scad`: the enclosure, which until now was an
   untracked file outside the repo while being what every dimension in the
   design notes is measured against
-- `tools/gen_netlist.py` — generates the netlist, placement and BOM, and
+- `tools/gen_netlist.py`: generates the netlist, placement and BOM, and
   checks every signal GPIO against `board_pueo.h` so the two cannot drift
 
 Carried over from 0.1.0, including several things the list here previously
 missed:
 
-- `board_pueo.h` — board profile, resolving all pin conflicts
-- `gps.cpp` — `gpsPortOpen()`/`gpsPortClose()` bracket every UART open/close and
+- `board_pueo.h`: board profile, resolving all pin conflicts
+- `gps.cpp`: `gpsPortOpen()`/`gpsPortClose()` bracket every UART open/close and
   hand GPIO 1 between the console and the GPS
-- `tools/check_pinmap.py` — pin map checker
-- `tools/build.sh` — pinned, isolated toolchain, build, and CC1101 patches
-- `wifi.cpp` — removed an out-of-bounds write in both deauth frame builders
-- `SpiBus.{h,cpp}` — single owner for the shared VSPI bus, and the fix for
+- `tools/check_pinmap.py`: pin map checker
+- `tools/build.sh`: pinned, isolated toolchain, build, and CC1101 patches
+- `wifi.cpp`: removed an out-of-bounds write in both deauth frame builders
+- `SpiBus.{h,cpp}`: single owner for the shared VSPI bus, and the fix for
   touch losing the bus to the radios
-- `docs/pueo/zmuldefs.md` — what `-zmuldefs` was hiding
-- `docs/pueo/warnings.md` — what `-w` was hiding
-- `wifi.cpp`, `bluetooth.cpp`, `subghz.cpp`, `utils.cpp` — the per-screen UI
+- `docs/pueo/zmuldefs.md`: what `-zmuldefs` was hiding
+- `docs/pueo/warnings.md`: what `-w` was hiding
+- `wifi.cpp`, `bluetooth.cpp`, `subghz.cpp`, `utils.cpp`: the per-screen UI
   macros are scoped constants now, so `-w` could come off
-- `docs/pueo/spi-bus.md` — the bus map, and why touch was losing it
-- `Spotter.{h,cpp}`, `SpotterSignatures.h` — passive detection of ALPR
+- `docs/pueo/spi-bus.md`: the bus map, and why touch was losing it
+- `Spotter.{h,cpp}`, `SpotterSignatures.h`: passive detection of ALPR
   cameras and smart glasses from WiFi OUIs and BLE service UUIDs
-- `Branding.h` and the boot screen — the fork's own name, version and logo
-- `libs/SmartRC-CC1101-Driver-Lib/` — vendored, with `SpiEnd()` no longer
+- `Branding.h` and the boot screen: the fork's own name, version and logo
+- `libs/SmartRC-CC1101-Driver-Lib/`: vendored, with `SpiEnd()` no longer
   calling `SPI.end()` after every register access and tearing the peripheral
   out from under touch and the SD card
-- IR removed — no IR LED or receiver exists on this board, so 140 KB of
+- IR removed: no IR LED or receiver exists on this board, so 140 KB of
   protocol tables could never run. Flash went from 93% to 85%
-- `tools/make_release.sh` — source archive and merged flash image
-- `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
+- `tools/make_release.sh`: source archive and merged flash image
+- `.github/FUNDING.yml`: fork funding, upstream's Patreon kept
 
 That list predates the board. One was flashed and run on 2026-09-20, and the
 boot screen, the menus, the packet monitor, Surveillance and Hunt all work on

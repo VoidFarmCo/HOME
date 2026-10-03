@@ -1,6 +1,6 @@
 # Google Fast Pair
 
-The Apple side of this device was well covered — Continuity proximity
+The Apple side of this device was well covered, Continuity proximity
 pairing, nearby action and offline finding are parsed in three separate
 places. The Google side was not covered at all. The only `0xFE2C` that had
 ever appeared in this tree was `GOOGLE_FAST_PAIR_ID`, a spoofing template
@@ -20,7 +20,7 @@ set out under "Two corrections".
 
 Fast Pair uses BLE **service data** under 16-bit UUID `0xFE2C`. Not
 manufacturer data. That is why an Apple-shaped parser, which reaches for
-`getManufacturerData()`, never sees a Fast Pair device at all — the three
+`getManufacturerData()`, never sees a Fast Pair device at all. The three
 Apple parsers in `bluetooth.cpp` are structurally incapable of noticing one.
 
 `0xFEF3` is Nearby, a separate Google service that shares the neighbourhood
@@ -46,7 +46,7 @@ nibble is the type.
 | `0x3` | battery, show UI |
 | `0x4` | battery, hide UI |
 
-Battery bytes are one per component — left bud, right bud, case. Bit 7 is
+Battery bytes are one per component: left bud, right bud, case. Bit 7 is
 charging, the low seven bits are a percentage, and `0b1111111` means
 unknown. Anything else above 100 is also reported unknown rather than
 printed as a percentage that cannot be right.
@@ -76,7 +76,7 @@ ID for them.** `modelId = data[0]<<16 | data[1]<<8 | data[2]` is correct for
 a discoverable frame and produces a confident, plausible, entirely
 meaningless six-hex-digit number for every other frame. Since most earbuds
 in the air already belong to somebody, that is the common case rather than
-the edge case. The failure is silent — nothing about the output looks wrong.
+the edge case. The failure is silent. Nothing about the output looks wrong.
 `check_fastpair.py` pins it: for the frame `00 40 01 02 03 04 11 C7`, the
 naive read yields `004001`, and the parser here reports no Model ID at all.
 
@@ -117,7 +117,7 @@ confident product name on screen with nothing behind it.
 
 An unrecognised Model ID displays as six hex digits, which is true and can
 be looked up. To add an entry, resolve it against Google's service and
-record where the answer came from — the standard the OUI tables in
+record where the answer came from, the standard the OUI tables in
 `SpotterSignatures.h` are held to.
 
 ## What is checked

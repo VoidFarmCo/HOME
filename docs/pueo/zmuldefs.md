@@ -80,7 +80,7 @@ SPIClass spi = SPIClass(HSPI);     // TFT_eSPI: the display's SPI bus object
 ```
 
 Both global, both external linkage, same name. The linker folded them onto one
-address — confirmed in the linked image, where a single 32-byte symbol covered
+address, confirmed in the linked image, where a single 32-byte symbol covered
 both:
 
 ```
@@ -92,7 +92,7 @@ driver's one-byte flag was sitting exactly on the display's SPI bus number.
 
 What that means in practice:
 
-**Writes.** `setSpiPin()` does `spi = 1`. On the ESP32, `FSPI` is 1 — the bus
+**Writes.** `setSpiPin()` does `spi = 1`. On the ESP32, `FSPI` is 1, the bus
 attached to the flash chip. So every call wrote `_spi_num = FSPI` into
 TFT_eSPI's bus object. The firmware calls `setSpiPin()` six times, once per
 SubGHz feature entry.
@@ -114,8 +114,8 @@ mattered.
 
 It was a landmine, not a fire. Any of these would have set it off:
 
-- re-initialising the display for any reason — theme change, sleep/wake, error
-  recovery — which would call `spiStartBus(FSPI, ...)` on the flash bus
+- re-initialising the display for any reason (theme change, sleep/wake, error
+  recovery) which would call `spiStartBus(FSPI, ...)` on the flash bus
 - adding a SubGHz path that calls `Init()` without `setSpiPin()` first, which
   would then run with `SCK_PIN`/`MISO_PIN`/`MOSI_PIN`/`SS_PIN` all zero
 - enabling `TFT_SDA_READ` in `User_Setup.h`, which calls `spi.begin()` on every
@@ -124,7 +124,7 @@ It was a landmine, not a fire. Any of these would have set it off:
 ### Fix
 
 Give the CC1101 flag internal linkage. Nothing outside that translation unit
-references it — there is no `extern` for it in any header.
+references it. There is no `extern` for it in any header.
 
 ```c
 static bool spi = 0;
@@ -142,7 +142,7 @@ had been one:
 
 `-zmuldefs` now covers exactly the one case it was meant for. The other 30
 collisions are gone, so a new duplicate symbol introduced from here on is
-still silently swallowed — the flag is global. If that matters later, the
+still silently swallowed. The flag is global. If that matters later, the
 narrower option is `-Wl,--allow-multiple-definition` applied only to the link
 step that needs it, or moving the `ieee80211` override into its own
 translation unit and linking that with its own flags.

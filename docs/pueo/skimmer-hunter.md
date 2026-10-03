@@ -2,7 +2,7 @@
 
 `Skimmer Detect` is upstream's, arriving with ESP32-DIV v1.7.2. It scans for
 the default names of the serial modules that turn up inside Bluetooth-enabled
-card skimmers -- HC-05, HM-10, JDY-08 and their relatives -- and rates each
+card skimmers (HC-05, HM-10, JDY-08 and their relatives), and rates each
 1 to 5. A hit means a suspicious module is nearby, not that a skimmer is.
 
 This note exists because the signature table promises more than the scanner
@@ -25,7 +25,7 @@ HC-05 and HC-06 are the modules most associated with skimmers in the first
 place. They speak Bluetooth Classic SPP and do not advertise over BLE, so
 this feature will sit next to one and report nothing.
 
-Three more -- BT-04, BT04-A, BT-08 -- are sold in both flavours under the
+Three more (BT-04, BT04-A, BT-08) are sold in both flavours under the
 same name, and the table cannot tell which is in front of it. They are marked
 `Both` rather than guessed at.
 

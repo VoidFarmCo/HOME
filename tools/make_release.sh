@@ -170,6 +170,7 @@ INCLUDE=(
   "tools/check_doc_versions.py"
   "tools/check_doc_counts.py"
   "tools/check_ascii_strings.py"
+  "tools/check_prose.py"
   "tools/check_file_server.py"
   "tools/check_nrf_presence.py"
   "tools/check_sd_paths.py"

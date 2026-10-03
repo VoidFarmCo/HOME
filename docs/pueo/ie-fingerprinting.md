@@ -22,7 +22,7 @@ sharper problem underneath that, and it is already visible in the data:
 `82:6B:F2` has the locally-administered bit set. It is not a vendor block at
 all. `flock-finder` reports newer units using locally-administered addresses
 specifically to defeat prefix matching, and a randomised address is
-randomised -- keeping a list of them is keeping a list of dice rolls.
+randomised. Keeping a list of them is keeping a list of dice rolls.
 
 A camera that randomises its MAC defeats the OUI table completely, and it
 also defeats the `Hit` table itself: `findOrAdd` keys on the MAC, so one
@@ -62,7 +62,7 @@ and those two exclusions matter more than any of the inclusions.
 **The SSID's contents must not be in the hash.** It is the one field that
 varies between two probes from the same device, and it is already matched
 separately. Including it would produce a fingerprint per network name rather
-than per device -- and a wildcard probe would not match a directed one from
+than per device, and a wildcard probe would not match a directed one from
 the same radio.
 
 **The DS Parameter Set's contents must not be in the hash.** It carries the
@@ -72,7 +72,7 @@ give the same camera up to thirteen different fingerprints.
 (The first draft of this document excluded both elements outright, ids and
 all. That is worse: whether a device emits a DS Parameter Set in a probe at
 all is stable per driver, and throwing the id away throws that away with the
-channel. `tools/fuzz_ie_walk.py` holds the distinction to account -- it
+channel. `tools/fuzz_ie_walk.py` holds the distinction to account. It
 asserts that changing the SSID or the channel leaves the fingerprint alone
 while changing the supported rates moves it.)
 
@@ -82,7 +82,7 @@ that changes between probes; the fact that the element is present, and whose
 it is, does not.
 
 FNV-1a over that canonical byte sequence gives a `uint32_t`. The choice of
-hash is not interesting -- it needs to be cheap and well distributed, not
+hash is not interesting. It needs to be cheap and well distributed, not
 cryptographic.
 
 ## Where it lands
@@ -99,8 +99,8 @@ if (ssidLen == 0 || ssidLen > 32 || len < (uint16_t)(ieStart + 2 + ssidLen)) {
 ```
 
 That was correct for what it did. It was also fatal for fingerprinting,
-because a zero-length SSID is a **wildcard probe request** -- a device asking
-"is anyone there" rather than "is *my* network there" -- and those are a
+because a zero-length SSID is a **wildcard probe request**, a device asking
+"is anyone there" rather than "is *my* network there", and those are a
 large fraction of the probes in the air. They carry the full element set.
 Dropping them threw away most of the evidence.
 
@@ -119,8 +119,8 @@ that created it.
 ## Cost
 
 `onPacket` runs on the WiFi task, not in an interrupt, so calling into
-flash-resident code is fine. The walk is one pass over the tagged region --
-a probe request is rarely more than 150 bytes of elements -- and the hash is
+flash-resident code is fine. The walk is one pass over the tagged region
+(a probe request is rarely more than 150 bytes of elements), and the hash is
 an xor and a multiply per byte fed. Against the 36 three-byte `memcmp`s the
 OUI table already does per frame, this is not the expensive part.
 
@@ -153,7 +153,7 @@ lengths but element contents, up to every byte of a capabilities element.
 that refuses any read outside the frame and runs 65,543 frames through it,
 including an element of every contents-reading id claiming more than the
 frame holds, and elements ending exactly on the last byte. It says nothing
-about the compiled C -- there is no host compiler here -- but the bounds
+about the compiled C (there is no host compiler here), but the bounds
 reasoning is the part worth checking.
 
 Worth stating plainly because the rest of this document is about detection
@@ -178,7 +178,7 @@ detector but a way to see fingerprints at all:
   the card, on the **Log** button, off until it is switched on
 
 Capture records every device it hears rather than only the ones a signature
-matched, which is the entire point -- a fingerprint that already matched
+matched, which is the entire point. A fingerprint that already matched
 something is one you already have. It is also why it is off by default. A
 capture of the air around you is a list of the people near you: their
 phones, their watches, their cars. It stays on the card, nothing uploads
@@ -196,7 +196,7 @@ captures.
 
 **Randomised-address flagging** is free and immediate. `src[0] & 0x02` says
 the transmitter address is locally administered. That alone is worth
-surfacing -- not as a detection, but as a note on the row, because it is
+surfacing, not as a detection, but as a note on the row, because it is
 exactly the case where the OUI beneath it means nothing.
 
 **Grouping by fingerprint** fixes the table-exhaustion problem whether or not
@@ -215,7 +215,7 @@ hiding, so it keeps its own row whatever it shares with its neighbours.
 
 It is still not proof. Two handsets of the same model, both randomising,
 are indistinguishable from here and will be merged. The fold is limited to
-the case where the alternative -- a row per address -- is certainly wrong.
+the case where the alternative, a row per address, is certainly wrong.
 `tools/check_spotter_merge.py` pins all of that down: sixteen rules, one of
 which is that two real cameras of a model stay two rows.
 
@@ -262,7 +262,7 @@ hardware it is meant to detect.
    persistence. Another 308 bytes of flash and 192 of RAM. The row's third
    line now reads `fp 25567F65 rnd +3 12m`: the hash, whether the address is
    made up, how many times it has changed underneath us, and how long the
-   device has been in range. None of it scores into the confidence -- a
+   device has been in range. None of it scores into the confidence. A
    device being persistent is displayed, not believed, because what
    persistence is worth is a question for hardware to answer.
 4. **Done.** SD capture mode. 1,532 bytes of flash and 1,800 of RAM, most of
@@ -271,7 +271,7 @@ hardware it is meant to detect.
    from the main one, so a full ring drops rather than blocking the sniffer;
    deduplication happens on the producing side, because a row per frame
    would be hundreds a second. `tools/check_spotter_capture.py` covers the
-   ring, the dedupe and the escaping -- an SSID is arbitrary bytes off the
+   ring, the dedupe and the escaping. An SSID is arbitrary bytes off the
    air going into a text file, and a network named with a quote and a
    newline should not be able to forge rows in somebody's capture.
 5. `kIeSigs[]`, populated from captures, once there are any.

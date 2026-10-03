@@ -44,7 +44,7 @@ RAW_Data: 331 -179 337 -181 332 -180
 A `SubGhzProfile` holds a value and a bit count. There is nowhere for
 timings to go. Parsing one anyway would produce a profile that looks valid
 in the list and transmits nonsense, which is worse than a file that will not
-open — so RAW is refused by name, and by three separate signals: the
+open, so RAW is refused by name, and by three separate signals: the
 `Filetype`, a `Protocol: RAW` line, and the presence of `RAW_Data`. Any one
 of them is enough.
 
@@ -98,8 +98,8 @@ Nothing calls `SubFile::parse()`. The build size is unchanged because the
 linker garbage-collects it.
 
 Wiring it in means more than calling the parser. `saveProfile()`
-(`ESP32-DIV/subghz.cpp:1105`) is UI-bound — it reads globals and drives the
-screen rather than taking a profile as an argument — and
+(`ESP32-DIV/subghz.cpp:1105`) is UI-bound (it reads globals and drives the
+screen rather than taking a profile as an argument), and
 `importProfilesFromSD()` handles only Pueo's own binary format, header magic
 and all. There are also only `MAX_PROFILES = 5` slots in EEPROM, so an
 import has to ask which one it is replacing.
@@ -110,8 +110,8 @@ and is proved, then the part that can only be judged on hardware.
 
 ## Writing `.sub`
 
-Not done. Export is the more useful direction of the two — a Pueo capture
-that opens on a Flipper — and it is easier, because it is formatting rather
+Not done. Export is the more useful direction of the two (a Pueo capture
+that opens on a Flipper), and it is easier, because it is formatting rather
 than parsing. It needs a `Preset` name chosen for the CC1101 settings
 actually used, and a decision about what to write in `Protocol` for a
 capture whose rc-switch number has no Flipper equivalent, which is the same

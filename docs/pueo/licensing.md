@@ -21,7 +21,7 @@ written for this fork. Everything inherited from
 [ESP32-DIV](https://github.com/cifertech/ESP32-DIV) is CiferTech's and remains
 MIT; anyone who wants those parts under MIT can take them from upstream, and
 the notice travels with any redistribution of this tree. MIT is
-GPL-compatible, so the combination is lawful. What it is not is *reversible* —
+GPL-compatible, so the combination is lawful. What it is not is *reversible*,
 the combined work is GPL from here.
 
 ## The dependencies
@@ -32,7 +32,7 @@ story and only the source says which.
 
 | Library | Grant | Where it says so |
 |---|---|---|
-| ~~RF24 1.6.2~~ | ~~GPL-2.0-only~~ | **removed — see below** |
+| ~~RF24 1.6.2~~ | ~~GPL-2.0-only~~ | **removed, see below** |
 | **arduinoFFT** 1.6.2 | **GPL-3.0-or-later** | `arduinoFFT.h` |
 | NimBLE-Arduino | Apache-2.0 | `LICENSE` |
 | rc-switch | LGPL-2.1-or-later | `RCSwitch.h` |
@@ -40,7 +40,7 @@ story and only the source says which.
 | Adafruit_BusIO, ArduinoJson, PCF8574 | MIT | `LICENSE` |
 | XPT2046_Touchscreen | MIT | header comment |
 | SmartRC-CC1101-Driver-Lib | MIT | `libs/.../VENDORED.md` |
-| TFT_eSPI | BSD-family, no notice in the shipped zip | — |
+| TFT_eSPI | BSD-family, no notice in the shipped zip | n/a |
 
 RF24 was the problem, and the exact wording is why:
 
@@ -50,7 +50,7 @@ RF24 was the problem, and the exact wording is why:
 
 No "or any later version". That is GPLv2-only. The "or later" that does
 appear in RF24's `LICENSE` file is in the GPL's own *How to Apply These Terms*
-appendix — boilerplate that ships with every copy of the licence text and
+appendix, boilerplate that ships with every copy of the licence text and
 grants nothing. It is an easy thing to misread, and worth reading twice.
 
 > arduinoFFT: "either version 3 of the License, or (at your option) any later
@@ -103,14 +103,14 @@ whoever receives the binary must be able to get the corresponding source.
 This project publishes the archive alongside the image, which is what that
 takes.
 
-Images published **before** the removal — 0.1.0, 0.2.0 and 0.2.1 — contain
+Images published **before** the removal, 0.1.0, 0.2.0 and 0.2.1. Contain
 RF24 and are in the conflicted state described above. That is a licence
 infringement against RF24's or arduinoFFT's authors, whoever chooses to mind,
 and the tidy thing is to replace them with a build that is not.
 
 ## Ways out, and the one taken
 
-**Replace RF24** — taken. It removed every edge at once, because nothing else
+**Replace RF24**: taken. It removed every edge at once, because nothing else
 in the tree is GPLv2-only. It was expected to cost a full nRF24L01+ driver;
 it cost one small file, because the features that do the interesting work
 with that chip never used the library in the first place.
@@ -118,7 +118,7 @@ with that chip never used the library in the first place.
 The others, recorded because they were real options and because they stay
 relevant if a GPLv2-only dependency ever appears again:
 
-**Drop `arduinoFFT`.** Used for exactly one thing in each of two features — a
+**Drop `arduinoFFT`.** Used for exactly one thing in each of two features, a
 Hamming window, a forward transform, a magnitude conversion. A small radix-2
 FFT or any BSD/MIT one would remove the GPLv3 edge. It would have been
 necessary but not sufficient, since RF24 also conflicted with NimBLE.
@@ -126,18 +126,18 @@ necessary but not sufficient, since RF24 also conflicted with NimBLE.
 **Drop the NRF24 features.** Cheapest in effort, most expensive in product.
 
 **Ship source only, no binary.** Sidesteps the question by not distributing
-the combined work, at the cost of a 1 GB toolchain download for every user —
+the combined work, at the cost of a 1 GB toolchain download for every user,
 which is the reason the merged image exists at all.
 
 ## What the relicence did and did not buy
 
 **Did:** made this fork's own code compatible with GPL-licensed work, which
 is what the fingerprinting effort needs. `FlipDeFlock` is GPL-3.0-or-later,
-so its signature data can now be used here with attribution — its name and
+so its signature data can now be used here with attribution. Its name and
 logo are separately restricted, see its `TRADEMARK.md`.
 
 **Did not, on its own:** fix the binary. Relicensing made RF24 incompatible
-with this project's own code as well as with two of its dependencies — it
+with this project's own code as well as with two of its dependencies. It
 added an edge to an already-broken graph. Removing RF24 is what repaired it.
 Both steps were needed and only the second one was the fix.
 
@@ -154,6 +154,6 @@ Two things this tree hands on without the notice they should carry:
 
 This is a reading of licence texts in this repository by someone who is not a
 lawyer. The facts in the table are checkable and worth checking. The
-conclusions drawn from them are an opinion, and the conclusion that matters —
-that a GPLv2-only library cannot be combined with GPLv3 — is the Free
+conclusions drawn from them are an opinion, and the conclusion that matters
+(that a GPLv2-only library cannot be combined with GPLv3) is the Free
 Software Foundation's own published position, not a novel reading.

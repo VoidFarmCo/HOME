@@ -29,7 +29,7 @@ with prefix `0x05`, which is the setup popup for an *unpaired* tag. The
 sixteen random bytes are payload padding, not a Find My key.
 
 Nothing here transmits `0x12` at all. The only code in this firmware that
-touches offline finding is `AirTagSniffer`, which **receives** it &mdash; that
+touches offline finding is `AirTagSniffer`, which **receives** it. That
 is what lets it tell a separated tag from a passing phone.
 
 ## The defect, and the fix
@@ -45,9 +45,9 @@ for (int i = 0; i < 6; i++) {
 ```
 
 That is `BleSpoofer::toggleAdvertising` and, word for word, `SourApple`.
-`AirTagSpoofer` has its own version writing `s_mac`, with `|= 0xC0` — the
+`AirTagSpoofer` has its own version writing `s_mac`, with `|= 0xC0` (the
 correct top bits for a static random address, so somebody knew what they
-were doing — and then also never applied it.
+were doing), and then also never applied it.
 
 Nothing in the file called `esp_ble_gap_set_rand_addr`,
 `NimBLEDevice::setOwnAddrType` or `ble_hs_id_set_rnd`, so **every packet all
@@ -69,7 +69,7 @@ a build having nothing unused in it.
 **Changed: AirTag Spoofer no longer displays an address it is not using.**
 It printed `s_mac` on screen and in the log as though that were where the
 packets came from. The screen now shows the address actually in use. That is
-an operator-facing correctness fix — a tool that tells you the wrong thing
+an operator-facing correctness fix, a tool that tells you the wrong thing
 about what it is transmitting is worse than one that says nothing.
 
 **Changed: the two dead constants are gone**, and the three unused-address
@@ -101,7 +101,7 @@ about twenty-five times less churn.
 **It gives up rather than going dark.** Rotation is stop, set, start, and
 if the board turns out to dislike that the failure has to be visible. Three
 consecutive failures latch it off and put one line on screen saying which
-step was refused &mdash; `stop refused`, `set addr refused`, `restart refused`.
+step was refused, `stop refused`, `set addr refused`, `restart refused`.
 Advertising is restarted whatever happened in between, because a spoofer
 that silently stops transmitting is worse than one transmitting from a stale
 address, and a stale address is exactly what every release before this did.
@@ -123,7 +123,7 @@ them conspicuous to anything watching the band.
 
 What none of these have been checked against is a phone. The packets are
 built from the byte layouts each platform documents, so what is verified is
-that the bytes go out in the right order — not that the popup appears.
+that the bytes go out in the right order, not that the popup appears.
 
 ## Two templates added: Swift Pair and Flipper Zero
 
@@ -146,7 +146,7 @@ LL FF 06 00 03 SS 80 <name>  vendor-specific
 
 From Microsoft's Swift Pair component guidelines. The vendor ID `0x0006`,
 the `0x80` reserved RSSI byte, and the sub-scenario table are stated in the
-text. **The Beacon ID `0x03` is not** — it appears only in that page's
+text. **The Beacon ID `0x03` is not**. It appears only in that page's
 figures, which are images. It is what implementations use and what Windows
 answers, but it was read off a picture, and that is worth knowing if it ever
 stops working.
@@ -169,7 +169,7 @@ send `0x03`, which is not in the table at all.
 prints it verbatim. A neutral name means whoever is running the test can
 tell their own notification from a stranger's, and nothing here impersonates
 a brand it has no business wearing. The four random characters exist because
-the BLE address never rotates — see above — so the name is the only thing
+the BLE address never rotates, see above, so the name is the only thing
 that makes a second burst appear as a second notification.
 
 ### Flipper Zero
@@ -182,7 +182,7 @@ LL 09 <name>                 complete local name
 ```
 
 The service UUID is `0x3080` with the hardware colour OR'd into the low
-bits. That is not inferred from captures — Flipper's own firmware does it,
+bits. That is not inferred from captures. Flipper's own firmware does it,
 in its serial profile:
 
 ```c
@@ -196,8 +196,8 @@ hardware, not three services. The colour is randomised per burst, skipping
 
 ### A dead line found next door
 
-`devices_uuid` in `bluetooth.cpp` is `00003082-0000-1000-9000-00805f9b34fb`
-— the Flipper UUID, which is where the number above was first noticed. It is
+`devices_uuid` in `bluetooth.cpp` is `00003082-0000-1000-9000-00805f9b34fb`:
+the Flipper UUID, which is where the number above was first noticed. It is
 passed to `addServiceUUID()` immediately before `setAdvertisementData()`, and
 a custom advertisement payload replaces whatever `addServiceUUID` built, so
 it never reaches the air. It also carries `9000` where the Bluetooth base
@@ -219,5 +219,5 @@ looks right in the log, and is silently dropped by everything that hears it.
 It also walks the three older templates, which are fixed arrays and had
 never been checked. They are all well formed. The Google one decodes as
 three bytes of Fast Pair service data, which by the rule in `FastPair.cpp`
-is a discoverable frame advertising Model ID `00B727` — one fixed model,
+is a discoverable frame advertising Model ID `00B727`, one fixed model,
 never varied.

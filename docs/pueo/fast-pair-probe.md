@@ -33,8 +33,8 @@ correct Provider says nothing at all.
 
 Exactly the above, except that at step 1 there is no anti-spoofing key,
 because not having it is the point. What gets used instead is either a
-public key the Provider itself exposes on its Model ID characteristic, or —
-when it exposes none — the secp256r1 generator point, which is a valid point
+public key the Provider itself exposes on its Model ID characteristic, or,
+when it exposes none, the secp256r1 generator point, which is a valid point
 on the curve and is named `kGeneratorP256` rather than dressed up as a key,
 because it is not one.
 
@@ -61,16 +61,16 @@ characteristic looks like, so confirm it twice before reporting it anywhere.
 safety** and the screen says so in those words. A device is also silent when
 it is busy, already connected to its owner's phone, out of range, or when
 the link dropped before the notification arrived. The failure mode to worry
-about is a probe that is subtly broken — a reversed address, a write to the
-wrong characteristic — because then every device reports "no response" and a
+about is a probe that is subtly broken (a reversed address, a write to the
+wrong characteristic) because then every device reports "no response" and a
 broken probe is indistinguishable from a room full of correctly-behaving
 devices. That is why `tools/check_fastpair_probe.py` exists and why it spends
 most of its 50,293 checks on the address field.
 
-**No Fast Pair service** — it advertised `0xFE2C` but exposes no such GATT
+**No Fast Pair service**. It advertised `0xFE2C` but exposes no such GATT
 service, or no Key-based Pairing characteristic. Nothing was tested.
 
-**Probe failed** — could not connect, the write was rejected, or the crypto
+**Probe failed**: could not connect, the write was rejected, or the crypto
 would not set up. Nothing was tested.
 
 **Refused: stealth mode.** The probe writes, so Stealth Mode stops it.

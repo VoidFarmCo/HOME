@@ -11,7 +11,7 @@
 *Pueo* is the Hawaiian owl, a low, silent flier that hunts by listening.
 
 **A handheld multi-radio field tool.** Open-source firmware for the
-"cheap yellow display" — a touchscreen ESP32 carrying a CC1101 for sub-GHz,
+"cheap yellow display", a touchscreen ESP32 carrying a CC1101 for sub-GHz,
 an NRF24L01+PA+LNA for 2.4 GHz, a PN532 for NFC and an ATGM336H for GPS, in
 a printed enclosure zoned to keep the radios apart.
 
@@ -93,7 +93,7 @@ the touch clock on the smaller board this used to build for as well.
 Right: the two printed parts, rendered from source.</sub></p>
 
 Three of those pins are the CYD's onboard RGB LED, which Pueo gives up. The
-GPS lands on GPIO 1 — UART0's *transmit* pin — which looks wrong and is
+GPS lands on GPIO 1, UART0's *transmit* pin, which looks wrong and is
 deliberate; [docs/pueo/hardware.md](docs/pueo/hardware.md) explains why, and
 `gpsPortOpen()`/`gpsPortClose()` hand the pin between the console and the GPS.
 
@@ -230,13 +230,13 @@ rather than a global Arduino install, so it cannot disturb another project.
 
 **Read "Things that will bite you" in [PUEO.md](PUEO.md) before deviating
 from the script.** The esp32 core version, the pinned library versions and
-the toolchain path length are all load-bearing — on Windows the last one is
+the toolchain path length are all load-bearing. On Windows the last one is
 a `MAX_PATH` trap that reports a header as missing when it is right there.
 
 The build compiles clean under `-Wall -Wextra`. Upstream's `platform.txt`
 carries `-w` and `-zmuldefs`; `build.sh` strips both, and
 [docs/pueo/warnings.md](docs/pueo/warnings.md) and
-[zmuldefs.md](docs/pueo/zmuldefs.md) record what each was hiding — including
+[zmuldefs.md](docs/pueo/zmuldefs.md) record what each was hiding, including
 one linker override that turned out to be load-bearing.
 
 ## Documentation
@@ -278,23 +278,23 @@ One thing is especially useful, because nobody here can produce it:
 
 Mostly the parts that decide whether the hardware works at all:
 
-- **`board_pueo.h`** — board profile resolving every pin conflict in the
+- **`board_pueo.h`**: board profile resolving every pin conflict in the
   stock CYD map
-- **`SpiBus.{h,cpp}`** — a single owner for the VSPI bus the display, SD card
+- **`SpiBus.{h,cpp}`**: a single owner for the VSPI bus the display, SD card
   and all three radios share
-- **`wifi.cpp`** — removed an out-of-bounds write present in both deauth
+- **`wifi.cpp`**: removed an out-of-bounds write present in both deauth
   frame builders
-- **CC1101 driver** — vendored; `SpiEnd()` no longer calls `SPI.end()` after
+- **CC1101 driver**: vendored; `SpiEnd()` no longer calls `SPI.end()` after
   every register access, which was tearing the peripheral out from under
   touch and the SD card
-- **Warnings** — `-w` and `-zmuldefs` removed from the build, and the
+- **Warnings**: `-w` and `-zmuldefs` removed from the build, and the
   underlying issues fixed rather than silenced
 
 And the ones that were giving wrong answers rather than crashing. Where a
 fix applies to upstream too it has been sent back, and the pull request is
 linked; the rest are CYD-specific or were already covered there.
 
-- **GPS** — NMEA sentences are checked against their own checksum before
+- **GPS**: NMEA sentences are checked against their own checksum before
   anything parses them. `stripChecksum()` truncated at the `*` and threw the
   two hex digits away, so a corrupted RMC still looked like a well formed
   RMC, with a plausible latitude and timestamp, and the wardriver wrote it
@@ -302,39 +302,39 @@ linked; the rest are CYD-specific or were already covered there.
   too, because truncation is the likely corruption here and a sentence cut
   before its `*` would otherwise pass with its remaining fields intact and
   wrong.
-- **CC1101 presence** — read back `PARTNUM` and `VERSION` over SPI and check
+- **CC1101 presence**: read back `PARTNUM` and `VERSION` over SPI and check
   the answer is one a CC1101 would give, twice, because a floating line can
   look like a version once. Before this the sub-GHz tools started against a
   radio that was not there and hung. All five features that use the radio go
   through the guard: Replay Attack, Sub-GHz Jammer, Sub-GHz Brute, Jamming
   Detector and Saved Profiles. Sent upstream as
   [#257](https://github.com/cifertech/ESP32-DIV/pull/257).
-- **Scratch AP** — the interface the WiFi tools raise to push raw frames had
+- **Scratch AP**: the interface the WiFi tools raise to push raw frames had
   a fixed WPA2 passphrase written into the source, so every unit running
   this brought up a visible network with a published key. It is hidden and
   open now and carries no key at all. Sent upstream as
   [#258](https://github.com/cifertech/ESP32-DIV/pull/258).
-- **BLE spoofers** — the random MAC each round generated was never applied
+- **BLE spoofers**: the random MAC each round generated was never applied
   to the adapter, so Sour Apple and the spoofer transmitted from the same
   address every time. Not sent: upstream already had a patch for it.
-- **Sub-GHz jammer** — leaving the jammer while it was running did not stop
+- **Sub-GHz jammer**, leaving the jammer while it was running did not stop
   it transmitting. `jammingRunning` was only ever cleared by the toggle, so
   backing out of the feature left the radio keyed. Sent upstream as
   [#255](https://github.com/cifertech/ESP32-DIV/pull/255).
-- **Menu tables** — a checker that the parallel label and icon arrays are
+- **Menu tables**: a checker that the parallel label and icon arrays are
   fully initialised. They are walked by the same index, so a short icon
   table is a null pointer dereference at a menu position nobody visits in
   testing. Sent upstream as [#256](https://github.com/cifertech/ESP32-DIV/pull/256).
 
 ## License
 
-**GPL-3.0-or-later** for this fork's own code — see [LICENSE](LICENSE).
+**GPL-3.0-or-later** for this fork's own code. See [LICENSE](LICENSE).
 
 Upstream is MIT, Copyright (c) 2023 CiferTech, kept verbatim in
 [LICENSE.MIT](LICENSE.MIT). Those portions stay available under MIT from
 upstream, and the notice travels with any redistribution of this tree.
 
-> Images published before the RF24 removal — 0.1.0, 0.2.0 and 0.2.1 — link
+> Images published before the RF24 removal, 0.1.0, 0.2.0 and 0.2.1. Link
 > RF24, which is GPL-2.0-*only* and cannot lawfully share a binary with
 > arduinoFFT or NimBLE-Arduino. That conflict was inherited from upstream's
 > dependency set and had been there since 0.1.0. RF24 is gone now, nothing
