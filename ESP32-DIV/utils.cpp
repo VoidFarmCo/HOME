@@ -1405,19 +1405,18 @@ void loading(int frameDelay, uint16_t color, int16_t x, int16_t y, int repeats, 
     logoY = (screenHeight - bitmapHeight) / 2;
   }
 
+  // H.O.M.E crowned-skull loader: the skull breaks into bits that fall off the
+  // bottom, then rise back and reassemble. One full pass per call (see the
+  // repeats the call sites pass). Replaces the upstream skull_loading frames.
   const unsigned char* bitmaps[] = {
-    bitmap_icon_skull_loading_1,
-    bitmap_icon_skull_loading_2,
-    bitmap_icon_skull_loading_3,
-    bitmap_icon_skull_loading_4,
-    bitmap_icon_skull_loading_5,
-    bitmap_icon_skull_loading_6,
-    bitmap_icon_skull_loading_7,
-    bitmap_icon_skull_loading_8,
-    bitmap_icon_skull_loading_9,
-    bitmap_icon_skull_loading_10
+    bitmap_home_load_1,  bitmap_home_load_2,  bitmap_home_load_3,
+    bitmap_home_load_4,  bitmap_home_load_5,  bitmap_home_load_6,
+    bitmap_home_load_7,  bitmap_home_load_8,  bitmap_home_load_9,
+    bitmap_home_load_10, bitmap_home_load_11, bitmap_home_load_12,
+    bitmap_home_load_13, bitmap_home_load_14, bitmap_home_load_15,
+    bitmap_home_load_16, bitmap_home_load_17, bitmap_home_load_18
   };
-  const int numFrames = 10;
+  const int numFrames = 18;
 
   for (int r = 0; r < repeats; r++) {
     for (int i = 0; i < numFrames; i++) {

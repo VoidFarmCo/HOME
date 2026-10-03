@@ -4183,7 +4183,7 @@ void displayScanning() {
   tft.setCursor(10, LIST_HEADER_Y);
   tft.println("Scanning.");
 
-  loading(100, ORANGE, 0, 0, 3, true);
+  loading(100, ORANGE, 0, 0, 1, true);
 /*
   tft.setCursor(60, LIST_HEADER_Y);
   for (int i = 0; i < 2; i++) {

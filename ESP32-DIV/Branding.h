@@ -89,7 +89,10 @@
  * own name on the box.
  *
  * The skull is repeats x 10 frames x 100 ms, so one pass is 1.0 s. */
-#define PUEO_BOOT_SKULL_REPEATS 0
+/* One pass of the H.O.M.E crowned-skull loader on boot (bits fall off, rise
+ * back, reassemble), then the static logo + name. Was 0 while the loader was
+ * still upstream's skull; it is H.O.M.E's own art now, so boot plays it. */
+#define PUEO_BOOT_SKULL_REPEATS 1
 #define PUEO_BOOT_LOGO_MS       1500
 
 #define PUEO_LOGO_W 160

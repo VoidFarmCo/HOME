@@ -2697,7 +2697,7 @@ void displayScanning() {
   tft.setTextColor(GREEN);
   tft.setCursor(10, 50);
   tft.println("Scanning.");
-  loading(100, ORANGE, 0, 0, 3, true);
+  loading(100, ORANGE, 0, 0, 1, true);
   tft.setCursor(10, 65);
   tft.println("Wait a moment.");
   isScanning = false;
@@ -4015,7 +4015,7 @@ static void cpCloneDrawNetworkList(int count, const int* idx, int selectedIdx, b
 
 static void cpCloneDrawScanning() {
   cpDrawCloneFrame("Scanning...", "Looking for nearby APs");
-  loading(100, UI_WARN, 0, 0, 3, true);
+  loading(100, UI_WARN, 0, 0, 1, true);
 }
 
 static void cpCloneDrawEmpty() {
@@ -5004,7 +5004,7 @@ void drawScanScreen() {
         tft.setCursor(10, 50);
         tft.setTextColor(GREEN);
         tft.println("Scanning.");
-        loading(100, ORANGE, 0, 0, 3, true);
+        loading(100, ORANGE, 0, 0, 1, true);
         tft.setCursor(10, 65);
         tft.println("Wait a moment.");
         return;
@@ -5705,7 +5705,7 @@ void drawScanScreen() {
         tft.setCursor(10, 50);
         tft.setTextColor(GREEN);
         tft.println("Scanning.");
-        loading(100, ORANGE, 0, 0, 3, true);
+        loading(100, ORANGE, 0, 0, 1, true);
         tft.setCursor(10, 65);
         tft.println("Wait a moment.");
         return;
@@ -6634,7 +6634,7 @@ static void drawScanScreen(bool fullRedraw) {
     tft.setCursor(10, 50);
     tft.setTextColor(GREEN);
     tft.println("Scanning.");
-    loading(100, ORANGE, 0, 0, 3, true);
+    loading(100, ORANGE, 0, 0, 1, true);
     tft.setCursor(10, 65);
     tft.println("Finding hidden SSIDs.");
     return;
@@ -7483,7 +7483,7 @@ static void displayScanning() {
   tft.setTextColor(GREEN);
   tft.setCursor(10, 50);
   tft.println("Scanning.");
-  loading(100, ORANGE, 0, 0, 3, true);
+  loading(100, ORANGE, 0, 0, 1, true);
   tft.setCursor(10, 65);
   tft.println("Looking for WPS APs.");
 }
@@ -8043,7 +8043,7 @@ static void displayBusy(const char* line1, const char* line2) {
 
 static void displayBusyWithLoading(const char* line1, const char* line2) {
   displayBusy(line1, line2);
-  loading(100, ORANGE, 0, 0, 3, true);
+  loading(100, ORANGE, 0, 0, 1, true);
   // Restore the status lines after the centered loading bitmap.
   tft.setTextSize(1);
   tft.setTextColor(GREEN, TFT_BLACK);
