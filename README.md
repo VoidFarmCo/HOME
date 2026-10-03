@@ -1,3 +1,41 @@
+# H.O.M.E — Heads Of My Enemies
+
+**A multi-radio ESP32 pentest handheld firmware**, built for the 3.5"
+"cheap yellow display" (ESP32-3248S035R) and the field units at
+[headsofmyenemies.com](https://headsofmyenemies.com). WiFi and Bluetooth on
+the ESP32's own radio, plus CC1101 sub-GHz, NRF24 2.4 GHz, PN532 NFC/RFID and
+GPS when those modules are fitted, with drone Remote ID and surveillance-hardware
+detection included.
+
+> **Authorized use only.** Everything here is for equipment you own or have
+> written permission to test. These tools scan, capture and transmit; using
+> them against other people's gear is illegal in most places.
+
+### Credit & licence
+
+H.O.M.E is a fork of **[Pueo](https://github.com/magikh0e/pueo)** by magikh0e,
+itself based on **[ESP32-DIV](https://github.com/cifertech/ESP32-DIV)** by
+CiferTech. It is **GPL-3.0-or-later**, free to use, modify and sell, with
+source kept open; see `LICENSE`. Our thanks to both upstream projects, whose
+work this is built on.
+
+### Build & flash
+
+One isolated toolchain, no global Arduino install:
+
+```bash
+bash tools/build.sh setup       # once — installs the pinned core + libs
+bash tools/build.sh             # compile
+bash tools/build.sh upload COM4 # flash
+```
+
+All ~48 `tools/check_*.py` must pass before any change. See `CONTRIBUTING.md`.
+
+---
+
+*Everything below is Pueo's own README, kept for its hardware, wiring and
+build detail.*
+
 <p align="center">
   <img src="docs/img/pueo-header.webp" width="100%"
        alt="The Pueo mark: a stylised horned owl in green on near-black, with
