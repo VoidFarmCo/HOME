@@ -2345,7 +2345,7 @@ static StationEntry* s_sta = nullptr;
 static volatile int  s_staCount = 0;
 static uint8_t  s_targetBssid[6] = {0};
 static uint8_t  s_targetCh = 1;
-static char     s_targetSsid[20] = {0};
+static char     s_targetSsid[12] = {0};   // header shows a truncated SSID; keep .bss small
 static bool     isStationView = false;
 static uint32_t s_staLastDraw = 0;
 static int      s_staSel = -1;        // selected client row, -1 = none
