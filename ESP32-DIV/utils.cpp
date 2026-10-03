@@ -1474,9 +1474,8 @@ void displayLogo(uint16_t color, int displayTime) {
   textY += 16;
 
   tft.drawString(PUEO_VERSION, cx, textY);
-  textY += 22;
-
-  tft.drawString(PUEO_UPSTREAM, cx, textY);
+  // Upstream credit is intentionally NOT on the boot splash — it lives on the
+  // About screen (page 2), the serial banner, and LICENSE.
 
   tft.setTextDatum(TL_DATUM);   // leave the datum as the rest of the UI expects
 

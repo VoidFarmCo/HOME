@@ -89,7 +89,7 @@
  * own name on the box.
  *
  * The skull is repeats x 10 frames x 100 ms, so one pass is 1.0 s. */
-#define PUEO_BOOT_SKULL_REPEATS 1
+#define PUEO_BOOT_SKULL_REPEATS 0
 #define PUEO_BOOT_LOGO_MS       1500
 
 #define PUEO_LOGO_W 160
