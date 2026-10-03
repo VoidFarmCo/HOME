@@ -7889,6 +7889,10 @@ static const ReconCred RECON_CREDS[] = {
 };
 static constexpr int RECON_CRED_N = (int)(sizeof(RECON_CREDS) / sizeof(RECON_CREDS[0]));
 static constexpr uint16_t RECON_TIMEOUT_MS = 250;
+static constexpr int RECON_CUSTOM_MAX = 20;   // extra "user:pass" lines from /creds.txt
+/* Telnet is slow (one login sequence per cred, ~2 s each) and blocks its tick,
+ * so cap how many creds it tries; HTTP is fast enough to try them all. */
+static constexpr int RECON_TELNET_CRED_MAX = 8;
 
 static constexpr int RECON_LOG_LINES = 15;
 /* All recon runtime state is heap-allocated while recon runs; this board's DRAM
@@ -7901,6 +7905,8 @@ struct ReconState {
   bool active;
   bool fileOpen;
   File file;
+  char custom[RECON_CUSTOM_MAX][24];   // "user:pass" from /creds.txt
+  int  customCount;
 };
 static ReconState* s_rc = nullptr;
 
@@ -8753,6 +8759,55 @@ static void reconB64(const char* in, char* out, size_t outSz) {
   out[o] = 0;
 }
 
+/* Credentials to try = the built-in list plus whatever /creds.txt added. One
+ * numbering across both so the two probes iterate them the same way. */
+static int reconCredCount() {
+  return RECON_CRED_N + (s_rc ? s_rc->customCount : 0);
+}
+
+static void reconCredAt(int i, char* user, size_t us, char* pass, size_t ps) {
+  user[0] = 0;
+  pass[0] = 0;
+  if (i < RECON_CRED_N) {
+    snprintf(user, us, "%s", RECON_CREDS[i].user);
+    snprintf(pass, ps, "%s", RECON_CREDS[i].pass);
+    return;
+  }
+  const int j = i - RECON_CRED_N;
+  if (!s_rc || j < 0 || j >= s_rc->customCount) return;
+  const char* raw = s_rc->custom[j];
+  const char* colon = strchr(raw, ':');
+  if (colon) {
+    size_t ul = (size_t)(colon - raw);
+    if (ul >= us) ul = us - 1;
+    memcpy(user, raw, ul);
+    user[ul] = 0;
+    snprintf(pass, ps, "%s", colon + 1);
+  } else {
+    snprintf(user, us, "%s", raw);   // bare username, empty password
+  }
+}
+
+/* Load /creds.txt from the SD root: one user:pass per line, '#' comments and
+ * blanks skipped. Capped at RECON_CUSTOM_MAX. Best-effort; no card is fine. */
+static void reconLoadCustomCreds() {
+  if (!s_rc) return;
+  s_rc->customCount = 0;
+  if (!isSDCardAvailable()) return;
+  File f = SD.open(PUEO_DIR "/creds.txt", FILE_READ);   // Pueo location first
+  if (!f) f = SD.open("/creds.txt", FILE_READ);         // owner-placed root fallback
+  if (!f) return;
+  while (f.available() && s_rc->customCount < RECON_CUSTOM_MAX) {
+    String ln = f.readStringUntil('\n');
+    ln.trim();
+    if (ln.length() < 3 || ln[0] == '#' || ln.indexOf(':') < 0) continue;
+    strncpy(s_rc->custom[s_rc->customCount], ln.c_str(), 23);
+    s_rc->custom[s_rc->customCount][23] = 0;
+    s_rc->customCount++;
+  }
+  f.close();
+}
+
 static void reconLog(const char* line) {
   if (!s_rc) return;
   Serial.print("[recon] ");   // mirror to serial so a run can be watched over USB
@@ -8830,9 +8885,12 @@ static void httpProbe(IPAddress ip, uint16_t port) {
   }
 
   if (code == 401) {
-    for (int k = 0; k < RECON_CRED_N; k++) {
+    const int total = reconCredCount();
+    for (int k = 0; k < total; k++) {
+      char user[24], pass[24];
+      reconCredAt(k, user, sizeof(user), pass, sizeof(pass));
       char up[48];
-      snprintf(up, sizeof(up), "%s:%s", RECON_CREDS[k].user, RECON_CREDS[k].pass);
+      snprintf(up, sizeof(up), "%s:%s", user, pass);
       char b64[72];
       reconB64(up, b64, sizeof(b64));
       WiFiClient a;
@@ -8883,6 +8941,57 @@ static void rtspProbe(IPAddress ip, uint16_t port) {
   reconLog(line);
 }
 
+/* Read printable bytes for up to ms, dropping Telnet IAC command sequences
+ * (0xFF + 2 bytes). Approximate -- enough to see a login prompt or a shell. */
+static String telnetRead(WiFiClient& c, uint32_t ms) {
+  String out;
+  uint32_t t0 = millis();
+  while (millis() - t0 < ms && out.length() < 120) {
+    while (c.available() && out.length() < 120) {
+      int b = c.read();
+      if (b == 0xFF) { c.read(); c.read(); continue; }   // skip IAC cmd + option
+      if (b >= 32 && b < 127) out += (char)b;
+      else if (b == '\n' || b == '\r') out += ' ';
+    }
+  }
+  return out;
+}
+
+/* Try default creds over Telnet: read the prompt, send user, send pass, and
+ * judge the reply. A shell prompt char with no "incorrect"/"login" is taken as
+ * success. Best-effort: no full option negotiation, and capped attempts because
+ * each login sequence blocks its tick for ~2 s. */
+static void telnetProbe(IPAddress ip, uint16_t port) {
+  int total = reconCredCount();
+  if (total > RECON_TELNET_CRED_MAX) total = RECON_TELNET_CRED_MAX;
+  for (int k = 0; k < total; k++) {
+    char user[24], pass[24];
+    reconCredAt(k, user, sizeof(user), pass, sizeof(pass));
+    WiFiClient c;
+    c.setTimeout(RECON_TIMEOUT_MS);
+    if (!c.connect(ip, port)) return;   // not actually reachable
+    telnetRead(c, 700);                  // banner / login prompt
+    c.print(user); c.print("\r\n");
+    telnetRead(c, 500);                  // password prompt
+    c.print(pass); c.print("\r\n");
+    String r = telnetRead(c, 700);       // result
+    c.stop();
+    String low = r;
+    low.toLowerCase();
+    const bool fail = low.indexOf("incorrect") >= 0 || low.indexOf("login") >= 0 ||
+                      low.indexOf("fail") >= 0 || low.indexOf("denied") >= 0;
+    const bool prompt = r.indexOf('#') >= 0 || r.indexOf('$') >= 0 || r.indexOf('>') >= 0;
+    if (!fail && prompt) {
+      char up[48];
+      snprintf(up, sizeof(up), "%s:%s", user, pass);
+      char line[40];
+      snprintf(line, sizeof(line), "  CRED %.24s OK tn", up);
+      reconLog(line);
+      return;
+    }
+  }
+}
+
 static void reconStop() {
   if (!s_rc) return;
   s_rc->active = false;
@@ -8900,6 +9009,7 @@ static void reconStart() {
   s_rc->port = 0;
   s_rc->active = true;
   s_rc->fileOpen = false;
+  reconLoadCustomCreds();
   s_phase = Phase::Recon;
 
   if (isSDCardAvailable() && sdEnsureDir(CAPTURE_DIR)) {
@@ -8913,7 +9023,7 @@ static void reconStart() {
   updateNavLabels();
   reconDraw(true);
   char line[40];
-  snprintf(line, sizeof(line), "Recon %d hosts", s_hostCount);
+  snprintf(line, sizeof(line), "Recon %d hosts, %d creds", s_hostCount, reconCredCount());
   reconLog(line);
 }
 
@@ -8953,6 +9063,8 @@ static void reconStep() {
       httpProbe(ip, rp.port);
     else if (rp.port == 554 || rp.port == 8554)
       rtspProbe(ip, rp.port);
+    else if (rp.port == 23)
+      telnetProbe(ip, rp.port);
   } else {
     c.stop();
   }

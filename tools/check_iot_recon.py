@@ -29,6 +29,14 @@ The ways it goes wrong, each caught here:
      (teardown) calls reconStop -- or every run leaks ~700 bytes on a board
      that has none to spare.
 
+  7. Telnet creds succeed only on a shell prompt with no failure word, and the
+     attempts are capped -- each Telnet login blocks its tick for ~2 s, so an
+     uncapped loop over every cred would freeze the device for a minute.
+
+  8. Custom creds from /creds.txt are actually tried: reconCredCount includes
+     them, and the loader skips comments and blanks rather than feeding junk in
+     as a username.
+
 Reads source. Needs no board.
 """
 import re
@@ -90,7 +98,7 @@ def main():
 
     # 1. cred test only on 401.
     ok("creds tried only on HTTP 401",
-       re.search(r"if\s*\(\s*code\s*==\s*401\s*\)\s*\{[^}]*RECON_CRED_N", http_region) is not None,
+       re.search(r"if\s*\(\s*code\s*==\s*401\s*\)\s*\{[^}]*reconCredCount", http_region) is not None,
        "trying creds at every host is noise and abuse")
 
     # 2. success only on 200.
@@ -139,6 +147,37 @@ def main():
     teardown_region = squeeze(src[td:td + 200]) if td != -1 else ""
     ok("teardown stops recon", "reconStop()" in teardown_region,
        "leaving mid-recon would leak and keep the file open")
+
+    # 7. telnet cred test.
+    tel = src.find("static void telnetProbe(")
+    tel_end = src.find("static void reconStop() {")
+    tel_region = squeeze(src[tel:tel_end]) if (tel != -1 and tel_end != -1) else ""
+    ok("telnetProbe found", bool(tel_region))
+    ok("telnet success needs a prompt and no failure word",
+       re.search(r"if\s*\(\s*!fail\s*&&\s*prompt\s*\)", tel_region) is not None,
+       "otherwise any banner reads as a successful login")
+    ok("telnet cred attempts are capped",
+       re.search(r"total\s*>\s*RECON_TELNET_CRED_MAX", tel_region) is not None,
+       "an uncapped telnet loop freezes the device for ~a minute")
+    step_region2 = squeeze(src[src.find("static void reconStep() {"):src.find("void arpScannerLoop() {")])
+    ok("reconStep runs telnetProbe on port 23",
+       re.search(r"rp\.port\s*==\s*23\s*\)\s*telnetProbe", step_region2) is not None)
+
+    # 8. custom creds from /creds.txt.
+    cc = src.find("static int reconCredCount()")
+    cc_region = squeeze(src[cc:cc + 160]) if cc != -1 else ""
+    ok("cred count includes the custom creds",
+       re.search(r"RECON_CRED_N\s*\+\s*\(s_rc\s*\?\s*s_rc->customCount", cc_region) is not None,
+       "loaded creds would never be tried")
+    load = src.find("static void reconLoadCustomCreds()")
+    load_end = src.find("static void reconLog(")
+    load_region = squeeze(src[load:load_end]) if (load != -1 and load_end != -1) else ""
+    ok("creds.txt loader skips comments and lines without a colon",
+       re.search(r"ln\[0\]\s*==\s*'#'\s*\|\|\s*ln\.indexOf\(':'\)\s*<\s*0", load_region) is not None,
+       "a comment or junk line would be sent as a username")
+    ok("creds.txt load is capped at RECON_CUSTOM_MAX",
+       "customCount < RECON_CUSTOM_MAX" in load_region,
+       "an oversized file would overrun the custom buffer")
 
     print()
     if FAILED:

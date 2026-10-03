@@ -62,6 +62,7 @@ LEGACY = {
     "/ssids.txt":              "kSsidFilePath",
     "/ducky":                  "DUCKY_DIR",
     "/firmware.bin":           "FIRMWARE_FILE",
+    "/creds.txt":              "CREDS_FILE",
     "/config/settings.json":   "SETTINGS_PATH",
 }
 

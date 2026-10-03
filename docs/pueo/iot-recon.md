@@ -28,12 +28,21 @@ the left slot costs nothing.
 Per host, a curated port set: FTP, SSH, Telnet, DNS, HTTP (80/88/8000/8080),
 HTTPS, SMB, RTSP (554/8554), Modbus, MQTT, and the Dahua/XMEye camera ports
 (34567/37777). On an open HTTP port it grabs the `Server:` header; if that port
-answers **401** (auth required) it tries a built-in list of default credentials
-and reports one only on an authenticated **200**. On an open RTSP port it logs
-the first response line.
+answers **401** (auth required) it tries the credential list and reports one only
+on an authenticated **200**. On an open RTSP port it logs the first response
+line. On an open **Telnet** port (23) it tries the credential list by driving the
+login (read prompt, send user, send pass) and reports a hit when the reply shows
+a shell prompt with no failure word; Telnet attempts are capped, because each
+login sequence blocks for a couple of seconds.
+
+**Credentials.** The list is a built-in set of common defaults
+(`admin:admin`, `root:root`, and so on) plus any lines in **`/creds.txt`** at
+the SD root, one `user:pass` per line (`#` comments and blank lines ignored, up
+to 20 lines). HTTP tries them all; Telnet tries the first few.
 
 Findings roll on screen (last 15 lines) and append to **`/captures/iot_recon.txt`**
-on the SD card when one is present.
+on the SD card when one is present. The run is mirrored to serial as `[recon] ...`
+so it can be watched over USB.
 
 ## How it stays responsive
 
@@ -56,6 +65,10 @@ aborts back to the host list if the connection drops mid-scan.
 - the Basic-Auth base64 encoder matches the standard library (so logins are real),
 - the scan advances one port per tick (UI and Stop stay live),
 - recon needs a joined connection, to start and to continue,
-- the heap state is freed on stop and on leaving the feature.
+- the heap state is freed on stop and on leaving the feature,
+- Telnet counts a hit only on a shell prompt with no failure word, and caps its
+  attempts; the port-23 probe is wired,
+- custom creds from `/creds.txt` are counted and tried, and the loader skips
+  comments and junk lines rather than sending them as usernames.
 
 Each was broken on purpose to confirm the check fails, per `CONTRIBUTING.md`.
