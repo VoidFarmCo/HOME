@@ -23,6 +23,7 @@ device shows less than one of a working one -- stated here rather than
 implied.
 """
 import argparse
+import io
 import math
 import os
 import re
@@ -79,6 +80,10 @@ def set_panel(panel=35):
     global TILE_W, TILE_H, COLUMN_WIDTH, X_OFFSET_RIGHT, Y_START, Y_SPACING
     global TILE_ICON_DY, TILE_TEXT_DY, STATUS_ICONS_W, STATUS_TALL, TILE_ICON
     global BODY_FONT, BODY_LINE, BODY_LINE3, BODY_ROW, BODY_SIZE
+    global GRID_COLS, GRID_ROWS, GRID_SLOTS, GRID_GAP_X, GRID_GAP_Y
+    global GRID_TILE_W, GRID_TILE_H, GRID_Y0, GRID_ICON
+    global GRID_ICON_DY, GRID_TEXT_DY, GRID_LINE_H, GRID_CHARS
+    global GRID_FOOT_H
     PANEL = 35
     W, H = 320, 480
     TILE_W, TILE_H, COLUMN_WIDTH = 145, 92, 155
@@ -92,6 +97,27 @@ def set_panel(panel=35):
     # PUEO_STATUS_TALL in shared.h. The menu grids get the taller bar; their
     # Y_START is 44, so it costs no tile.
     STATUS_TALL = 34
+
+    # ── the submenu grid ──────────────────────────────────────────────────
+    #
+    # ESP32-DIV.ino's GRID_* block. The submenus were a list of 30 px rows,
+    # which is 4.6 mm on a 165 ppi panel and under what a fingertip wants,
+    # and they paged at six entries. These tiles are 96x70, or 14.8 x 10.8 mm,
+    # and fifteen of them hold the largest submenu, so there are no pages.
+    GRID_COLS = 3
+    GRID_ROWS = 5
+    GRID_SLOTS = GRID_COLS * GRID_ROWS
+    GRID_GAP_X = 8
+    GRID_GAP_Y = 6
+    GRID_TILE_W = (W - GRID_GAP_X * (GRID_COLS + 1)) // GRID_COLS
+    GRID_TILE_H = 70
+    GRID_Y0 = 54
+    GRID_ICON = 32
+    GRID_ICON_DY = 8
+    GRID_TEXT_DY = 46
+    GRID_LINE_H = 10
+    GRID_CHARS = (GRID_TILE_W - 4) // 6
+    GRID_FOOT_H = 34
     # PUEO_BODY_FONT / PUEO_BODY_H in shared.h. This panel is dense, so the
     # list screens use font 2. The drone detector deliberately does not.
     BODY_FONT = 2
@@ -747,41 +773,106 @@ def render_menu(t, selected=0):
     status_bar(t, STATUS_TALL)
 
 
-BT_PAGE0 = [
-    ("BLE Jammer", "bitmap_icon_ble_jammer"),
-    ("BLE Spoofer", "bitmap_icon_spoofer"),
-    ("Sour Apple", "bitmap_icon_apple"),
-    ("AirTag Spoofer", "bitmap_icon_tags"),
-    ("AirTag Sniffer", "bitmap_icon_magnifying_glass"),
-    ("Sniffer", "bitmap_icon_analyzer"),
-    ("BLE Scanner", "bitmap_icon_graph"),
-    ("BLE Rubber Ducky", "bitmap_icon_rubber_ducky"),
-]
+
+
+def ino_table(name):
+    """A menu's strings or icon names, read out of the sketch.
+
+    BT_PAGE0 used to be a list in this file with eight entries while the
+    sketch's page had six. A screenshot is documentation and this is the file
+    that exists so documentation cannot drift from the source, so it does not
+    get to keep its own copy of the source.
+    """
+    src = io.open(os.path.join(REPO, "ESP32-DIV", "ESP32-DIV.ino"),
+                  encoding="utf-8", errors="replace").read()
+    m = re.search(r"\*\s*%s\s*\[[^\]]*\]\s*=\s*\{(.*?)\};"
+                  % re.escape(name), src, re.S)
+    if not m:
+        raise SystemExit("render_screens: no table %s in the sketch" % name)
+    body = re.sub(r"//[^\n]*", "", m.group(1))
+    if '"' in body:
+        return re.findall(r'"([^"]*)"', body)
+    return [x.strip() for x in body.split(",") if x.strip()]
+
+
+def grid_wrap(label):
+    """Two lines, split at the space that balances them. gridWrap() in the
+    sketch, same rule, because the screenshot has to break where the panel
+    breaks."""
+    if len(label) <= GRID_CHARS:
+        return label, ""
+    best, cost = -1, 1 << 20
+    for i, ch in enumerate(label):
+        if ch != " ":
+            continue
+        a, b = i, len(label) - i - 1
+        if a > GRID_CHARS or b > GRID_CHARS:
+            continue
+        if abs(a - b) < cost:
+            best, cost = i, abs(a - b)
+    if best < 0:
+        return label[:GRID_CHARS], label[GRID_CHARS:GRID_CHARS * 2]
+    return label[:best], label[best + 1:]
+
+
+def render_grid(t, title, items, icons, selected):
+    """drawMenuGrid() plus drawSubmenuFooter()."""
+    t.fill_screen(UI_BG)
+    status_bar(t, STATUS_TALL)
+    t.print_f1(8, 38, title, UI_ICON, UI_BG)
+    n = "%d features" % len(items)
+    t.print_f1(W - 8 - len(n) * 6, 38, n, rgb(0x8410), UI_BG)
+    t.draw_fast_hline(0, 50, W, UI_LINE)
+
+    for i, (label, icon) in enumerate(zip(items, icons)):
+        if i >= GRID_SLOTS:
+            break
+        col, row = i % GRID_COLS, i // GRID_COLS
+        x = GRID_GAP_X + col * (GRID_TILE_W + GRID_GAP_X)
+        y = GRID_Y0 + row * (GRID_TILE_H + GRID_GAP_Y)
+        sel = (i == selected)
+        fill = UI_ICON if sel else UI_FG
+        edge = UI_ICON if sel else UI_LINE
+        ink = UI_BG if sel else UI_TEXT
+        icol = UI_BG if sel else UI_ICON
+        t.fill_round_rect(x, y, GRID_TILE_W, GRID_TILE_H, 5, fill)
+        t.draw_round_rect(x, y, GRID_TILE_W, GRID_TILE_H, 5, edge)
+        try:
+            t.draw_bitmap_scaled(x + (GRID_TILE_W - GRID_ICON) // 2,
+                                 y + GRID_ICON_DY, icon, 16, 16, icol,
+                                 GRID_ICON // 16)
+        except Exception:
+            pass
+        l1, l2 = grid_wrap(label)
+        ty = y + GRID_TEXT_DY + (0 if l2 else GRID_LINE_H // 2)
+        t.print_f1(x + (GRID_TILE_W - len(l1) * 6) // 2, ty, l1, ink, fill)
+        if l2:
+            t.print_f1(x + (GRID_TILE_W - len(l2) * 6) // 2, ty + GRID_LINE_H,
+                       l2, ink, fill)
+
+    fy = H - GRID_FOOT_H
+    t.fill_rect(0, fy, W, GRID_FOOT_H, UI_BG)
+    t.draw_fast_hline(0, fy, W, UI_LINE)
+    iy = fy + (GRID_FOOT_H - 16) // 2
+    try:
+        t.draw_bitmap(10, iy, "bitmap_icon_go_back", 16, 16, UI_TEXT)
+    except Exception:
+        pass
+    t.print_f2(30, iy, "Main Menu", UI_TEXT, UI_BG)
+
+
 
 
 def render_bluetooth(t, selected=3):
-    """displayPagedSubmenu(), Bluetooth page 0.
+    """The Bluetooth submenu, which is one grid now rather than two pages.
 
-    A list, not a tile grid: rows at 30 + i * 30, so the short bar. Calling
-    it a grid in a comment is how it got a tall one that painted over its
-    own first row."""
-    t.fill_screen(UI_BG)
-    for i, (label, icon) in enumerate(BT_PAGE0):
-        y = 30 + i * 30
-        c = UI_ICON if i == selected else UI_TEXT
-        t.draw_bitmap(10, y, icon, 16, 16, c)
-        t.print_f2(30, y, "| " + label, c, UI_BG)
-
-    ny = H - 30
-    icon_y = ny + (28 - 16) // 2
-    text_y = ny + (28 - 16) // 2
-    t.draw_bitmap(10, icon_y, "bitmap_icon_go_back", 16, 16, UI_TEXT)
-    t.print_f2(30, text_y, "Main Menu", UI_TEXT, UI_BG)
-    label = "Next Page"
-    icon_x = W - 10 - 16
-    t.print_f2(icon_x - 4 - t.text_width(label), text_y, label, UI_TEXT, UI_BG)
-    t.draw_bitmap(icon_x, icon_y, "bitmap_icon_navigate_right", 16, 16, UI_TEXT)
-    status_bar(t)
+    Eleven features, fifteen slots, so Next Page is gone. The rows it had
+    were 30 px, which is 4.6 mm on this panel against the 7 mm a fingertip
+    wants, and they were the tap targets.
+    """
+    items = ino_table("bluetooth_page0_items") + ino_table("bluetooth_page1_items")
+    icons = ino_table("bluetooth_page0_icons") + ino_table("bluetooth_page1_icons")
+    render_grid(t, "Bluetooth", items, icons, selected)
 
 
 # Spotter rows, in the shape drawList() prints them. Each is what the

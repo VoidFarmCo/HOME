@@ -355,6 +355,72 @@ static int* pagedSubmenuPage() {
     return (current_menu_index == 4) ? &bluetooth_submenu_page : &wifi_submenu_page;
 }
 
+/* ── Both pages, as one grid ──────────────────────────────────────────────
+ *
+ * WiFi is twelve features and Bluetooth eleven, and both fit in the grid's
+ * fifteen slots, so neither needs a second page. The page variables stay.
+ *
+ * That is deliberate rather than lazy. Which feature a tap launches is
+ * decided by about ninety tests of the form
+ *
+ *     if (wifi_submenu_page == 0 && current_submenu_index == 3)
+ *
+ * scattered through the dispatch, and rewriting all of them into one index
+ * space is the kind of change that silently launches the wrong feature. So
+ * the grid is a view over both pages: tile 7 sets page 1, index 1, and every
+ * one of those tests goes on reading what it always read.
+ *
+ * Nothing on screen has a page any more. The variable is an implementation
+ * detail of the dispatch now, which is where it can stay until that is worth
+ * untangling on its own.
+ */
+static int pagedTotalFeatures() {
+    return (current_menu_index == 4)
+        ? (BT_PAGE0_FEATURES + BT_PAGE1_FEATURES)
+        : (WIFI_PAGE0_FEATURES + WIFI_PAGE1_FEATURES);
+}
+
+static int pagedFirstPageCount() {
+    return (current_menu_index == 4) ? BT_PAGE0_FEATURES : WIFI_PAGE0_FEATURES;
+}
+
+/* Tile index -> (page, index on that page). */
+static void pagedSplit(int tile, int &page, int &idx) {
+    const int first = pagedFirstPageCount();
+    if (tile < first) { page = 0; idx = tile; }
+    else              { page = 1; idx = tile - first; }
+}
+
+static const char* pagedItemAt(int tile) {
+    int page, idx;
+    pagedSplit(tile, page, idx);
+    if (current_menu_index == 4) {
+        return page ? bluetooth_page1_items[idx] : bluetooth_page0_items[idx];
+    }
+    return page ? wifi_page1_items[idx] : wifi_page0_items[idx];
+}
+
+/* Which tile the last tap chose, in the page-local index the dispatch uses.
+ * -1 when the tap was not on a tile. */
+static int s_gridTapIndex = -1;
+
+static void applyPagedSubmenuPage() {
+    if (current_menu_index == 4) {
+        applyBluetoothSubmenuPage();
+    } else {
+        applyWifiSubmenuPage();
+    }
+}
+
+static const unsigned char* pagedIconAt(int tile) {
+    int page, idx;
+    pagedSplit(tile, page, idx);
+    if (current_menu_index == 4) {
+        return page ? bluetooth_page1_icons[idx] : bluetooth_page0_icons[idx];
+    }
+    return page ? wifi_page1_icons[idx] : wifi_page0_icons[idx];
+}
+
 // Bottom row: [icon | Main Menu] ........ [Next/Prev Page | icon]
 static int pagedBackBtnIndex() {
     return pagedFeatureCount();
@@ -906,6 +972,174 @@ const int Y_SPACING = 106;
 const int TILE_ICON_DY = 19;
 const int TILE_TEXT_DY = 57;
 
+/* ── The submenu grid ────────────────────────────────────────────────────
+ *
+ * Three columns of five, replacing the list the submenus used.
+ *
+ * The list was not a style problem. Its rows were 30 px, which is 4.6 mm on
+ * a 165 ppi panel against the 7 mm a fingertip needs, and the rows are the
+ * tap targets: the d-pad path needs a PCF8574 expander that is not fitted,
+ * so touch is the only input there is. It also paged at six entries while
+ * leaving 45% of the panel black, which cost a tap for nothing.
+ *
+ * A tile is the only shape here that was already finger sized. These are
+ * 96x70, which is 14.8 x 10.8 mm, and fifteen of them hold the largest
+ * submenu with room to spare, so Next Page is gone rather than restyled.
+ *
+ * The labels are the ones the menu tables already carry, wrapped to two
+ * lines in the 6 px font rather than shortened, because they are the same
+ * strings the website lists and check_site_menu.py holds the two together.
+ */
+static constexpr int GRID_COLS    = 3;
+static constexpr int GRID_ROWS    = 5;
+static constexpr int GRID_SLOTS   = GRID_COLS * GRID_ROWS;
+static constexpr int GRID_GAP_X   = 8;
+static constexpr int GRID_GAP_Y   = 6;
+static constexpr int GRID_TILE_W  =
+    (PUEO_SCREEN_W - GRID_GAP_X * (GRID_COLS + 1)) / GRID_COLS;
+static constexpr int GRID_TILE_H  = 70;
+static constexpr int GRID_Y0      = 54;   // clears PUEO_STATUS_TALL (34) and the title row
+static constexpr int GRID_ICON    = 32;
+static constexpr int GRID_ICON_DY = 8;
+static constexpr int GRID_TEXT_DY = 46;
+static constexpr int GRID_LINE_H  = 10;
+/* 6 px a character in font 1 at size 1, less a pixel of margin each side. */
+static constexpr int GRID_CHARS   = (GRID_TILE_W - 4) / 6;
+
+static void gridTileXY(int i, int &x, int &y) {
+    const int col = i % GRID_COLS;
+    const int row = i / GRID_COLS;
+    x = GRID_GAP_X + col * (GRID_TILE_W + GRID_GAP_X);
+    y = GRID_Y0 + row * (GRID_TILE_H + GRID_GAP_Y);
+}
+
+/* Which tile a tap landed on, or -1. One implementation, because five copies
+ * of a hit test is how five of them came to say x <= 220 on a 320 px panel. */
+static int gridHit(int tx, int ty, int count) {
+    for (int i = 0; i < count && i < GRID_SLOTS; i++) {
+        int x, y;
+        gridTileXY(i, x, y);
+        if (tx >= x && tx < x + GRID_TILE_W &&
+            ty >= y && ty < y + GRID_TILE_H) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Split a label across two lines at a space, preferring the break that
+ * leaves the lines closest in length. "Hidden SSID Revealer" is twenty
+ * characters and the tile holds fifteen, so this is what keeps the table's
+ * own wording instead of inventing a short one for the screen. */
+static void gridWrap(const char *label, char *l1, char *l2, size_t cap) {
+    l1[0] = l2[0] = '\0';
+    const size_t n = strlen(label);
+    if (n <= (size_t)GRID_CHARS) {
+        snprintf(l1, cap, "%s", label);
+        return;
+    }
+    int best = -1, bestCost = 1 << 20;
+    for (size_t i = 0; i < n; i++) {
+        if (label[i] != ' ') continue;
+        const int a = (int)i, b = (int)(n - i - 1);
+        if (a > GRID_CHARS || b > GRID_CHARS) continue;
+        const int cost = (a > b) ? (a - b) : (b - a);
+        if (cost < bestCost) { bestCost = cost; best = (int)i; }
+    }
+    if (best < 0) {                      /* no usable space: hard cut */
+        snprintf(l1, cap, "%.*s", GRID_CHARS, label);
+        snprintf(l2, cap, "%.*s", GRID_CHARS, label + GRID_CHARS);
+        return;
+    }
+    snprintf(l1, cap, "%.*s", best, label);
+    snprintf(l2, cap, "%s", label + best + 1);
+}
+
+static void drawGridTile(int i, const char *label,
+                         const unsigned char *icon, bool selected) {
+    int x, y;
+    gridTileXY(i, x, y);
+    const uint16_t fill = selected ? UI_ICON : UI_FG;
+    const uint16_t edge = selected ? UI_ICON : UI_LINE;
+    const uint16_t ink  = selected ? UI_BG   : UI_TEXT;
+    const uint16_t icol = selected ? UI_BG   : UI_ICON;
+
+    tft.fillRoundRect(x, y, GRID_TILE_W, GRID_TILE_H, 5, fill);
+    tft.drawRoundRect(x, y, GRID_TILE_W, GRID_TILE_H, 5, edge);
+    if (icon) {
+        drawBitmapScaled(x + (GRID_TILE_W - GRID_ICON) / 2, y + GRID_ICON_DY,
+                         icon, 16, 16, icol, GRID_ICON / 16);
+    }
+
+    char l1[32], l2[32];
+    gridWrap(label, l1, l2, sizeof(l1));
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(ink, fill);
+    const int ty = y + GRID_TEXT_DY + (l2[0] ? 0 : GRID_LINE_H / 2);
+    tft.setCursor(x + (GRID_TILE_W - (int)strlen(l1) * 6) / 2, ty);
+    tft.print(l1);
+    if (l2[0]) {
+        tft.setCursor(x + (GRID_TILE_W - (int)strlen(l2) * 6) / 2,
+                      ty + GRID_LINE_H);
+        tft.print(l2);
+    }
+    tft.setTextFont(2);
+}
+
+/* The whole grid. `count` excludes the trailing "Back to Main Menu" entry,
+ * which is the footer button rather than a tile. */
+static void drawMenuGrid(const char *const *items,
+                         const unsigned char *const *icons,
+                         int count, int selected, const char *title) {
+    tft.fillScreen(UI_BG);
+    drawStatusBar(currentBatteryVoltage, true);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_ICON, UI_BG);
+    tft.setCursor(8, 38);
+    tft.print(title);
+    char n[20];
+    snprintf(n, sizeof(n), "%d features", count);
+    tft.setTextColor(uiDimTextColor(), UI_BG);
+    tft.setCursor(PUEO_SCREEN_W - 8 - (int)strlen(n) * 6, 38);
+    tft.print(n);
+    tft.drawFastHLine(0, 50, PUEO_SCREEN_W, UI_LINE);
+    tft.setTextFont(2);
+
+    for (int i = 0; i < count && i < GRID_SLOTS; i++) {
+        drawGridTile(i, items[i], icons ? icons[i] : nullptr, i == selected);
+    }
+}
+
+/* Back, as the footer rather than the last row of the list.
+ *
+ * The bar is drawn 34 px tall to match every feature screen's footer, and
+ * its hit zone runs from the bottom of the last tile row instead, which is
+ * 60 px. A target can be bigger than the thing drawn in it, and the strip
+ * below the grid is not doing anything else. 34 px is 5.2 mm and under what
+ * a finger wants; 60 px is 9.2 mm and over it. */
+static constexpr int GRID_FOOT_H = 34;
+static constexpr int GRID_FOOT_Y = PUEO_SCREEN_H - GRID_FOOT_H;
+static constexpr int GRID_FOOT_HIT_Y =
+    GRID_Y0 + GRID_ROWS * (GRID_TILE_H + GRID_GAP_Y);
+
+static void drawSubmenuFooter() {
+    tft.fillRect(0, GRID_FOOT_Y, PUEO_SCREEN_W, GRID_FOOT_H, UI_BG);
+    tft.drawFastHLine(0, GRID_FOOT_Y, PUEO_SCREEN_W, UI_LINE);
+    tft.setTextFont(2);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    const int iy = GRID_FOOT_Y + (GRID_FOOT_H - 16) / 2;
+    tft.drawBitmap(10, iy, bitmap_icon_go_back, 16, 16, UI_TEXT);
+    tft.setCursor(30, iy);
+    tft.print("Main Menu");
+}
+
+static bool gridFooterHit(int ty) {
+    return ty >= GRID_FOOT_HIT_Y;
+}
+
 void displayOtherMenuGrid();
 void displayPagedSubmenu();
 
@@ -930,122 +1164,65 @@ void displaySubmenu() {
         return;
     }
 
+    setStatusBarHeight(PUEO_STATUS_TALL);  // a tile grid, like the others
     menu_initialized = false;
     last_menu_index = -1;
 
-    tft.setTextFont(2);
-    tft.setTextSize(1);
-
-    if (!submenu_initialized) {
-        tft.fillScreen(UI_BG);
-
-        for (int i = 0; i < active_submenu_size; i++) {
-            const int yPos = submenuItemY(i);
-            const bool isBack = (i == active_submenu_size - 1);
-
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, yPos, active_submenu_icons[i], 16, 16, UI_TEXT);
-            tft.setCursor(30, yPos);
-            if (!isBack) {
-                tft.print("| ");
-            }
-            tft.print(active_submenu_items[i]);
-        }
-
-        submenu_initialized = true;
-        last_submenu_index = -1;
+    /* The last entry is "Back to Main Menu" and is the footer's left button,
+     * not a tile. Every feature screen already puts back there, so a submenu
+     * that put it at the end of a list was the odd one out. */
+    const int tiles = (active_submenu_size > 0) ? active_submenu_size - 1 : 0;
+    int sel = current_submenu_index;
+    if (sel >= tiles) {
+        sel = -1;
     }
 
-    if (last_submenu_index != current_submenu_index) {
-        if (last_submenu_index >= 0) {
-            const int prev_yPos = submenuItemY(last_submenu_index);
-            const bool prevBack = (last_submenu_index == active_submenu_size - 1);
+    drawMenuGrid(active_submenu_items, active_submenu_icons, tiles, sel,
+                 menu_items[current_menu_index]);
+    drawSubmenuFooter();
 
-            tft.fillRect(0, prev_yPos, tft.width(), 28, UI_BG);
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, prev_yPos, active_submenu_icons[last_submenu_index], 16, 16, UI_TEXT);
-            tft.setCursor(30, prev_yPos);
-            if (!prevBack) {
-                tft.print("| ");
-            }
-            tft.print(active_submenu_items[last_submenu_index]);
-        }
-
-        const int new_yPos = submenuItemY(current_submenu_index);
-        const bool newBack = (current_submenu_index == active_submenu_size - 1);
-
-        tft.fillRect(0, new_yPos, tft.width(), 28, UI_BG);
-        tft.setTextColor(UI_ICON, UI_BG);
-        tft.drawBitmap(10, new_yPos, active_submenu_icons[current_submenu_index], 16, 16, UI_ICON);
-        tft.setCursor(30, new_yPos);
-        if (!newBack) {
-            tft.print("| ");
-        }
-        tft.print(active_submenu_items[current_submenu_index]);
-
-        last_submenu_index = current_submenu_index;
-    }
-
-    setStatusBarHeight(PUEO_STATUS_SHORT);  // a list, whose first row is at y=30
-    drawStatusBar(currentBatteryVoltage, true);
+    submenu_initialized = true;
+    last_submenu_index = current_submenu_index;
 }
 
 void displayPagedSubmenu() {
+    setStatusBarHeight(PUEO_STATUS_TALL);  // a tile grid now, with room above it
     menu_initialized = false;
     last_menu_index = -1;
 
-    const int featureCount = pagedFeatureCount();
-    tft.setTextFont(2);
-    tft.setTextSize(1);
+    const int total = pagedTotalFeatures();
 
-    if (!submenu_initialized) {
-        tft.fillScreen(UI_BG);
-        for (int i = 0; i < featureCount; i++) {
-            const int yPos = 30 + i * 30;
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, yPos, active_submenu_icons[i], 16, 16, UI_TEXT);
-            tft.setCursor(30, yPos);
-            tft.print("| ");
-            tft.print(active_submenu_items[i]);
-        }
-        drawPagedFooterButtons();
-        submenu_initialized = true;
-        last_submenu_index = -1;
-        s_pagedFooterFocus = -1;
+    /* The grid holds both pages, so the only thing the page still decides is
+     * which tile is highlighted. */
+    int sel = -1;
+    const int cur = current_submenu_index;
+    if (cur >= 0 && cur < pagedFeatureCount()) {
+        sel = (*pagedSubmenuPage() == 0) ? cur : pagedFirstPageCount() + cur;
     }
 
-    if (last_submenu_index != current_submenu_index) {
-        if (last_submenu_index >= 0 && last_submenu_index < featureCount) {
-            const int prev_yPos = 30 + last_submenu_index * 30;
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, prev_yPos, active_submenu_icons[last_submenu_index], 16, 16, UI_TEXT);
-            tft.setCursor(30, prev_yPos);
-            tft.print("| ");
-            tft.print(active_submenu_items[last_submenu_index]);
-        }
-
-        if (current_submenu_index >= 0 && current_submenu_index < featureCount) {
-            const int new_yPos = 30 + current_submenu_index * 30;
-            tft.setTextColor(UI_ICON, UI_BG);
-            tft.drawBitmap(10, new_yPos, active_submenu_icons[current_submenu_index], 16, 16, UI_ICON);
-            tft.setCursor(30, new_yPos);
-            tft.print("| ");
-            tft.print(active_submenu_items[current_submenu_index]);
-            s_pagedFooterFocus = -1;
-        } else if (current_submenu_index == pagedBackBtnIndex()) {
-            s_pagedFooterFocus = 0;
-        } else if (current_submenu_index == pagedPageBtnIndex()) {
-            s_pagedFooterFocus = 1;
-        } else {
-            s_pagedFooterFocus = -1;
-        }
-
-        drawPagedFooterButtons();
-        last_submenu_index = current_submenu_index;
-    }
-
-    setStatusBarHeight(PUEO_STATUS_SHORT);  // a list: first row is at y=30
+    tft.fillScreen(UI_BG);
     drawStatusBar(currentBatteryVoltage, true);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_ICON, UI_BG);
+    tft.setCursor(8, 38);
+    tft.print(menu_items[current_menu_index]);
+    char n[20];
+    snprintf(n, sizeof(n), "%d features", total);
+    tft.setTextColor(uiDimTextColor(), UI_BG);
+    tft.setCursor(PUEO_SCREEN_W - 8 - (int)strlen(n) * 6, 38);
+    tft.print(n);
+    tft.drawFastHLine(0, 50, PUEO_SCREEN_W, UI_LINE);
+    tft.setTextFont(2);
+
+    for (int i = 0; i < total && i < GRID_SLOTS; i++) {
+        drawGridTile(i, pagedItemAt(i), pagedIconAt(i), i == sel);
+    }
+    drawSubmenuFooter();
+
+    submenu_initialized = true;
+    last_submenu_index = current_submenu_index;
+    s_pagedFooterFocus = -1;
 }
 
 void displayOtherMenuGrid() {
@@ -1666,8 +1843,11 @@ void handleWiFiSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
 
-        layoutPagedFooterButtons();
-        const int footerHit = FeatureUI::hit(s_pagedFooterBtns, 2, x, y);
+        /* One footer button now, because there are no pages to turn. Back
+         * is the strip below the last tile row, which is 60 px rather than
+         * the 34 the bar is drawn in: a target may be larger than the thing
+         * inside it, and nothing else is down there. */
+        const int footerHit = gridFooterHit(y) ? 0 : -1;
         if (footerHit == 0) {
             // Left: Main Menu
             current_submenu_index = pagedBackBtnIndex();
@@ -1698,21 +1878,27 @@ void handleWiFiSubmenuButtons() {
         }
 
         const int featureCount = wifiFeatureCount();
+        /* A tap on the grid picks a tile, and the tile says which page and
+         * which index on it. Setting both here means the dispatch below,
+         * which is written in those terms in about ninety places, needs no
+         * change at all. */
+        {
+            const int tapped = gridHit(x, y, pagedTotalFeatures());
+            if (tapped >= 0) {
+                int tpage, tidx;
+                pagedSplit(tapped, tpage, tidx);
+                if (*pagedSubmenuPage() != tpage) {
+                    *pagedSubmenuPage() = tpage;
+                    applyPagedSubmenuPage();
+                }
+                s_gridTapIndex = tidx;
+            } else {
+                s_gridTapIndex = -1;
+            }
+        }
         for (int i = 0; i < featureCount; i++) {
-            int yPos = 30 + i * 30;
-
-            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
-             * across, so 10..220 covered it. This one is 320, which left the
-             * right 100 px of every row in every list menu dead to a tap.
-             * The same mistake the tile grids had, found and fixed there, and
-             * it survived here for the same reason: a hit box reads like a
-             * coordinate rather than like a dimension. */
-            int button_x1 = 0;
-            int button_y1 = yPos;
-            int button_x2 = PUEO_SCREEN_W;
-            int button_y2 = yPos + 30;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid decided which tile; this loop only has to agree. */
+            if (i == s_gridTapIndex) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -2475,8 +2661,11 @@ void handleBluetoothSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
 
-        layoutPagedFooterButtons();
-        const int footerHit = FeatureUI::hit(s_pagedFooterBtns, 2, x, y);
+        /* One footer button now, because there are no pages to turn. Back
+         * is the strip below the last tile row, which is 60 px rather than
+         * the 34 the bar is drawn in: a target may be larger than the thing
+         * inside it, and nothing else is down there. */
+        const int footerHit = gridFooterHit(y) ? 0 : -1;
         if (footerHit == 0) {
             current_submenu_index = pagedBackBtnIndex();
             last_interaction_time = millis();
@@ -2505,21 +2694,27 @@ void handleBluetoothSubmenuButtons() {
         }
 
         const int featureCount = bluetoothFeatureCount();
+        /* A tap on the grid picks a tile, and the tile says which page and
+         * which index on it. Setting both here means the dispatch below,
+         * which is written in those terms in about ninety places, needs no
+         * change at all. */
+        {
+            const int tapped = gridHit(x, y, pagedTotalFeatures());
+            if (tapped >= 0) {
+                int tpage, tidx;
+                pagedSplit(tapped, tpage, tidx);
+                if (*pagedSubmenuPage() != tpage) {
+                    *pagedSubmenuPage() = tpage;
+                    applyPagedSubmenuPage();
+                }
+                s_gridTapIndex = tidx;
+            } else {
+                s_gridTapIndex = -1;
+            }
+        }
         for (int i = 0; i < featureCount; i++) {
-            int yPos = 30 + i * 30;
-
-            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
-             * across, so 10..220 covered it. This one is 320, which left the
-             * right 100 px of every row in every list menu dead to a tap.
-             * The same mistake the tile grids had, found and fixed there, and
-             * it survived here for the same reason: a hit box reads like a
-             * coordinate rather than like a dimension. */
-            int button_x1 = 0;
-            int button_y1 = yPos;
-            int button_x2 = PUEO_SCREEN_W;
-            int button_y2 = yPos + 30;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid decided which tile; this loop only has to agree. */
+            if (i == s_gridTapIndex) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -2985,20 +3180,14 @@ void handleNRFSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
         for (int i = 0; i < active_submenu_size; i++) {
-            int yPos = submenuItemY(i);
-
-            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
-             * across, so 10..220 covered it. This one is 320, which left the
-             * right 100 px of every row in every list menu dead to a tap.
-             * The same mistake the tile grids had, found and fixed there, and
-             * it survived here for the same reason: a hit box reads like a
-             * coordinate rather than like a dimension. */
-            int button_x1 = 0;
-            int button_y1 = yPos;
-            int button_x2 = PUEO_SCREEN_W;
-            int button_y2 = yPos + 28;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid owns the geometry, in one place. Five copies of a
+             * hit test is how five of them came to say x <= 220 on a 320 px
+             * panel. The last entry is Back and lives in the footer. */
+            const bool isBack = (i == active_submenu_size - 1);
+            const bool hit = isBack
+                ? gridFooterHit(y)
+                : (gridHit(x, y, active_submenu_size - 1) == i);
+            if (hit) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -3064,20 +3253,14 @@ void handleSubGHzSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
         for (int i = 0; i < active_submenu_size; i++) {
-            int yPos = submenuItemY(i);
-
-            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
-             * across, so 10..220 covered it. This one is 320, which left the
-             * right 100 px of every row in every list menu dead to a tap.
-             * The same mistake the tile grids had, found and fixed there, and
-             * it survived here for the same reason: a hit box reads like a
-             * coordinate rather than like a dimension. */
-            int button_x1 = 0;
-            int button_y1 = yPos;
-            int button_x2 = PUEO_SCREEN_W;
-            int button_y2 = yPos + 28;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid owns the geometry, in one place. Five copies of a
+             * hit test is how five of them came to say x <= 220 on a 320 px
+             * panel. The last entry is Back and lives in the footer. */
+            const bool isBack = (i == active_submenu_size - 1);
+            const bool hit = isBack
+                ? gridFooterHit(y)
+                : (gridHit(x, y, active_submenu_size - 1) == i);
+            if (hit) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -3249,20 +3432,14 @@ void handleListSubmenuButtons(void (*launch)(int), int backIdx) {
         }
 
         for (int i = 0; i < active_submenu_size; i++) {
-            int yPos = submenuItemY(i);
-
-            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
-             * across, so 10..220 covered it. This one is 320, which left the
-             * right 100 px of every row in every list menu dead to a tap.
-             * The same mistake the tile grids had, found and fixed there, and
-             * it survived here for the same reason: a hit box reads like a
-             * coordinate rather than like a dimension. */
-            int button_x1 = 0;
-            int button_y1 = yPos;
-            int button_x2 = PUEO_SCREEN_W;
-            int button_y2 = yPos + 28;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid owns the geometry, in one place. Five copies of a
+             * hit test is how five of them came to say x <= 220 on a 320 px
+             * panel. The last entry is Back and lives in the footer. */
+            const bool isBack = (i == active_submenu_size - 1);
+            const bool hit = isBack
+                ? gridFooterHit(y)
+                : (gridHit(x, y, active_submenu_size - 1) == i);
+            if (hit) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();

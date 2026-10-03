@@ -151,6 +151,15 @@ def main():
             "TILE_ICON_DY", "TILE_TEXT_DY"]
     compare("ESP32-DIV.ino", c_consts(ino, grid), [(n, n) for n in grid])
 
+    # The submenu grid, written out in both files. The comment in each says
+    # the other is held to it by this check, so this is what makes that true
+    # rather than a hope.
+    print("\nthe submenu grid:")
+    sub = ["GRID_COLS", "GRID_ROWS", "GRID_GAP_X", "GRID_GAP_Y",
+           "GRID_TILE_H", "GRID_Y0", "GRID_ICON", "GRID_ICON_DY",
+           "GRID_TEXT_DY", "GRID_LINE_H", "GRID_FOOT_H"]
+    compare("ESP32-DIV.ino", c_consts(ino, sub), [(n, n) for n in sub])
+
     print("\nthe chrome:")
     chrome = ["PUEO_STATUS_TALL", "PUEO_TILE_ICON"]
     c2 = c_consts(shared, chrome,
