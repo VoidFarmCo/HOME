@@ -162,6 +162,8 @@ INCLUDE=(
   "tools/check_render_sync.py"
   "tools/check_text_pitch.py"
   "tools/check_text_fits.py"
+  "tools/check_centre_fits.py"
+  "tools/tft_fonts.py"
   "tools/check_svg_labels.py"
   "tools/check_solder_pads.py"
   "tools/check_log_fields.py"

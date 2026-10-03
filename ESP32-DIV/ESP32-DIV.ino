@@ -3870,21 +3870,28 @@ void drawAboutPage(int page) {
 
     /* No name line: the artwork carries the wordmark, which is what
      * PUEO_LOGO_HAS_WORDMARK records and why displayLogo() drops its own. */
-    /* Font 2, not font 1 at size 1. That is 8 px, which is 1.23 mm on a
-     * 165 ppi panel: the three lines under a 200 px logo were the smallest
-     * text on the device and the only thing on the screen worth reading.
-     * The widest of them is 157 px on a 320 px panel, so there is room. */
-    tft.setTextFont(2);
+    /* Font 4: a real 26 px face, not font 2 doubled, because a scaled
+     * bitmap font gets blockier rather than clearer. These two lines sit
+     * under a 200 px mark and are the only text on the page, so they are
+     * what the page is. Font 1 at size 1 made them 8 px, 1.23 mm on a 165
+     * ppi panel, and font 2 at 16 px was still too small to read at arm's
+     * length. From widtbl_f32 the tagline is 223 px and the byline 243, so
+     * a 320 px panel leaves 38 px of margin either side. */
+    tft.setTextFont(4);
     tft.setTextColor(UI_TEXT, UI_BG);
-    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 2);
-    y += 20;
+    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 4);
+    y += 30;
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
     tft.drawCentreString("by " PUEO_AUTHOR "  -  " PUEO_VERSION,
-                         PUEO_SCREEN_W / 2, y, 2);
+                         PUEO_SCREEN_W / 2, y, 4);
 
+    /* Back to font 2 for the hint. It is an instruction rather than the
+     * page, and at font 4 it would be 262 px of 320 and 26 px tall against
+     * a bottom edge 26 px away. */
+    tft.setTextFont(2);
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
     tft.setTextDatum(TL_DATUM);
-    tft.setCursor(16, PUEO_SCREEN_H - 26);
+    tft.setCursor(16, PUEO_SCREEN_H - 24);
     tft.print("SELECT / tap for details");
     return;
   }
@@ -3894,17 +3901,22 @@ void drawAboutPage(int page) {
   tft.setCursor(16, 40);
   tft.print(PUEO_NAME " " PUEO_VERSION);
 
-  tft.setTextFont(1);
+  /* No setTextFont(1) here. The whole body of this page used to draw at
+   * font 1 size 1, which is 8 px, and this is the page with the board, the
+   * author, the URL and the upstream credit on it. Font 2 is 16 px, so the
+   * rest of this function is respaced to match: the rule moved from 78 to
+   * 82, the rows step 22 rather than 20, and the credit lines 18 rather
+   * than 14. Widest line is 213 px of 320 and the body ends at y=236. */
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(16, 62);
   tft.print(PUEO_TAGLINE);
 
-  tft.drawFastHLine(12, 78, PUEO_SCREEN_W - 24, UI_LINE);
+  tft.drawFastHLine(12, 82, PUEO_SCREEN_W - 24, UI_LINE);
 
   const int xLabel = 16;
-  const int xValue = 76;
-  const int step = 20;
-  int y = 94;
+  const int xValue = 84;
+  const int step = 22;
+  int y = 98;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
@@ -3933,27 +3945,27 @@ void drawAboutPage(int page) {
   /* The credit back to the project this was forked from.
    *
    * ESP32-DIV is MIT, and the licence's requirement is the notice in
-   * LICENSE, which is kept. This is not that -- it is here because the code
+   * LICENSE, which is kept. This is not that. It is here because the code
    * came from somewhere and saying so costs nothing.
    *
    * Their project and repository, not their personal email: an address on a
    * fork's About screen points support at someone who did not ship it. */
   tft.drawFastHLine(12, y, PUEO_SCREEN_W - 24, UI_LINE);
-  y += 12;
+  y += 14;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
   tft.print(PUEO_UPSTREAM);
-  y += 14;
+  y += 18;
   tft.setCursor(xLabel, y);
   tft.print(PUEO_UPSTREAM_URL);
-  y += 14;
+  y += 18;
   tft.setCursor(xLabel, y);
   tft.print("forked at ");
   tft.print(ESP32DIV_VERSION);
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
-  tft.setCursor(16, PUEO_SCREEN_H - 20);
+  tft.setCursor(16, PUEO_SCREEN_H - 22);
   tft.print("SELECT / tap to go back");
 }
 
