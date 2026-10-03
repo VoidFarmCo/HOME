@@ -51,7 +51,7 @@ static const AccentOption kAccentPresets[] = {
   {"Green",  0xB721},
   {"Red",    0xF800},
   {"Cyan",   0x07FF},
-  {"Purple", 0xF81F},
+  {"Purple", 0x79DD},   // H.O.M.E brand purple (matches UI_ACCENT), was 0xF81F magenta
   {"Yellow", 0xFFE0},
   {"White",  0xFFFF},
 };

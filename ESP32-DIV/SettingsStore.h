@@ -16,7 +16,7 @@ struct AppSettings {
 
   uint8_t  brightness = BKL_LEVEL_MED;
   Theme    theme      = Theme::Dark;
-  uint8_t  accentColor = 0;
+  uint8_t  accentColor = 4;   // default to the Purple preset (H.O.M.E brand), was 0 (Orange)
 
   bool     autoWifiScan    = true;
   bool     autoBleScan     = true;
