@@ -448,7 +448,7 @@ the feature has its own switch turned off.
 Pueo is for the 3.5 inch ESP32-3248S035R and nothing else.
 
 It used to build a 2.8 inch ESP32-2432S028R image as well. That image was
-released every version and nobody ever booted one, so it was never support in
+released every version and nobody ever booted one, so it was never supported in
 any sense you could rely on, and it is gone after 0.4.13. Those releases are
 still published if you want to try one, and the last of them is where to
 start; nothing after it will run on that board at all.
