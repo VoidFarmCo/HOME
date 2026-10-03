@@ -12,6 +12,7 @@
 #include "Spotter.h"
 #include "ApTracker.h"
 #include "FileServer.h"
+#include "SysInfo.h"
 #include "TrackerHunt.h"
 #include "ducky.h"
 #include "Branding.h"
@@ -159,7 +160,7 @@ const char *subghz_submenu_items[subghz_NUM_SUBMENU_ITEMS] = {
  * whole tiles of an eight tile grid, both of them things nobody opens in the
  * middle of a session, sitting at the same visual weight as the radios. The
  * two slots they free are what RFID/NFC and GPS were promoted into. */
-const int tools_NUM_SUBMENU_ITEMS = 8;
+const int tools_NUM_SUBMENU_ITEMS = 9;
 const char *tools_submenu_items[tools_NUM_SUBMENU_ITEMS] = {
     "Serial Monitor",
     "Update Firmware",
@@ -171,6 +172,7 @@ const char *tools_submenu_items[tools_NUM_SUBMENU_ITEMS] = {
     "File Transfer",
     "Settings",
     "About",
+    "Device Info",
     "Back to Main Menu"};
 
 /* Detect was More until 0.4.11, and More held four things that were not one
@@ -299,6 +301,7 @@ const unsigned char *tools_submenu_icons[tools_NUM_SUBMENU_ITEMS] = {
     bitmap_icon_wifi2,
     bitmap_icon_setting,
     bitmap_icon_question,
+    bitmap_icon_dot_matrix,
     bitmap_icon_go_back
 };
 
@@ -3379,7 +3382,8 @@ constexpr int TOOLS_IDX_SD_FILES = 3;
 constexpr int TOOLS_IDX_XFER     = 4;
 constexpr int TOOLS_IDX_SETTINGS = 5;
 constexpr int TOOLS_IDX_ABOUT    = 6;
-constexpr int TOOLS_IDX_BACK     = 7;
+constexpr int TOOLS_IDX_DEVINFO  = 7;
+constexpr int TOOLS_IDX_BACK     = 8;
 
 static void runToolsFeatureExitCleanup() {
     in_sub_menu = true;
@@ -3470,6 +3474,9 @@ static void launchToolsFeature(int idx) {
         case TOOLS_IDX_ABOUT:
             handleAboutPage();
             reopenSystemSubmenu();
+            break;
+        case TOOLS_IDX_DEVINFO:
+            runToolsFeature(idx, SysInfo::setup, SysInfo::loop);
             break;
         default:
             break;
