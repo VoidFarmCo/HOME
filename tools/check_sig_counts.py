@@ -156,6 +156,50 @@ def main():
            "no row in the guide's table for it" if phrase is None
            else "no table row says %r" % phrase)
 
+    # Every doc in the repository, not the guide alone. README.md said "108
+    # signatures across nine kinds" for several releases while this check
+    # passed, because the repo half read user-guide.md and nothing else. The
+    # site half already knows better -- see site_pages(), and the comment
+    # there saying a number copied onto one page is usually copied onto two.
+    # It is just as true of a number copied into one file.
+    #
+    # Strict, with no allowance for a historical figure, because no doc here
+    # states one: the changelog is the place for "it was 108 before", and the
+    # changelog is not in this list. A doc that needs to say an old number
+    # should fail this and be given a reason to be an exception, rather than
+    # the rule being loosened in advance for a case that does not exist.
+    print()
+    print("no other doc states a count of its own:")
+    docs = sorted((ROOT / "docs" / "pueo").glob("*.md"))
+    docs += [ROOT / n for n in ("README.md", "PUEO.md", "CONTRIBUTING.md")]
+    for d in docs:
+        if not d.is_file() or d == GUIDE:
+            continue
+        flat = " ".join(d.read_text(encoding="utf-8", errors="replace").split())
+        said = [m for m in re.finditer(r"\b(\d+) signatures\b", flat)]
+        bad = [m.group(0) for m in said if int(m.group(1)) != total]
+        if said or bad:
+            ok("  %-22s" % d.name, not bad,
+               "it says %s and there are %d" % (", ".join(bad), total))
+        # "kinds" is an ordinary English word, so a count in front of it is
+        # only this count when the sentence is about signatures. ble-sniffer.md
+        # says Sniffer "raises two kinds of alert", which is correct and has
+        # nothing to do with the tables. Requiring the word nearby also means
+        # a sentence like the guide's "toggle any of the nine kinds" is not
+        # read, which is the right trade: the guide's own count is checked
+        # above by name, and a check that cries wolf is one that gets ignored.
+        kinds = [m for m in re.finditer(
+            r"\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)"
+            r" kinds\b", flat)
+            if "signature" in flat[max(0, m.start() - 200):m.end() + 60].lower()]
+        spelling = {str(nkinds), {1: "one", 2: "two", 3: "three", 4: "four",
+                                  5: "five", 6: "six", 7: "seven", 8: "eight",
+                                  9: "nine", 10: "ten"}.get(nkinds, "")}
+        wrongk = [m.group(0) for m in kinds if m.group(1).lower() not in spelling]
+        if kinds:
+            ok("  %-22s kinds" % d.name, not wrongk,
+               "it says %s and there are %d" % (", ".join(wrongk), nkinds))
+
     print()
     pages = site_pages()
     if not pages:

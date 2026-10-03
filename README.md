@@ -125,10 +125,11 @@ Six features are Pueo's own. Four of them only listen.
 **Surveillance** (called Spotter until 0.4.0) is passive detection of
 surveillance and tracking hardware that announces itself: plate readers and
 their accessories, body cameras, fixed cameras and doorbells, smart glasses,
-item trackers, vehicle modules and pentest kit. It matches Wi-Fi OUIs,
-network names, BLE device names and 16- and 128-bit service UUIDs against
-108 signatures across nine kinds, and grades what it finds rather than
-asserting it.
+item trackers, vehicle modules and pentest kit. It matches whole MAC
+addresses, Wi-Fi OUIs, network names from the start or anywhere in the middle,
+BLE device names, 16- and 128-bit service UUIDs, and the bytes past a company
+ID or a service UUID, against 266 signatures across nine kinds, and grades
+what it finds rather than asserting it.
 
 Two of those are not surveillance gear and are there because knowing they
 are nearby is worth something on its own. **Pwnagotchi** beacons from a fixed

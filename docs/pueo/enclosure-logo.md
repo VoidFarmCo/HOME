@@ -139,7 +139,7 @@ that actually turned up rather than assuming one. Passing `dpi=25.4` to
 
 `tools/check_logo_scale.py` now renders the artwork at three sizes and
 asserts height, width, centring and area against figures derived from the
-source bitmap, plus the lid's removed volume. 14 checks. It skips cleanly
+source bitmap, plus the lid's removed volume. 15 checks. It skips cleanly
 when OpenSCAD is absent, since the firmware build does not need it.
 
 ## Which way up

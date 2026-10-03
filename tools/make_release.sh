@@ -168,6 +168,7 @@ INCLUDE=(
   "tools/check_button_waits.py"
   "tools/check_text_margins.py"
   "tools/check_doc_versions.py"
+  "tools/check_doc_counts.py"
   "tools/check_file_server.py"
   "tools/check_nrf_presence.py"
   "tools/check_sd_paths.py"
