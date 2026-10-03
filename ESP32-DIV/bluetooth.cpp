@@ -183,13 +183,35 @@ static int bleContentBottom() {
   return featureHasTouchNavBar() ? touchNavContentBottomY() : kBleScreenH;
 }
 
+/* What the gate saw, so the screen can say it rather than making somebody
+ * attach a serial cable to find out which kind of low this was. */
+static uint32_t s_bleLastHeap = 0;
+
 bool ensureBleStackReady() {
   static bool ready = false;
   if (ready) {
     return true;
   }
+  /* Reclaim before measuring, not after.
+   *
+   * This read the heap, refused below 40 KB, and then released the Classic
+   * BT controller's RAM, which the comment below says is about 30 KB. A
+   * board at 30 KB free was therefore told it had not got enough memory by
+   * the function that was one statement away from handing it 30 KB more.
+   *
+   * Releasing first is safe whether or not the stack then comes up. This
+   * firmware is NimBLE only, Classic BT is never initialised, and that RAM
+   * was never going to be used. The call already tolerates
+   * ESP_ERR_INVALID_STATE, which is what it returns the second time. */
+  esp_err_t rel = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+  if (rel != ESP_OK && rel != ESP_ERR_INVALID_STATE) {
+    Serial.printf("[ble] classic mem_release: %s\n", esp_err_to_name(rel));
+  }
+
   const uint32_t heap = ESP.getFreeHeap();
-  Serial.printf("[ble] init begin, free heap=%u\n", (unsigned)heap);
+  s_bleLastHeap = heap;
+  Serial.printf("[ble] init begin, free heap=%u (after classic release)\n",
+                (unsigned)heap);
 #if !BOARD_HAS_ESP32S3
   // Classic ESP32 NimBLE typically needs ~40KB+ free; abort soft instead of OOM reboot.
   if (heap < 40000u) {
@@ -197,12 +219,6 @@ bool ensureBleStackReady() {
     return false;
   }
 #endif
-  // Classic BT controller RAM is unused by NimBLE; reclaim it before stack init.
-  // On ESP32 this often frees ~30KB and avoids boot OOM/reboot after the intro.
-  esp_err_t rel = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-  if (rel != ESP_OK && rel != ESP_ERR_INVALID_STATE) {
-    Serial.printf("[ble] classic mem_release: %s\n", esp_err_to_name(rel));
-  }
   BLEDevice::init(ESP32DIV_NAME);
   ready = true;
   Serial.printf("[ble] init done, free heap=%u\n", (unsigned)ESP.getFreeHeap());
@@ -221,7 +237,12 @@ static bool bleRequireStackOrExit() {
   tft.print("BLE: low memory");
   tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
   tft.setCursor(12, 140);
-  tft.print("Exit and try again");
+  char hl[40];
+  snprintf(hl, sizeof(hl), "%lu bytes free, needs 40000",
+           (unsigned long)s_bleLastHeap);
+  tft.print(hl);
+  tft.setCursor(12, 156);
+  tft.print("Reboot clears it");
   delay(1200);
   feature_exit_requested = true;
   return false;
@@ -3552,6 +3573,11 @@ void bleSkimmerSetup() {
   redrawList();
 
   startScan();
+  /* redrawList() above ran while s_scanning was still false, so it painted
+   * "Press Start to begin" onto a screen that is about to start scanning,
+   * and nothing repainted it. The feature has scanned from the moment it
+   * opens since it was written; only the text disagreed. */
+  redrawList();
   updateHeader(true);
   updateNavLabels();
 }
