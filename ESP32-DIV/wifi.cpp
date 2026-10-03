@@ -877,8 +877,14 @@ static void ptmDrawWaitCard() {
 static bool     s_sweep      = false;
 static uint8_t  s_sweepCh    = 1;
 static uint32_t s_sweepHopMs = 0;
-static uint32_t s_chanPkts[MAX_CH + 1] = {0};   // index 1..MAX_CH; [0] unused
+/* Heap, not .bss: this board's DRAM is full, so the per-channel counts are
+ * allocated only while sweeping. Loop-context only (never the ISR), so no lock. */
+static uint32_t* s_chanPkts = nullptr;   // [MAX_CH + 1]; index 1..MAX_CH, [0] unused
 static constexpr uint32_t SWEEP_DWELL_MS = 150;
+
+static void sweepFree() {
+  if (s_chanPkts) { free(s_chanPkts); s_chanPkts = nullptr; }
+}
 
 /* Clear the feature body (below the toolbar, above the nav bar). Called when
  * the mode flips so neither view is left showing the other's leftovers. */
@@ -889,6 +895,8 @@ static void sweepClearBody() {
 }
 
 static void sweepReset() {
+  if (!s_chanPkts) s_chanPkts = (uint32_t*)calloc(MAX_CH + 1, sizeof(uint32_t));
+  if (!s_chanPkts) { s_sweep = false; return; }   // no room; stay on the waterfall
   for (int i = 0; i <= MAX_CH; i++) s_chanPkts[i] = 0;
   s_sweepCh = 1;
   s_sweepHopMs = millis();
@@ -900,6 +908,7 @@ static void sweepReset() {
  * zero without it, and a 2.4 GHz band with nothing on it is the ordinary
  * bench case, not an edge one. */
 static void sweepDraw() {
+  if (!s_chanPkts) return;
   const int top = 40;
   const int bottom = wifiContentBottom() - 14;   // leave room for channel numbers
   const int plotH = bottom - top;
@@ -934,6 +943,7 @@ void ptmSetup() {
   setTouchNavLabels("Ch-", nullptr, "Exit", "Sweep", "Ch+");
   s_ptmHwReady = false;
   s_sweep = false;   // every entry opens on the single-channel waterfall
+  sweepFree();
 
 #if HAS_PCF8574_BUTTONS
   pcf.pinMode(BTN_UP, INPUT_PULLUP);
@@ -1017,6 +1027,7 @@ void ptmLoop() {
                     (unsigned long)pcapPacketsWritten, (unsigned long)pcapDropped);
     }
     pcapStop();
+    sweepFree();
     feature_exit_requested = true;
     return;
   }
@@ -1029,6 +1040,7 @@ void ptmLoop() {
                     (unsigned long)pcapPacketsWritten, (unsigned long)pcapDropped);
     }
     pcapStop();
+    sweepFree();
     return;
   }
   updateStatusBar();
@@ -1039,12 +1051,12 @@ void ptmLoop() {
     s_sweep = !s_sweep;
     sweepClearBody();
     if (s_sweep) sweepReset();
-    else         epoch = 0;   // restart the waterfall cleanly
+    else { epoch = 0; sweepFree(); }   // restart the waterfall cleanly
   }
 
   // In sweep, hop to the next channel once its dwell is up, clearing that
   // channel's count so its bar measures only the dwell it is about to get.
-  if (s_sweep && (millis() - s_sweepHopMs) >= SWEEP_DWELL_MS) {
+  if (s_sweep && s_chanPkts && (millis() - s_sweepHopMs) >= SWEEP_DWELL_MS) {
     s_sweepCh = (uint8_t)((s_sweepCh % MAX_CH) + 1);   // 1..MAX_CH, wrapping
     s_chanPkts[s_sweepCh] = 0;
     ch = s_sweepCh;
@@ -1121,7 +1133,7 @@ void ptmLoop() {
   } else {
     // Frames the ISR counted this loop belong to the channel we are dwelling
     // on; fold them in before the shared reset below zeroes the counter.
-    s_chanPkts[s_sweepCh] += tmpPacketCounter;
+    if (s_chanPkts) s_chanPkts[s_sweepCh] += tmpPacketCounter;
     sweepDraw();
     delay(5);
   }
@@ -7821,7 +7833,8 @@ static constexpr int ARP_MAX_HOSTS_SWEEP = 254;
 
 enum class Phase : uint8_t {
   ApList = 0,
-  Hosts
+  Hosts,
+  Recon
 };
 
 struct ApEntry {
@@ -7852,12 +7865,55 @@ static int s_lastRenderedIndex = -1;
 static int s_lastRenderedPage = -1;
 static char s_joinedSsid[33] = {0};
 
+/* ── IoT Recon ───────────────────────────────────────────────────────────
+ * The ARP sweep found the hosts; this deep-dives them the way HaleHound's IoT
+ * Recon does: for each discovered host, probe common service ports, fingerprint
+ * HTTP/RTSP/Telnet, and test default HTTP Basic-Auth credentials. Runs over the
+ * existing STA connection (plain TCP), so no radio-mode juggling. Cooperative:
+ * one port per loop tick, so the UI and Stop stay live. Findings roll on screen
+ * and append to a report on SD. */
+struct ReconPort { uint16_t port; const char* svc; };
+static const ReconPort RECON_PORTS[] = {
+  {21, "FTP"},   {22, "SSH"},    {23, "Telnet"}, {53, "DNS"},
+  {80, "HTTP"},  {88, "HTTP"},   {443, "HTTPS"}, {445, "SMB"},
+  {554, "RTSP"}, {502, "Modbus"},{1883, "MQTT"}, {8000, "HTTP"},
+  {8080, "HTTP"},{8554, "RTSP"}, {34567, "Dahua"}, {37777, "Dahua"}
+};
+static constexpr int RECON_PORT_N = (int)(sizeof(RECON_PORTS) / sizeof(RECON_PORTS[0]));
+
+struct ReconCred { const char* user; const char* pass; };
+static const ReconCred RECON_CREDS[] = {
+  {"admin", "admin"}, {"admin", ""},    {"admin", "12345"}, {"admin", "1234"},
+  {"admin", "password"}, {"admin", "admin123"}, {"root", "root"}, {"root", ""},
+  {"root", "admin"},  {"user", "user"}
+};
+static constexpr int RECON_CRED_N = (int)(sizeof(RECON_CREDS) / sizeof(RECON_CREDS[0]));
+static constexpr uint16_t RECON_TIMEOUT_MS = 250;
+
+static constexpr int RECON_LOG_LINES = 15;
+/* All recon runtime state is heap-allocated while recon runs; this board's DRAM
+ * has no room for it in .bss. Only the pointer lives there. */
+struct ReconState {
+  char log[RECON_LOG_LINES][40];
+  int  logCount;
+  int  host;        // index into s_hosts
+  int  port;        // index into RECON_PORTS
+  bool active;
+  bool fileOpen;
+  File file;
+};
+static ReconState* s_rc = nullptr;
+
 static void drawScreen(bool fullRedraw);
 static void updateNavLabels();
 static void scanAccessPoints();
 static void joinSelectedAp();
 static void runArpSweep();
 static void disconnectSta();
+static void reconStart();
+static void reconStop();
+static void reconStep();
+static void reconDraw(bool full);
 
 static int networksPerPage() {
   return max(1, (wifiListBottomY() - LIST_FIRST_ROW_Y) / LIST_ROW_H);
@@ -7869,8 +7925,11 @@ static void updateNavLabels() {
   }
   if (s_phase == Phase::ApList) {
     setTouchNavLabels("Rescan", "Next", "Exit", "Prev", "Join");
-  } else {
-    setTouchNavLabels("Rescan", "Next", "Exit", "Prev", "Back");
+  } else if (s_phase == Phase::Hosts) {
+    // Rescan stays on the top undo icon; the left slot runs recon here.
+    setTouchNavLabels("Recon", "Next", "Exit", "Prev", "Back");
+  } else {  // Recon
+    setTouchNavLabels(nullptr, nullptr, "Exit", nullptr, "Stop");
   }
   redrawTouchButtonBar();
 }
@@ -8477,13 +8536,29 @@ static void handleNavButtons() {
     return;
   }
 
+  if (s_phase == Phase::Recon) {
+    if (isButtonPressedEdge(BTN_RIGHT)) {   // Stop -> back to the host list
+      reconStop();
+      s_phase = Phase::Hosts;
+      s_lastRenderedPage = -1;
+      drawScreen(true);
+      updateNavLabels();
+      s_lastBtnMs = now;
+    } else {
+      (void)isButtonPressedEdge(BTN_LEFT);
+      (void)isButtonPressedEdge(BTN_UP);
+      (void)isButtonPressedEdge(BTN_DOWN);
+    }
+    return;
+  }
+
   const int count = (s_phase == Phase::ApList) ? s_apCount : s_hostCount;
 
   if (isButtonPressedEdge(BTN_LEFT)) {
     if (s_phase == Phase::ApList) {
       scanAccessPoints();
-    } else {
-      runArpSweep();
+    } else {  // Hosts: left slot runs recon (rescan is on the undo icon)
+      reconStart();
     }
     s_lastBtnMs = now;
     return;
@@ -8528,7 +8603,7 @@ static void handleTouch() {
   if (!feature_active || !readTouchXY(x, y)) {
     return;
   }
-  if (s_scanning) {
+  if (s_scanning || s_phase == Phase::Recon) {
     return;
   }
 
@@ -8590,7 +8665,7 @@ static void runUI() {
       if (activeIcon == 0) {
         if (s_phase == Phase::ApList) {
           scanAccessPoints();
-        } else {
+        } else if (s_phase == Phase::Hosts) {
           runArpSweep();
         }
       }
@@ -8626,6 +8701,7 @@ static void runUI() {
 }
 
 static void teardown() {
+  reconStop();
   disconnectSta();
   WiFi.scanDelete();
   s_scanning = false;
@@ -8660,6 +8736,232 @@ void arpScannerSetup() {
   scanAccessPoints();
 }
 
+static void reconB64(const char* in, char* out, size_t outSz) {
+  static const char* T =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const size_t n = strlen(in);
+  size_t o = 0;
+  for (size_t i = 0; i < n && o + 4 < outSz; i += 3) {
+    uint32_t v = (uint8_t)in[i] << 16;
+    if (i + 1 < n) v |= (uint8_t)in[i + 1] << 8;
+    if (i + 2 < n) v |= (uint8_t)in[i + 2];
+    out[o++] = T[(v >> 18) & 0x3F];
+    out[o++] = T[(v >> 12) & 0x3F];
+    out[o++] = (i + 1 < n) ? T[(v >> 6) & 0x3F] : '=';
+    out[o++] = (i + 2 < n) ? T[v & 0x3F] : '=';
+  }
+  out[o] = 0;
+}
+
+static void reconLog(const char* line) {
+  if (!s_rc) return;
+  if (s_rc->logCount < RECON_LOG_LINES) {
+    strncpy(s_rc->log[s_rc->logCount], line, 39);
+    s_rc->log[s_rc->logCount][39] = 0;
+    s_rc->logCount++;
+  } else {
+    for (int i = 1; i < RECON_LOG_LINES; i++) memcpy(s_rc->log[i - 1], s_rc->log[i], 40);
+    strncpy(s_rc->log[RECON_LOG_LINES - 1], line, 39);
+    s_rc->log[RECON_LOG_LINES - 1][39] = 0;
+  }
+  if (s_rc->fileOpen) { s_rc->file.println(line); s_rc->file.flush(); }
+  reconDraw(false);
+}
+
+void reconDraw(bool full) {
+  if (!s_rc) return;
+  if (full) {
+    wifiClearBody(TFT_BLACK);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  }
+  tft.setTextFont(1);
+  tft.setTextSize(1);
+  char hdr[48];
+  const int h = (s_rc->host < s_hostCount) ? s_rc->host + 1 : s_hostCount;
+  snprintf(hdr, sizeof(hdr), "IoT Recon  host %d/%d", h, s_hostCount);
+  tft.fillRect(0, 40, PUEO_SCREEN_W, 14, TFT_BLACK);
+  tft.setCursor(8, 42);
+  tft.setTextColor(WHITE, TFT_BLACK);
+  tft.print(hdr);
+  const int top = 58, rowH = 13;
+  for (int i = 0; i < RECON_LOG_LINES; i++) {
+    const int y = top + i * rowH;
+    tft.fillRect(0, y, PUEO_SCREEN_W, rowH, TFT_BLACK);
+    if (i < s_rc->logCount) {
+      tft.setCursor(6, y);
+      tft.setTextColor(strstr(s_rc->log[i], "CRED") ? ORANGE : WHITE, TFT_BLACK);
+      tft.print(s_rc->log[i]);
+    }
+  }
+}
+
+/* GET / on an open HTTP port: log the Server header, and if it answers 401
+ * (auth required) try the default credentials; a 200 back means the login
+ * worked. A plain 200 means no auth at all. */
+static void httpProbe(IPAddress ip, uint16_t port) {
+  WiFiClient c;
+  c.setTimeout(RECON_TIMEOUT_MS);
+  if (!c.connect(ip, port)) return;
+  c.print("GET / HTTP/1.0\r\nHost: ");
+  c.print(ip);
+  c.print("\r\nConnection: close\r\n\r\n");
+  String resp;
+  uint32_t t0 = millis();
+  while (c.connected() && millis() - t0 < 600 && resp.length() < 400) {
+    while (c.available() && resp.length() < 400) resp += (char)c.read();
+  }
+  c.stop();
+
+  int code = 0;
+  int sp = resp.indexOf(' ');
+  if (sp > 0) code = resp.substring(sp + 1, sp + 4).toInt();
+
+  char line[40];
+  int si = resp.indexOf("Server:");
+  if (si >= 0) {
+    int e = resp.indexOf('\r', si);
+    if (e < 0) e = resp.length();
+    String sv = resp.substring(si + 7, e);
+    sv.trim();
+    snprintf(line, sizeof(line), "  http: %s", sv.c_str());
+    reconLog(line);
+  }
+
+  if (code == 401) {
+    for (int k = 0; k < RECON_CRED_N; k++) {
+      char up[48];
+      snprintf(up, sizeof(up), "%s:%s", RECON_CREDS[k].user, RECON_CREDS[k].pass);
+      char b64[72];
+      reconB64(up, b64, sizeof(b64));
+      WiFiClient a;
+      a.setTimeout(RECON_TIMEOUT_MS);
+      if (!a.connect(ip, port)) break;
+      a.print("GET / HTTP/1.0\r\nAuthorization: Basic ");
+      a.print(b64);
+      a.print("\r\nConnection: close\r\n\r\n");
+      String r2;
+      uint32_t t1 = millis();
+      while (a.connected() && millis() - t1 < 400 && r2.length() < 20) {
+        while (a.available() && r2.length() < 20) r2 += (char)a.read();
+      }
+      a.stop();
+      int c2 = 0;
+      int s2 = r2.indexOf(' ');
+      if (s2 > 0) c2 = r2.substring(s2 + 1, s2 + 4).toInt();
+      if (c2 == 200) {
+        snprintf(line, sizeof(line), "  CRED %.28s OK", up);
+        reconLog(line);
+        break;
+      }
+    }
+  } else if (code == 200) {
+    reconLog("  http: no auth");
+  }
+}
+
+static void rtspProbe(IPAddress ip, uint16_t port) {
+  WiFiClient c;
+  c.setTimeout(RECON_TIMEOUT_MS);
+  if (!c.connect(ip, port)) return;
+  c.print("OPTIONS rtsp://");
+  c.print(ip);
+  c.print("/ RTSP/1.0\r\nCSeq: 1\r\n\r\n");
+  String r;
+  uint32_t t0 = millis();
+  while (c.connected() && millis() - t0 < 400 && r.length() < 60) {
+    while (c.available() && r.length() < 60) r += (char)c.read();
+  }
+  c.stop();
+  int e = r.indexOf('\r');
+  if (e < 0) e = r.length();
+  String first = r.substring(0, e);
+  first.trim();
+  char line[40];
+  snprintf(line, sizeof(line), "  rtsp: %s", first.c_str());
+  reconLog(line);
+}
+
+static void reconStop() {
+  if (!s_rc) return;
+  s_rc->active = false;
+  if (s_rc->fileOpen) { s_rc->file.close(); s_rc->fileOpen = false; }
+  delete s_rc;
+  s_rc = nullptr;
+}
+
+static void reconStart() {
+  if (s_hostCount <= 0 || WiFi.status() != WL_CONNECTED) return;
+  if (!s_rc) s_rc = new ReconState();
+  if (!s_rc) return;              // no room; stay in the host list
+  s_rc->logCount = 0;
+  s_rc->host = 0;
+  s_rc->port = 0;
+  s_rc->active = true;
+  s_rc->fileOpen = false;
+  s_phase = Phase::Recon;
+
+  if (isSDCardAvailable() && sdEnsureDir(CAPTURE_DIR)) {
+    s_rc->file = SD.open(CAPTURE_DIR "/iot_recon.txt", FILE_APPEND);
+    if (s_rc->file) {
+      s_rc->fileOpen = true;
+      s_rc->file.printf("=== IoT Recon on %s ===\n", s_joinedSsid);
+    }
+  }
+
+  updateNavLabels();
+  reconDraw(true);
+  char line[40];
+  snprintf(line, sizeof(line), "Recon %d hosts", s_hostCount);
+  reconLog(line);
+}
+
+static void reconStep() {
+  if (!s_rc || !s_rc->active) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    reconLog("! wifi dropped");
+    reconStop();
+    s_phase = Phase::Hosts;
+    s_lastRenderedPage = -1;
+    drawScreen(true);
+    updateNavLabels();
+    return;
+  }
+  if (s_rc->host >= s_hostCount) {
+    reconLog("-- done --");
+    reconStop();
+    return;
+  }
+
+  IPAddress ip(s_hosts[s_rc->host].ip);
+  if (s_rc->port == 0) {
+    char line[40];
+    snprintf(line, sizeof(line), "%s", ip.toString().c_str());
+    reconLog(line);
+  }
+
+  const ReconPort& rp = RECON_PORTS[s_rc->port];
+  WiFiClient c;
+  c.setTimeout(RECON_TIMEOUT_MS);
+  if (c.connect(ip, rp.port)) {
+    c.stop();
+    char line[40];
+    snprintf(line, sizeof(line), "  :%u %s open", rp.port, rp.svc);
+    reconLog(line);
+    if (rp.port == 80 || rp.port == 88 || rp.port == 8000 || rp.port == 8080)
+      httpProbe(ip, rp.port);
+    else if (rp.port == 554 || rp.port == 8554)
+      rtspProbe(ip, rp.port);
+  } else {
+    c.stop();
+  }
+
+  s_rc->port++;
+  if (s_rc->port >= RECON_PORT_N) {
+    s_rc->port = 0;
+    s_rc->host++;
+  }
+}
+
 void arpScannerLoop() {
   if (feature_exit_requested) {
     teardown();
@@ -8673,6 +8975,7 @@ void arpScannerLoop() {
 
   handleNavButtons();
   handleTouch();
+  if (s_phase == Phase::Recon) reconStep();
   updateStatusBar();
   runUI();
   maintainTouchNavBar();
