@@ -83,6 +83,7 @@ def set_panel(panel=35):
     global GRID_COLS, GRID_ROWS, GRID_SLOTS, GRID_GAP_X, GRID_GAP_Y
     global GRID_TILE_W, GRID_TILE_H, GRID_Y0, GRID_ICON
     global GRID_ICON_DY, GRID_TEXT_DY, GRID_LINE_H, GRID_TEXT_W
+    global GRID_LINES
     global GRID_FOOT_H
     PANEL = 35
     W, H = 320, 480
@@ -105,18 +106,19 @@ def set_panel(panel=35):
     # and they paged at six entries. These tiles are 96x70, or 14.8 x 10.8 mm,
     # and fifteen of them hold the largest submenu, so there are no pages.
     GRID_COLS = 3
-    GRID_ROWS = 5
+    GRID_ROWS = 4
     GRID_SLOTS = GRID_COLS * GRID_ROWS
     GRID_GAP_X = 8
     GRID_GAP_Y = 6
     GRID_TILE_W = (W - GRID_GAP_X * (GRID_COLS + 1)) // GRID_COLS
-    GRID_TILE_H = 70
+    GRID_TILE_H = 92
     GRID_Y0 = 54
-    GRID_ICON = 24
+    GRID_ICON = 32
     GRID_ICON_DY = 6
-    GRID_TEXT_DY = 34
-    GRID_LINE_H = 17
+    GRID_TEXT_DY = 44
+    GRID_LINE_H = 16
     GRID_TEXT_W = GRID_TILE_W - 16
+    GRID_LINES = 3
     GRID_FOOT_H = 34
     # PUEO_BODY_FONT / PUEO_BODY_H in shared.h. This panel is dense, so the
     # list screens use font 2. The drone detector deliberately does not.
@@ -796,26 +798,27 @@ def ino_table(name):
 
 
 def grid_wrap(t, label):
-    """Two lines, split at the space that balances them, measured.
+    """Greedy word wrap into at most GRID_LINES lines, measured.
 
     gridWrap() in the sketch, same rule and the same font. Font 2 is
-    proportional, so the sketch measures with textWidth() and so does this;
-    a character count would break somewhere else and the screenshot would
-    stop being a picture of the panel."""
-    if t.text_width(label) <= GRID_TEXT_W:
-        return label, ""
-    best, cost = -1, 1 << 20
-    for i, ch in enumerate(label):
-        if ch != " ":
-            continue
-        a, b = t.text_width(label[:i]), t.text_width(label[i + 1:])
-        if a > GRID_TEXT_W or b > GRID_TEXT_W:
-            continue
-        if abs(a - b) < cost:
-            best, cost = i, abs(a - b)
-    if best < 0:
-        return label, ""
-    return label[:best], label[best + 1:]
+    proportional, so the sketch measures with textWidth() and so does this; a
+    character count would break somewhere else and the screenshot would stop
+    being a picture of the panel.
+
+    Greedy rather than the balanced two-way split this replaced, because
+    balanced does not generalise to three lines and 'Probe Request Flood'
+    needs three."""
+    out, cur = [], ""
+    for w in label.split():
+        trial = w if not cur else cur + " " + w
+        if t.text_width(trial) <= GRID_TEXT_W or not cur:
+            cur = trial
+        else:
+            out.append(cur)
+            cur = w
+    if cur:
+        out.append(cur)
+    return out[:GRID_LINES]
 
 
 def render_grid(t, title, items, icons, selected):
@@ -846,12 +849,11 @@ def render_grid(t, title, items, icons, selected):
                                  GRID_ICON // 16)
         except Exception:
             pass
-        l1, l2 = grid_wrap(t, label)
-        ty = y + GRID_TEXT_DY + (0 if l2 else GRID_LINE_H // 2)
-        t.print_f2(x + (GRID_TILE_W - t.text_width(l1)) // 2, ty, l1, ink, fill)
-        if l2:
-            t.print_f2(x + (GRID_TILE_W - t.text_width(l2)) // 2,
-                       ty + GRID_LINE_H, l2, ink, fill)
+        ls = grid_wrap(t, label)
+        ty = y + GRID_TEXT_DY + ((GRID_LINES - len(ls)) * GRID_LINE_H) // 2
+        for k, line in enumerate(ls):
+            t.print_f2(x + (GRID_TILE_W - t.text_width(line)) // 2,
+                       ty + k * GRID_LINE_H, line, ink, fill)
 
     fy = H - GRID_FOOT_H
     t.fill_rect(0, fy, W, GRID_FOOT_H, UI_BG)
@@ -864,6 +866,18 @@ def render_grid(t, title, items, icons, selected):
     t.print_f2(30, iy, "Main Menu", UI_TEXT, UI_BG)
 
 
+
+
+def render_wifi(t, selected=11):
+    """The WiFi submenu: twelve features, one screen, no page button.
+
+    The one worth rendering. It holds the two longest labels in the firmware,
+    "Hidden SSID Revealer" at 134 px and "Probe Request Flood" at 131, in a
+    96 px tile, so if the wrapping is wrong anywhere it is wrong here.
+    """
+    items = ino_table("wifi_page0_items") + ino_table("wifi_page1_items")
+    icons = ino_table("wifi_page0_icons") + ino_table("wifi_page1_icons")
+    render_grid(t, "WiFi", items, icons, selected)
 
 
 def render_bluetooth(t, selected=3):
@@ -1222,6 +1236,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     for name, fn in (("boot", lambda t: render_boot(t, brand)),
                      ("menu", render_menu),
+                     ("wifi", render_wifi),
                      ("bluetooth", render_bluetooth),
                      ("spotter", render_spotter),
                      ("hunt-pick", render_hunt_pick),

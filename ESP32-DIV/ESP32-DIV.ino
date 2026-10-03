@@ -991,20 +991,21 @@ const int TILE_TEXT_DY = 57;
  * strings the website lists and check_site_menu.py holds the two together.
  */
 static constexpr int GRID_COLS    = 3;
-static constexpr int GRID_ROWS    = 5;
+static constexpr int GRID_ROWS    = 4;
 static constexpr int GRID_SLOTS   = GRID_COLS * GRID_ROWS;
 static constexpr int GRID_GAP_X   = 8;
 static constexpr int GRID_GAP_Y   = 6;
 static constexpr int GRID_TILE_W  =
     (PUEO_SCREEN_W - GRID_GAP_X * (GRID_COLS + 1)) / GRID_COLS;
-static constexpr int GRID_TILE_H  = 70;
+static constexpr int GRID_TILE_H  = 92;
 static constexpr int GRID_Y0      = 54;   // clears PUEO_STATUS_TALL (34) and the title row
-/* The icon gives up 8 px so the label can have the 16 px font. 24 px is
- * still 3.7 mm, and the label is the part being read at arm's length. */
-static constexpr int GRID_ICON    = 24;
+static constexpr int GRID_ICON    = 32;
 static constexpr int GRID_ICON_DY = 6;
-static constexpr int GRID_TEXT_DY = 34;
-static constexpr int GRID_LINE_H  = 17;
+static constexpr int GRID_TEXT_DY = 44;
+static constexpr int GRID_LINE_H  = 16;
+/* Three lines fit a 92 px tile under a 32 px icon, and three is what the
+ * longest label in the firmware needs: Probe / Request / Flood. */
+static constexpr int GRID_LINES   = 3;
 /* Room for the text, in pixels. Font 2 is proportional, so a character count
  * is not a width and only textWidth() can say whether a label fits.
  *
@@ -1039,37 +1040,40 @@ static int gridHit(int tx, int ty, int count) {
  * leaves the lines closest in length. "Hidden SSID Revealer" is twenty
  * characters and the tile holds fifteen, so this is what keeps the table's
  * own wording instead of inventing a short one for the screen. */
-static void gridWrap(const char *label, char *l1, char *l2, size_t cap) {
-    l1[0] = l2[0] = '\0';
-    /* Measured, not counted. The caller has already selected font 2, which
-     * is proportional: "Hidden SSID Revealer" and twenty Ws are both twenty
-     * characters and nothing like the same width. */
-    if (tft.textWidth(label) <= GRID_TEXT_W) {
-        snprintf(l1, cap, "%s", label);
-        return;
+/* Greedy word wrap into at most GRID_LINES lines, measured in the font the
+ * caller has selected. Returns how many lines were used.
+ *
+ * Greedy rather than the balanced two-way split this replaced: balanced was
+ * written for exactly two lines and does not generalise to three, and for
+ * every label that fitted under the old rule it produces the same answer.
+ *
+ * A word too wide for a line on its own goes on that line anyway and is
+ * drawn over. That cannot happen with any label in the firmware, and
+ * check_grid_capacity.py says so rather than leaving it to chance. */
+static int gridWrap(const char *label, char out[][40], int cap) {
+    int used = 0;
+    const char *p = label;
+    while (*p && used < cap) {
+        /* longest run of words that still fits */
+        int take = 0;
+        int lastFit = 0;
+        for (;;) {
+            while (p[take] == ' ') take++;
+            while (p[take] && p[take] != ' ') take++;
+            char probe[40];
+            snprintf(probe, sizeof(probe), "%.*s", take, p);
+            if (tft.textWidth(probe) > GRID_TEXT_W && lastFit > 0) {
+                break;
+            }
+            lastFit = take;
+            if (!p[take]) break;
+        }
+        snprintf(out[used], 40, "%.*s", lastFit, p);
+        used++;
+        p += lastFit;
+        while (*p == ' ') p++;
     }
-    const size_t n = strlen(label);
-    int best = -1, bestCost = 1 << 20;
-    char head[40], tail[40];
-    for (size_t i = 0; i < n; i++) {
-        if (label[i] != ' ') continue;
-        snprintf(head, sizeof(head), "%.*s", (int)i, label);
-        snprintf(tail, sizeof(tail), "%s", label + i + 1);
-        const int a = tft.textWidth(head);
-        const int b = tft.textWidth(tail);
-        if (a > GRID_TEXT_W || b > GRID_TEXT_W) continue;
-        const int cost = (a > b) ? (a - b) : (b - a);
-        if (cost < bestCost) { bestCost = cost; best = (int)i; }
-    }
-    if (best < 0) {
-        /* No space splits it small enough. Give the whole thing to one line
-         * and let it be clipped rather than cutting a word in half, which
-         * reads as a different word. */
-        snprintf(l1, cap, "%s", label);
-        return;
-    }
-    snprintf(l1, cap, "%.*s", best, label);
-    snprintf(l2, cap, "%s", label + best + 1);
+    return used;
 }
 
 static void drawGridTile(int i, const char *label,
@@ -1091,16 +1095,16 @@ static void drawGridTile(int i, const char *label,
     /* Font first: gridWrap() measures with whatever is selected. */
     tft.setTextFont(2);
     tft.setTextSize(1);
-    char l1[40], l2[40];
-    gridWrap(label, l1, l2, sizeof(l1));
+    char lines[GRID_LINES][40];
+    const int n = gridWrap(label, lines, GRID_LINES);
     tft.setTextColor(ink, fill);
-    const int ty = y + GRID_TEXT_DY + (l2[0] ? 0 : GRID_LINE_H / 2);
-    tft.setCursor(x + (GRID_TILE_W - tft.textWidth(l1)) / 2, ty);
-    tft.print(l1);
-    if (l2[0]) {
-        tft.setCursor(x + (GRID_TILE_W - tft.textWidth(l2)) / 2,
-                      ty + GRID_LINE_H);
-        tft.print(l2);
+    /* Centred in the block, so a one-line label does not sit high in a tile
+     * sized for three. */
+    const int ty = y + GRID_TEXT_DY + ((GRID_LINES - n) * GRID_LINE_H) / 2;
+    for (int i = 0; i < n; i++) {
+        tft.setCursor(x + (GRID_TILE_W - tft.textWidth(lines[i])) / 2,
+                      ty + i * GRID_LINE_H);
+        tft.print(lines[i]);
     }
 }
 
