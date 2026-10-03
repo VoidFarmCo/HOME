@@ -181,6 +181,7 @@ INCLUDE=(
   "tools/check_spotter_prims.py"
   "tools/check_spotter_filter.py"
   "tools/check_sig_counts.py"
+  "tools/check_site_menu.py"
   "tools/check_oui_registry.py"
   "tools/check_nrf24_rpd.py"
   "tools/render_screens.py"
