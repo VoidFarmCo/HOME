@@ -3378,6 +3378,9 @@ void handleNRFSubmenuButtons() {
 }
 
 void handleSubGHzSubmenuButtons() {
+    // "Back to Main Menu" is the last entry; derive it so adding a feature
+    // above it does not strand Back (which is how SubGHz Chat broke it).
+    const int backIdx = active_submenu_size - 1;
     if (isButtonPressed(BTN_UP)) {
         current_submenu_index = (current_submenu_index - 1 + active_submenu_size) % active_submenu_size;
         if (current_submenu_index < 0) {
@@ -3402,7 +3405,7 @@ void handleSubGHzSubmenuButtons() {
         last_interaction_time = millis();
         delay(200);
 
-        if (current_submenu_index == 5) {
+        if (current_submenu_index == backIdx) {
             in_sub_menu = false;
             feature_active = false;
             feature_exit_requested = false;
@@ -3411,7 +3414,7 @@ void handleSubGHzSubmenuButtons() {
             is_main_menu = false;
         }
 
-        if (current_submenu_index != 5) {
+        if (current_submenu_index != backIdx) {
             launchSubGhzFeature(current_submenu_index);
         }
     }
@@ -3434,7 +3437,7 @@ void handleSubGHzSubmenuButtons() {
                 displaySubmenu();
                 delay(200);
 
-                if (current_submenu_index == 5) {
+                if (current_submenu_index == backIdx) {
                     in_sub_menu = false;
                     feature_active = false;
                     feature_exit_requested = false;
