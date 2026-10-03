@@ -449,6 +449,56 @@ if [ -n "${PUEO_PUBLISH_DIR:-}" ]; then
     exit 1
   fi
 
+  # ── screenshots ──────────────────────────────────────────────────────────
+  #
+  # The site's screenshots are rendered from this firmware's own source by
+  # tools/render_screens.py, not photographed, so they are an artifact of the
+  # release exactly as the binaries are. The version is on the boot screen and
+  # in the status bar, which means most of them change every time it does.
+  #
+  # Nothing regenerated them, so 0.4.24 published a site showing 0.4.23 on
+  # nine screens. The release step is the only place that knows a release is
+  # happening, so it is where this belongs.
+  #
+  # Only files already in the site are replaced. A render with no counterpart
+  # there is reported rather than copied: it is a screen nothing links yet,
+  # and quietly adding an unreferenced image is not this script's decision.
+  if [ -d "$DEST/assets" ]; then
+    SHOTS="$(mktemp -d)"
+    if ! python tools/render_screens.py --out "$SHOTS" >/dev/null 2>&1; then
+      echo "render_screens.py failed; the site would keep the previous" >&2
+      echo "release's screenshots. Needs Python 3 with Pillow." >&2
+      echo "Cut without publishing with --no-publish if that is what you want." >&2
+      rm -rf "$SHOTS"
+      exit 1
+    fi
+    shots_new=0
+    shots_same=0
+    shots_orphan=""
+    for f in "$SHOTS"/*@3x.png; do
+      [ -f "$f" ] || continue
+      base="$(basename "$f" | sed 's/^pueo-screen-/screen-/; s/@3x//')"
+      dst="$DEST/assets/$base"
+      if [ ! -f "$dst" ]; then
+        shots_orphan="$shots_orphan $base"
+        continue
+      fi
+      if cmp -s "$f" "$dst"; then
+        shots_same=$((shots_same + 1))
+      else
+        cp "$f" "$dst"
+        cmp -s "$f" "$dst" || { echo "screenshot copy failed: $base" >&2; exit 1; }
+        shots_new=$((shots_new + 1))
+      fi
+    done
+    rm -rf "$SHOTS"
+    echo "screenshots: $shots_new updated, $shots_same already current"
+    [ -n "$shots_orphan" ] && \
+      echo "  rendered but not on the site, so not copied:$shots_orphan"
+    [ "$shots_new" != "0" ] && \
+      echo "  the site repo needs a deploy for these to reach the web"
+  fi
+
   # ── retention ────────────────────────────────────────────────────────────
   #
   # Keep the release just cut, the one before it, and the two pinned below.
