@@ -251,7 +251,7 @@ bool ensureBleStackReady() {
     return false;
   }
 #endif
-  BLEDevice::init(ESP32DIV_NAME);
+  BLEDevice::init(PUEO_BLE_NAME);
   ready = true;
   s_bleStackUp = true;
   Serial.printf("[ble] init done, free heap=%u\n", (unsigned)ESP.getFreeHeap());

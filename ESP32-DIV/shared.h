@@ -76,8 +76,12 @@ uint16_t uiUniversalColor();
 #endif
 
 /*──────────────────── Project Info ────────────────────*/
-#ifndef ESP32DIV_NAME
-#define ESP32DIV_NAME "ESP32-DIV"
+/* What the board calls itself over BLE, which is what a phone shows when it
+ * asks to pair. It said ESP32-DIV, which is upstream's name and not this
+ * one, and it is the name that turned up on a phone minutes after Sour Apple
+ * had been closed. Nothing compares against it; it is only announced. */
+#ifndef PUEO_BLE_NAME
+#define PUEO_BLE_NAME "Pueo"
 #endif
 #ifndef ESP32DIV_VERSION
 #define ESP32DIV_VERSION "v1.7.2"
