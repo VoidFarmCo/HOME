@@ -355,6 +355,72 @@ static int* pagedSubmenuPage() {
     return (current_menu_index == 4) ? &bluetooth_submenu_page : &wifi_submenu_page;
 }
 
+/* ── Both pages, as one grid ──────────────────────────────────────────────
+ *
+ * WiFi is twelve features and Bluetooth eleven, and both fit in the grid's
+ * fifteen slots, so neither needs a second page. The page variables stay.
+ *
+ * That is deliberate rather than lazy. Which feature a tap launches is
+ * decided by about ninety tests of the form
+ *
+ *     if (wifi_submenu_page == 0 && current_submenu_index == 3)
+ *
+ * scattered through the dispatch, and rewriting all of them into one index
+ * space is the kind of change that silently launches the wrong feature. So
+ * the grid is a view over both pages: tile 7 sets page 1, index 1, and every
+ * one of those tests goes on reading what it always read.
+ *
+ * Nothing on screen has a page any more. The variable is an implementation
+ * detail of the dispatch now, which is where it can stay until that is worth
+ * untangling on its own.
+ */
+static int pagedTotalFeatures() {
+    return (current_menu_index == 4)
+        ? (BT_PAGE0_FEATURES + BT_PAGE1_FEATURES)
+        : (WIFI_PAGE0_FEATURES + WIFI_PAGE1_FEATURES);
+}
+
+static int pagedFirstPageCount() {
+    return (current_menu_index == 4) ? BT_PAGE0_FEATURES : WIFI_PAGE0_FEATURES;
+}
+
+/* Tile index -> (page, index on that page). */
+static void pagedSplit(int tile, int &page, int &idx) {
+    const int first = pagedFirstPageCount();
+    if (tile < first) { page = 0; idx = tile; }
+    else              { page = 1; idx = tile - first; }
+}
+
+static const char* pagedItemAt(int tile) {
+    int page, idx;
+    pagedSplit(tile, page, idx);
+    if (current_menu_index == 4) {
+        return page ? bluetooth_page1_items[idx] : bluetooth_page0_items[idx];
+    }
+    return page ? wifi_page1_items[idx] : wifi_page0_items[idx];
+}
+
+/* Which tile the last tap chose, in the page-local index the dispatch uses.
+ * -1 when the tap was not on a tile. */
+static int s_gridTapIndex = -1;
+
+static void applyPagedSubmenuPage() {
+    if (current_menu_index == 4) {
+        applyBluetoothSubmenuPage();
+    } else {
+        applyWifiSubmenuPage();
+    }
+}
+
+static const unsigned char* pagedIconAt(int tile) {
+    int page, idx;
+    pagedSplit(tile, page, idx);
+    if (current_menu_index == 4) {
+        return page ? bluetooth_page1_icons[idx] : bluetooth_page0_icons[idx];
+    }
+    return page ? wifi_page1_icons[idx] : wifi_page0_icons[idx];
+}
+
 // Bottom row: [icon | Main Menu] ........ [Next/Prev Page | icon]
 static int pagedBackBtnIndex() {
     return pagedFeatureCount();
@@ -906,6 +972,260 @@ const int Y_SPACING = 106;
 const int TILE_ICON_DY = 19;
 const int TILE_TEXT_DY = 57;
 
+/* ── The submenu grid ────────────────────────────────────────────────────
+ *
+ * Three columns of five, replacing the list the submenus used.
+ *
+ * The list was not a style problem. Its rows were 30 px, which is 4.6 mm on
+ * a 165 ppi panel against the 7 mm a fingertip needs, and the rows are the
+ * tap targets: the d-pad path needs a PCF8574 expander that is not fitted,
+ * so touch is the only input there is. It also paged at six entries while
+ * leaving 45% of the panel black, which cost a tap for nothing.
+ *
+ * A tile is the only shape here that was already finger sized. These are
+ * 96x70, which is 14.8 x 10.8 mm, and fifteen of them hold the largest
+ * submenu with room to spare, so Next Page is gone rather than restyled.
+ *
+ * The labels are the ones the menu tables already carry, wrapped to two
+ * lines in the 6 px font rather than shortened, because they are the same
+ * strings the website lists and check_site_menu.py holds the two together.
+ */
+static constexpr int GRID_COLS    = 3;
+static constexpr int GRID_ROWS    = 4;
+static constexpr int GRID_SLOTS   = GRID_COLS * GRID_ROWS;
+static constexpr int GRID_GAP_X   = 8;
+static constexpr int GRID_GAP_Y   = 6;
+static constexpr int GRID_TILE_W  =
+    (PUEO_SCREEN_W - GRID_GAP_X * (GRID_COLS + 1)) / GRID_COLS;
+static constexpr int GRID_TILE_H  = 92;
+static constexpr int GRID_Y0      = 54;   // clears PUEO_STATUS_TALL (34) and the title row
+static constexpr int GRID_ICON    = 32;
+static constexpr int GRID_ICON_DY = 6;
+static constexpr int GRID_TEXT_DY = 44;
+static constexpr int GRID_LINE_H  = 16;
+/* Three lines fit a 92 px tile under a 32 px icon, and three is what the
+ * longest label in the firmware needs: Probe / Request / Flood. */
+static constexpr int GRID_LINES   = 3;
+/* Room for the text, in pixels. Font 2 is proportional, so a character count
+ * is not a width and only textWidth() can say whether a label fits.
+ *
+ * 16 rather than 4, which is 8 px of air each side. At 4 the widest labels
+ * technically fitted and touched both borders, and a word with its ends
+ * against the edges of a box reads as having run out of room whether or not
+ * it has. Eight is enough to look deliberate. */
+static constexpr int GRID_TEXT_W  = GRID_TILE_W - 16;
+
+static void gridTileXY(int i, int &x, int &y) {
+    const int col = i % GRID_COLS;
+    const int row = i / GRID_COLS;
+    x = GRID_GAP_X + col * (GRID_TILE_W + GRID_GAP_X);
+    y = GRID_Y0 + row * (GRID_TILE_H + GRID_GAP_Y);
+}
+
+/* Which tile a tap landed on, or -1. One implementation, because five copies
+ * of a hit test is how five of them came to say x <= 220 on a 320 px panel. */
+static int gridHit(int tx, int ty, int count) {
+    for (int i = 0; i < count && i < GRID_SLOTS; i++) {
+        int x, y;
+        gridTileXY(i, x, y);
+        if (tx >= x && tx < x + GRID_TILE_W &&
+            ty >= y && ty < y + GRID_TILE_H) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Split a label across two lines at a space, preferring the break that
+ * leaves the lines closest in length. "Hidden SSID Revealer" is twenty
+ * characters and the tile holds fifteen, so this is what keeps the table's
+ * own wording instead of inventing a short one for the screen. */
+/* Greedy word wrap into at most GRID_LINES lines, measured in the font the
+ * caller has selected. Returns how many lines were used.
+ *
+ * Greedy rather than the balanced two-way split this replaced: balanced was
+ * written for exactly two lines and does not generalise to three, and for
+ * every label that fitted under the old rule it produces the same answer.
+ *
+ * A word too wide for a line on its own goes on that line anyway and is
+ * drawn over. That cannot happen with any label in the firmware, and
+ * check_grid_capacity.py says so rather than leaving it to chance. */
+static int gridWrap(const char *label, char out[][40], int cap) {
+    int used = 0;
+    const char *p = label;
+    while (*p && used < cap) {
+        /* longest run of words that still fits */
+        int take = 0;
+        int lastFit = 0;
+        for (;;) {
+            while (p[take] == ' ') take++;
+            while (p[take] && p[take] != ' ') take++;
+            char probe[40];
+            snprintf(probe, sizeof(probe), "%.*s", take, p);
+            if (tft.textWidth(probe) > GRID_TEXT_W && lastFit > 0) {
+                break;
+            }
+            lastFit = take;
+            if (!p[take]) break;
+        }
+        snprintf(out[used], 40, "%.*s", lastFit, p);
+        used++;
+        p += lastFit;
+        while (*p == ' ') p++;
+    }
+    return used;
+}
+
+static void drawGridTile(int i, const char *label,
+                         const unsigned char *icon, bool selected) {
+    int x, y;
+    gridTileXY(i, x, y);
+    const uint16_t fill = selected ? UI_ICON : UI_FG;
+    const uint16_t edge = selected ? UI_ICON : UI_LINE;
+    const uint16_t ink  = selected ? UI_BG   : UI_TEXT;
+    const uint16_t icol = selected ? UI_BG   : UI_ICON;
+
+    tft.fillRoundRect(x, y, GRID_TILE_W, GRID_TILE_H, 5, fill);
+    tft.drawRoundRect(x, y, GRID_TILE_W, GRID_TILE_H, 5, edge);
+    if (icon) {
+        drawBitmapScaled(x + (GRID_TILE_W - GRID_ICON) / 2, y + GRID_ICON_DY,
+                         icon, 16, 16, icol, GRID_ICON / 16);
+    }
+
+    /* Font first: gridWrap() measures with whatever is selected. */
+    tft.setTextFont(2);
+    tft.setTextSize(1);
+    char lines[GRID_LINES][40];
+    const int n = gridWrap(label, lines, GRID_LINES);
+    tft.setTextColor(ink, fill);
+    /* Centred in the block, so a one-line label does not sit high in a tile
+     * sized for three. */
+    const int ty = y + GRID_TEXT_DY + ((GRID_LINES - n) * GRID_LINE_H) / 2;
+    for (int i = 0; i < n; i++) {
+        tft.setCursor(x + (GRID_TILE_W - tft.textWidth(lines[i])) / 2,
+                      ty + i * GRID_LINE_H);
+        tft.print(lines[i]);
+    }
+}
+
+/* The whole grid. `count` excludes the trailing "Back to Main Menu" entry,
+ * which is the footer button rather than a tile. */
+static void drawMenuGrid(const char *const *items,
+                         const unsigned char *const *icons,
+                         int count, int selected, const char *title) {
+    tft.fillScreen(UI_BG);
+    drawStatusBar(currentBatteryVoltage, true);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_ICON, UI_BG);
+    tft.setCursor(8, 38);
+    tft.print(title);
+    char n[20];
+    snprintf(n, sizeof(n), "%d features", count);
+    tft.setTextColor(uiDimTextColor(), UI_BG);
+    tft.setCursor(PUEO_SCREEN_W - 8 - (int)strlen(n) * 6, 38);
+    tft.print(n);
+    tft.drawFastHLine(0, 50, PUEO_SCREEN_W, UI_LINE);
+    tft.setTextFont(2);
+
+    for (int i = 0; i < count && i < GRID_SLOTS; i++) {
+        drawGridTile(i, items[i], icons ? icons[i] : nullptr, i == selected);
+    }
+}
+
+/* Back, as the footer rather than the last row of the list.
+ *
+ * The bar is drawn 34 px tall to match every feature screen's footer, and
+ * its hit zone runs from the bottom of the last tile row instead, which is
+ * 60 px. A target can be bigger than the thing drawn in it, and the strip
+ * below the grid is not doing anything else. 34 px is 5.2 mm and under what
+ * a finger wants; 60 px is 9.2 mm and over it. */
+static constexpr int GRID_FOOT_H = 34;
+static constexpr int GRID_FOOT_Y = PUEO_SCREEN_H - GRID_FOOT_H;
+static constexpr int GRID_FOOT_HIT_Y =
+    GRID_Y0 + GRID_ROWS * (GRID_TILE_H + GRID_GAP_Y);
+
+/* ── hardware a menu depends on ───────────────────────────────────────────
+ *
+ * Until now the only way to find out the CC1101 is not fitted was to open a
+ * SubGHz feature and be told, which says nothing about the other five entries
+ * in that menu and comes one tap too late.
+ *
+ * Probed once and remembered. subghzCc1101Present() claims the SPI bus and
+ * the PN532's begin() attaches it, so probing on a repaint would put bus
+ * traffic behind a redraw. Opening the menu is a user action and a fair
+ * moment to go and look.
+ *
+ * GPS is not here. There is no cheap probe: the module answers by emitting
+ * NMEA when it is ready, and a brief look that found none would report "no
+ * GPS" for one that was still waking up. Saying nothing beats saying
+ * something false.
+ */
+/* Neither of these has a header in this tree. */
+bool subghzCc1101Present();
+namespace Nrf24Raw { bool begin(); }
+
+enum HwProbe : uint8_t { HW_UNKNOWN = 0, HW_THERE, HW_ABSENT };
+static HwProbe s_hwNrf  = HW_UNKNOWN;
+static HwProbe s_hwCc   = HW_UNKNOWN;
+static HwProbe s_hwNfc  = HW_UNKNOWN;
+
+static const char* submenuHardwareNote(int menuIndex) {
+    switch (menuIndex) {
+        case 1:   /* NRF24 */
+            if (s_hwNrf == HW_UNKNOWN) {
+                s_hwNrf = Nrf24Raw::begin() ? HW_THERE : HW_ABSENT;
+            }
+            return (s_hwNrf == HW_ABSENT) ? "no nRF24" : nullptr;
+        case 5:   /* SubGHz */
+            if (s_hwCc == HW_UNKNOWN) {
+                s_hwCc = subghzCc1101Present() ? HW_THERE : HW_ABSENT;
+            }
+            return (s_hwCc == HW_ABSENT) ? "no CC1101" : nullptr;
+        case 6:   /* RFID/NFC */
+            if (s_hwNfc == HW_UNKNOWN) {
+                s_hwNfc = RfidNfc::begin() ? HW_THERE : HW_ABSENT;
+            }
+            return (s_hwNfc == HW_ABSENT) ? "no PN532" : nullptr;
+        default:
+            return nullptr;
+    }
+}
+
+/* Defined in bluetooth.cpp. A menu on screen means no feature is running,
+ * and nothing that is not running may transmit. */
+void bleQuietDown();
+
+static void drawSubmenuFooter() {
+    tft.fillRect(0, GRID_FOOT_Y, PUEO_SCREEN_W, GRID_FOOT_H, UI_BG);
+    tft.drawFastHLine(0, GRID_FOOT_Y, PUEO_SCREEN_W, UI_LINE);
+    tft.setTextFont(2);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    const int iy = GRID_FOOT_Y + (GRID_FOOT_H - 16) / 2;
+    tft.drawBitmap(10, iy, bitmap_icon_go_back, 16, 16, UI_TEXT);
+    tft.setCursor(30, iy);
+    tft.print("Main Menu");
+
+    /* Opposite Main Menu, in the warn colour, and only when something is
+     * missing. A footer that always carries a hardware line is a footer
+     * nobody reads. */
+    const char* note = submenuHardwareNote(current_menu_index);
+    if (note) {
+        tft.setTextFont(1);
+        tft.setTextSize(1);
+        tft.setTextColor(UI_ICON, UI_BG);
+        const int w = (int)strlen(note) * 6;
+        tft.setCursor(PUEO_SCREEN_W - 10 - w, GRID_FOOT_Y + (GRID_FOOT_H - 8) / 2);
+        tft.print(note);
+        tft.setTextFont(2);
+    }
+}
+
+static bool gridFooterHit(int ty) {
+    return ty >= GRID_FOOT_HIT_Y;
+}
+
 void displayOtherMenuGrid();
 void displayPagedSubmenu();
 
@@ -918,6 +1238,7 @@ static int submenuItemY(int index) {
 }
 
 void displaySubmenu() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
     setTouchButtonInputEnabled(false);
 
     if (current_menu_index == 2) {
@@ -930,125 +1251,70 @@ void displaySubmenu() {
         return;
     }
 
+    setStatusBarHeight(PUEO_STATUS_TALL);  // a tile grid, like the others
     menu_initialized = false;
     last_menu_index = -1;
 
-    tft.setTextFont(2);
-    tft.setTextSize(1);
-
-    if (!submenu_initialized) {
-        tft.fillScreen(UI_BG);
-
-        for (int i = 0; i < active_submenu_size; i++) {
-            const int yPos = submenuItemY(i);
-            const bool isBack = (i == active_submenu_size - 1);
-
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, yPos, active_submenu_icons[i], 16, 16, UI_TEXT);
-            tft.setCursor(30, yPos);
-            if (!isBack) {
-                tft.print("| ");
-            }
-            tft.print(active_submenu_items[i]);
-        }
-
-        submenu_initialized = true;
-        last_submenu_index = -1;
+    /* The last entry is "Back to Main Menu" and is the footer's left button,
+     * not a tile. Every feature screen already puts back there, so a submenu
+     * that put it at the end of a list was the odd one out. */
+    const int tiles = (active_submenu_size > 0) ? active_submenu_size - 1 : 0;
+    int sel = current_submenu_index;
+    if (sel >= tiles) {
+        sel = -1;
     }
 
-    if (last_submenu_index != current_submenu_index) {
-        if (last_submenu_index >= 0) {
-            const int prev_yPos = submenuItemY(last_submenu_index);
-            const bool prevBack = (last_submenu_index == active_submenu_size - 1);
+    drawMenuGrid(active_submenu_items, active_submenu_icons, tiles, sel,
+                 menu_items[current_menu_index]);
+    drawSubmenuFooter();
 
-            tft.fillRect(0, prev_yPos, tft.width(), 28, UI_BG);
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, prev_yPos, active_submenu_icons[last_submenu_index], 16, 16, UI_TEXT);
-            tft.setCursor(30, prev_yPos);
-            if (!prevBack) {
-                tft.print("| ");
-            }
-            tft.print(active_submenu_items[last_submenu_index]);
-        }
-
-        const int new_yPos = submenuItemY(current_submenu_index);
-        const bool newBack = (current_submenu_index == active_submenu_size - 1);
-
-        tft.fillRect(0, new_yPos, tft.width(), 28, UI_BG);
-        tft.setTextColor(UI_ICON, UI_BG);
-        tft.drawBitmap(10, new_yPos, active_submenu_icons[current_submenu_index], 16, 16, UI_ICON);
-        tft.setCursor(30, new_yPos);
-        if (!newBack) {
-            tft.print("| ");
-        }
-        tft.print(active_submenu_items[current_submenu_index]);
-
-        last_submenu_index = current_submenu_index;
-    }
-
-    setStatusBarHeight(PUEO_STATUS_SHORT);  // a list, whose first row is at y=30
-    drawStatusBar(currentBatteryVoltage, true);
+    submenu_initialized = true;
+    last_submenu_index = current_submenu_index;
 }
 
 void displayPagedSubmenu() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
+    setStatusBarHeight(PUEO_STATUS_TALL);  // a tile grid now, with room above it
     menu_initialized = false;
     last_menu_index = -1;
 
-    const int featureCount = pagedFeatureCount();
-    tft.setTextFont(2);
-    tft.setTextSize(1);
+    const int total = pagedTotalFeatures();
 
-    if (!submenu_initialized) {
-        tft.fillScreen(UI_BG);
-        for (int i = 0; i < featureCount; i++) {
-            const int yPos = 30 + i * 30;
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, yPos, active_submenu_icons[i], 16, 16, UI_TEXT);
-            tft.setCursor(30, yPos);
-            tft.print("| ");
-            tft.print(active_submenu_items[i]);
-        }
-        drawPagedFooterButtons();
-        submenu_initialized = true;
-        last_submenu_index = -1;
-        s_pagedFooterFocus = -1;
+    /* The grid holds both pages, so the only thing the page still decides is
+     * which tile is highlighted. */
+    int sel = -1;
+    const int cur = current_submenu_index;
+    if (cur >= 0 && cur < pagedFeatureCount()) {
+        sel = (*pagedSubmenuPage() == 0) ? cur : pagedFirstPageCount() + cur;
     }
 
-    if (last_submenu_index != current_submenu_index) {
-        if (last_submenu_index >= 0 && last_submenu_index < featureCount) {
-            const int prev_yPos = 30 + last_submenu_index * 30;
-            tft.setTextColor(UI_TEXT, UI_BG);
-            tft.drawBitmap(10, prev_yPos, active_submenu_icons[last_submenu_index], 16, 16, UI_TEXT);
-            tft.setCursor(30, prev_yPos);
-            tft.print("| ");
-            tft.print(active_submenu_items[last_submenu_index]);
-        }
-
-        if (current_submenu_index >= 0 && current_submenu_index < featureCount) {
-            const int new_yPos = 30 + current_submenu_index * 30;
-            tft.setTextColor(UI_ICON, UI_BG);
-            tft.drawBitmap(10, new_yPos, active_submenu_icons[current_submenu_index], 16, 16, UI_ICON);
-            tft.setCursor(30, new_yPos);
-            tft.print("| ");
-            tft.print(active_submenu_items[current_submenu_index]);
-            s_pagedFooterFocus = -1;
-        } else if (current_submenu_index == pagedBackBtnIndex()) {
-            s_pagedFooterFocus = 0;
-        } else if (current_submenu_index == pagedPageBtnIndex()) {
-            s_pagedFooterFocus = 1;
-        } else {
-            s_pagedFooterFocus = -1;
-        }
-
-        drawPagedFooterButtons();
-        last_submenu_index = current_submenu_index;
-    }
-
-    setStatusBarHeight(PUEO_STATUS_SHORT);  // a list: first row is at y=30
+    tft.fillScreen(UI_BG);
     drawStatusBar(currentBatteryVoltage, true);
+    tft.setTextFont(1);
+    tft.setTextSize(1);
+    tft.setTextColor(UI_ICON, UI_BG);
+    tft.setCursor(8, 38);
+    tft.print(menu_items[current_menu_index]);
+    char n[20];
+    snprintf(n, sizeof(n), "%d features", total);
+    tft.setTextColor(uiDimTextColor(), UI_BG);
+    tft.setCursor(PUEO_SCREEN_W - 8 - (int)strlen(n) * 6, 38);
+    tft.print(n);
+    tft.drawFastHLine(0, 50, PUEO_SCREEN_W, UI_LINE);
+    tft.setTextFont(2);
+
+    for (int i = 0; i < total && i < GRID_SLOTS; i++) {
+        drawGridTile(i, pagedItemAt(i), pagedIconAt(i), i == sel);
+    }
+    drawSubmenuFooter();
+
+    submenu_initialized = true;
+    last_submenu_index = current_submenu_index;
+    s_pagedFooterFocus = -1;
 }
 
 void displayOtherMenuGrid() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
     applyThemeToPalette(settings().theme);
 
     submenu_initialized = false;
@@ -1138,6 +1404,7 @@ void displayOtherMenuGrid() {
 
 
 void displayMenu() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
 
   setTouchButtonInputEnabled(false);
   applyThemeToPalette(settings().theme);
@@ -1666,8 +1933,11 @@ void handleWiFiSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
 
-        layoutPagedFooterButtons();
-        const int footerHit = FeatureUI::hit(s_pagedFooterBtns, 2, x, y);
+        /* One footer button now, because there are no pages to turn. Back
+         * is the strip below the last tile row, which is 60 px rather than
+         * the 34 the bar is drawn in: a target may be larger than the thing
+         * inside it, and nothing else is down there. */
+        const int footerHit = gridFooterHit(y) ? 0 : -1;
         if (footerHit == 0) {
             // Left: Main Menu
             current_submenu_index = pagedBackBtnIndex();
@@ -1698,15 +1968,27 @@ void handleWiFiSubmenuButtons() {
         }
 
         const int featureCount = wifiFeatureCount();
+        /* A tap on the grid picks a tile, and the tile says which page and
+         * which index on it. Setting both here means the dispatch below,
+         * which is written in those terms in about ninety places, needs no
+         * change at all. */
+        {
+            const int tapped = gridHit(x, y, pagedTotalFeatures());
+            if (tapped >= 0) {
+                int tpage, tidx;
+                pagedSplit(tapped, tpage, tidx);
+                if (*pagedSubmenuPage() != tpage) {
+                    *pagedSubmenuPage() = tpage;
+                    applyPagedSubmenuPage();
+                }
+                s_gridTapIndex = tidx;
+            } else {
+                s_gridTapIndex = -1;
+            }
+        }
         for (int i = 0; i < featureCount; i++) {
-            int yPos = 30 + i * 30;
-
-            int button_x1 = 10;
-            int button_y1 = yPos;
-            int button_x2 = 220;
-            int button_y2 = yPos + 30;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid decided which tile; this loop only has to agree. */
+            if (i == s_gridTapIndex) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -2469,8 +2751,11 @@ void handleBluetoothSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
 
-        layoutPagedFooterButtons();
-        const int footerHit = FeatureUI::hit(s_pagedFooterBtns, 2, x, y);
+        /* One footer button now, because there are no pages to turn. Back
+         * is the strip below the last tile row, which is 60 px rather than
+         * the 34 the bar is drawn in: a target may be larger than the thing
+         * inside it, and nothing else is down there. */
+        const int footerHit = gridFooterHit(y) ? 0 : -1;
         if (footerHit == 0) {
             current_submenu_index = pagedBackBtnIndex();
             last_interaction_time = millis();
@@ -2499,15 +2784,27 @@ void handleBluetoothSubmenuButtons() {
         }
 
         const int featureCount = bluetoothFeatureCount();
+        /* A tap on the grid picks a tile, and the tile says which page and
+         * which index on it. Setting both here means the dispatch below,
+         * which is written in those terms in about ninety places, needs no
+         * change at all. */
+        {
+            const int tapped = gridHit(x, y, pagedTotalFeatures());
+            if (tapped >= 0) {
+                int tpage, tidx;
+                pagedSplit(tapped, tpage, tidx);
+                if (*pagedSubmenuPage() != tpage) {
+                    *pagedSubmenuPage() = tpage;
+                    applyPagedSubmenuPage();
+                }
+                s_gridTapIndex = tidx;
+            } else {
+                s_gridTapIndex = -1;
+            }
+        }
         for (int i = 0; i < featureCount; i++) {
-            int yPos = 30 + i * 30;
-
-            int button_x1 = 10;
-            int button_y1 = yPos;
-            int button_x2 = 220;
-            int button_y2 = yPos + 30;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid decided which tile; this loop only has to agree. */
+            if (i == s_gridTapIndex) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -2973,14 +3270,14 @@ void handleNRFSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
         for (int i = 0; i < active_submenu_size; i++) {
-            int yPos = submenuItemY(i);
-
-            int button_x1 = 10;
-            int button_y1 = yPos;
-            int button_x2 = 220;
-            int button_y2 = yPos + 28;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid owns the geometry, in one place. Five copies of a
+             * hit test is how five of them came to say x <= 220 on a 320 px
+             * panel. The last entry is Back and lives in the footer. */
+            const bool isBack = (i == active_submenu_size - 1);
+            const bool hit = isBack
+                ? gridFooterHit(y)
+                : (gridHit(x, y, active_submenu_size - 1) == i);
+            if (hit) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -3046,14 +3343,14 @@ void handleSubGHzSubmenuButtons() {
         if (!readTouchXY(x, y)) { return; }
         delay(10);
         for (int i = 0; i < active_submenu_size; i++) {
-            int yPos = submenuItemY(i);
-
-            int button_x1 = 10;
-            int button_y1 = yPos;
-            int button_x2 = 220;
-            int button_y2 = yPos + 28;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid owns the geometry, in one place. Five copies of a
+             * hit test is how five of them came to say x <= 220 on a 320 px
+             * panel. The last entry is Back and lives in the footer. */
+            const bool isBack = (i == active_submenu_size - 1);
+            const bool hit = isBack
+                ? gridFooterHit(y)
+                : (gridHit(x, y, active_submenu_size - 1) == i);
+            if (hit) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -3225,14 +3522,14 @@ void handleListSubmenuButtons(void (*launch)(int), int backIdx) {
         }
 
         for (int i = 0; i < active_submenu_size; i++) {
-            int yPos = submenuItemY(i);
-
-            int button_x1 = 10;
-            int button_y1 = yPos;
-            int button_x2 = 220;
-            int button_y2 = yPos + 28;
-
-            if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
+            /* The grid owns the geometry, in one place. Five copies of a
+             * hit test is how five of them came to say x <= 220 on a 320 px
+             * panel. The last entry is Back and lives in the footer. */
+            const bool isBack = (i == active_submenu_size - 1);
+            const bool hit = isBack
+                ? gridFooterHit(y)
+                : (gridHit(x, y, active_submenu_size - 1) == i);
+            if (hit) {
                 current_submenu_index = i;
                 last_interaction_time = millis();
                 displaySubmenu();
@@ -3305,7 +3602,15 @@ static void otherRfidPlaceholderAction(int idx) {
      * every entry in that menu comes through this one function. */
     if (Stealth::refuse("RFID/NFC")) { feature_active = false; return; }
     if (!RfidNfc::begin()) {
-        showNotification("RFID/NFC", "PN532 not found. Check SPI wiring/pins.");
+        /* Same panel and the same amount of help as the nRF24 and CC1101
+         * messages. The DIP switches are in here because a PN532 left in
+         * I2C mode is the commonest reason one is fitted, wired and silent,
+         * and nothing on the board says which mode it is in. */
+        showNotification("RFID/NFC",
+                         "needs the PN532, and nothing answered on the SPI "
+                         "bus. Check the module is fitted and that MISO, "
+                         "MOSI, SCK and SS are wired, and that its DIP "
+                         "switches are set for SPI: CH1 off, CH2 on.");
         otherDismissPlaceholder();
         feature_active = false;
         return;
@@ -3565,17 +3870,28 @@ void drawAboutPage(int page) {
 
     /* No name line: the artwork carries the wordmark, which is what
      * PUEO_LOGO_HAS_WORDMARK records and why displayLogo() drops its own. */
-    tft.setTextFont(1);
+    /* Font 4: a real 26 px face, not font 2 doubled, because a scaled
+     * bitmap font gets blockier rather than clearer. These two lines sit
+     * under a 200 px mark and are the only text on the page, so they are
+     * what the page is. Font 1 at size 1 made them 8 px, 1.23 mm on a 165
+     * ppi panel, and font 2 at 16 px was still too small to read at arm's
+     * length. From widtbl_f32 the tagline is 223 px and the byline 243, so
+     * a 320 px panel leaves 38 px of margin either side. */
+    tft.setTextFont(4);
     tft.setTextColor(UI_TEXT, UI_BG);
-    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 1);
-    y += 14;
+    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 4);
+    y += 30;
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
     tft.drawCentreString("by " PUEO_AUTHOR "  -  " PUEO_VERSION,
-                         PUEO_SCREEN_W / 2, y, 1);
+                         PUEO_SCREEN_W / 2, y, 4);
 
+    /* Back to font 2 for the hint. It is an instruction rather than the
+     * page, and at font 4 it would be 262 px of 320 and 26 px tall against
+     * a bottom edge 26 px away. */
+    tft.setTextFont(2);
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
     tft.setTextDatum(TL_DATUM);
-    tft.setCursor(16, PUEO_SCREEN_H - 20);
+    tft.setCursor(16, PUEO_SCREEN_H - 24);
     tft.print("SELECT / tap for details");
     return;
   }
@@ -3585,17 +3901,22 @@ void drawAboutPage(int page) {
   tft.setCursor(16, 40);
   tft.print(PUEO_NAME " " PUEO_VERSION);
 
-  tft.setTextFont(1);
+  /* No setTextFont(1) here. The whole body of this page used to draw at
+   * font 1 size 1, which is 8 px, and this is the page with the board, the
+   * author, the URL and the upstream credit on it. Font 2 is 16 px, so the
+   * rest of this function is respaced to match: the rule moved from 78 to
+   * 82, the rows step 22 rather than 20, and the credit lines 18 rather
+   * than 14. Widest line is 213 px of 320 and the body ends at y=236. */
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(16, 62);
   tft.print(PUEO_TAGLINE);
 
-  tft.drawFastHLine(12, 78, PUEO_SCREEN_W - 24, UI_LINE);
+  tft.drawFastHLine(12, 82, PUEO_SCREEN_W - 24, UI_LINE);
 
   const int xLabel = 16;
-  const int xValue = 76;
-  const int step = 20;
-  int y = 94;
+  const int xValue = 84;
+  const int step = 22;
+  int y = 98;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
@@ -3624,27 +3945,27 @@ void drawAboutPage(int page) {
   /* The credit back to the project this was forked from.
    *
    * ESP32-DIV is MIT, and the licence's requirement is the notice in
-   * LICENSE, which is kept. This is not that -- it is here because the code
+   * LICENSE, which is kept. This is not that. It is here because the code
    * came from somewhere and saying so costs nothing.
    *
    * Their project and repository, not their personal email: an address on a
    * fork's About screen points support at someone who did not ship it. */
   tft.drawFastHLine(12, y, PUEO_SCREEN_W - 24, UI_LINE);
-  y += 12;
+  y += 14;
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
   tft.setCursor(xLabel, y);
   tft.print(PUEO_UPSTREAM);
-  y += 14;
+  y += 18;
   tft.setCursor(xLabel, y);
   tft.print(PUEO_UPSTREAM_URL);
-  y += 14;
+  y += 18;
   tft.setCursor(xLabel, y);
   tft.print("forked at ");
   tft.print(ESP32DIV_VERSION);
 
   tft.setTextColor(UI_DIM_TEXT, UI_BG);
-  tft.setCursor(16, PUEO_SCREEN_H - 20);
+  tft.setCursor(16, PUEO_SCREEN_H - 22);
   tft.print("SELECT / tap to go back");
 }
 

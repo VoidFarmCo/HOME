@@ -11,6 +11,214 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.27 - 2026-10-03
+-------------------
+
+  * THE UPDATE GUARDS ASKED THE WRONG QUESTION, and an update that got as
+    far as writing would have erased the firmware it was running from.
+
+    Reported from a board on 0.4.26: Web OTA offered a network list and SD
+    Update asked for a card. Neither of the guards added in 0.4.26 fired,
+    on a build with one app partition, which is the only kind this is.
+
+    Both tested esp_ota_get_next_update_partition(NULL) == nullptr. That
+    call does not return null here. It returns the next OTA partition after
+    the running one, and on a single-slot table that is the running one, so
+    the test was false and both guards waved the update through.
+
+    Not cosmetic. Updater.cpp takes what that call returns and erases it,
+    with no check of its own that it differs from the partition currently
+    executing:
+
+        _partition = esp_ota_get_next_update_partition(NULL);
+        if (!_partition) { _error = UPDATE_ERROR_NO_PARTITION; return false; }
+
+    So the write would have gone into the running app and the board would
+    have needed a USB reflash. Both guards existed to prevent exactly that
+    and neither could.
+
+    otaHasSpareSlot() asks what they always meant: whether there is a
+    partition that exists and is not the one running.
+
+  * THE ABOUT PAGE WAS THE SMALLEST TEXT ON THE DEVICE, and nothing in the
+    tree measured it.
+
+    Page 0 draws its tagline and byline in font 4, a real 26 px face rather
+    than font 2 doubled, because a scaled bitmap font gets blockier and no
+    clearer. They were font 1 at size 1, which is 8 px, 1.23 mm on a 165 ppi
+    panel, under a 200 px logo, and they are the only text on the page.
+
+    Page 1 had the same 8 px for its whole body, and that is the page
+    carrying the board, the author, the URL and the upstream credit. It goes
+    to font 2, and since that doubles the line height the vertical run is
+    respaced with it: the rule from 78 to 82, the rows stepping 22 rather
+    than 20, and the three credit lines 18 rather than 14.
+
+    check_text_fits.py could not have caught either. It matches the name
+    showLine and opens only .cpp files, so all 35 drawCentreString call
+    sites were unmeasured and the About page, being in a .ino, was never
+    read. check_text_margins.py skips 40 sites for "an explicit font that is
+    not 1", because its arithmetic is 6 px per character.
+
+    So check_centre_fits.py measures centred strings in whatever font the
+    call names, and tft_fonts.py carries the glyph tables, parsed out of
+    Libraries/TFT_eSPI-master.zip rather than the Arduino library directory,
+    since the zip ships in the release archive and a check that only runs in
+    its own tree cannot verify a release built from published source.
+
+    The tables are the point. A 24 character line is 144 px in font 1 and
+    anywhere from 24 to 600 px in font 4, so a character count says nothing
+    about whether a line fits. The two About lines turn out to be the widest
+    centred strings in the firmware, at 243 px and 223 px of 320. 22 of 34
+    call sites measure; the 12 skips are String expressions, a .c_str() and
+    one unresolved centre x, each counted and printed on every run.
+
+    Two things the parser has to handle. Font16.c carries row 96..103 twice
+    under #ifdef TFT_ESPI_GRAVE_IS_DEGREE, which the build does not define,
+    so it takes the #else row: keeping both would shift the table eight
+    entries and mismeasure every character above 0x60. And each row ends in
+    a "// char 32 - 39" comment whose numbers are not widths.
+
+    This check reads the panel width from shared.h rather than the PANELS
+    list the older checks carry, because that list still has a 240 px entry
+    for a panel that was dropped and that shared.h can no longer build.
+
+    51 checks pass.
+
+
+0.4.26 - 2026-10-03
+-------------------
+
+  * THE SPOOFERS WERE CONNECTABLE, and a phone was answering.
+
+    Reported from a board: a pairing request from ESP32-DIV arriving minutes
+    after Sour Apple had been closed.
+
+    NimBLE defaults conn_mode to BLE_GAP_CONN_MODE_UND, undirected
+    connectable, whenever the peripheral role is compiled in, which this
+    firmware does because the Rubber Ducky is a BLE HID device. It also puts
+    the device name in the advertisement. So BleSpoofer, SourApple and
+    AirTagSpoofer each advertised as a connectable device named after the
+    board wearing somebody else's payload, and a phone answered the only part
+    of that it understood.
+
+    That is also why it outlived the feature. A central connects, the
+    connection ends, and the host resumes advertising, so SourApple::exit()'s
+    stop() was being undone rather than failing. None of those three has
+    anything to connect to; they are broadcasts. Non-connectable removes the
+    prompt, the connection and the restart together.
+
+    Two things guard it now. check_adv_nonconn.py holds every advertising
+    start in a broadcast-only namespace to setting the mode first, and
+    asserts the Rubber Ducky is NOT non-connectable, since being connected to
+    is the whole point of a keyboard. And the four menu painters call
+    bleQuietDown() before drawing: a menu on screen means no feature is
+    running, and nothing that is not running may transmit. That one is a net
+    rather than a fix, and it is what proved the leak was real.
+
+    The BLE name is Pueo rather than ESP32-DIV. Only the BLE identity: the
+    hidden scratch AP in wifi.cpp and the test-string tables keep the old
+    name, the first because renaming it changes attack behaviour rather than
+    branding, the others because they are things to send.
+
+  * THE SUBMENUS ARE A GRID, AND THERE ARE NO PAGES.
+
+    They were lists of 30 px rows, which is 4.6 mm on a 165 ppi panel against
+    the 7 mm a fingertip needs, and the rows are the tap targets: the d-pad
+    path wants a PCF8574 expander that is not fitted, so touch is all there
+    is. They also paged at six entries while leaving 45% of the panel black.
+
+    Three columns by four, 96x92 tiles, which is 14.8 x 14.2 mm. Twelve slots
+    holds the largest menu, so Next Page is gone rather than restyled: WiFi's
+    twelve features and Bluetooth's eleven are each one screen.
+
+    Labels are the strings the menu tables already carry, wrapped greedily
+    into up to three lines and measured in the panel's own font rather than
+    counted, because font 2 is proportional. Three lines because every label
+    in the firmware fits in two except "Probe Request Flood", which needs 89
+    px in a 96 px tile as a pair, and TFT_eSPI does not clip: on one line it
+    ran across the screen through its neighbours.
+
+    The page variables stay. Which feature a tap launches is decided by about
+    ninety tests of the form (wifi_submenu_page == 0 && current_submenu_index
+    == 3), and rewriting those into one index space is how the wrong feature
+    gets launched quietly. The grid is a view over both pages instead: tile 7
+    sets page 1, index 1, and every one of those tests reads what it always
+    read.
+
+    check_grid_capacity.py fails if a menu outgrows the grid. WiFi uses
+    twelve of twelve, and drawMenuGrid() stops at GRID_SLOTS, so a thirteenth
+    feature would simply not be drawn with nothing to say so.
+
+  * THE RIGHT 100 PX OF EVERY LIST ROW WAS DEAD TO A TAP.
+
+    Five menus tested x <= 220 on a panel 320 across. 220 is a 2.8" number:
+    that panel is 240 wide, where 10..220 covered it. The tile grids had the
+    same bug and it was caught; the lists kept it, for the reason the comment
+    there gives, which is that a hit box reads like a coordinate and behaves
+    like a dimension.
+
+    check_touch_targets.py reads the panel from shared.h and fails on a hit
+    box that runs past it or stops more than 40 px short. It also prints,
+    without failing, every tap target under 7 mm, because a row pitch is a
+    design decision and a check that failed on one would be demanding a
+    redesign.
+
+  * THE PANEL CANNOT DRAW AN EM DASH, and Hunt was drawing two sizes.
+
+    Font 1 covers 0x20 to 0x7E, so an em dash arrives as three UTF-8 bytes
+    and three wrong glyphs. 36 strings had one, twenty of them in rfid.cpp's
+    Card Clone flow, where the status line is the entire interface.
+
+    Hunt's picker set size 1 at the top and restored PUEO_BODY_SIZE after
+    each row's right-hand column. Those are not the same 2: the font is
+    TFT_eSPI's font 2, already 16 px, and the size is a multiplier for font 1.
+    Every row after the first came out 32 px tall in a 40 px row whose lines
+    sit 20 apart, so each label wore the address below it. check_font_size.py
+    tracks which font was last selected before each use of the constant.
+
+  * UPDATE FIRMWARE CANNOT WORK, AND ONLY HALF OF IT SAID SO.
+
+    An OTA write copies into a spare app partition and this build has none.
+    huge_app gives one 3.00 MB slot where min_spiffs gives two of 1.88, a
+    trade made at 0.4.2 because the sketch was at 89% of the smaller one, and
+    it is 57% of this one.
+
+    SD Update checked for the spare slot and explained. Web OTA did not: it
+    asked you to choose a network and type a password, and only then reached
+    Update.begin(), which fails with a number. That is the SD path's own
+    stated reason for checking, and the web path never did. Both share one
+    message now and both check before asking for anything.
+
+    The message named pueo-<version>-35-merged.bin. The -35 suffix marked the
+    3.5" image until 0.4.13, when the 2.8" was dropped and the plain name
+    became the only one, so the single instruction on that screen pointed at
+    a file that is not published. build-guide.md said it too, three hundred
+    lines above its own explanation of the change.
+
+    The feature stays. It cannot update anything, but the screen it shows is
+    the answer to how you do update one, and a menu entry that is gone
+    answers nothing.
+
+  * Also, all reported off a board: the BLE gate read the free heap and
+    refused below 40 KB before releasing the 30 KB of Classic BT controller
+    RAM it was about to release, so a board at 30 KB was turned away by the
+    function one statement from helping it. Skimmer Detect said press Start
+    while already scanning, because redrawList() ran before startScan() and
+    nothing repainted it. The jammer button said Toggle, which names the
+    mechanism rather than what it will do. Missing hardware now uses the
+    notification panel the Rubber Ducky uses, with the pins to check and, for
+    the PN532, the DIP switches, since one left in I2C mode is the commonest
+    reason one is fitted and silent. And a submenu says in its footer when
+    the module it needs is not there, probed once and remembered.
+
+    GPS has no such note on purpose. There is no cheap probe: the module
+    answers by emitting NMEA when it is ready, and a brief look that found
+    none would report "no GPS" for one still waking up.
+
+    47 checks pass.
+
+
 0.4.25 - 2026-10-03
 -------------------
 
@@ -3602,6 +3810,16 @@ of them, because a digest is the one thing about an old release
 that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.26
+  1f7dcd99e29cb409a864fbf15f13b0d7fecdcb33281f8ecc8e4cfcef1a748771  pueo-0.4.26-beacon-35-merged.bin
+  2e8750633437c2697ff91e92cf9043a2938149aaa739aeb2eccfd636d8abe36c  pueo-0.4.26-merged.bin
+  2faa8d84a2637ed3873d9a6ef74bad6ff50009b9547506411d249a6724eb0b17  pueo-0.4.26-src.zip
+
+0.4.25
+  dae3eb5f13b1cf0d274f9a1ccb25ce290e08754c63b56a0d20734c73cfb06573  pueo-0.4.25-beacon-35-merged.bin
+  c2fcb64ec675f0a3929aa49a0dbe745c69cbbe62c4d2859914734cf5089e639f  pueo-0.4.25-merged.bin
+  2819def361ad4738b948ee1d9668b5081de3fb3d721e4001b388bb25bd82d93d  pueo-0.4.25-src.zip
 
 0.4.24
   84a7695f67fdb7e1739d7b3a487b9c476df1ab7685e4176c3b81833392a97c6f  pueo-0.4.24-beacon-35-merged.bin

@@ -315,7 +315,13 @@ void drawPicker() {
     tft.setTextColor(sel ? ORANGE : TFT_WHITE, sel ? 0x2124 : TFT_BLACK);
     tft.drawString(dbm, kRightX, y + kRowRight);
     tft.drawString(age, kRightX, y + kRowLine2 + 2);
-    tft.setTextSize(PUEO_BODY_SIZE);
+    /* Back to 1, not PUEO_BODY_SIZE. This screen selects PUEO_BODY_FONT,
+     * which is font 2 and already 16 px tall; the multiplier is for font 1,
+     * as the comment on it in shared.h says. Restoring it here made every
+     * row after the first 32 px tall in a 40 px row with its two lines 20
+     * apart, so each label wore the address below it. ApTracker runs the
+     * same line safely because it selects font 1. */
+    tft.setTextSize(1);
 
     y += kRowH;
   }

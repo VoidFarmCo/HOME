@@ -93,9 +93,14 @@ def main():
     # A function that force-draws the bar is painting a whole screen. The menu
     # painters are the ones that choose; features inherit from the submenu they
     # were launched off, which is why only these must declare.
+    # Or delegates to the one function that does. displaySubmenu draws the
+    # shared grid now rather than painting rows itself, so a sweep for the
+    # drawStatusBar call stopped seeing it, and a painter this check cannot
+    # see is a painter it cannot hold to anything.
     painters = sorted(n for n, b in fns.items()
                       if re.match(r"display\w*$", n)
-                      and "drawStatusBar(currentBatteryVoltage, true)" in b)
+                      and ("drawStatusBar(currentBatteryVoltage, true)" in b
+                           or "drawMenuGrid(" in b))
     ok("found the menu painters", len(painters) >= 4, str(painters))
     for n in painters:
         ok("%s declares a bar height" % n,
@@ -135,8 +140,13 @@ def main():
 
     # The converse: the list screens must actually be declared short.
     short_fns = [n for n, b in fns.items() if "PUEO_STATUS_SHORT" in b]
-    ok("displayPagedSubmenu is short, being a list whose first row is at 30",
-       "displayPagedSubmenu" in short_fns, str(sorted(short_fns)))
+    # displayPagedSubmenu was a list whose first row sat at y=30, which is
+    # under a 34 px bar, so it was the one screen that had to stay short. It
+    # is a tile grid now and its first row is at GRID_Y0, so it takes the tall
+    # bar like every other grid and this assertion is about a screen that no
+    # longer exists.
+    ok("the only short screen left is About",
+       sorted(short_fns) == ["drawAboutPage"], str(sorted(short_fns)))
 
     # The tiles themselves are placed from Y_START, not a literal, so they are
     # checked against the constant rather than by the sweep above. This is the

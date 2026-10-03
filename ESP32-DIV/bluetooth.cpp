@@ -9,6 +9,7 @@
 #include "shared.h"
 #include "utils.h"
 #include "Nrf24Raw.h"
+
 #include "TrackerFollow.h"
 #include "SpiBus.h"
 
@@ -183,13 +184,66 @@ static int bleContentBottom() {
   return featureHasTouchNavBar() ? touchNavContentBottomY() : kBleScreenH;
 }
 
+/* What the gate saw, so the screen can say it rather than making somebody
+ * attach a serial cable to find out which kind of low this was. */
+static uint32_t s_bleLastHeap = 0;
+
+/* Whether the stack is up, without bringing it up. bleQuietDown() needs to
+ * ask before it touches NimBLE, and ensureBleStackReady() would answer by
+ * initialising it. */
+static bool s_bleStackUp = false;
+
+bool bleStackIsUp() {
+  return s_bleStackUp;
+}
+
+/* Stop advertising, whoever started it.
+ *
+ * Every transmitting feature has an exit() that stops its own advertising,
+ * and all of them are dispatched. That is still one call on one path per
+ * feature, and the failure mode is a board left advertising after its screen
+ * has gone: a phone kept asking to pair with ESP32-DIV minutes after Sour
+ * Apple was closed.
+ *
+ * So the menus assert the opposite invariant instead. A menu on screen means
+ * no feature is running, and nothing that is not running may transmit. This
+ * costs one call per menu draw and does not care which path leaked. */
+void bleQuietDown() {
+  if (!s_bleStackUp) {
+    return;
+  }
+  NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+  if (adv && adv->isAdvertising()) {
+    adv->stop();
+    Serial.println("[ble] advertising stopped on return to menu");
+  }
+}
+
 bool ensureBleStackReady() {
   static bool ready = false;
   if (ready) {
     return true;
   }
+  /* Reclaim before measuring, not after.
+   *
+   * This read the heap, refused below 40 KB, and then released the Classic
+   * BT controller's RAM, which the comment below says is about 30 KB. A
+   * board at 30 KB free was therefore told it had not got enough memory by
+   * the function that was one statement away from handing it 30 KB more.
+   *
+   * Releasing first is safe whether or not the stack then comes up. This
+   * firmware is NimBLE only, Classic BT is never initialised, and that RAM
+   * was never going to be used. The call already tolerates
+   * ESP_ERR_INVALID_STATE, which is what it returns the second time. */
+  esp_err_t rel = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+  if (rel != ESP_OK && rel != ESP_ERR_INVALID_STATE) {
+    Serial.printf("[ble] classic mem_release: %s\n", esp_err_to_name(rel));
+  }
+
   const uint32_t heap = ESP.getFreeHeap();
-  Serial.printf("[ble] init begin, free heap=%u\n", (unsigned)heap);
+  s_bleLastHeap = heap;
+  Serial.printf("[ble] init begin, free heap=%u (after classic release)\n",
+                (unsigned)heap);
 #if !BOARD_HAS_ESP32S3
   // Classic ESP32 NimBLE typically needs ~40KB+ free; abort soft instead of OOM reboot.
   if (heap < 40000u) {
@@ -197,14 +251,9 @@ bool ensureBleStackReady() {
     return false;
   }
 #endif
-  // Classic BT controller RAM is unused by NimBLE; reclaim it before stack init.
-  // On ESP32 this often frees ~30KB and avoids boot OOM/reboot after the intro.
-  esp_err_t rel = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-  if (rel != ESP_OK && rel != ESP_ERR_INVALID_STATE) {
-    Serial.printf("[ble] classic mem_release: %s\n", esp_err_to_name(rel));
-  }
-  BLEDevice::init(ESP32DIV_NAME);
+  BLEDevice::init(PUEO_BLE_NAME);
   ready = true;
+  s_bleStackUp = true;
   Serial.printf("[ble] init done, free heap=%u\n", (unsigned)ESP.getFreeHeap());
   return true;
 }
@@ -221,7 +270,12 @@ static bool bleRequireStackOrExit() {
   tft.print("BLE: low memory");
   tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
   tft.setCursor(12, 140);
-  tft.print("Exit and try again");
+  char hl[40];
+  snprintf(hl, sizeof(hl), "%lu bytes free, needs 40000",
+           (unsigned long)s_bleLastHeap);
+  tft.print(hl);
+  tft.setCursor(12, 156);
+  tft.print("Reboot clears it");
   delay(1200);
   feature_exit_requested = true;
   return false;
@@ -263,8 +317,15 @@ static void bleSetExitOnlyNavLabels() {
   setTouchNavLabels(nullptr, nullptr, "Exit", nullptr, nullptr);
 }
 
-static void bleSetJammerNavLabels() {
-  setTouchNavLabels("Mode-", nullptr, "Exit", "Toggle", "Mode+");
+/* The running flag is passed in rather than read: BleJammer and ProtoKill
+ * each keep their own jammerActive in their own namespace, and this sits
+ * above both. */
+static void bleSetJammerNavLabels(bool running) {
+  /* "Toggle" names the mechanism, which is visible, rather than what the
+   * button will do, which is not. The Skimmer's button already reads Stop or
+   * Start off its own state; these two now do the same. */
+  setTouchNavLabels("Mode-", nullptr, "Exit",
+                    running ? "Stop" : "Start", "Mode+");
 }
 
 static void bleSetScannerNavLabels() {
@@ -1088,6 +1149,12 @@ void toggleAdvertising() {
       pAdvertising->setMaxInterval(0x20);
       pAdvertising->setMinPreferred(0x20);
       pAdvertising->setMaxPreferred(0x20);
+      /* Broadcast only. NimBLE defaults to undirected connectable when the
+       * peripheral role is compiled in, and it puts the device name in the
+       * advertisement, so this was a connectable device called Pueo wearing
+       * somebody else's payload. A phone answered the part it understood and
+       * asked to pair. There is nothing here to connect to. */
+      pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
       pAdvertising->start();
 
       Printspoofer("[+] Device Type: " + String(deviceType), TFT_WHITE, false);
@@ -1523,6 +1590,12 @@ void sourappleLoop() {
   Advertising->setMinPreferred(0x20);
   Advertising->setMaxPreferred(0x20);
 
+  /* Broadcast only. NimBLE defaults to undirected connectable when the
+   * peripheral role is compiled in, and it puts the device name in the
+   * advertisement, so this was a connectable device called Pueo wearing
+   * somebody else's payload. A phone answered the part it understood and
+   * asked to pair. There is nothing here to connect to. */
+  Advertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
   Advertising->start();
 
   delay(40);
@@ -1880,6 +1953,12 @@ static void burstOnce(bool forceLog) {
     s_advConfigured = true;
   }
   s_advertising->setAdvertisementData(advData);
+  /* Broadcast only. NimBLE defaults to undirected connectable when the
+   * peripheral role is compiled in, and it puts the device name in the
+   * advertisement, so this was a connectable device called Pueo wearing
+   * somebody else's payload. A phone answered the part it understood and
+   * asked to pair. There is nothing here to connect to. */
+  s_advertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
   s_advertising->start();
 
   /* Same once-a-second cadence as the other two. This runs after start()
@@ -3552,6 +3631,11 @@ void bleSkimmerSetup() {
   redrawList();
 
   startScan();
+  /* redrawList() above ran while s_scanning was still false, so it painted
+   * "Press Start to begin" onto a screen that is about to start scanning,
+   * and nothing repainted it. The feature has scanned from the moment it
+   * opens since it was written; only the text disagreed. */
+  redrawList();
   updateHeader(true);
   updateNavLabels();
 }
@@ -3845,6 +3929,10 @@ void checkModeChange() {
     jammerActive = !jammerActive;
     initializeRadios();
     updateTFT();
+    /* The button says what it will do next, so it is repainted when that
+     * changes. */
+    bleSetJammerNavLabels(jammerActive);
+    redrawTouchButtonBar();
 
     String jammerText = "[!] Jammer ";
     jammerText += (jammerActive) ? "Activated" : "Deactivated";
@@ -3857,7 +3945,7 @@ void blejamSetup() {
 
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
-  bleSetJammerNavLabels();
+  bleSetJammerNavLabels(jammerActive);
   bleClearBody(TFT_BLACK);
 
   float currentBatteryVoltage = readBatteryVoltage();
@@ -4814,22 +4902,15 @@ void exit() {
  * ───────────────────────────────────────────────────────────────────────── */
 
 static void nrfReportMissing(const char* feature) {
-  tft.fillScreen(TFT_BLACK);
-  drawStatusBar(readBatteryVoltage(), true);
-  tft.setTextFont(2);
-  tft.setTextColor(TFT_RED, TFT_BLACK);
-  tft.drawString("No nRF24", 12, 46);
-  tft.setTextFont(1);
-  tft.setTextColor(UI_TEXT, TFT_BLACK);
-  tft.drawString(feature, 12, 72);
-  tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-  tft.drawString("needs the 2.4 GHz module, and", 12, 90);
-  tft.drawString("nothing answered on the SPI bus.", 12, 102);
-  tft.drawString("Check the module is fitted and", 12, 122);
-  tft.drawString("that MISO, CSN, CE, SCK and", 12, 134);
-  tft.drawString("MOSI are wired.", 12, 146);
-  tft.setTextColor(UI_ICON, TFT_BLACK);
-  tft.drawString("SELECT / tap to go back", 12, PUEO_SCREEN_H - 24);
+  /* The same panel the Rubber Ducky uses for "requires ESP32-S3", rather
+   * than a screen only this file knows how to draw. The wiring is kept:
+   * whoever reads this is deciding which joint to reflow. */
+  char msg[200];
+  snprintf(msg, sizeof(msg),
+           "%s needs the 2.4 GHz module, and nothing answered on the SPI "
+           "bus. Check the module is fitted and that MISO, CSN, CE, SCK and "
+           "MOSI are wired.", feature);
+  showNotification("No nRF24", msg);
 }
 
 static bool nrfReady(const char* feature) {
@@ -6090,6 +6171,10 @@ void checkModeChange() {
     jammerActive = !jammerActive;
     initializeRadios();
     updateTFT();
+    /* The button says what it will do next, so it is repainted when that
+     * changes. */
+    bleSetJammerNavLabels(jammerActive);
+    redrawTouchButtonBar();
     printJammerStatus(jammerActive);
   }
 }
@@ -6100,7 +6185,7 @@ void prokillSetup() {
   if (!nrfReady("Proto Kill")) return;
 
   setTouchButtonInputEnabled(true);
-  bleSetJammerNavLabels();
+  bleSetJammerNavLabels(jammerActive);
   bleClearBody(TFT_BLACK);
   Index = 0;
 

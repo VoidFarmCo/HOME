@@ -10126,6 +10126,53 @@ static bool waitForTouchXY(int& x, int& y) {
 
 int yshift = 40;
 
+/* Whether an update has anywhere to go.
+ *
+ * Not `esp_ota_get_next_update_partition(nullptr) == nullptr`, which is what
+ * this used to be and what let both guards through. That call returns the
+ * next OTA partition after the running one, and on a single-slot table that
+ * is the running one, so it is non-null and useless as a test.
+ *
+ * Updater.cpp does not check either: it takes whatever that call returns and
+ * erases it. An update that got as far as writing would have erased the
+ * firmware it was executing from.
+ */
+static bool otaHasSpareSlot() {
+  const esp_partition_t* next = esp_ota_get_next_update_partition(nullptr);
+  if (next == nullptr) {
+    return false;
+  }
+  return next != esp_ota_get_running_partition();
+}
+
+/* Why an update cannot be written, said the same way on both paths.
+ *
+ * An OTA write copies into a spare app partition and this firmware has none:
+ * huge_app gives one 3.00 MB slot where min_spiffs gives two of 1.88, a
+ * trade made at 0.4.2 because the sketch was at 89% of the smaller one.
+ *
+ * The filename matters. The -35 suffix marked the 3.5" image until 0.4.13,
+ * when the 2.8" was dropped and the plain name became the only one; this
+ * said -35 and sent people after a file that is not published. */
+static void otaDrawUnavailable(const char* title) {
+  tft.setCursor(10, 10 + yshift);
+  tft.setTextColor(TFT_RED, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.println(title);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(10, 34 + yshift);
+  tft.println("This build uses a single app");
+  tft.setCursor(10, 46 + yshift);
+  tft.println("partition, so there is no spare");
+  tft.setCursor(10, 58 + yshift);
+  tft.println("slot to write an update into.");
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.setCursor(10, 78 + yshift);
+  tft.println("Flash over USB instead:");
+  tft.setCursor(10, 90 + yshift);
+  tft.println("pueo-<version>-merged.bin");
+}
+
 void performSDUpdate() {
   updateStatusBar();
   runUI();
@@ -10140,23 +10187,8 @@ void performSDUpdate() {
    *
    * Said here rather than left to Update.begin(), which fails with a number
    * and no explanation. */
-  if (esp_ota_get_next_update_partition(nullptr) == nullptr) {
-    tft.setCursor(10, 10 + yshift);
-    tft.setTextColor(TFT_RED, TFT_BLACK);
-    tft.setTextSize(1);
-    tft.println("SD Update unavailable");
-    tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setCursor(10, 34 + yshift);
-    tft.println("This build uses a single app");
-    tft.setCursor(10, 46 + yshift);
-    tft.println("partition, so there is no spare");
-    tft.setCursor(10, 58 + yshift);
-    tft.println("slot to write an update into.");
-    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.setCursor(10, 78 + yshift);
-    tft.println("Flash over USB instead:");
-    tft.setCursor(10, 90 + yshift);
-    tft.println("pueo-<version>-35-merged.bin");
+  if (!otaHasSpareSlot()) {
+    otaDrawUnavailable("SD Update unavailable");
     delay(2500);
     return;
   }
@@ -10636,6 +10668,18 @@ void performWebOTAUpdate() {
   uiDrawn = false;
   static size_t totalUploaded = 0;
   bool inUpdate = false;
+
+  /* Before the network picker and the password, not after. This used to ask
+   * for both and then fail inside Update.begin() with a number, which is the
+   * SD path's own stated reason for checking, and the web path never did. */
+  if (!otaHasSpareSlot()) {
+    const int bodyBottom = fwContentBottom();
+    tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
+    otaDrawUnavailable("Web OTA unavailable");
+    delay(2500);
+    drawMenu();
+    return;
+  }
 
   if (!selectWiFiNetwork()) {
     drawMenu();

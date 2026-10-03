@@ -5,7 +5,9 @@ fault easy to find.
 
 **Nothing in this guide has been wired yet.** Step 2 is done (a board was
 flashed and run on 2026-09-20, and the display, the menus, touch, the WiFi
-scanner, the packet monitor, Surveillance and Hunt all work), but no module has
+scanner, the packet monitor, Surveillance and Hunt all work, and the submenu
+grid was tried on 2026-10-03 with every tile launching the feature it names),
+but no module has
 been soldered to anything, so steps 3 onward remain untested. The rest is
 derived from the pin map in [hardware.md](hardware.md), which
 `tools/check_pinmap.py` verifies against each board's own wiring, from the
@@ -117,9 +119,8 @@ battery on 34), and the resolution is the same 320x480. The only entry
 that differs at all is the controller's suffix, ST7796S against the 3.5"'s
 ST7796U, and TFT_eSPI drives the family with one `ST7796_DRIVER`.
 
-So the firmware needs nothing: flash `pueo-<version>-35-merged.bin`. The
-name is then wrong about the diagonal and right about everything it
-actually selects.
+So the firmware needs nothing: flash `pueo-<version>-merged.bin`, which is
+the 3.5" image and selects nothing this board wants differently.
 
 One exception, as of 2026-09-23: **sound would not work on it.** The 3.5"
 image used to assert GPIO 4 as an audio amplifier's enable, which is exactly
@@ -387,7 +388,7 @@ boot screen and menu come up and touch responds, you have a known-good
 starting point, and you will want one.
 
 ```bash
-esptool.py --chip esp32 -b 921600 write_flash 0x0 pueo-0.4.25-merged.bin
+esptool.py --chip esp32 -b 921600 write_flash 0x0 pueo-0.4.27-merged.bin
 ```
 
 `-b 921600` because esptool defaults to 115200, and the write is about 19
