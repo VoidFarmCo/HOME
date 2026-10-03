@@ -22,6 +22,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SKETCH = REPO / "ESP32-DIV"
+
+# Read rather than written down, so a panel change moves this with it.
+_shared = (SKETCH / "shared.h").read_text(encoding="utf-8", errors="replace")
+PUEO_W = int(re.search(r"#define\s+PUEO_SCREEN_W\s+(\d+)", _shared).group(1))
 BEACON = REPO / "PueoBeacon"
 
 CHECKS = 0
@@ -353,6 +357,40 @@ def main():
        "const esp_err_t r = esp_wifi_80211_tx" in emit,
        "a discarded return makes a dead transmitter look like a dead receiver")
     ok("a refusal is shown on the screen", "TX REFUSED" in ino)
+
+    # The beacon's whole job is to say which detector feature should see each
+    # decoy, so a name on its screen that is not a name in the detector's
+    # menus sends somebody looking for a feature that is not there. It said
+    # "Spotter" for ten of its fourteen signals, which the menu stopped being
+    # called at 0.4.0, and "Drones" for the two Remote ID ones, which it has
+    # never been called.
+    print("\nevery feature it names is a feature the detector has:")
+    ino_src = (SKETCH / "ESP32-DIV.ino").read_text(encoding="utf-8",
+                                                   errors="replace")
+    entries = set()
+    for body in re.findall(r"const char \*\w+\[\w+\] = \{(.*?)\};",
+                           ino_src, re.S):
+        b = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
+        b = re.sub(r"//[^\n]*", "", b)
+        entries |= set(re.findall(r'"([^"]*)"', b))
+
+    m = re.search(r"const char\* detectedBy.*?\n\}", emit, re.S)
+    ok("detectedBy() was found", m is not None,
+       "the function the screen draws from is not there to read")
+    labels = sorted(set(re.findall(r'return "([^"]+)"', m.group(0)))) if m else []
+    ok("it names at least one", bool(labels))
+    for lab in labels:
+        # "Hunt / AirTag Sniffer" is one row naming two features, because one
+        # decoy is seen by both. Each half still has to be a real entry.
+        parts = [p.strip() for p in lab.split("/")]
+        missing = [p for p in parts if p not in entries]
+        ok("  %-22s" % lab, not missing,
+           "%s is in no menu table; the detector has no such entry"
+           % ", ".join(missing))
+        # x=20, font 1 at size 2 advances 12px, and the panel is 320 wide.
+        ok("  %-22s fits" % lab, 20 + 12 * len(lab) <= PUEO_W,
+           "%d chars runs to x=%d and the panel is %d"
+           % (len(lab), 20 + 12 * len(lab), PUEO_W))
 
     print("\nand it is a separate image from the detector:")
     build = (REPO / "tools" / "build.sh").read_text(encoding="utf-8",

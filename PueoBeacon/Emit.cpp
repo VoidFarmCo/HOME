@@ -280,18 +280,18 @@ const char* name(Signal s) {
 const char* detectedBy(Signal s) {
   switch (s) {
     case RemoteIdWifi:
-    case RemoteIdBle:   return "Drones";
+    case RemoteIdBle:   return "Drone Detector";
     case AlprProbe:
     case BodycamBeacon:
     case GlassesBle:
-    case VehicleBle:    return "Spotter";
+    case VehicleBle:    return "Surveillance";
     case TrackerBle:    return "Hunt / AirTag Sniffer";
     case FindHubBle:
     case DultBle:
     case PentestWifi:
     case FleetBle:
     case TpmsBle:
-    case CarBle:        return "Spotter";
+    case CarBle:        return "Surveillance";
     case FastPairBle:   return "Fast Pair";
     default:            return "";
   }
