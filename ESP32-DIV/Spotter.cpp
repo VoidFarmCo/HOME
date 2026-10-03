@@ -1078,8 +1078,10 @@ void dwellAlert(const Hit& h) {
    * screen and calling it advice. The suggestion is shown when it is
    * actionable and withheld when it is not.
    *
-   * "may be" is doing real work in that line. This firmware has no position
-   * of its own: it cannot tell a tracker moving with you from a beacon you
+   * "may be" is doing real work in that line. Pueo has no position of its
+   * own -- not the firmware, the device: there is no GNSS fix behind this
+   * screen and no dead reckoning, so it cannot tell a tracker moving with
+   * you from a beacon you
    * have been sitting next to. It reports duration and offers the tool that
    * would settle it. It does not decide. */
   const bool huntable = (h.viaBle && h.kind == Kind::Tracker);

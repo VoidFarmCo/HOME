@@ -2828,7 +2828,8 @@ const unsigned char bitmap_pueo_spotter [] PROGMEM = {
 
 /* The dwell mark: an owl looking back at five identical signal masts on a
  * line. Identical and evenly spaced on purpose -- a trail receding into the
- * distance would read as movement, and this firmware cannot detect movement.
+ * distance would read as movement, and Pueo cannot detect movement: there
+ * is no position behind this screen to measure it against.
  * Repetition at constant size is what it does know: the same thing, again
  * and again, over time.
  *
