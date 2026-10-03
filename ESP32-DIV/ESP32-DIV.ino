@@ -999,12 +999,20 @@ static constexpr int GRID_TILE_W  =
     (PUEO_SCREEN_W - GRID_GAP_X * (GRID_COLS + 1)) / GRID_COLS;
 static constexpr int GRID_TILE_H  = 70;
 static constexpr int GRID_Y0      = 54;   // clears PUEO_STATUS_TALL (34) and the title row
-static constexpr int GRID_ICON    = 32;
-static constexpr int GRID_ICON_DY = 8;
-static constexpr int GRID_TEXT_DY = 46;
-static constexpr int GRID_LINE_H  = 10;
-/* 6 px a character in font 1 at size 1, less a pixel of margin each side. */
-static constexpr int GRID_CHARS   = (GRID_TILE_W - 4) / 6;
+/* The icon gives up 8 px so the label can have the 16 px font. 24 px is
+ * still 3.7 mm, and the label is the part being read at arm's length. */
+static constexpr int GRID_ICON    = 24;
+static constexpr int GRID_ICON_DY = 6;
+static constexpr int GRID_TEXT_DY = 34;
+static constexpr int GRID_LINE_H  = 17;
+/* Room for the text, in pixels. Font 2 is proportional, so a character count
+ * is not a width and only textWidth() can say whether a label fits.
+ *
+ * 16 rather than 4, which is 8 px of air each side. At 4 the widest labels
+ * technically fitted and touched both borders, and a word with its ends
+ * against the edges of a box reads as having run out of room whether or not
+ * it has. Eight is enough to look deliberate. */
+static constexpr int GRID_TEXT_W  = GRID_TILE_W - 16;
 
 static void gridTileXY(int i, int &x, int &y) {
     const int col = i % GRID_COLS;
@@ -1033,22 +1041,31 @@ static int gridHit(int tx, int ty, int count) {
  * own wording instead of inventing a short one for the screen. */
 static void gridWrap(const char *label, char *l1, char *l2, size_t cap) {
     l1[0] = l2[0] = '\0';
-    const size_t n = strlen(label);
-    if (n <= (size_t)GRID_CHARS) {
+    /* Measured, not counted. The caller has already selected font 2, which
+     * is proportional: "Hidden SSID Revealer" and twenty Ws are both twenty
+     * characters and nothing like the same width. */
+    if (tft.textWidth(label) <= GRID_TEXT_W) {
         snprintf(l1, cap, "%s", label);
         return;
     }
+    const size_t n = strlen(label);
     int best = -1, bestCost = 1 << 20;
+    char head[40], tail[40];
     for (size_t i = 0; i < n; i++) {
         if (label[i] != ' ') continue;
-        const int a = (int)i, b = (int)(n - i - 1);
-        if (a > GRID_CHARS || b > GRID_CHARS) continue;
+        snprintf(head, sizeof(head), "%.*s", (int)i, label);
+        snprintf(tail, sizeof(tail), "%s", label + i + 1);
+        const int a = tft.textWidth(head);
+        const int b = tft.textWidth(tail);
+        if (a > GRID_TEXT_W || b > GRID_TEXT_W) continue;
         const int cost = (a > b) ? (a - b) : (b - a);
         if (cost < bestCost) { bestCost = cost; best = (int)i; }
     }
-    if (best < 0) {                      /* no usable space: hard cut */
-        snprintf(l1, cap, "%.*s", GRID_CHARS, label);
-        snprintf(l2, cap, "%.*s", GRID_CHARS, label + GRID_CHARS);
+    if (best < 0) {
+        /* No space splits it small enough. Give the whole thing to one line
+         * and let it be clipped rather than cutting a word in half, which
+         * reads as a different word. */
+        snprintf(l1, cap, "%s", label);
         return;
     }
     snprintf(l1, cap, "%.*s", best, label);
@@ -1071,20 +1088,20 @@ static void drawGridTile(int i, const char *label,
                          icon, 16, 16, icol, GRID_ICON / 16);
     }
 
-    char l1[32], l2[32];
-    gridWrap(label, l1, l2, sizeof(l1));
-    tft.setTextFont(1);
+    /* Font first: gridWrap() measures with whatever is selected. */
+    tft.setTextFont(2);
     tft.setTextSize(1);
+    char l1[40], l2[40];
+    gridWrap(label, l1, l2, sizeof(l1));
     tft.setTextColor(ink, fill);
     const int ty = y + GRID_TEXT_DY + (l2[0] ? 0 : GRID_LINE_H / 2);
-    tft.setCursor(x + (GRID_TILE_W - (int)strlen(l1) * 6) / 2, ty);
+    tft.setCursor(x + (GRID_TILE_W - tft.textWidth(l1)) / 2, ty);
     tft.print(l1);
     if (l2[0]) {
-        tft.setCursor(x + (GRID_TILE_W - (int)strlen(l2) * 6) / 2,
+        tft.setCursor(x + (GRID_TILE_W - tft.textWidth(l2)) / 2,
                       ty + GRID_LINE_H);
         tft.print(l2);
     }
-    tft.setTextFont(2);
 }
 
 /* The whole grid. `count` excludes the trailing "Back to Main Menu" entry,

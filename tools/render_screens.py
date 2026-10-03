@@ -82,7 +82,7 @@ def set_panel(panel=35):
     global BODY_FONT, BODY_LINE, BODY_LINE3, BODY_ROW, BODY_SIZE
     global GRID_COLS, GRID_ROWS, GRID_SLOTS, GRID_GAP_X, GRID_GAP_Y
     global GRID_TILE_W, GRID_TILE_H, GRID_Y0, GRID_ICON
-    global GRID_ICON_DY, GRID_TEXT_DY, GRID_LINE_H, GRID_CHARS
+    global GRID_ICON_DY, GRID_TEXT_DY, GRID_LINE_H, GRID_TEXT_W
     global GRID_FOOT_H
     PANEL = 35
     W, H = 320, 480
@@ -112,11 +112,11 @@ def set_panel(panel=35):
     GRID_TILE_W = (W - GRID_GAP_X * (GRID_COLS + 1)) // GRID_COLS
     GRID_TILE_H = 70
     GRID_Y0 = 54
-    GRID_ICON = 32
-    GRID_ICON_DY = 8
-    GRID_TEXT_DY = 46
-    GRID_LINE_H = 10
-    GRID_CHARS = (GRID_TILE_W - 4) // 6
+    GRID_ICON = 24
+    GRID_ICON_DY = 6
+    GRID_TEXT_DY = 34
+    GRID_LINE_H = 17
+    GRID_TEXT_W = GRID_TILE_W - 16
     GRID_FOOT_H = 34
     # PUEO_BODY_FONT / PUEO_BODY_H in shared.h. This panel is dense, so the
     # list screens use font 2. The drone detector deliberately does not.
@@ -795,23 +795,26 @@ def ino_table(name):
     return [x.strip() for x in body.split(",") if x.strip()]
 
 
-def grid_wrap(label):
-    """Two lines, split at the space that balances them. gridWrap() in the
-    sketch, same rule, because the screenshot has to break where the panel
-    breaks."""
-    if len(label) <= GRID_CHARS:
+def grid_wrap(t, label):
+    """Two lines, split at the space that balances them, measured.
+
+    gridWrap() in the sketch, same rule and the same font. Font 2 is
+    proportional, so the sketch measures with textWidth() and so does this;
+    a character count would break somewhere else and the screenshot would
+    stop being a picture of the panel."""
+    if t.text_width(label) <= GRID_TEXT_W:
         return label, ""
     best, cost = -1, 1 << 20
     for i, ch in enumerate(label):
         if ch != " ":
             continue
-        a, b = i, len(label) - i - 1
-        if a > GRID_CHARS or b > GRID_CHARS:
+        a, b = t.text_width(label[:i]), t.text_width(label[i + 1:])
+        if a > GRID_TEXT_W or b > GRID_TEXT_W:
             continue
         if abs(a - b) < cost:
             best, cost = i, abs(a - b)
     if best < 0:
-        return label[:GRID_CHARS], label[GRID_CHARS:GRID_CHARS * 2]
+        return label, ""
     return label[:best], label[best + 1:]
 
 
@@ -843,12 +846,12 @@ def render_grid(t, title, items, icons, selected):
                                  GRID_ICON // 16)
         except Exception:
             pass
-        l1, l2 = grid_wrap(label)
+        l1, l2 = grid_wrap(t, label)
         ty = y + GRID_TEXT_DY + (0 if l2 else GRID_LINE_H // 2)
-        t.print_f1(x + (GRID_TILE_W - len(l1) * 6) // 2, ty, l1, ink, fill)
+        t.print_f2(x + (GRID_TILE_W - t.text_width(l1)) // 2, ty, l1, ink, fill)
         if l2:
-            t.print_f1(x + (GRID_TILE_W - len(l2) * 6) // 2, ty + GRID_LINE_H,
-                       l2, ink, fill)
+            t.print_f2(x + (GRID_TILE_W - t.text_width(l2)) // 2,
+                       ty + GRID_LINE_H, l2, ink, fill)
 
     fy = H - GRID_FOOT_H
     t.fill_rect(0, fy, W, GRID_FOOT_H, UI_BG)

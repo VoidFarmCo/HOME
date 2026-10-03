@@ -158,6 +158,9 @@ def main():
     sub = ["GRID_COLS", "GRID_ROWS", "GRID_GAP_X", "GRID_GAP_Y",
            "GRID_TILE_H", "GRID_Y0", "GRID_ICON", "GRID_ICON_DY",
            "GRID_TEXT_DY", "GRID_LINE_H", "GRID_FOOT_H"]
+    # Not GRID_TEXT_W or GRID_TILE_W: both are derived from GRID_TILE_W and
+    # GRID_GAP_X, which are checked, and neither side states them as a
+    # literal this can fold.
     compare("ESP32-DIV.ino", c_consts(ino, sub), [(n, n) for n in sub])
 
     print("\nthe chrome:")
