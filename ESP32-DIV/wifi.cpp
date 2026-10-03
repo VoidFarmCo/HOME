@@ -8755,6 +8755,8 @@ static void reconB64(const char* in, char* out, size_t outSz) {
 
 static void reconLog(const char* line) {
   if (!s_rc) return;
+  Serial.print("[recon] ");   // mirror to serial so a run can be watched over USB
+  Serial.println(line);
   if (s_rc->logCount < RECON_LOG_LINES) {
     strncpy(s_rc->log[s_rc->logCount], line, 39);
     s_rc->log[s_rc->logCount][39] = 0;
