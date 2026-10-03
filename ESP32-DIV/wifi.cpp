@@ -4886,6 +4886,11 @@ uint8_t selectedChannel;
 int selected_ap_index = -1;
 int network_count = 0;
 wifi_ap_record_t *ap_list = nullptr;
+/* Deauth All: the attack normally hits the one selected AP; with this on it
+ * cycles every scanned AP (its own channel per frame), the way Marauder's
+ * "deauth all" does. Toggled by the Up slot on the attack screen. */
+static bool s_deauthAll = false;
+static int  s_deauthAllIdx = 0;
 bool scanning = false;
 uint32_t last_packet_time = 0;
 int current_page = 0;
@@ -4896,7 +4901,8 @@ static void deautherUpdateNavLabels(bool onAttackScreen) {
     return;
   }
   if (onAttackScreen) {
-    setTouchNavLabels(attack_running ? "Stop" : "Start", nullptr, "Exit", nullptr, "Back");
+    setTouchNavLabels(attack_running ? "Stop" : "Start", nullptr, "Exit",
+                      s_deauthAll ? "One" : "All", "Back");
   } else {
     setTouchNavLabels("Rescan", "Next", "Exit", "Prev", "View");
   }
@@ -5120,7 +5126,11 @@ void drawAttackScreen() {
 
     char buf[64];
     tft.setTextColor(WHITE);
-    snprintf(buf, sizeof(buf), "Target: %s", selectedAp.ssid);
+    if (s_deauthAll) {
+        snprintf(buf, sizeof(buf), "Target: ALL (%d APs)", network_count);
+    } else {
+        snprintf(buf, sizeof(buf), "Target: %s", selectedAp.ssid);
+    }
     tft.setCursor(10, 50);
     tft.println(buf);
 
@@ -5191,6 +5201,14 @@ static void deautherHandleNavButtons() {
             last_packet_time = 0;
             selected_ap_index = -1;
             drawScanScreen();
+            deautherLastButtonPress = now;
+            return;
+        }
+        if (isButtonPressedEdge(BTN_UP)) {   // toggle All <-> One target
+            s_deauthAll = !s_deauthAll;
+            s_deauthAllIdx = 0;
+            deautherUpdateNavLabels(true);
+            drawAttackScreen();
             deautherLastButtonPress = now;
             return;
         }
@@ -5397,6 +5415,8 @@ void runUI() {
 void deautherSetup() {
   if (Stealth::refuse("WiFi Deauther")) return;
 
+    s_deauthAll = false;   // every entry starts on single-AP targeting
+    s_deauthAllIdx = 0;
     pauseBackgroundRadioTasks();
     setTouchButtonInputEnabled(true);
     deautherUpdateNavLabels(false);
@@ -5468,7 +5488,14 @@ void deautherLoop() {
         }
 
         if (current_time - last_packet_time >= 100 && attack_running) {
-            wsl_bypasser_send_deauth_frame(&selectedAp, selectedChannel);
+            if (s_deauthAll && network_count > 0 && ap_list) {
+                // Cycle every scanned AP, each on its own channel.
+                s_deauthAllIdx = (s_deauthAllIdx + 1) % network_count;
+                wsl_bypasser_send_deauth_frame(&ap_list[s_deauthAllIdx],
+                                               ap_list[s_deauthAllIdx].primary);
+            } else {
+                wsl_bypasser_send_deauth_frame(&selectedAp, selectedChannel);
+            }
             last_packet_time = current_time;
         }
     }
