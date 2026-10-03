@@ -10126,6 +10126,25 @@ static bool waitForTouchXY(int& x, int& y) {
 
 int yshift = 40;
 
+/* Whether an update has anywhere to go.
+ *
+ * Not `esp_ota_get_next_update_partition(nullptr) == nullptr`, which is what
+ * this used to be and what let both guards through. That call returns the
+ * next OTA partition after the running one, and on a single-slot table that
+ * is the running one, so it is non-null and useless as a test.
+ *
+ * Updater.cpp does not check either: it takes whatever that call returns and
+ * erases it. An update that got as far as writing would have erased the
+ * firmware it was executing from.
+ */
+static bool otaHasSpareSlot() {
+  const esp_partition_t* next = esp_ota_get_next_update_partition(nullptr);
+  if (next == nullptr) {
+    return false;
+  }
+  return next != esp_ota_get_running_partition();
+}
+
 /* Why an update cannot be written, said the same way on both paths.
  *
  * An OTA write copies into a spare app partition and this firmware has none:
@@ -10168,7 +10187,7 @@ void performSDUpdate() {
    *
    * Said here rather than left to Update.begin(), which fails with a number
    * and no explanation. */
-  if (esp_ota_get_next_update_partition(nullptr) == nullptr) {
+  if (!otaHasSpareSlot()) {
     otaDrawUnavailable("SD Update unavailable");
     delay(2500);
     return;
@@ -10653,7 +10672,7 @@ void performWebOTAUpdate() {
   /* Before the network picker and the password, not after. This used to ask
    * for both and then fail inside Update.begin() with a number, which is the
    * SD path's own stated reason for checking, and the web path never did. */
-  if (esp_ota_get_next_update_partition(nullptr) == nullptr) {
+  if (!otaHasSpareSlot()) {
     const int bodyBottom = fwContentBottom();
     tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
     otaDrawUnavailable("Web OTA unavailable");

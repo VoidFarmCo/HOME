@@ -3870,17 +3870,21 @@ void drawAboutPage(int page) {
 
     /* No name line: the artwork carries the wordmark, which is what
      * PUEO_LOGO_HAS_WORDMARK records and why displayLogo() drops its own. */
-    tft.setTextFont(1);
+    /* Font 2, not font 1 at size 1. That is 8 px, which is 1.23 mm on a
+     * 165 ppi panel: the three lines under a 200 px logo were the smallest
+     * text on the device and the only thing on the screen worth reading.
+     * The widest of them is 157 px on a 320 px panel, so there is room. */
+    tft.setTextFont(2);
     tft.setTextColor(UI_TEXT, UI_BG);
-    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 1);
-    y += 14;
+    tft.drawCentreString(PUEO_TAGLINE, PUEO_SCREEN_W / 2, y, 2);
+    y += 20;
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
     tft.drawCentreString("by " PUEO_AUTHOR "  -  " PUEO_VERSION,
-                         PUEO_SCREEN_W / 2, y, 1);
+                         PUEO_SCREEN_W / 2, y, 2);
 
     tft.setTextColor(UI_DIM_TEXT, UI_BG);
     tft.setTextDatum(TL_DATUM);
-    tft.setCursor(16, PUEO_SCREEN_H - 20);
+    tft.setCursor(16, PUEO_SCREEN_H - 26);
     tft.print("SELECT / tap for details");
     return;
   }
