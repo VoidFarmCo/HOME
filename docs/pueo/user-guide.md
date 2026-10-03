@@ -162,8 +162,10 @@ watches for the Remote ID broadcasts drones are required to send.
 announces itself in a way one of them recognises.
 
 The useful thing to know is not the list of vendors, which goes stale, but
-the kinds of question being asked, because that is what explains a row that
-is there and a row that is not:
+the questions being asked, because that is what explains a row that is there
+and a row that is not. Eight questions over the nine tables, because a name
+matched from its first character is one question asked separately of a WiFi
+network and a BLE device:
 
 | It can see | What that catches |
 |---|---|

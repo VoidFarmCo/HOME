@@ -150,6 +150,26 @@ def main():
     ok("the guide's table was found", bool(rows),
        "no markdown table under the Surveillance heading")
 
+    # The guide says how many questions the table asks, which is not the same
+    # as how many tables there are: kSsidSigs and kBleNameSigs both match a
+    # name from its first character, so they are two tables and one question.
+    # The paragraph said "9 kinds" above an eight-row table and used the same
+    # word for both, so a reader who counted got a different number from the
+    # one they had just read. Now it says eight, and this is what stops that
+    # number drifting the next time a table is added.
+    body = [l for l in rows.splitlines()
+            if l.startswith("|") and not re.match(r"^\|[\s|:-]+\|?$", l)]
+    nq = max(0, len(body) - 1)  # less the header row
+    qwords = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six",
+              7: "Seven", 8: "Eight", 9: "Nine", 10: "Ten", 11: "Eleven"}
+    ok("the guide's count of questions matches its table",
+       re.search(r"\b%s questions over the %s tables\b"
+                 % (qwords.get(nq, str(nq)),
+                    {9: "nine", 10: "ten", 11: "eleven"}.get(nkinds, str(nkinds))),
+                 guide, re.I) is not None,
+       "the table has %d rows over %d tables; the sentence above it does not "
+       "say so" % (nq, nkinds))
+
     for name in sorted(tables):
         phrase = DESCRIBED.get(name)
         ok("  %-14s" % name, phrase is not None and phrase in rows,
