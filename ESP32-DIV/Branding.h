@@ -20,15 +20,17 @@
  * serial banner, which is the honest way round. */
 #define PUEO_VERSION     "0.4.25"
 
-#define PUEO_NAME        "Pueo"
-#define PUEO_TAGLINE     "multi-radio field tool"
-#define PUEO_AUTHOR      "magikh0e"
+#define PUEO_NAME        "H.O.M.E"
+#define PUEO_TAGLINE     "heads of my enemies"
+#define PUEO_AUTHOR      "VoidFarmCo"
 
-#define PUEO_URL         "pueo.magikh0e.pl"
+#define PUEO_URL         "headsofmyenemies.com"
 
-/* Shown under the name on the splash, and in the serial banner. */
-#define PUEO_UPSTREAM    "based on ESP32-DIV by CiferTech"
-#define PUEO_UPSTREAM_URL "github.com/cifertech/ESP32-DIV"
+/* Shown under the name on the splash, and in the serial banner. H.O.M.E is a
+ * fork of Pueo (magikh0e), which is itself based on ESP32-DIV (CiferTech).
+ * Both credits are kept here and in the About screen; LICENSE is unchanged. */
+#define PUEO_UPSTREAM    "fork of Pueo, on ESP32-DIV"
+#define PUEO_UPSTREAM_URL "github.com/magikh0e/pueo"
 
 /* ── Boot logo ───────────────────────────────────────────────────────────────
  * Define PUEO_LOGO_BITMAP to a 150x150 1-bpp array to draw a logo above the
