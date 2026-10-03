@@ -1701,9 +1701,15 @@ void handleWiFiSubmenuButtons() {
         for (int i = 0; i < featureCount; i++) {
             int yPos = 30 + i * 30;
 
-            int button_x1 = 10;
+            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
+             * across, so 10..220 covered it. This one is 320, which left the
+             * right 100 px of every row in every list menu dead to a tap.
+             * The same mistake the tile grids had, found and fixed there, and
+             * it survived here for the same reason: a hit box reads like a
+             * coordinate rather than like a dimension. */
+            int button_x1 = 0;
             int button_y1 = yPos;
-            int button_x2 = 220;
+            int button_x2 = PUEO_SCREEN_W;
             int button_y2 = yPos + 30;
 
             if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
@@ -2502,9 +2508,15 @@ void handleBluetoothSubmenuButtons() {
         for (int i = 0; i < featureCount; i++) {
             int yPos = 30 + i * 30;
 
-            int button_x1 = 10;
+            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
+             * across, so 10..220 covered it. This one is 320, which left the
+             * right 100 px of every row in every list menu dead to a tap.
+             * The same mistake the tile grids had, found and fixed there, and
+             * it survived here for the same reason: a hit box reads like a
+             * coordinate rather than like a dimension. */
+            int button_x1 = 0;
             int button_y1 = yPos;
-            int button_x2 = 220;
+            int button_x2 = PUEO_SCREEN_W;
             int button_y2 = yPos + 30;
 
             if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
@@ -2975,9 +2987,15 @@ void handleNRFSubmenuButtons() {
         for (int i = 0; i < active_submenu_size; i++) {
             int yPos = submenuItemY(i);
 
-            int button_x1 = 10;
+            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
+             * across, so 10..220 covered it. This one is 320, which left the
+             * right 100 px of every row in every list menu dead to a tap.
+             * The same mistake the tile grids had, found and fixed there, and
+             * it survived here for the same reason: a hit box reads like a
+             * coordinate rather than like a dimension. */
+            int button_x1 = 0;
             int button_y1 = yPos;
-            int button_x2 = 220;
+            int button_x2 = PUEO_SCREEN_W;
             int button_y2 = yPos + 28;
 
             if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
@@ -3048,9 +3066,15 @@ void handleSubGHzSubmenuButtons() {
         for (int i = 0; i < active_submenu_size; i++) {
             int yPos = submenuItemY(i);
 
-            int button_x1 = 10;
+            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
+             * across, so 10..220 covered it. This one is 320, which left the
+             * right 100 px of every row in every list menu dead to a tap.
+             * The same mistake the tile grids had, found and fixed there, and
+             * it survived here for the same reason: a hit box reads like a
+             * coordinate rather than like a dimension. */
+            int button_x1 = 0;
             int button_y1 = yPos;
-            int button_x2 = 220;
+            int button_x2 = PUEO_SCREEN_W;
             int button_y2 = yPos + 28;
 
             if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
@@ -3227,9 +3251,15 @@ void handleListSubmenuButtons(void (*launch)(int), int backIdx) {
         for (int i = 0; i < active_submenu_size; i++) {
             int yPos = submenuItemY(i);
 
-            int button_x1 = 10;
+            /* Full width, not 220. 220 is a 2.8" number: that panel is 240
+             * across, so 10..220 covered it. This one is 320, which left the
+             * right 100 px of every row in every list menu dead to a tap.
+             * The same mistake the tile grids had, found and fixed there, and
+             * it survived here for the same reason: a hit box reads like a
+             * coordinate rather than like a dimension. */
+            int button_x1 = 0;
             int button_y1 = yPos;
-            int button_x2 = 220;
+            int button_x2 = PUEO_SCREEN_W;
             int button_y2 = yPos + 28;
 
             if (x >= button_x1 && x <= button_x2 && y >= button_y1 && y <= button_y2) {
