@@ -11,6 +11,130 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.24 - 2026-10-02
+-------------------
+
+  * THE PANEL CANNOT DRAW AN EM DASH, and was being asked to 36 times.
+
+    TFT_eSPI's font 1 is a 96-glyph table covering 0x20 to 0x7E. A character
+    outside it is UTF-8 in the source, so it reaches drawString() as two or
+    three bytes, each indexed into that table separately, and what appears on
+    the panel is two or three wrong glyphs in the middle of a sentence.
+
+        injDrawStatusValue(0, "none - run Scan", UI_DIM_TEXT);
+
+    rfid.cpp had twenty of them. Card Clone walks somebody through four steps
+    and every one of those steps is a status line reading "Step 1/4 - Present
+    SOURCE tag", which is the whole interface for that feature. Nothing has
+    reported it because no PN532 is soldered to a board yet, so none of those
+    strings has been drawn on hardware.
+
+    A label and its value takes the colon the dash was standing in for.
+    Ranges take a hyphen, an ellipsis becomes three dots, an arrow becomes ->
+    and the non-breaking hyphen in Wi-Fi becomes a hyphen. Every replacement
+    is the same length or shorter, and each dash was drawing three glyphs, so
+    none of them can widen a line that already fitted.
+
+    check_ascii_strings.py strips comments before it looks, because the
+    comment banners are full of box-drawing characters that nothing draws and
+    forty false positives would bury the seven real ones. It separates
+    strings it can see reaching the panel from strings it can see reaching
+    the serial console, and fails on both those and on any whose destination
+    it cannot work out: a check that passes because it could not tell is not
+    a check.
+
+  * THE BEACON NAMED TWO FEATURES THE DETECTOR DOES NOT HAVE.
+
+    Its whole job is to say which screen should hear each decoy. It said
+    Spotter for ten of the fourteen signals and Drones for the other two. The
+    menu stopped being called Spotter at 0.4.0 and has never been called
+    Drones: the entries are Surveillance and Drone Detector. Somebody reading
+    the beacon went looking in the detector for a feature that is not there.
+
+    check_beacon.py now takes every string detectedBy() can return, splits
+    the one row that names two features, and insists each half is an entry in
+    one of the sketch's menu tables. It also checks the label fits, with the
+    panel width read from shared.h rather than written down again.
+
+  * FIVE DOCUMENTS HAD STOPPED BEING TRUE, and now something reads them.
+
+    README.md said Surveillance matches "108 signatures across nine kinds"
+    and named four matching primitives. There are 266, and three primitives
+    arrived in 0.4.21 that the sentence never learned about: a whole MAC
+    address, the bytes past a company ID, and the bytes past a service UUID.
+
+    PUEO.md called the 3.5" the board "this has run on" in its third
+    paragraph and then closed its changes list with "None of this is tested
+    on hardware yet". Both cannot be right. Its Status block listed compiler
+    flags, symbol-level checks and host tests, which is everything except
+    whether the firmware runs. Its size was 1,690,265 bytes at 85% of a
+    partition the build stopped using at 0.4.2; it is 1,805,632 at 57% of the
+    3.00 MB slot, measured off the published image rather than remembered.
+
+    spi-bus.md said the touch prediction was "the first thing to test when a
+    CYD exists". One exists.
+
+    enclosure-logo.md said check_logo_scale.py runs 14 checks and it runs 15.
+    eapol-capture.md said check_eapol.py runs 120,301 and it runs 124,315.
+    Both drifted the same way: an assertion was added, the script went on
+    passing, and nothing was reading the sentence that described it.
+
+    The user guide said "266 signatures across 9 kinds" above a table of
+    eight rows, using the word kinds for both, so a reader who counted got a
+    different number from the one just read. There are nine tables and eight
+    questions, because a name matched from its first character is one
+    question asked separately of a WiFi network and a BLE device.
+
+    Four checks for that class of failure. check_doc_counts.py finds every
+    case count a doc quotes for a named check script and runs that script to
+    compare; it attributes a count to the nearest script named before it at
+    any distance, and fails on one it cannot attribute at all, because the
+    first version used a fixed window and silently dropped two of eight.
+    check_sig_counts.py reads every doc in the repository rather than the
+    user guide alone, which is where README.md had been wrong for three
+    releases. check_site_menu.py holds the website's menu listing to the
+    sketch's menu tables, that block being introduced as every entry in the
+    menus while missing File Transfer. And check_ascii_strings.py, above.
+
+  * 510 DASHES DOING A COMMA'S JOB.
+
+    The house rule is commas and full stops. Every dash in the documentation
+    predated the rule, and they are not all one thing: a pair around an aside
+    is not a dash joining two clauses, and neither is the one between a term
+    and its gloss in a bullet.
+
+    So the replacement is per instance. A pair around a list or a clause
+    takes brackets, because commas there read as more items. A pair around a
+    phrase takes commas. A subordinator or conjunction after it takes a
+    comma. A clause that can stand alone takes a full stop. A term in a
+    bullet, a label and its value, and a dash introducing a list take the
+    colon the dash stood in for.
+
+    Four were left for a person, because a rule general enough to catch them
+    broke the band table: "31 - 62% - had been seen" is thirty-one of fifty,
+    which is 62%, and digits either side of a dash is how a range looks.
+
+    The changelog keeps its 129. It ships inside every published
+    pueo-<version>-src.zip, those archives are verified byte for byte, and
+    rewriting an old entry now would put this tree at odds with every copy
+    already downloaded.
+
+    check_prose.py holds three rules: no dash doing a comma's job, nothing
+    about the conversation that produced the work, and none of the handful of
+    phrases that are always deletable. What it must not flag matters as much
+    as what it must: a range with spaces around its dash, a dash in a
+    heading, and a dash inside a code span all pass, because a check that
+    cries wolf on correct text is one that gets turned off.
+
+  * Also: the website's section navigation carries every section of every
+    page rather than a flat list of eight, read out of each page's own jump
+    nav so the two cannot drift apart. The overview listed three of the six
+    features this fork added and said thirteen check scripts where there are
+    forty-three.
+
+    43 checks pass.
+
+
 0.4.23 - 2026-10-02
 -------------------
 
@@ -3371,6 +3495,11 @@ of them, because a digest is the one thing about an old release
 that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.23
+  1bc9e3e8b5376fc78e9cfca7fa6ad696bf4f5f50b9372b3015e1883dc4fc4b64  pueo-0.4.23-beacon-35-merged.bin
+  4124ff0d509975eb0c98cb5a0cdfcb3f4c9d142fc764b82981001b9753c8ecdc  pueo-0.4.23-merged.bin
+  e51056e7e72eebaec7d98bc2426d9be50e85b7862150a502bee4028556b9883a  pueo-0.4.23-src.zip
 
 0.4.22
   04730d45cfee65d7b95670537c476ef1e68bc837fb473e2e733d5633a4fcc99f  pueo-0.4.22-beacon-35-merged.bin

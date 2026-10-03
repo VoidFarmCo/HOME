@@ -2,7 +2,7 @@
 """The website's menu listing is the menu.
 
 firmware.html opens that block with "Every entry in the menus, as of
-0.4.23", which is a claim about completeness, and nothing was checking it.
+<version>", which is a claim about completeness, and nothing was checking it.
 It was wrong in two ways at once: the heading said Tools, which the menu
 stopped being when Settings and About were folded into System, and File
 Transfer was missing from a list introduced as every entry.
