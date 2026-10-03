@@ -11,6 +11,113 @@ Digests for every release, pruned ones included, are at the end of
 this file.
 
 
+0.4.25 - 2026-10-03
+-------------------
+
+  * THE FIRMWARE IS UNCHANGED. No file under ESP32-DIV/ or PueoBeacon/ moved
+    since 0.4.24, so the image differs from it only in the version string it
+    prints. Flashing this over 0.4.24 gains nothing. It is cut because the
+    documentation, the screenshots and the release tooling moved, and those
+    ship in the archive and on the site.
+
+  * A FLOCK ALPR RAISED A ROW, so the camera signatures are no longer
+    untested against the hardware they name.
+
+    Three documents said they had never been tested against a real camera.
+    One has matched now. Nothing was captured or logged off it, so the claim
+    is kept to its size: that is one signature and the matching path
+    confirmed together, on one device, on one occasion, and every other
+    signature in the table is still untested against the hardware it names.
+    The bench beacon still proves only the matching path, by transmitting a
+    known OUI, which has always been a different claim from the signature
+    being right.
+
+    It does not touch the fingerprint claims, and the wording now says why.
+    An IE fingerprint table needs packets captured off a camera, and a row
+    appearing on a screen is not a capture. There are still no values to ship.
+
+  * A LICENCE SENTENCE THAT ARGUED THE OPPOSITE OF THE POSITION.
+
+    ie-fingerprinting.md refused FlipDeFlock's fingerprint tables because "it
+    is GPL-3.0-or-later and Pueo is MIT". Pueo has been GPL-3.0-or-later since
+    the relicence, and the website already says the move was made partly so
+    those tables could be used. The table stays empty for the reason that
+    actually applies: they are somebody else's captures rather than this
+    project's.
+
+  * THE SCREENSHOT RENDERER HAD THE BEACON'S SIGNALS WRITTEN OUT BY HAND.
+
+    render_screens.py parses the firmware's bitmaps, fonts and coordinates
+    out of the source precisely so a screenshot cannot drift from what the
+    panel draws. Its beacon table was a list typed into the file, under a
+    comment saying it was Emit::name() and Emit::detectedBy().
+
+    It was eight rows when the enum had fourteen, and it still said Spotter
+    and Drones after those became Surveillance and Drone Detector, so the
+    published screenshot showed a beacon that had not existed for three
+    releases. The same failure 0.4.24 was full of, in the one file whose
+    entire purpose is not to have it.
+
+    Both tables are read from Emit.cpp now, in the enum's order from Emit.h,
+    with the fall-through cases resolved so a label reaches every case
+    stacked above its return. The counts are keyed by signal name rather than
+    by position: as a list of eight it raised an IndexError at fourteen, and
+    before that it had been quietly rendering the first eight of however many
+    there were.
+
+    The counts came off a board rather than being invented. The four WiFi
+    paths run to about 362 and the ten BLE signals to about 12, because the
+    BLE ones share ten rotation slots of three seconds. The numbers that were
+    there spread evenly between the two, which is a device that cannot exist.
+    Verified against a photograph of the panel: fourteen rows, same order,
+    same labels, same counts, chevron on the same row.
+
+  * MAKE_RELEASE REGENERATES THE SCREENSHOTS IT PUBLISHES.
+
+    They are rendered from the firmware's own source, which makes them an
+    artifact of the release exactly as the binaries are, and the version is
+    on the boot screen and in the status bar, so most of them move whenever
+    it does. Nothing regenerated them, and 0.4.24 published a site showing
+    0.4.23 on nine screens.
+
+    Render into a temporary directory, replace what differs, verify each copy
+    with cmp, say how many moved. Only files already on the site are
+    replaced; a render with no counterpart there is named and left alone. A
+    failed render stops the publish rather than warning, because the
+    alternative is shipping a release whose site shows the previous one.
+
+    No check script for it. One would compare the site against a fresh
+    render, and the release sequence bumps the version before make_release
+    publishes, so it would fail on every release at the point where the site
+    is correctly still showing the old one.
+
+  * SEVENTEEN TYRE-SENSOR SIGNATURES, AND NOTHING SAID WHICH KIND.
+
+    The table carries Schrader, Goodyear, Pacific, Huf, FOBO, TireCheck, the
+    SIG's own tyre service and four aftermarket valve-cap rows. TPMS appeared
+    nowhere in the documentation or on the website, so somebody meeting "TPMS
+    sensor" on the beacon's screen had no way to know these are the Bluetooth
+    sensors rather than the 315 and 433 MHz ones a car reads itself.
+
+    Factory TPMS is a valve-stem transmitter talking to a receiver in the car.
+    The CC1101 tunes across both of its bands, so the hardware could read it,
+    and no feature does. Saying so matters more than it looks: somebody who
+    owns this device and wants that will otherwise go looking for a screen
+    that is not there.
+
+    The source had it right in a comment all along, which is the one place a
+    reader will not look.
+
+  * Also: two documents named the menu entry Spotter, which it stopped being
+    at 0.4.0. The source is still Spotter and that is correct, but
+    build-guide.md was listing what works on a board, which is a list of menu
+    entries, and ble-sniffer.md put Surveillance in the Bluetooth menu, where
+    it has not been since 0.4.11. And "it was never support in any sense you
+    could rely on" wanted supported.
+
+    43 checks pass.
+
+
 0.4.24 - 2026-10-02
 -------------------
 
@@ -3495,6 +3602,11 @@ of them, because a digest is the one thing about an old release
 that is still worth having after the file itself is gone.
 
 Generated by tools/changelog_digests.py from dist/*.sha256.
+
+0.4.24
+  84a7695f67fdb7e1739d7b3a487b9c476df1ab7685e4176c3b81833392a97c6f  pueo-0.4.24-beacon-35-merged.bin
+  467cb649506239cb77ec4d955e54413774b78fe332856115553cef6f0bcbbaac  pueo-0.4.24-merged.bin
+  1d38ab4485265e396aa6ea527139b5b6f1e198749ee6e0b4dd3e84cb53376c05  pueo-0.4.24-src.zip
 
 0.4.23
   1bc9e3e8b5376fc78e9cfca7fa6ad696bf4f5f50b9372b3015e1883dc4fc4b64  pueo-0.4.23-beacon-35-merged.bin
