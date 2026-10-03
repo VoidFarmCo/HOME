@@ -160,10 +160,12 @@ Cost: **+832 bytes flash, +24 bytes RAM.**
 
 ## What this does not do
 
-It is not verified on hardware. Every claim above about the Arduino core is
-read from its source and can be checked by anyone; the claim about touch
-actually dying is a prediction derived from those, and it is the first thing
-to test when a CYD exists.
+The arbitration has run on hardware since 2026-09-20 and touch has not
+misbehaved, which is consistent with it working and is not the same as having
+seen the failure it prevents. Every claim above about the Arduino core is read
+from its source and can be checked by anyone; the claim about touch actually
+dying is a prediction derived from those, and testing that one means taking
+the arbitration back out.
 
 ## The CC1101 driver was the other half of it
 

@@ -25,9 +25,11 @@ the pin conflicts in the stock CYD map, a single owner for the SPI bus that
 the display, SD card and all three radios share, and a build that compiles
 clean under `-Wall -Wextra` rather than suppressing its own warnings.
 
-> **Status.** Everything here compiles clean under `-Wall -Wextra`, several
-> of the fixes are verified at the symbol level, and the parsers carry
-> model-based tests that run on a host. Features inherited from upstream are
+> **Status.** It runs on the reference board, and has since 2026-09-20.
+> Everything here compiles clean under `-Wall -Wextra`, several of the fixes
+> are verified at the symbol level, and the parsers carry model-based tests
+> that run on a host. No radio module is soldered to a board yet, so the
+> features that need one are compiled rather than exercised. Features inherited from upstream are
 > inherited, not audited — where one has been read closely, the changelog
 > entry that did it says so.
 
@@ -351,5 +353,9 @@ missed:
 - `tools/make_release.sh` — source archive and merged flash image
 - `.github/FUNDING.yml` — fork funding, upstream's Patreon kept
 
-None of this is tested on hardware yet. It compiles, the board profile is
-confirmed present in the flash image, and that is all that is currently known.
+That list predates the board. One was flashed and run on 2026-09-20, and the
+boot screen, the menus, the packet monitor, Surveillance and Hunt all work on
+a 3.5" ESP32-3248S035R. No module has been soldered to one yet, so everything
+needing the CC1101, the nRF24, the PN532 or the GPS is still compiled and
+reasoned about rather than seen. `docs/pueo/build-guide.md` tracks which step
+that is up to.
