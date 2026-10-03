@@ -2317,6 +2317,27 @@ bool isDetailView = false;
 bool isScanning = false;
 bool exitRequested = false;
 
+/* ── Station scanner ─────────────────────────────────────────────────────
+ * Marauder's and HaleHound's model: scan APs, pick one, then sniff for the
+ * clients talking to it. Chained from the AP detail view (the Stations slot),
+ * so it reuses the scan and the selection. It pins the radio to the chosen
+ * AP's own channel rather than hopping, which catches more of one AP's
+ * traffic than a sweep would. A third view state on top of list/detail;
+ * everything about those two is left alone. */
+struct StationEntry { uint8_t mac[6]; int8_t rssi; uint32_t last_seen; };
+static constexpr int STA_MAX = 32;
+/* Heap, not .bss: 384 bytes of static array overflows this board's DRAM. It is
+ * allocated when the scanner opens and freed when it closes, the way
+ * PacketMonitor keeps its PCAP pool off .bss on the classic ESP32. */
+static StationEntry* s_sta = nullptr;
+static volatile int  s_staCount = 0;
+static uint8_t  s_targetBssid[6] = {0};
+static uint8_t  s_targetCh = 1;
+static char     s_targetSsid[20] = {0};
+static bool     isStationView = false;
+static uint32_t s_staLastDraw = 0;
+static portMUX_TYPE s_staMux = portMUX_INITIALIZER_UNLOCKED;
+
 static TaskHandle_t bgScanTaskHandle = nullptr;
 static volatile bool bgHasResults = false;
 static volatile uint32_t bgLastScanMs = 0;
@@ -2497,8 +2518,11 @@ static void wifiScanUpdateNavLabels() {
   if (!featureHasTouchNavBar()) {
     return;
   }
-  if (isDetailView) {
-    setTouchNavLabels("Scan", "Next", "Exit", "Prev", "Back");
+  if (isStationView) {
+    // Prev/Next do nothing here, so the up slot is free for the Stations entry.
+    setTouchNavLabels(nullptr, nullptr, "Exit", nullptr, "Back");
+  } else if (isDetailView) {
+    setTouchNavLabels("Scan", "Next", "Exit", "Stations", "Back");
   } else {
     setTouchNavLabels("Scan", "Next", "Exit", "Prev", "View");
   }
@@ -2969,6 +2993,7 @@ void wifiscanSetup() {
 
   setupTouchscreen();
 
+  isStationView = false;
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
 
@@ -2991,10 +3016,160 @@ void wifiscanSetup() {
   redrawTouchButtonBar();
 }
 
+/* True for broadcast and any multicast address. The group bit (bit 0 of the
+ * first octet) is set for both, so one test covers ff:ff:.. and 01:00:5e:..
+ * alike. A station is always a unicast address; the rest are not clients. */
+static bool staIsGroupAddr(const uint8_t* m) {
+  return (m[0] & 0x01) != 0;
+}
+
+/* Given the target AP's BSSID and a data frame's two address fields (addr1 =
+ * receiver at offset 4, addr2 = transmitter at offset 10), return the client
+ * address, or nullptr when neither end is this AP. Whichever address is the
+ * AP, the other end is its client -- the same rule Marauder uses. */
+static const uint8_t* staPickClient(const uint8_t* bssid,
+                                    const uint8_t* a1, const uint8_t* a2) {
+  if (memcmp(a2, bssid, 6) == 0) return a1;   // AP is transmitter -> dest is client
+  if (memcmp(a1, bssid, 6) == 0) return a2;   // AP is receiver    -> src  is client
+  return nullptr;
+}
+
+void stationCb(void* buf, wifi_promiscuous_pkt_type_t type) {
+  if (type != WIFI_PKT_DATA) return;
+  if (!s_sta) return;
+  const wifi_promiscuous_pkt_t* p = (const wifi_promiscuous_pkt_t*)buf;
+  if (p->rx_ctrl.sig_len < 16) return;        // need addr1 and addr2 present
+  const uint8_t* a1 = p->payload + 4;
+  const uint8_t* a2 = p->payload + 10;
+  const uint8_t* sta = staPickClient(s_targetBssid, a1, a2);
+  if (!sta || staIsGroupAddr(sta)) return;
+
+  const int8_t rssi = p->rx_ctrl.rssi;
+  const uint32_t now = millis();
+  portENTER_CRITICAL_ISR(&s_staMux);
+  for (int i = 0; i < s_staCount; i++) {
+    if (memcmp(s_sta[i].mac, sta, 6) == 0) {   // already seen -> refresh, never duplicate
+      s_sta[i].rssi = rssi;
+      s_sta[i].last_seen = now;
+      portEXIT_CRITICAL_ISR(&s_staMux);
+      return;
+    }
+  }
+  if (s_staCount < STA_MAX) {
+    memcpy(s_sta[s_staCount].mac, sta, 6);
+    s_sta[s_staCount].rssi = rssi;
+    s_sta[s_staCount].last_seen = now;
+    s_staCount++;
+  }
+  portEXIT_CRITICAL_ISR(&s_staMux);
+}
+
+static void stationStop() {
+  esp_wifi_set_promiscuous(false);   // stop the callback before freeing its buffer
+  WiFi.mode(WIFI_STA);          // hand the radio back so a rescan still works
+  if (s_sta) { free(s_sta); s_sta = nullptr; }
+  isStationView = false;
+}
+
+static void stationStart() {
+  const int n = WiFi.scanComplete();
+  if (n <= 0 || currentIndex < 0 || currentIndex >= n) return;
+  if (!s_sta) s_sta = (StationEntry*)malloc(sizeof(StationEntry) * STA_MAX);
+  if (!s_sta) return;           // no room; stay in the detail view
+  memcpy(s_targetBssid, WiFi.BSSID(currentIndex), 6);
+  s_targetCh = (uint8_t)WiFi.channel(currentIndex);
+  strncpy(s_targetSsid, WiFi.SSID(currentIndex).c_str(), sizeof(s_targetSsid) - 1);
+  s_targetSsid[sizeof(s_targetSsid) - 1] = 0;
+
+  portENTER_CRITICAL(&s_staMux);
+  s_staCount = 0;
+  portEXIT_CRITICAL(&s_staMux);
+
+  // Single channel -- the AP's own -- in promiscuous. No hop, so no gaps.
+  esp_wifi_set_promiscuous(false);
+  esp_wifi_set_promiscuous_rx_cb(&stationCb);
+  esp_wifi_set_channel(s_targetCh ? s_targetCh : 1, WIFI_SECOND_CHAN_NONE);
+  esp_wifi_set_promiscuous(true);
+
+  isStationView = true;
+  s_staLastDraw = 0;
+  wifiScanClearBody();
+  wifiScanUpdateNavLabels();
+}
+
+static void stationDraw() {
+  if (!s_sta) return;
+  const uint32_t now = millis();
+  if (now - s_staLastDraw < 300) return;      // ~3 Hz, enough for a client list
+  s_staLastDraw = now;
+
+  StationEntry snap[STA_MAX];
+  int n;
+  portENTER_CRITICAL(&s_staMux);
+  n = s_staCount;
+  if (n > STA_MAX) n = STA_MAX;
+  memcpy(snap, s_sta, sizeof(StationEntry) * n);
+  portEXIT_CRITICAL(&s_staMux);
+
+  tft.setTextFont(1);
+  tft.setTextSize(1);
+  char hdr[48];
+  snprintf(hdr, sizeof(hdr), "%s  Ch%d  %d sta", s_targetSsid, (int)s_targetCh, n);
+  tft.fillRect(0, 40, PUEO_SCREEN_W, 14, TFT_BLACK);
+  tft.setCursor(10, 42);
+  tft.setTextColor(WHITE, TFT_BLACK);
+  tft.print(hdr);
+
+  const int top = 58, rowH = 14;
+  const int bottom = wifiContentBottom();
+  const int maxRows = (bottom - top) / rowH;
+  for (int i = 0; i < maxRows; i++) {
+    const int y = top + i * rowH;
+    tft.fillRect(0, y, PUEO_SCREEN_W, rowH, TFT_BLACK);
+    if (i >= n) continue;
+    char line[48];
+    const unsigned long age = (now - snap[i].last_seen) / 1000UL;
+    snprintf(line, sizeof(line),
+             "%02X:%02X:%02X:%02X:%02X:%02X %4ddBm %2lus",
+             snap[i].mac[0], snap[i].mac[1], snap[i].mac[2],
+             snap[i].mac[3], snap[i].mac[4], snap[i].mac[5],
+             (int)snap[i].rssi, age);
+    tft.setCursor(6, y);
+    tft.setTextColor(WHITE, TFT_BLACK);
+    tft.print(line);
+  }
+}
+
+static void stationLoop() {
+  esp_wifi_set_channel(s_targetCh ? s_targetCh : 1, WIFI_SECOND_CHAN_NONE);
+  if (isButtonPressed(BTN_RIGHT)) {            // Back -> AP detail
+    delay(200);
+    stationStop();
+    uiDrawn = false;
+    displayWiFiDetails();
+    return;
+  }
+  stationDraw();
+}
+
 void wifiscanLoop() {
 
   if (feature_active && (isButtonPressed(BTN_SELECT) || featureExitButtonPressed())) {
+    if (isStationView) stationStop();
     feature_exit_requested = true;
+    return;
+  }
+
+  if (isStationView) {
+    stationLoop();
+    updateStatusBar();
+    return;
+  }
+
+  // From the AP detail view, the Stations slot (up) opens the station scanner.
+  if (isDetailView && isButtonPressed(BTN_UP)) {
+    delay(200);
+    stationStart();
     return;
   }
 
