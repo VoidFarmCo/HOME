@@ -5,7 +5,9 @@ fault easy to find.
 
 **Nothing in this guide has been wired yet.** Step 2 is done (a board was
 flashed and run on 2026-09-20, and the display, the menus, touch, the WiFi
-scanner, the packet monitor, Surveillance and Hunt all work), but no module has
+scanner, the packet monitor, Surveillance and Hunt all work, and the submenu
+grid was tried on 2026-10-03 with every tile launching the feature it names),
+but no module has
 been soldered to anything, so steps 3 onward remain untested. The rest is
 derived from the pin map in [hardware.md](hardware.md), which
 `tools/check_pinmap.py` verifies against each board's own wiring, from the

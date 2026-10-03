@@ -62,10 +62,11 @@ the feature. Common ones are `Back`, `Exit`, `Save`, `Next` and `Prev`.
 **`Back` and `Exit` both leave**, and they are not always in the same place,
 so read the row rather than aiming from memory.
 
-**Menus longer than one screen are paged.** WiFi and Bluetooth both have two
-pages, with the page button in the bottom row next to the back button. If a
-feature you expected is missing from a menu, look at the second page before
-concluding anything.
+**Every menu is one screen.** A submenu is a grid of tiles, fifteen slots,
+and the largest menu uses twelve of them. There is no second page and no page
+button: if a feature is not on the screen in front of you, it is not in that
+menu. Back is the bar along the bottom, and the whole strip below the tiles
+is part of it.
 
 ---
 
