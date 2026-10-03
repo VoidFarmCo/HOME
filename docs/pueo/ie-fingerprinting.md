@@ -165,10 +165,16 @@ memory rather than a missed camera.
 Here is the part that decides the shape of the work.
 
 **There are no fingerprint values to ship.** I have none, because that needs
-a capture from a real camera and nothing in this project has been near one.
-They cannot be taken from `FlipDeFlock` either: it is GPL-3.0-or-later and
-Pueo is MIT, so its tables are not ours to read values out of. Reimplementing
-the technique from the 802.11 spec is fine. Copying its data is not.
+a capture from a real camera and no capture has been taken here. A Flock ALPR
+has since raised a row on the panel, which says a signature matched and says
+nothing about fingerprints: a row is not a capture.
+
+`FlipDeFlock` has values. When this was written Pueo was MIT and its
+GPL-3.0-or-later tables were not ours to read. That is no longer the
+position: this fork relicensed to GPL-3.0-or-later, partly so they could be
+used, with attribution and without its name, which its trademark file keeps
+separate from its code. They are still somebody else's captures rather than
+mine, which is the reason the table is empty rather than borrowed.
 
 So `kIeSigs[]` ships empty, and the first useful thing built is not a
 detector but a way to see fingerprints at all:
