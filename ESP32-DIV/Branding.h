@@ -62,13 +62,13 @@
  * The ten-frame loading animation (bitmap_icon_skull_loading_1..10, 100x120)
  * is also upstream artwork and is still in use. Replace it the same way when
  * you have frames of your own. */
-#define PUEO_LOGO_BITMAP bitmap_pueo_logo
+#define PUEO_LOGO_BITMAP bitmap_home_logo
 
 /* Set when the artwork already contains the wordmark, so displayLogo() drops
  * its separate name line instead of printing "Pueo" twice. Dropping that line
  * also frees 26px, which is what lets the logo go to 200 -- see the layout
  * note above. */
-#define PUEO_LOGO_HAS_WORDMARK 1
+#define PUEO_LOGO_HAS_WORDMARK 0
 
 /* -- Feature marks ----------------------------------------------------------
  * Hunt and Spotter each open on their own artwork rather than on nothing.
@@ -92,5 +92,5 @@
 #define PUEO_BOOT_SKULL_REPEATS 1
 #define PUEO_BOOT_LOGO_MS       1500
 
-#define PUEO_LOGO_W 200
-#define PUEO_LOGO_H 200
+#define PUEO_LOGO_W 160
+#define PUEO_LOGO_H 160

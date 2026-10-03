@@ -35,7 +35,7 @@ uint16_t uiUniversalColor();
 #define ICON_Light     0xFBE4
 #define TEXT_Dark      0xFFFF
 #define TEXT_Light     0x0000   
-#define UI_ACCENT      0x3166
+#define UI_ACCENT      0x79DD
 
 #define L_Dark        0x4208
 #define L_Light       0xC618
