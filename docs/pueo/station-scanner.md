@@ -35,8 +35,24 @@ Both ways out drop promiscuous mode and hand the radio back (`WiFi.mode(STA)`):
 radio in promiscuous would make the next feature open onto a stale channel and
 look broken.
 
-A later step can hand a selected client to the deauther, the way both reference
-tools do. The list carries the MAC it would need; the handoff is not wired yet.
+## Deauth handoff
+
+Tap a client row to select it (it gets a `>` and turns orange), then press
+**Deauth** (the up slot) to kick it off the AP. That opens a deauth view
+showing the client, the AP and a running frame count; **Stop** returns to the
+client list and resumes the sniff, **Exit** leaves the feature.
+
+The deauth cannot run while sniffing: the sniff is promiscuous and the deauth
+transmits, so Deauth drops the sniff, switches the radio to AP mode (the raw-TX
+helper sends on the AP interface), and sends targeted frames on the AP's
+channel. Each round sends two: AP to client (the client is told the AP dropped
+it) and client to AP (the AP is told the client left). The receiver address is
+the one selected client, not broadcast, so it is a handoff rather than the
+broadcast deauther. Both ways out (Stop, Exit) hand the radio back to STA.
+
+It reuses the WiFi Deauther's raw-frame transmitter
+(`Deauther::wsl_bypasser_send_raw_frame`) and the same 26-byte frame layout, so
+there is one transmit path, not two.
 
 ## What a check holds
 

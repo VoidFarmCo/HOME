@@ -28,6 +28,21 @@ The ways that goes wrong, each caught here and each expensive on the board:
      next feature opens onto a radio still in promiscuous mode on a stale
      channel, which looks like the new feature is broken.
 
+The deauth handoff kicks the selected client off its AP, and has its own ways
+to go wrong:
+
+  6. It is a handoff, not a broadcast deauth. The frame's receiver (addr1) is
+     the selected client, and the sender/BSSID (addr2/addr3) is the AP. Point
+     addr1 at ff:ff:.. instead and it deauths the whole AP, which is the
+     broadcast deauther, not a client handoff.
+
+  7. It fires only with a client selected, so a stray tap on the slot with no
+     selection does nothing rather than deauthing addr 00:00:...
+
+  8. It transmits on the AP interface, which needs AP mode, and hands the
+     radio back to STA on the way out -- otherwise the sniff cannot resume and
+     the next feature inherits an AP-mode radio.
+
 Reads source. Needs no board.
 """
 import re
@@ -124,6 +139,35 @@ def main():
     ok("feature exit calls stationStop when in the station view",
        re.search(r"if\s*\(\s*isStationView\s*\)\s*stationStop\s*\(\s*\)", squeeze(loop_region)) is not None,
        "exiting mid-sniff would leave the radio in promiscuous")
+
+    # --- deauth handoff ---
+    send = src.find("static void deauthSendOnce()")
+    send_region = squeeze(src[send:send + 900]) if send != -1 else ""
+    ok("deauth receiver (addr1) is the selected client",
+       re.search(r"memcpy\s*\(\s*f\s*\+\s*4\s*,\s*s_deauthClient\s*,\s*6\s*\)", send_region) is not None,
+       "a broadcast addr1 deauths the whole AP, not one client")
+    ok("deauth sender/BSSID (addr2/addr3) is the AP",
+       re.search(r"memcpy\s*\(\s*f\s*\+\s*10\s*,\s*s_targetBssid", send_region) is not None and
+       re.search(r"memcpy\s*\(\s*f\s*\+\s*16\s*,\s*s_targetBssid", send_region) is not None)
+    ok("deauth transmits via the AP-interface helper",
+       re.search(r"Deauther::wsl_bypasser_send_raw_frame\s*\(\s*f\s*,", send_region) is not None)
+
+    stationloop = src.find("static void stationLoop()")
+    sl_region = squeeze(src[stationloop:stationloop + 1200]) if stationloop != -1 else ""
+    ok("deauth fires only with a client selected",
+       re.search(r"if\s*\(\s*sel\s*>=\s*0\s*\)\s*\{\s*deauthStart\s*\(\s*\)", sl_region) is not None,
+       "a tap with no selection would deauth 00:00:..")
+
+    dstart = src.find("static void deauthStart()")
+    dstart_region = squeeze(src[dstart:dstart + 300]) if dstart != -1 else ""
+    ok("deauthStart switches to AP mode for TX",
+       re.search(r"WiFi\.mode\s*\(\s*WIFI_AP\s*\)", dstart_region) is not None)
+    dstop = src.find("static void deauthStop()")
+    dstop_region = squeeze(src[dstop:dstop + 200]) if dstop != -1 else ""
+    ok("deauthStop hands the radio back to STA",
+       re.search(r"WiFi\.mode\s*\(\s*WIFI_STA\s*\)", dstop_region) is not None)
+    ok("feature exit calls deauthStop when in the deauth view",
+       re.search(r"if\s*\(\s*isDeauthView\s*\)\s*deauthStop\s*\(\s*\)", squeeze(loop_region)) is not None)
 
     print()
     if FAILED:
