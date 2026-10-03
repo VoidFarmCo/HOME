@@ -3581,7 +3581,15 @@ static void otherRfidPlaceholderAction(int idx) {
      * every entry in that menu comes through this one function. */
     if (Stealth::refuse("RFID/NFC")) { feature_active = false; return; }
     if (!RfidNfc::begin()) {
-        showNotification("RFID/NFC", "PN532 not found. Check SPI wiring/pins.");
+        /* Same panel and the same amount of help as the nRF24 and CC1101
+         * messages. The DIP switches are in here because a PN532 left in
+         * I2C mode is the commonest reason one is fitted, wired and silent,
+         * and nothing on the board says which mode it is in. */
+        showNotification("RFID/NFC",
+                         "needs the PN532, and nothing answered on the SPI "
+                         "bus. Check the module is fitted and that MISO, "
+                         "MOSI, SCK and SS are wired, and that its DIP "
+                         "switches are set for SPI: CH1 off, CH2 on.");
         otherDismissPlaceholder();
         feature_active = false;
         return;
