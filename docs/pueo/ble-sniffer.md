@@ -90,8 +90,9 @@ menu and believes this scans Classic.
 
 ## It transmits
 
-`setActiveScan(true)`. Worth stating because three features in this menu
-listen and only Spotter is passive. For a general sniffer, active scanning
+`setActiveScan(true)`. Worth stating because the passive detector is
+Surveillance, which is under Detect rather than in this menu, so a feature
+that listens is not necessarily a feature that is quiet. For a general sniffer, active scanning
 at least buys something (scan responses carry names) unlike in AirTag
 Sniffer, where it bought nothing and has been turned off.
 
