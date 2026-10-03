@@ -14,8 +14,8 @@ The ways that regresses, each caught here:
      and loading() walks off the array (draws garbage / reads past the end);
      too low and the tail of the animation never shows.
 
-  3. Boot plays it: PUEO_BOOT_SKULL_REPEATS >= 1. At 0 the boot splash shows no
-     animation at all, which is where it started while the art was still Pueo's.
+Whether the boot splash plays a pass (PUEO_BOOT_SKULL_REPEATS) is a preference,
+not an invariant -- the owner chose a logo-only boot -- so it is not checked.
 
 Reads source. Needs no board.
 """
@@ -66,13 +66,6 @@ def main():
     ok("numFrames matches the frames that exist",
        numFrames == defined and defined > 0,
        "numFrames=%d but %d home_load arrays defined" % (numFrames, defined))
-
-    # 3. boot plays it.
-    branding = (SKETCH / "Branding.h").read_text(encoding="utf-8", errors="replace")
-    mb = re.search(r"#define\s+PUEO_BOOT_SKULL_REPEATS\s+(\d+)", branding)
-    reps = int(mb.group(1)) if mb else 0
-    ok("boot splash plays the loader (repeats >= 1)", reps >= 1,
-       "PUEO_BOOT_SKULL_REPEATS = %d" % reps)
 
     print()
     if FAILED:
