@@ -866,11 +866,74 @@ static void ptmDrawWaitCard() {
   tft.setTextColor(UI_TEXT, FEATURE_BG);
 }
 
+/* ── Channel sweep (analyzer) ────────────────────────────────────────────
+ * Packet Monitor watches one channel. The Sweep slot turns it into a 2.4 GHz
+ * occupancy meter: the radio hops 1..MAX_CH on a fixed dwell and each channel
+ * keeps a bar for the frames that landed on it during its last visit, so a
+ * glance says which channel is busy. Off by default, so opening Packet
+ * Monitor still lands on the waterfall it always did, and every line below is
+ * additive -- single-channel mode is left exactly as it was.
+ */
+static bool     s_sweep      = false;
+static uint8_t  s_sweepCh    = 1;
+static uint32_t s_sweepHopMs = 0;
+static uint32_t s_chanPkts[MAX_CH + 1] = {0};   // index 1..MAX_CH; [0] unused
+static constexpr uint32_t SWEEP_DWELL_MS = 150;
+
+/* Clear the feature body (below the toolbar, above the nav bar). Called when
+ * the mode flips so neither view is left showing the other's leftovers. */
+static void sweepClearBody() {
+  const int top = 37;
+  const int bottom = wifiContentBottom();
+  if (bottom > top) tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
+}
+
+static void sweepReset() {
+  for (int i = 0; i <= MAX_CH; i++) s_chanPkts[i] = 0;
+  s_sweepCh = 1;
+  s_sweepHopMs = millis();
+  ch = s_sweepCh;
+}
+
+/* One bar per channel, scaled to the busiest. The maxVal == 0 guard is the
+ * whole reason check_channel_sweep.py exists: an all-quiet band divides by
+ * zero without it, and a 2.4 GHz band with nothing on it is the ordinary
+ * bench case, not an edge one. */
+static void sweepDraw() {
+  const int top = 40;
+  const int bottom = wifiContentBottom() - 14;   // leave room for channel numbers
+  const int plotH = bottom - top;
+  if (plotH <= 0) return;
+
+  uint32_t maxVal = 0;
+  for (int c = 1; c <= MAX_CH; c++)
+    if (s_chanPkts[c] > maxVal) maxVal = s_chanPkts[c];
+  if (maxVal == 0) maxVal = 1;                    // never divide by zero
+
+  const int slotW = PUEO_SCREEN_W / MAX_CH;       // 320 / 14 = 22
+  const int barW  = slotW - 6;
+
+  for (int c = 1; c <= MAX_CH; c++) {
+    const int x = (c - 1) * slotW + 3;
+    const int barH = (int)((uint32_t)plotH * s_chanPkts[c] / maxVal);
+    tft.fillRect(x, top, barW, plotH, TFT_BLACK);               // erase the column
+    if (barH > 0)
+      tft.fillRect(x, bottom - barH, barW, barH,
+                   c == s_sweepCh ? UI_ACCENT : UI_FG);          // bar grows from baseline
+    tft.setTextDatum(TC_DATUM);
+    tft.setTextFont(1);
+    tft.setTextColor(c == s_sweepCh ? UI_ACCENT : UI_TEXT, TFT_BLACK);
+    tft.drawNumber(c, x + barW / 2, bottom + 2);                // channel label
+  }
+  tft.setTextDatum(TL_DATUM);
+}
+
 void ptmSetup() {
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
-  setTouchNavLabels("Ch-", nullptr, "Exit", nullptr, "Ch+");
+  setTouchNavLabels("Ch-", nullptr, "Exit", "Sweep", "Ch+");
   s_ptmHwReady = false;
+  s_sweep = false;   // every entry opens on the single-channel waterfall
 
 #if HAS_PCF8574_BUTTONS
   pcf.pinMode(BTN_UP, INPUT_PULLUP);
@@ -970,6 +1033,24 @@ void ptmLoop() {
   }
   updateStatusBar();
 
+  // UP toggles the channel-analyzer sweep. Single-channel is the default, so
+  // the waterfall is what opens; this only ever switches an already-open view.
+  if (isTouchNavButtonPressedEdge(BTN_UP)) {
+    s_sweep = !s_sweep;
+    sweepClearBody();
+    if (s_sweep) sweepReset();
+    else         epoch = 0;   // restart the waterfall cleanly
+  }
+
+  // In sweep, hop to the next channel once its dwell is up, clearing that
+  // channel's count so its bar measures only the dwell it is about to get.
+  if (s_sweep && (millis() - s_sweepHopMs) >= SWEEP_DWELL_MS) {
+    s_sweepCh = (uint8_t)((s_sweepCh % MAX_CH) + 1);   // 1..MAX_CH, wrapping
+    s_chanPkts[s_sweepCh] = 0;
+    ch = s_sweepCh;
+    s_sweepHopMs = millis();
+  }
+
   esp_wifi_set_channel(ch, WIFI_SECOND_CHAN_NONE);
 
   setPromiscFilter(WIFI_PROMIS_FILTER_MASK_ALL);
@@ -1003,38 +1084,46 @@ void ptmLoop() {
     }
   }
 
-  tft.drawFastHLine(0, 90, PUEO_SCREEN_W, UI_LINE);
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  if (!s_sweep) {
+    tft.drawFastHLine(0, 90, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
 
-  do_sampling_FFT();
-  delay(10);
-  epoch++;
+    do_sampling_FFT();
+    delay(10);
+    epoch++;
 
-  if (epoch >= tft.width())
-    epoch = 0;
+    if (epoch >= tft.width())
+      epoch = 0;
 
-  static uint32_t lastButtonTime = 0;
-  const uint32_t debounceDelay = 200;
+    static uint32_t lastButtonTime = 0;
+    const uint32_t debounceDelay = 200;
 
-  bool leftButtonState = isButtonPressed(BTN_LEFT);
-  bool rightButtonState = isButtonPressed(BTN_RIGHT);
+    bool leftButtonState = isButtonPressed(BTN_LEFT);
+    bool rightButtonState = isButtonPressed(BTN_RIGHT);
 
-  uint32_t currentTime = millis();
+    uint32_t currentTime = millis();
 
-  if (leftButtonState && !btnLeftPressed && (currentTime - lastButtonTime > debounceDelay)) {
-    btnLeftPressed = true;
-    setChannel(ch - 1);
-    lastButtonTime = currentTime;
-  } else if (!leftButtonState) {
-    btnLeftPressed = false;
-  }
+    if (leftButtonState && !btnLeftPressed && (currentTime - lastButtonTime > debounceDelay)) {
+      btnLeftPressed = true;
+      setChannel(ch - 1);
+      lastButtonTime = currentTime;
+    } else if (!leftButtonState) {
+      btnLeftPressed = false;
+    }
 
-  if (rightButtonState && !btnRightPressed && (currentTime - lastButtonTime > debounceDelay)) {
-    btnRightPressed = true;
-    setChannel(ch + 1);
-    lastButtonTime = currentTime;
-  } else if (!rightButtonState) {
-    btnRightPressed = false;
+    if (rightButtonState && !btnRightPressed && (currentTime - lastButtonTime > debounceDelay)) {
+      btnRightPressed = true;
+      setChannel(ch + 1);
+      lastButtonTime = currentTime;
+    } else if (!rightButtonState) {
+      btnRightPressed = false;
+    }
+  } else {
+    // Frames the ISR counted this loop belong to the channel we are dwelling
+    // on; fold them in before the shared reset below zeroes the counter.
+    s_chanPkts[s_sweepCh] += tmpPacketCounter;
+    sweepDraw();
+    delay(5);
   }
 
   pkts[MAX_X - 1] = tmpPacketCounter;
