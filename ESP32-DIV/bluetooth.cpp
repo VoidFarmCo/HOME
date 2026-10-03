@@ -317,8 +317,15 @@ static void bleSetExitOnlyNavLabels() {
   setTouchNavLabels(nullptr, nullptr, "Exit", nullptr, nullptr);
 }
 
-static void bleSetJammerNavLabels() {
-  setTouchNavLabels("Mode-", nullptr, "Exit", "Toggle", "Mode+");
+/* The running flag is passed in rather than read: BleJammer and ProtoKill
+ * each keep their own jammerActive in their own namespace, and this sits
+ * above both. */
+static void bleSetJammerNavLabels(bool running) {
+  /* "Toggle" names the mechanism, which is visible, rather than what the
+   * button will do, which is not. The Skimmer's button already reads Stop or
+   * Start off its own state; these two now do the same. */
+  setTouchNavLabels("Mode-", nullptr, "Exit",
+                    running ? "Stop" : "Start", "Mode+");
 }
 
 static void bleSetScannerNavLabels() {
@@ -3922,6 +3929,10 @@ void checkModeChange() {
     jammerActive = !jammerActive;
     initializeRadios();
     updateTFT();
+    /* The button says what it will do next, so it is repainted when that
+     * changes. */
+    bleSetJammerNavLabels(jammerActive);
+    redrawTouchButtonBar();
 
     String jammerText = "[!] Jammer ";
     jammerText += (jammerActive) ? "Activated" : "Deactivated";
@@ -3934,7 +3945,7 @@ void blejamSetup() {
 
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
-  bleSetJammerNavLabels();
+  bleSetJammerNavLabels(jammerActive);
   bleClearBody(TFT_BLACK);
 
   float currentBatteryVoltage = readBatteryVoltage();
@@ -6160,6 +6171,10 @@ void checkModeChange() {
     jammerActive = !jammerActive;
     initializeRadios();
     updateTFT();
+    /* The button says what it will do next, so it is repainted when that
+     * changes. */
+    bleSetJammerNavLabels(jammerActive);
+    redrawTouchButtonBar();
     printJammerStatus(jammerActive);
   }
 }
@@ -6170,7 +6185,7 @@ void prokillSetup() {
   if (!nrfReady("Proto Kill")) return;
 
   setTouchButtonInputEnabled(true);
-  bleSetJammerNavLabels();
+  bleSetJammerNavLabels(jammerActive);
   bleClearBody(TFT_BLACK);
   Index = 0;
 
