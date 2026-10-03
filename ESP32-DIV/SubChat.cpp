@@ -5,6 +5,12 @@
 #include "Stealth.h"
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
 
+/* Bounded CC1101 presence check (subghz.cpp). ELECHOUSE's Init() below opens
+ * with an unbounded `while (digitalRead(MISO));` that hangs forever with no
+ * module wired, so radioInit() is only ever called once this says a chip is
+ * there -- otherwise the chat still opens and exits, it just cannot transmit. */
+bool subghzCc1101Present();
+
 namespace SubChat {
 
 /* Payload on the air: [nameLen][name...][text...]. Capped so the whole packet
@@ -165,9 +171,13 @@ void setup() {
   s_cs->logCount = 0;
   s_cs->radioUp = false;
   deriveName();
-  radioInit();
   draw();
-  logLine("sys", "listening on 433.92");
+  if (subghzCc1101Present()) {       // only Init a chip that is actually there
+    radioInit();
+    logLine("sys", "listening on 433.92");
+  } else {
+    logLine("sys", "no CC1101 found");
+  }
   draw();
 }
 

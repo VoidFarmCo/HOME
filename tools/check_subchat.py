@@ -54,6 +54,12 @@ def main():
     ok("RX clamps the text length to the buffer",
        re.search(r"if\s*\(\s*textLen\s*>\s*CHAT_TEXT_MAX\s*\)\s*textLen\s*=\s*CHAT_TEXT_MAX", flat) is not None)
 
+    # 2b. the CC1101 Init is gated behind the bounded presence check, or it
+    #     hangs on a bare board (ELECHOUSE Init busy-waits on MISO).
+    ok("radio init is gated behind subghzCc1101Present()",
+       re.search(r"if\s*\(\s*subghzCc1101Present\(\)\s*\)\s*\{[^;}]*radioInit\(\)", flat) is not None,
+       "ELECHOUSE Init() hangs with no module wired unless a chip is confirmed first")
+
     # 3. menu dispatch.
     ino = (SKETCH / "ESP32-DIV.ino").read_text(encoding="utf-8", errors="replace")
     ok("SubGHz Chat is dispatched from launchSubGhzFeature",
