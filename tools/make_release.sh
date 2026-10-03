@@ -173,6 +173,7 @@ INCLUDE=(
   "tools/check_prose.py"
   "tools/check_touch_targets.py"
   "tools/check_font_size.py"
+  "tools/check_adv_nonconn.py"
   "tools/check_file_server.py"
   "tools/check_nrf_presence.py"
   "tools/check_sd_paths.py"

@@ -1142,6 +1142,12 @@ void toggleAdvertising() {
       pAdvertising->setMaxInterval(0x20);
       pAdvertising->setMinPreferred(0x20);
       pAdvertising->setMaxPreferred(0x20);
+      /* Broadcast only. NimBLE defaults to undirected connectable when the
+       * peripheral role is compiled in, and it puts the device name in the
+       * advertisement, so this was a connectable device called Pueo wearing
+       * somebody else's payload. A phone answered the part it understood and
+       * asked to pair. There is nothing here to connect to. */
+      pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
       pAdvertising->start();
 
       Printspoofer("[+] Device Type: " + String(deviceType), TFT_WHITE, false);
@@ -1577,6 +1583,12 @@ void sourappleLoop() {
   Advertising->setMinPreferred(0x20);
   Advertising->setMaxPreferred(0x20);
 
+  /* Broadcast only. NimBLE defaults to undirected connectable when the
+   * peripheral role is compiled in, and it puts the device name in the
+   * advertisement, so this was a connectable device called Pueo wearing
+   * somebody else's payload. A phone answered the part it understood and
+   * asked to pair. There is nothing here to connect to. */
+  Advertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
   Advertising->start();
 
   delay(40);
@@ -1934,6 +1946,12 @@ static void burstOnce(bool forceLog) {
     s_advConfigured = true;
   }
   s_advertising->setAdvertisementData(advData);
+  /* Broadcast only. NimBLE defaults to undirected connectable when the
+   * peripheral role is compiled in, and it puts the device name in the
+   * advertisement, so this was a connectable device called Pueo wearing
+   * somebody else's payload. A phone answered the part it understood and
+   * asked to pair. There is nothing here to connect to. */
+  s_advertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);
   s_advertising->start();
 
   /* Same once-a-second cadence as the other two. This runs after start()
