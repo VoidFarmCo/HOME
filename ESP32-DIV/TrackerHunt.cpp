@@ -264,7 +264,7 @@ void drawPicker() {
 
   tft.fillRect(0, top, PUEO_SCREEN_W, bottom - top, TFT_BLACK);
   tft.setTextFont(PUEO_BODY_FONT);
-  tft.setTextSize(PUEO_BODY_SIZE);
+  tft.setTextSize(1);
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   char hdr[40];
@@ -274,12 +274,8 @@ void drawPicker() {
   if (s_count == 0) {
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.drawString("listening...", 8, top + 2 + PUEO_BODY_LINE);
-    /* Two lines. At body size this is 34 characters, which is 408 px from
-     * x=8 on a 320 px panel, and TFT_eSPI does not clip: it just stops. */
-    tft.drawString("Find My, Tile,",
+    tft.drawString("Find My, Tile, SmartTag, Eddystone",
                    8, top + 2 + 2 * PUEO_BODY_LINE);
-    tft.drawString("SmartTag, Eddystone",
-                   8, top + 2 + 3 * PUEO_BODY_LINE);
     return;
   }
 
@@ -319,7 +315,13 @@ void drawPicker() {
     tft.setTextColor(sel ? ORANGE : TFT_WHITE, sel ? 0x2124 : TFT_BLACK);
     tft.drawString(dbm, kRightX, y + kRowRight);
     tft.drawString(age, kRightX, y + kRowLine2 + 2);
-    tft.setTextSize(PUEO_BODY_SIZE);
+    /* Back to 1, not PUEO_BODY_SIZE. This screen selects PUEO_BODY_FONT,
+     * which is font 2 and already 16 px tall; the multiplier is for font 1,
+     * as the comment on it in shared.h says. Restoring it here made every
+     * row after the first 32 px tall in a 40 px row with its two lines 20
+     * apart, so each label wore the address below it. ApTracker runs the
+     * same line safely because it selects font 1. */
+    tft.setTextSize(1);
 
     y += kRowH;
   }
