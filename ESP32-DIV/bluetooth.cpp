@@ -193,7 +193,7 @@ bool ensureBleStackReady() {
 #if !BOARD_HAS_ESP32S3
   // Classic ESP32 NimBLE typically needs ~40KB+ free; abort soft instead of OOM reboot.
   if (heap < 40000u) {
-    Serial.println("[ble] skip init — low heap");
+    Serial.println("[ble] skip init: low heap");
     return false;
   }
 #endif
@@ -7650,7 +7650,7 @@ static void rpToggleArm() {
   s_armed = !s_armed;
   if (s_armed) {
     rpConfigureRx();
-    rpAppendLog("[+] Armed — capturing", UI_OK);
+    rpAppendLog("[+] Armed: capturing", UI_OK);
   } else {
     rpDisable();
     rpAppendLog("[*] Capture paused", UI_DIM_TEXT);
@@ -9060,7 +9060,7 @@ static void injUpdateStatusPanel() {
              t.vulnerable ? " VULN" : "");
     injDrawStatusValue(1, String(chLine), t.vulnerable ? UI_WARN : UI_DIM_TEXT);
   } else {
-    injDrawStatusValue(0, "none — run Scan", UI_DIM_TEXT);
+    injDrawStatusValue(0, "none: run Scan", UI_DIM_TEXT);
     injDrawStatusValue(1, "from Scan / rescan", UI_DIM_TEXT);
   }
 
@@ -9269,7 +9269,7 @@ static void injStopScan() {
   if (!s_scanning) return;
   s_scanning = false;
   injDisable();
-  injAppendLog(String("[*] Scan stop — ") + String(s_targetCount) + " targets", UI_DIM_TEXT);
+  injAppendLog(String("[*] Scan stop: ") + String(s_targetCount) + " targets", UI_DIM_TEXT);
   s_statusDirty = true;
   injFlushUi(true);
 }

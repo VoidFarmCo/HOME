@@ -1281,7 +1281,7 @@ bool isSDCardAvailable() {
 #if !BOARD_HAS_ESP32S3
     if (!s_sdFsMounted) {
       s_sdMountGaveUp = true;
-      Serial.println("[sd] mount failed — will not retry until reboot");
+      Serial.println("[sd] mount failed: will not retry until reboot");
     }
 #endif
     return s_sdFsMounted;

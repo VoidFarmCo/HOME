@@ -3276,9 +3276,9 @@ static void wardPerformWigleUpload(const char* srcCsvPath, File* liveLog) {
 
   if (!wardReadWigleConfig(apiUser, sizeof(apiUser), apiTok, sizeof(apiTok), staSsid, sizeof(staSsid), staPass,
                            sizeof(staPass), &useStoredWifi)) {
-    wardNotify("WiGLE", "SD:/config/wigle.txt — line1: WiGLE API name, line2: token. If this ESP32 already "
-                        "joined Wi‑Fi once, stop at line 2. Else add line3=SSID line4=password. Optional "
-                        "line3 AUTO or - uses saved Wi‑Fi only.");
+    wardNotify("WiGLE", "SD:/config/wigle.txt: line1: WiGLE API name, line2: token. If this ESP32 already "
+                        "joined Wi-Fi once, stop at line 2. Else add line3=SSID line4=password. Optional "
+                        "line3 AUTO or - uses saved Wi-Fi only.");
     return;
   }
 
@@ -3315,8 +3315,8 @@ static void wardPerformWigleUpload(const char* srcCsvPath, File* liveLog) {
     delay(400);
   }
   if (!gotIp) {
-    wardNotify("WiGLE", useStoredWifi ? "WiFi failed. Connect this device to Wi‑Fi once in another tool, "
-                                        "or add SSID + password on lines 3–4 of wigle.txt."
+    wardNotify("WiGLE", useStoredWifi ? "WiFi failed. Connect this device to Wi-Fi once in another tool, "
+                                        "or add SSID + password on lines 3-4 of wigle.txt."
                                       : "WiFi connect failed (check wigle.txt SSID/pass).");
     WiFi.disconnect();
     delay(100);
