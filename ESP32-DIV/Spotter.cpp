@@ -1512,7 +1512,7 @@ void hopChannel() {
 /* ── Feature entry points ────────────────────────────────────────────────── */
 
 void spotterSetup() {
-  showFeatureMark(bitmap_pueo_spotter, "Surveillance");
+  showFeatureMark(bitmap_home_mark, "Surveillance");
 
   s_hitCount = 0;
   s_frames = 0;

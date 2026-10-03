@@ -171,7 +171,7 @@ void droneAlert(const Craft& c) {
     const uint16_t textC = blend565(TFT_WHITE, TFT_BLACK, t);
     const uint16_t dimC  = blend565(UI_DIM_TEXT, TFT_BLACK, t);
 
-    tft.drawBitmap(x, y, bitmap_pueo_drone, mw, mh, markC);
+    tft.drawBitmap(x, y, bitmap_home_mark, mw, mh, markC);
     tft.setTextColor(markC, TFT_BLACK);
     tft.drawString(c.viaBle ? "DRONE  BLE" : "DRONE  WiFi", cx, y + mh + 6);
     tft.setTextColor(textC, TFT_BLACK);
@@ -512,7 +512,7 @@ void drawList() {
 }  // namespace
 
 void setup() {
-  showFeatureMark(bitmap_pueo_drone, "Drone Detector");
+  showFeatureMark(bitmap_home_mark, "Drone Detector");
 
   memset(s_craft, 0, sizeof(s_craft));
   s_craftCount = 0;

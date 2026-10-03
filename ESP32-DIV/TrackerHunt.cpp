@@ -375,7 +375,7 @@ void enterPicker() {
 /* ── Entry points ────────────────────────────────────────────────────────── */
 
 void setup() {
-  showFeatureMark(bitmap_pueo_hunt, "Hunt");
+  showFeatureMark(bitmap_home_mark, "Hunt");
 
   s_count   = 0;
   s_sel     = 0;
