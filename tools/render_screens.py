@@ -543,17 +543,48 @@ BCN_LIVE = rgb(0x07E0)
 BCN_WARN = rgb(0xFBE0)
 BCN_STOP = rgb(0xF800)
 
-# Emit::name() and Emit::detectedBy(), in enum order.
-BEACON_SIGNALS = [
-    ("Remote ID / WiFi", "Drones"),
-    ("Remote ID / BLE",  "Drones"),
-    ("ALPR probe",       "Spotter"),
-    ("Bodycam beacon",   "Spotter"),
-    ("Smart glasses",    "Spotter"),
-    ("Vehicle module",   "Spotter"),
-    ("Find My tracker",  "Hunt / AirTag Sniffer"),
-    ("Fast Pair",        "Fast Pair"),
-]
+def beacon_signals():
+    """Emit::name() and Emit::detectedBy(), read in enum order.
+
+    This used to be a list written out here, under a comment saying it was
+    those two functions. It was eight rows when the enum had fourteen, and it
+    still said Spotter and Drones after the labels became Surveillance and
+    Drone Detector, so the rendered screenshot showed a beacon that had not
+    existed for three releases.
+
+    A screenshot is documentation, and a fact copied out of the source into a
+    place that does not compile goes stale the same way wherever it lands.
+
+    Both functions are switches whose cases fall through, so a label belongs
+    to every case stacked above its return.
+    """
+    src = open(BEACON_EMIT.replace("Emit.h", "Emit.cpp"),
+               encoding="utf-8", errors="replace").read()
+    hdr = open(BEACON_EMIT, encoding="utf-8", errors="replace").read()
+
+    m = re.search(r"enum Signal[^{]*\{(.*?)\}", hdr, re.S)
+    order = [x for x in re.findall(r"^\s*([A-Z]\w*)\s*(?:=[^,]*)?,", m.group(1),
+                                   re.M) if x != "kSignalCount"]
+
+    def table(fn):
+        body = re.search(r"const char\* %s\(Signal s\).*?\n\}" % fn,
+                         src, re.S).group(0)
+        out, pending = {}, []
+        for case, label in re.findall(
+                r"case\s+(\w+):|return\s+\"([^\"]*)\"", body):
+            if case:
+                pending.append(case)
+            else:
+                for c in pending:
+                    out[c] = label
+                pending = []
+        return out
+
+    names, by = table("name"), table("detectedBy")
+    return [(names[s], by[s]) for s in order if s in names and s in by]
+
+
+BEACON_SIGNALS = beacon_signals()
 
 
 def render_drone_alert(t, have_operator):
@@ -638,19 +669,41 @@ def render_beacon_running(t, brand):
     t.draw_fast_hline(0, 42, W, BCN_DIM)
 
     y = 50
-    t.print_f1(8, y, "TRANSMITTING - stops in 11:38", BCN_LIVE, BCN_BG)
+    t.print_f1(8, y, "TRANSMITTING - stops in 8:54", BCN_LIVE, BCN_BG)
     y += 16
 
     # BLE advertising is a state rather than an event, so exactly one BLE
     # signal is live at a time and the scheduler rotates them. Find My is up.
-    live = 6
-    counts = [214, 96, 495, 188, 61, 44, 33, 51]
+    #
+    # Keyed by name rather than by position. As a list of eight it threw an
+    # IndexError the moment the enum reached fourteen, and before that it had
+    # been silently rendering the first eight of however many there were.
+    # A signal with no number here draws a plausible one rather than stopping
+    # the render, because the alternative is that adding a decoy breaks the
+    # screenshots.
+    # Read off a board mid-session rather than invented, because the shape
+    # was the part that mattered and guessing got it wrong. The four WiFi
+    # paths send on their own timer and run to the same figure; the ten BLE
+    # signals share ten rotation slots of three seconds, so each gets a turn
+    # roughly every thirty seconds and they sit two orders of magnitude lower.
+    # A set of numbers spread evenly between the two, which is what was here
+    # before, shows a device that cannot exist.
+    live_name = "Smart glasses"
+    COUNTS = {
+        "Remote ID / WiFi": 363, "ALPR probe": 363,
+        "Bodycam beacon": 362, "Pineapple SSID": 362,
+        "Remote ID / BLE": 13, "Smart glasses": 13,
+        "Vehicle module": 12, "Find My tracker": 12, "Find Hub tag": 12,
+        "DULT tracker": 12, "Fleet tracker": 12, "TPMS sensor": 12,
+        "Car (weak row)": 12, "Fast Pair": 12,
+    }
 
     for i, (nm, by) in enumerate(BEACON_SIGNALS):
-        is_live = (i == live)
-        colour = BCN_LIVE if is_live else (BCN_TEXT if counts[i] else BCN_DIM)
+        is_live = (nm == live_name)
+        n = COUNTS.get(nm, 20 + (i * 7) % 40)
+        colour = BCN_LIVE if is_live else (BCN_TEXT if n else BCN_DIM)
         t.print_f1(8, y, ("> " if is_live else "  ") + nm, colour, BCN_BG)
-        cnt = str(counts[i])
+        cnt = str(n)
         t.print_f1(W - 44, y, cnt, BCN_DIM, BCN_BG)
         t.print_f1(20, y + 10, by, BCN_DIM, BCN_BG)
         y += 24
