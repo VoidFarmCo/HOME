@@ -26,6 +26,7 @@ void exit();
 
 namespace BleSpoofer {
   void spooferSetup();
+  void spamAllSetup();
   void spooferLoop();
 }
 

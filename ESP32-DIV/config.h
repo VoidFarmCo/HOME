@@ -51,6 +51,7 @@ namespace BleJammer {
 }
 namespace BleSpoofer {
   void spooferSetup();
+  void spamAllSetup();
   void spooferLoop();
   void exit();
 }

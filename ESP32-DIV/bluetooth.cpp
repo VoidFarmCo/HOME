@@ -1269,6 +1269,9 @@ void runUI() {
 void spooferSetup() {
   if (Stealth::refuse("BLE Spoofer")) return;
 
+  // The normal Spoofer tile never opens in Spam All; only spamAllSetup() does.
+  if (deviceType == SPOOF_TYPE_ALL) deviceType = 1;
+
   bleAddrRotateReset();
   if (!bleRequireStackOrExit()) return;
   setTouchButtonInputEnabled(true);
@@ -1331,6 +1334,16 @@ void spooferSetup() {
   uiDrawn = false;
   tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
   redrawTouchButtonBar();
+}
+
+/* The Spam All tile: open the Spoofer already on the cycle-all type, so one tap
+ * starts rotating every vendor. Same feature as cycling the type to Spam All by
+ * hand; this just presets it. */
+void spamAllSetup() {
+  spooferSetup();
+  deviceType = SPOOF_TYPE_ALL;
+  setAdvertisingData();   // arms s_spamAll and seeds the first payload
+  updateSpoofer();        // relabel the device-type well to "Spam All"
 }
 
 void spooferLoop() {

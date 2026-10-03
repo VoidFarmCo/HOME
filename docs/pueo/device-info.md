@@ -25,7 +25,7 @@ run by `runToolsFeature()` like the other System tools. It is row
 `TOOLS_IDX_DEVINFO` (7) in `tools_submenu_items`, which pushed Back to 8; the
 dispatch is a `case` in `launchToolsFeature()`. The menu-integrity checks
 (`check_menu_dispatch`, `check_menu_tables`, `check_grid_capacity`) cover the
-wiring, so this feature adds no check of its own -- the screen is read-only and
+wiring, so this feature adds no check of its own. The screen is read-only and
 has no behavior of its own to pin.
 
 Radio Test (probe each module + wiring) is the other HaleHound tool H.O.M.E does
