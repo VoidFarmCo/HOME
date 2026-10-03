@@ -2,7 +2,13 @@
 #include "utils.h"
 #include "Nrf24Raw.h"
 #include "rfid.h"
-#include <ELECHOUSE_CC1101_SRC_DRV.h>
+
+/* The bounded, bus-safe CC1101 presence check from subghz.cpp. NOT the ELECHOUSE
+ * library: its Init()/getCC1101()/SpiReadStatus() all open with an unbounded
+ * `while (digitalRead(MISO));` that hangs forever when no module is wired, which
+ * on a bare board froze this feature before its loop could run (you could not
+ * exit). subghzCc1101Present() reads PARTNUM/VERSION with a deadline instead. */
+bool subghzCc1101Present();
 
 namespace RadioTest {
 
@@ -11,10 +17,7 @@ static constexpr uint16_t C_NO   = 0xF800;   // red
 static constexpr uint16_t C_TEXT = 0xFFFF;   // white
 
 static bool probeCC1101() {
-  ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
-  ELECHOUSE_cc1101.setGDO(CC1101_GDO0, CC1101_GDO2);
-  ELECHOUSE_cc1101.Init();
-  return ELECHOUSE_cc1101.getCC1101();   // reads the VERSION register
+  return subghzCc1101Present();   // bounded register read; never hangs on a bare board
 }
 
 static bool probeNrf24() {
