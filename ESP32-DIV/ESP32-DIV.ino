@@ -1124,6 +1124,57 @@ static constexpr int GRID_FOOT_Y = PUEO_SCREEN_H - GRID_FOOT_H;
 static constexpr int GRID_FOOT_HIT_Y =
     GRID_Y0 + GRID_ROWS * (GRID_TILE_H + GRID_GAP_Y);
 
+/* ── hardware a menu depends on ───────────────────────────────────────────
+ *
+ * Until now the only way to find out the CC1101 is not fitted was to open a
+ * SubGHz feature and be told, which says nothing about the other five entries
+ * in that menu and comes one tap too late.
+ *
+ * Probed once and remembered. subghzCc1101Present() claims the SPI bus and
+ * the PN532's begin() attaches it, so probing on a repaint would put bus
+ * traffic behind a redraw. Opening the menu is a user action and a fair
+ * moment to go and look.
+ *
+ * GPS is not here. There is no cheap probe: the module answers by emitting
+ * NMEA when it is ready, and a brief look that found none would report "no
+ * GPS" for one that was still waking up. Saying nothing beats saying
+ * something false.
+ */
+/* Neither of these has a header in this tree. */
+bool subghzCc1101Present();
+namespace Nrf24Raw { bool begin(); }
+
+enum HwProbe : uint8_t { HW_UNKNOWN = 0, HW_THERE, HW_ABSENT };
+static HwProbe s_hwNrf  = HW_UNKNOWN;
+static HwProbe s_hwCc   = HW_UNKNOWN;
+static HwProbe s_hwNfc  = HW_UNKNOWN;
+
+static const char* submenuHardwareNote(int menuIndex) {
+    switch (menuIndex) {
+        case 1:   /* NRF24 */
+            if (s_hwNrf == HW_UNKNOWN) {
+                s_hwNrf = Nrf24Raw::begin() ? HW_THERE : HW_ABSENT;
+            }
+            return (s_hwNrf == HW_ABSENT) ? "no nRF24" : nullptr;
+        case 5:   /* SubGHz */
+            if (s_hwCc == HW_UNKNOWN) {
+                s_hwCc = subghzCc1101Present() ? HW_THERE : HW_ABSENT;
+            }
+            return (s_hwCc == HW_ABSENT) ? "no CC1101" : nullptr;
+        case 6:   /* RFID/NFC */
+            if (s_hwNfc == HW_UNKNOWN) {
+                s_hwNfc = RfidNfc::begin() ? HW_THERE : HW_ABSENT;
+            }
+            return (s_hwNfc == HW_ABSENT) ? "no PN532" : nullptr;
+        default:
+            return nullptr;
+    }
+}
+
+/* Defined in bluetooth.cpp. A menu on screen means no feature is running,
+ * and nothing that is not running may transmit. */
+void bleQuietDown();
+
 static void drawSubmenuFooter() {
     tft.fillRect(0, GRID_FOOT_Y, PUEO_SCREEN_W, GRID_FOOT_H, UI_BG);
     tft.drawFastHLine(0, GRID_FOOT_Y, PUEO_SCREEN_W, UI_LINE);
@@ -1134,6 +1185,20 @@ static void drawSubmenuFooter() {
     tft.drawBitmap(10, iy, bitmap_icon_go_back, 16, 16, UI_TEXT);
     tft.setCursor(30, iy);
     tft.print("Main Menu");
+
+    /* Opposite Main Menu, in the warn colour, and only when something is
+     * missing. A footer that always carries a hardware line is a footer
+     * nobody reads. */
+    const char* note = submenuHardwareNote(current_menu_index);
+    if (note) {
+        tft.setTextFont(1);
+        tft.setTextSize(1);
+        tft.setTextColor(UI_ICON, UI_BG);
+        const int w = (int)strlen(note) * 6;
+        tft.setCursor(PUEO_SCREEN_W - 10 - w, GRID_FOOT_Y + (GRID_FOOT_H - 8) / 2);
+        tft.print(note);
+        tft.setTextFont(2);
+    }
 }
 
 static bool gridFooterHit(int ty) {
@@ -1152,6 +1217,7 @@ static int submenuItemY(int index) {
 }
 
 void displaySubmenu() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
     setTouchButtonInputEnabled(false);
 
     if (current_menu_index == 2) {
@@ -1186,6 +1252,7 @@ void displaySubmenu() {
 }
 
 void displayPagedSubmenu() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
     setStatusBarHeight(PUEO_STATUS_TALL);  // a tile grid now, with room above it
     menu_initialized = false;
     last_menu_index = -1;
@@ -1226,6 +1293,7 @@ void displayPagedSubmenu() {
 }
 
 void displayOtherMenuGrid() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
     applyThemeToPalette(settings().theme);
 
     submenu_initialized = false;
@@ -1315,6 +1383,7 @@ void displayOtherMenuGrid() {
 
 
 void displayMenu() {
+    bleQuietDown();  /* a menu is up, so nothing may be transmitting */
 
   setTouchButtonInputEnabled(false);
   applyThemeToPalette(settings().theme);

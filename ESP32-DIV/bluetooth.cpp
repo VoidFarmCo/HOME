@@ -9,6 +9,7 @@
 #include "shared.h"
 #include "utils.h"
 #include "Nrf24Raw.h"
+
 #include "TrackerFollow.h"
 #include "SpiBus.h"
 
@@ -187,6 +188,37 @@ static int bleContentBottom() {
  * attach a serial cable to find out which kind of low this was. */
 static uint32_t s_bleLastHeap = 0;
 
+/* Whether the stack is up, without bringing it up. bleQuietDown() needs to
+ * ask before it touches NimBLE, and ensureBleStackReady() would answer by
+ * initialising it. */
+static bool s_bleStackUp = false;
+
+bool bleStackIsUp() {
+  return s_bleStackUp;
+}
+
+/* Stop advertising, whoever started it.
+ *
+ * Every transmitting feature has an exit() that stops its own advertising,
+ * and all of them are dispatched. That is still one call on one path per
+ * feature, and the failure mode is a board left advertising after its screen
+ * has gone: a phone kept asking to pair with ESP32-DIV minutes after Sour
+ * Apple was closed.
+ *
+ * So the menus assert the opposite invariant instead. A menu on screen means
+ * no feature is running, and nothing that is not running may transmit. This
+ * costs one call per menu draw and does not care which path leaked. */
+void bleQuietDown() {
+  if (!s_bleStackUp) {
+    return;
+  }
+  NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+  if (adv && adv->isAdvertising()) {
+    adv->stop();
+    Serial.println("[ble] advertising stopped on return to menu");
+  }
+}
+
 bool ensureBleStackReady() {
   static bool ready = false;
   if (ready) {
@@ -221,6 +253,7 @@ bool ensureBleStackReady() {
 #endif
   BLEDevice::init(ESP32DIV_NAME);
   ready = true;
+  s_bleStackUp = true;
   Serial.printf("[ble] init done, free heap=%u\n", (unsigned)ESP.getFreeHeap());
   return true;
 }
@@ -4840,22 +4873,15 @@ void exit() {
  * ───────────────────────────────────────────────────────────────────────── */
 
 static void nrfReportMissing(const char* feature) {
-  tft.fillScreen(TFT_BLACK);
-  drawStatusBar(readBatteryVoltage(), true);
-  tft.setTextFont(2);
-  tft.setTextColor(TFT_RED, TFT_BLACK);
-  tft.drawString("No nRF24", 12, 46);
-  tft.setTextFont(1);
-  tft.setTextColor(UI_TEXT, TFT_BLACK);
-  tft.drawString(feature, 12, 72);
-  tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-  tft.drawString("needs the 2.4 GHz module, and", 12, 90);
-  tft.drawString("nothing answered on the SPI bus.", 12, 102);
-  tft.drawString("Check the module is fitted and", 12, 122);
-  tft.drawString("that MISO, CSN, CE, SCK and", 12, 134);
-  tft.drawString("MOSI are wired.", 12, 146);
-  tft.setTextColor(UI_ICON, TFT_BLACK);
-  tft.drawString("SELECT / tap to go back", 12, PUEO_SCREEN_H - 24);
+  /* The same panel the Rubber Ducky uses for "requires ESP32-S3", rather
+   * than a screen only this file knows how to draw. The wiring is kept:
+   * whoever reads this is deciding which joint to reflow. */
+  char msg[200];
+  snprintf(msg, sizeof(msg),
+           "%s needs the 2.4 GHz module, and nothing answered on the SPI "
+           "bus. Check the module is fitted and that MISO, CSN, CE, SCK and "
+           "MOSI are wired.", feature);
+  showNotification("No nRF24", msg);
 }
 
 static bool nrfReady(const char* feature) {

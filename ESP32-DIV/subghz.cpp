@@ -10,6 +10,7 @@
 #include "SpiBus.h"
 
 
+
 namespace {
   /* One list, because there were two.
    *
@@ -500,6 +501,13 @@ static uint8_t cc1101ReadStatusReg(uint8_t addr) {
   return value;
 }
 
+static bool cc1101Present();
+
+/* The menu needs to ask this too, and the probe is in here. */
+bool subghzCc1101Present() {
+    return cc1101Present();
+}
+
 static bool cc1101Present() {
   /* Probing means driving the bus, so own it first. claim() re-points the
    * GPIO matrix and applies the CC1101's clock, which is what makes a plain
@@ -549,21 +557,13 @@ static bool cc1101Ready(const char* feature);
 /* Draw the "no radio" screen and wait for the user to leave. Returns when
  * they do; the caller must then exit the feature. */
 static void cc1101ReportMissing(const char* feature) {
-  tft.fillScreen(TFT_BLACK);
-  drawStatusBar(readBatteryVoltage(), true);
-  tft.setTextFont(2);
-  tft.setTextColor(TFT_RED, TFT_BLACK);
-  tft.drawString("No CC1101", 12, 46);
-  tft.setTextFont(1);
-  tft.setTextColor(UI_TEXT, TFT_BLACK);
-  tft.drawString(feature, 12, 72);
-  tft.setTextColor(UI_DIM_TEXT, TFT_BLACK);
-  tft.drawString("needs the sub-GHz radio, and nothing", 12, 90);
-  tft.drawString("answered on the SPI bus.", 12, 102);
-  tft.drawString("Check the module is fitted and that", 12, 122);
-  tft.drawString("MISO, CS, SCK and MOSI are wired.", 12, 134);
-  tft.setTextColor(UI_ICON, TFT_BLACK);
-  tft.drawString("SELECT / tap to go back", 12, PUEO_SCREEN_H - 24);
+  /* The shared panel, as the nRF24 and the Rubber Ducky use. */
+  char msg[200];
+  snprintf(msg, sizeof(msg),
+           "%s needs the sub-GHz radio, and nothing answered on the SPI bus. "
+           "Check the module is fitted and that MISO, CS, SCK and MOSI are "
+           "wired.", feature);
+  showNotification("No CC1101", msg);
 }
 
 static bool cc1101Ready(const char* feature) {
