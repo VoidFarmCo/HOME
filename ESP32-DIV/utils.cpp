@@ -1484,8 +1484,8 @@ void displayLogo(uint16_t color, int displayTime) {
   Serial.println(PUEO_NAME " - " PUEO_TAGLINE);
   Serial.println("by: " PUEO_AUTHOR);
   Serial.print("Version:      "); Serial.println(PUEO_VERSION);
-  Serial.print("Forked from:  ESP32-DIV "); Serial.println(ESP32DIV_VERSION);
-  Serial.println(PUEO_UPSTREAM);
+  Serial.println("Fork of:      Pueo by magikh0e");
+  Serial.print("  based on ESP32-DIV "); Serial.print(ESP32DIV_VERSION); Serial.println(" by CiferTech");
   Serial.print("Upstream:     "); Serial.println(PUEO_UPSTREAM_URL);
   Serial.println("==================================");
 
