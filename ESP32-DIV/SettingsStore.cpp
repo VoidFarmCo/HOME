@@ -154,6 +154,7 @@ bool settingsLoad() {
   s.accentColor     = accentPresetClamp(doc["accentColor"] | s.accentColor);
   s.profile         = (Profile)(uint8_t)(doc["profile"] | (uint8_t)s.profile);
   s.profileChosen   = doc["profileChosen"]   | s.profileChosen;
+  snprintf(s.chatName, sizeof(s.chatName), "%s", doc["chatName"] | s.chatName);
 
   s.autoWifiScan    = doc["autoWifiScan"]    | s.autoWifiScan;
   s.autoBleScan     = doc["autoBleScan"]     | s.autoBleScan;
@@ -210,6 +211,7 @@ bool settingsSave() {
   doc["accentColor"]     = s.accentColor;
   doc["profile"]         = (uint8_t)s.profile;
   doc["profileChosen"]   = s.profileChosen;
+  doc["chatName"]        = s.chatName;
 
   doc["autoWifiScan"]    = s.autoWifiScan;
   doc["autoBleScan"]     = s.autoBleScan;

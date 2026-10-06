@@ -3,6 +3,7 @@
 #include "utils.h"
 #include "KeyboardUI.h"
 #include "Stealth.h"
+#include "SettingsStore.h"
 #include "chat_subghz.h"
 #include "chat_espnow.h"
 #include "chat_lora.h"
@@ -82,7 +83,12 @@ struct ChatState {
 static ChatState* s_cs = nullptr;
 
 static void deriveName() {
-  const uint64_t id = ESP.getEfuseMac();
+  const char* custom = settings().chatName;
+  if (custom && custom[0]) {                       // user-set name wins
+    snprintf(s_cs->name, sizeof(s_cs->name), "%s", custom);
+    return;
+  }
+  const uint64_t id = ESP.getEfuseMac();            // else the auto MAC handle
   snprintf(s_cs->name, sizeof(s_cs->name), "H-%04X", (unsigned)(uint16_t)id);
 }
 
@@ -169,14 +175,23 @@ static void pollReceive() {
 }
 
 static void compose() {
+  // OnScreenKeyboardConfig has no default initializers: every field the keyboard
+  // reads must be set here or it is an indeterminate stack value (a garbage
+  // pointer crashes TFT_eSPI::textWidth). Set the full set -- no shuffle.
   OnScreenKeyboardConfig cfg;
   osKeyboardUseStandardLayout(cfg);
   cfg.titleLine1 = channelLabel(s_ch);
   cfg.titleLine2 = "Message";
   cfg.maxLen = CHAT_TEXT_MAX;
-  cfg.okLabel = "Send";
+  cfg.buttonsY = 195;
   cfg.backLabel = "Cancel";
+  cfg.middleLabel = nullptr;
+  cfg.okLabel = "Send";
+  cfg.enableShuffle = false;
+  cfg.shuffleNames = nullptr;
+  cfg.shuffleCount = 0;
   cfg.requireNonEmpty = true;
+  cfg.emptyErrorMsg = "Type a message first";
   OnScreenKeyboardResult r = showOnScreenKeyboard(cfg, "");
   featureClearContent(TFT_BLACK);
   drawStatusBar(readBatteryVoltage(), true);

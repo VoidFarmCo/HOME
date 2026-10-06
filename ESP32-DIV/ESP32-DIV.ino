@@ -4282,7 +4282,12 @@ static void toolRun(uint8_t cat, uint8_t idx) {
     drawPlaybookHome();   /* repaint our screen immediately, no Pueo submenu flash */
 }
 
-/* Full-width stacked tiles; same geometry for the home and a group grid. */
+/* The purpose-tile home is a 2-wide grid (6 tiles -> 2x3). drawPlaybookHome and
+ * the home hit-test both use this, so the rendered grid and the tap targets can
+ * never drift apart. */
+static constexpr int HOME_TILE_COLS = 2;
+
+/* Tile geometry, shared by the home and a group grid. */
 static void pbTileRect(int vis, int visCount, int cols, int& x, int& y, int& w, int& h) {
     const int top = 30;
     const int pad = HOME_UI_PAD;
@@ -4343,7 +4348,7 @@ static void drawTile(int vis, int visCount, int cols, const char* label) {
 
 static void drawPlaybookHome() {
     const uint8_t mask = pbActiveMask();
-    const int cols = (s_group < 0) ? 1 : 2;
+    const int cols = (s_group < 0) ? HOME_TILE_COLS : 2;
     tft.fillScreen(UI_BG);
     drawHomeHeader();
 
@@ -4401,7 +4406,7 @@ static void handlePlaybookHome() {
         int vis = 0;
         for (int g = 0; g < GRP_COUNT; g++) {
             if (!groupVisible(g, mask)) continue;
-            int tx, ty, tw, th; pbTileRect(vis, visCount, 1, tx, ty, tw, th);
+            int tx, ty, tw, th; pbTileRect(vis, visCount, HOME_TILE_COLS, tx, ty, tw, th);
             if (x >= tx && x <= tx + tw && y >= ty && y <= ty + th) {
                 while (isTouchDownDismiss()) delay(10);
                 s_group = g; pbHomeDirty = true; return;

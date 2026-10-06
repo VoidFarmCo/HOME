@@ -17,6 +17,8 @@
 #include "Branding.h"
 #include "BootLock.h"
 #include "profile_picker.h"
+#include "KeyboardUI.h"
+#include "home_ui.h"
 #include "Stealth.h"
 
 
@@ -1877,8 +1879,14 @@ static const int kFirstSwitch     = sizeof(kFixedRows)/sizeof(kFixedRows[0]);
 static const int kMainSwitchCount = sizeof(kMainSwitches)/sizeof(kMainSwitches[0]);
 static const int kLinkRow         = kFirstSwitch + kMainSwitchCount;   /* SD Logging */
 static const int kBootRow         = kLinkRow + 1;                     /* Boot Lock  */
+#if HOME_PROFILES_ENABLED
 static const int kProfileRow      = kBootRow + 1;                     /* Profile    */
-static const int kMainRows        = kProfileRow + 1;
+static const int kChatNameRow     = kProfileRow + 1;                  /* Chat Name  */
+#else
+static const int kProfileRow      = -1;   /* hidden while profiles are collapsed */
+static const int kChatNameRow     = kBootRow + 1;                     /* Chat Name  */
+#endif
+static const int kMainRows        = kChatNameRow + 1;
 
 /* Master switch, then one row per LogApp. The per-app rows are generated
  * from kLogApps, so a feature added to that table appears here without this
@@ -1906,7 +1914,8 @@ static const char* rowLabel(int i) {
   if (i < kLinkRow)     return kMainSwitches[i - kFirstSwitch].label;
   if (i == kLinkRow)    return "SD Logging";
   if (i == kBootRow)    return "Boot Lock";
-  return "Profile";
+  if (i == kProfileRow) return "Profile";   /* kProfileRow==-1 when collapsed */
+  return "Chat Name";
 }
 
 static bool rowIsSwitch(int i) {
@@ -2345,6 +2354,56 @@ static void drawProfileRow(int row, bool selected) {
   drawProfileWidget(row);
 }
 
+/* Chat Name row: an action row like Profile, showing the current chat handle
+ * (or "(auto)" when unset) on the right. Tapping it opens the keyboard. */
+static void drawChatNameWidget(int row) {
+  Rect r = rowRect(row);
+  tft.startWrite();
+  tft.fillRect(r.x + LABEL_W, r.y + 2, r.w - LABEL_W - 6, r.h - 4, UI_BG);
+  const char* nm = settings().chatName;
+  if (!nm[0]) nm = "(auto)";
+  setLabelFont();
+  const int ty    = r.y + (r.h / 2 - 6);
+  const int right = r.x + r.w - 6;
+  const int wChev = (int)tft.textWidth(">");
+  const int wNm   = (int)tft.textWidth(nm);
+  tft.setTextColor(textStrong, UI_BG);
+  tft.setCursor(right - wChev, ty);
+  tft.print(">");
+  tft.setCursor(right - wChev - 8 - wNm, ty);
+  tft.print(nm);
+  tft.endWrite();
+}
+static void drawChatNameRow(int row, bool selected) {
+  drawCardStatic(row, selected);
+  drawChatNameWidget(row);
+}
+
+/* Edit the chat handle on the keyboard. Blank clears it back to the auto name.
+ * Every OnScreenKeyboardConfig field is set -- unset ones are indeterminate
+ * stack values and a garbage pointer crashes the text draw. */
+static void editChatName() {
+  OnScreenKeyboardConfig cfg;
+  osKeyboardUseStandardLayout(cfg);
+  cfg.titleLine1      = "Chat Name";
+  cfg.titleLine2      = "Blank = auto H-XXXX";
+  cfg.maxLen          = (uint8_t)(sizeof(settings().chatName) - 1);
+  cfg.buttonsY        = 195;
+  cfg.backLabel       = "Cancel";
+  cfg.middleLabel     = nullptr;
+  cfg.okLabel         = "Save";
+  cfg.enableShuffle   = false;
+  cfg.shuffleNames    = nullptr;
+  cfg.shuffleCount    = 0;
+  cfg.requireNonEmpty = false;
+  cfg.emptyErrorMsg   = nullptr;
+  OnScreenKeyboardResult r = showOnScreenKeyboard(cfg, settings().chatName);
+  if (r.accepted) {
+    snprintf(settings().chatName, sizeof(settings().chatName), "%s", r.text.c_str());
+    settingsSave();
+  }
+}
+
 /* One row, whichever kind it is. The four enumerating sites call this rather
  * than each deciding for themselves what row 3 is. */
 static void drawRow(int i, bool selected) {
@@ -2356,6 +2415,7 @@ static void drawRow(int i, bool selected) {
   if (i == kLinkRow)    { drawLinkRow(i, selected);    return; }
   if (i == kBootRow)    { drawBootRow(i, selected);    return; }
   if (i == kProfileRow) { drawProfileRow(i, selected); return; }
+  if (i == kChatNameRow){ drawChatNameRow(i, selected); return; }
   switch (i) {
     case 0: drawBrightness(s.brightness, selected); break;
     case 1: drawTheme(s.theme, selected); break;
@@ -2632,7 +2692,7 @@ static void handleTouch() {
         lastToggleMs = now;
       }
     }
-  } else if (sel == kLinkRow || sel == kBootRow || sel == kProfileRow) {
+  } else if (sel == kLinkRow || sel == kBootRow || sel == kProfileRow || sel == kChatNameRow) {
     /* The whole right-hand half opens it. A chevron is a small target and
      * these rows have nothing else on that side to hit by mistake. */
     Rect rr = rowRect(sel);
@@ -2646,6 +2706,9 @@ static void handleTouch() {
           /* Takes over the screen and hands it back in whatever state the
            * keyboard left it, so this repaints rather than trusting it. */
           BootLock::manage();
+          drawAll();
+        } else if (sel == kChatNameRow) {
+          editChatName();
           drawAll();
         } else {
           /* Profile: the picker owns switching (it applies the accent). */

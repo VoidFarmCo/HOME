@@ -26,6 +26,10 @@ struct AppSettings {
    * shows, and persists so the picker asks exactly once per card. */
   bool     profileChosen = false;
 
+  /* User's chat handle. Empty -> chat_core falls back to the auto H-XXXX MAC
+   * name. 11 = 10 chars (chat_core CHAT_NAME_MAX) + NUL. */
+  char     chatName[11] = "";
+
   bool     autoWifiScan    = true;
   bool     autoBleScan     = true;
 
