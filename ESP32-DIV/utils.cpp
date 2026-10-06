@@ -722,6 +722,14 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
 
     tft.fillRect(0, 0, tft.width(), barHeight, UI_LABLE);
 
+    /* Only a board with a real battery-sense pin draws the gauge. On this
+     * panel BATTERY_ADC_PIN is -1 -- the BAT1 cell runs through the FM5324GA
+     * charger and reaches no free ADC pin (34 is the CdS sensor, 35 is CC1101
+     * RX, 36/39 are touch; see docs/pueo/hardware.md) -- so readBatteryVoltage()
+     * would read a dead pin and the bar sat pinned at a fake 0%. The guard is
+     * compile-time so a board whose overlay sets BATTERY_ADC_PIN gets the gauge
+     * back with no further change, and so DIV boards (pin 36) are untouched. */
+#if BATTERY_ADC_PIN >= 0
     tft.drawRoundRect(x, y, 22, 10, 2, TFT_WHITE);
     tft.fillRect(x + 22, y + 3, 2, 4, TFT_WHITE);
 
@@ -734,6 +742,7 @@ void drawStatusBar(float batteryVoltage, bool forceUpdate, bool bottomSeparator)
     tft.setTextFont(1);
     tft.setTextSize(1);
     tft.print(String(batteryPercentage) + "%");
+#endif
 
     /* Name and version, centred in what is left of the bar.
      *

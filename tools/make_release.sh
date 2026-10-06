@@ -143,6 +143,7 @@ INCLUDE=(
   "tools/make_release.sh"
   "tools/check_pinmap.py"
   "tools/check_status_bar.py"
+  "tools/check_battery_gauge.py"
   "tools/check_droneid.py"
   "tools/check_beacon.py"
   "tools/fuzz_ie_walk.py"
