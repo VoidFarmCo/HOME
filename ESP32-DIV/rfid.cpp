@@ -252,7 +252,7 @@ static bool s_rfidBoxesDrawn = false;
 static bool s_rfidStatusStaticDrawn = false;
 static bool s_rfidDetailBoxVisible = false;
 static char s_featureInfoTitle[32];
-static char s_featureInfoBody[640];
+static char s_featureInfoBody[448];  /* interim: DRAM for the playbook home (chat/mesh/ESP-NOW); RFID is a placeholder now, removal reclaims this entirely */
 static bool s_featureInfoAvailable = false;
 static char s_listenCenterLabel[24];
 static String s_rfidLogBuffer[kRfidMaxLogLines];

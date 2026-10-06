@@ -145,7 +145,16 @@ SIGNALS = {
     "CE_PIN_2": "NRF24 #2 CE", "CSN_PIN_2": "NRF24 #2 CSN",
     "CE_PIN_3": "NRF24 #3 CE", "CSN_PIN_3": "NRF24 #3 CSN",
     "GPS_UART_RX": "GPS RX",
+    "MCP23017_SDA": "MCP23017 SDA", "MCP23017_SCL": "MCP23017 SCL",
+    "LORA_CS": "LoRa CS", "LORA_RESET": "LoRa RESET", "LORA_BUSY": "LoRa BUSY",
 }
+
+# Control lines may live on an MCP23017 expander (owner's board): a pin value
+# >= MCP_BASE is channel (pin - MCP_BASE), not a GPIO. Must match Mcp23017::PIN_BASE.
+MCP_BASE = 100
+
+# Signals that only exist on some boards; absence is not an error.
+OPTIONAL = {"MCP23017_SDA", "MCP23017_SCL", "LORA_CS", "LORA_RESET", "LORA_BUSY"}
 
 # Bus lines are shared on purpose; never report them against each other.
 SHARED_BUS = {"SD_MOSI", "SD_MISO", "SD_SCLK",
@@ -158,7 +167,7 @@ NRF_ALIASES = {"CE_PIN_2": "CE_PIN_1", "CE_PIN_3": "CE_PIN_1",
                "CSN_PIN_2": "CSN_PIN_1", "CSN_PIN_3": "CSN_PIN_1"}
 
 # Signals allowed to sit on GPIO 34-39, which are input-only on the ESP32.
-INPUT_ONLY_OK = {"CC1101_GDO2", "GPS_UART_RX", "SD_MISO"}
+INPUT_ONLY_OK = {"CC1101_GDO2", "GPS_UART_RX", "SD_MISO", "LORA_BUSY"}
 
 DIRECTIVE = re.compile(r"^\s*#\s*(\w+)\s*(.*)$")
 DEFINE = re.compile(r"^(\w+)(?:\s+(.*))?$")
@@ -286,6 +295,12 @@ def check():
             pins[macro] = (pin, label)
 
     for macro, (pin, label) in sorted(pins.items(), key=lambda kv: kv[1][0]):
+        if pin >= MCP_BASE:
+            print(f"  MCP ch{pin - MCP_BASE:>2}  {label:<20}  [on the MCP23017 expander]")
+            continue
+        if pin < 0:
+            print(f"  (none)  {label:<20}  [unassigned]")
+            continue
         note = reserved.get(pin, "")
         tag = ""
         if note:
@@ -296,12 +311,32 @@ def check():
     print()
     errors = []
     for macro in unresolved:
+        if macro in OPTIONAL:
+            continue
         errors.append(f"{macro} did not resolve to an integer")
 
-    # Two different signals on one pad.
+    # Expander channels used more than once (same alias rule as GPIO below).
+    by_ch = {}
+    for macro, (pin, _) in pins.items():
+        if pin >= MCP_BASE:
+            ch = pin - MCP_BASE
+            if not (0 <= ch <= 15):
+                errors.append("%s is MCP channel %d -- the MCP23017 has 0..15" % (macro, ch))
+            by_ch.setdefault(pin, []).append(macro)
+    for pin, macros in sorted(by_ch.items()):
+        real = [m for m in macros
+                if m not in NRF_ALIASES
+                or pins.get(NRF_ALIASES[m], (None,))[0] != pin]
+        if len(real) >= 2:
+            errors.append("MCP ch%d driven by: %s" %
+                          (pin - MCP_BASE, ", ".join("%s (%s)" % (m, pins[m][1]) for m in macros)))
+
+    # Two different signals on one GPIO pad (expander channels and unassigned
+    # pins -1 are handled/skipped separately).
     by_pin = {}
     for macro, (pin, _) in pins.items():
-        by_pin.setdefault(pin, []).append(macro)
+        if 0 <= pin < MCP_BASE:
+            by_pin.setdefault(pin, []).append(macro)
     for pin, macros in sorted(by_pin.items()):
         if len(macros) < 2:
             continue
@@ -357,6 +392,17 @@ def check():
         errors.append(
             "BACKLIGHT_PIN is GPIO %d but the display's backlight is GPIO %d"
             " -- the Brightness setting drives a pad nothing is on" % (bl, tft_bl))
+
+    # The expander base this check assumes must match the firmware's, or a pin
+    # flagged here as an expander channel is a real GPIO to the driver (or vice
+    # versa) and the whole split is wrong.
+    mcp_h = SKETCH / "Mcp23017.h"
+    if mcp_h.is_file():
+        m = re.search(r"PIN_BASE\s*=\s*(\d+)",
+                      mcp_h.read_text(encoding="utf-8", errors="replace"))
+        if m and int(m.group(1)) != MCP_BASE:
+            errors.append("Mcp23017::PIN_BASE is %s but check_pinmap uses %d"
+                          % (m.group(1), MCP_BASE))
 
     return errors
 

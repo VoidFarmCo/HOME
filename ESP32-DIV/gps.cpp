@@ -1389,6 +1389,12 @@ void drainButtons() {
 
 } // namespace
 
+/* GPS time/date for the home header. These live in the anonymous namespace
+ * above (internal linkage); expose read-only copies so other translation
+ * units can show them. Hold the dashes until GPS has a fix. */
+const char* gpsUtcStr()  { return utcStr; }
+const char* gpsDateStr() { return dateStr; }
+
 namespace GpsSatelliteScanner {
 
 void session() {

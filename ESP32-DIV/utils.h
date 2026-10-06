@@ -40,6 +40,12 @@ void reclaimSharedSpiBus();
 void holdSdInactiveOnSharedSpi();
 void drawStatusBar(float batteryVoltage, bool forceUpdate = false, bool bottomSeparator = false);
 
+/* Apply an accent preset (index into kAccentPresets): updates accentColor and
+ * rebuilds the palette. Returns false if it was already that preset. Exposed so
+ * the profile picker can set the profile's default accent. Lives in the settings
+ * UI namespace where it is defined. */
+namespace AppSettingsUI { bool applyAccent(uint8_t preset); }
+
 /* Set by whichever function paints the screen, immediately before it forces
  * the bar to redraw. Shared state rather than an argument because the bar is
  * also repainted asynchronously by statusBarTask, which has no idea what is

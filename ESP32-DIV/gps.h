@@ -1,5 +1,10 @@
 #pragma once
 
+/* GPS UTC time ("HH:MM:SS") and date ("DD/MM/YY") as last parsed from NMEA;
+ * both read "--" until there is a fix. Backed by gps.cpp. */
+const char* gpsUtcStr();
+const char* gpsDateStr();
+
 /** Neo-6M / GNSS: GSV sky plot, GGA/RMC fix + time, GSA DOP + satellites in solution. */
 namespace GpsSatelliteScanner {
 

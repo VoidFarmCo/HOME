@@ -1,4 +1,5 @@
 #include "Stealth.h"
+#include "Mcp23017.h"
 #include <algorithm>
 #include <vector>
 #include "KeyboardUI.h"
@@ -73,8 +74,8 @@ namespace {
     }
 
 #if defined(CC1101_CS)
-    pinMode(CC1101_CS, OUTPUT);
-    digitalWrite(CC1101_CS, HIGH);
+    Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+    Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 
     restoreSdAfterSharedSpi();
@@ -487,7 +488,7 @@ static void subghzSetBruteNavLabels() {
  * same unbounded `while(digitalRead(MISO_PIN));` as Init() and would hang in
  * the probe instead of in the driver. */
 static uint8_t cc1101ReadStatusReg(uint8_t addr) {
-  digitalWrite(CC1101_CS, LOW);
+  Mcp23017::writeAny(CC1101_CS, LOW);
 
   /* The chip pulls MISO low when its crystal is stable. Bounded, because
    * that is the whole point of this file. */
@@ -497,7 +498,7 @@ static uint8_t cc1101ReadStatusReg(uint8_t addr) {
 
   SPI.transfer(addr | 0xC0);
   const uint8_t value = SPI.transfer(0x00);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
   return value;
 }
 
@@ -514,9 +515,9 @@ static bool cc1101Present() {
    * SPI.transfer() below correct. */
   SpiBus::claim(SpiBus::Dev::Cc1101);
 
-  pinMode(CC1101_CS, OUTPUT);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
   pinMode(CC1101_MISO, INPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
   delayMicroseconds(50);
 
   /* PARTNUM is 0x00 on every CC1101. VERSION is 0x04 or 0x14 on genuine
@@ -1469,8 +1470,8 @@ void ReplayAttackSetup() {
   digitalWrite(SD_CS, HIGH);
 #endif
 #if defined(CC1101_CS)
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 
   ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
@@ -3155,8 +3156,8 @@ static void brutePrepareTx() {
   digitalWrite(SD_CS, HIGH);
 #endif
 #if defined(CC1101_CS)
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
   ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
   ELECHOUSE_cc1101.setGDO(CC1101_GDO0, CC1101_GDO2);
@@ -3570,7 +3571,7 @@ static void runBruteForce() {
     const uint32_t now = millis();
     if (now - lastUiMs >= 150) {
 #if defined(CC1101_CS)
-      digitalWrite(CC1101_CS, HIGH);
+      Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
       drawProgressBody(false);
       maintainTouchNavBar();
@@ -3759,8 +3760,8 @@ void subBruteSetup() {
   digitalWrite(SD_CS, HIGH);
 #endif
 #if defined(CC1101_CS)
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 
   ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
@@ -3949,8 +3950,8 @@ static bool jdMountSD() {
   if (logMounted && SD.exists("/")) return true;
 
 #if defined(CC1101_CS)
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 
   restoreSdAfterSharedSpi();
@@ -4413,8 +4414,8 @@ void Setup() {
   digitalWrite(SD_CS, HIGH);
 #endif
 #if defined(CC1101_CS)
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 
   cc1101BeginRx();

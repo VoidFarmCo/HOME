@@ -13,11 +13,13 @@
 #include "ApTracker.h"
 #include "FileServer.h"
 #include "SysInfo.h"
-#include "SubChat.h"
+#include "chat_core.h"
 #include "RadioTest.h"
 #include "TrackerHunt.h"
 #include "ducky.h"
 #include "Branding.h"
+#include "profile_picker.h"
+#include "Mcp23017.h"
 #include "icon.h"
 #include "gps.h"
 #include "rfid.h"
@@ -78,6 +80,12 @@ const unsigned char *bitmap_icons[NUM_MENU_ITEMS] = {
 
 int current_menu_index = 0;
 bool is_main_menu = false;
+
+/* The playbook home is the landing screen: the active profile's one-tap tiles,
+ * our own UI, organized by purpose (not the inherited radio menu). */
+bool in_playbook_home = true;
+bool g_toolFromHome = false;   // a tool launched from the purpose-tile home: skip the inherited submenu repaint on exit
+bool pbHomeDirty = true;
 
 const int NUM_SUBMENU_ITEMS = 12;
 const char *submenu_items[NUM_SUBMENU_ITEMS] = {
@@ -2370,6 +2378,42 @@ void handleWiFiSubmenuButtons() {
     }
 }
 
+/* BLE Spam All launch + run loop. Was copy-pasted in the touch and D-pad paths
+ * of handleBluetoothSubmenuButtons(); extracted here so a lifecycle fix is made
+ * once. Caller has already matched bluetooth_submenu_page==1 && index==5. */
+static void runBleSpamAll() {
+    current_submenu_index = 5;
+    in_sub_menu = true;
+    feature_active = true;
+    feature_exit_requested = false;
+    BleSpoofer::spamAllSetup();
+    while (bluetooth_submenu_page == 1 && current_submenu_index == 5 && !feature_exit_requested) {
+        current_submenu_index = 5;
+        in_sub_menu = true;
+        BleSpoofer::spooferLoop();
+        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
+            in_sub_menu = true;
+            is_main_menu = false;
+            submenu_initialized = false;
+            feature_active = false;
+            feature_exit_requested = false;
+            if (!g_toolFromHome) { displaySubmenu(); delay(200); }
+            waitForButtonRelease(BTN_SELECT);
+            break;
+        }
+    }
+    BleSpoofer::exit();
+    if (feature_exit_requested) {
+        in_sub_menu = true;
+        is_main_menu = false;
+        submenu_initialized = false;
+        feature_active = false;
+        feature_exit_requested = false;
+        displaySubmenu();
+        delay(200);
+    }
+}
+
 void handleBluetoothSubmenuButtons() {
     if (isButtonPressed(BTN_UP)) {
         current_submenu_index = (current_submenu_index - 1 + active_submenu_size) % active_submenu_size;
@@ -2757,37 +2801,7 @@ void handleBluetoothSubmenuButtons() {
         }
 
         if (bluetooth_submenu_page == 1 && current_submenu_index == 5) {
-            current_submenu_index = 5;
-            in_sub_menu = true;
-            feature_active = true;
-            feature_exit_requested = false;
-            BleSpoofer::spamAllSetup();
-            while (bluetooth_submenu_page == 1 && current_submenu_index == 5 && !feature_exit_requested) {
-                current_submenu_index = 5;
-                in_sub_menu = true;
-                BleSpoofer::spooferLoop();
-                if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                    in_sub_menu = true;
-                    is_main_menu = false;
-                    submenu_initialized = false;
-                    feature_active = false;
-                    feature_exit_requested = false;
-                    displaySubmenu();
-                    delay(200);
-                    waitForButtonRelease(BTN_SELECT);
-                    break;
-                }
-            }
-            BleSpoofer::exit();
-            if (feature_exit_requested) {
-                in_sub_menu = true;
-                is_main_menu = false;
-                submenu_initialized = false;
-                feature_active = false;
-                feature_exit_requested = false;
-                displaySubmenu();
-                delay(200);
-            }
+            runBleSpamAll();
         }
     }
 
@@ -3178,37 +3192,7 @@ void handleBluetoothSubmenuButtons() {
                         delay(200);
                     }
                 } else if (bluetooth_submenu_page == 1 && current_submenu_index == 5) {
-                    current_submenu_index = 5;
-                    in_sub_menu = true;
-                    feature_active = true;
-                    feature_exit_requested = false;
-                    BleSpoofer::spamAllSetup();
-                    while (bluetooth_submenu_page == 1 && current_submenu_index == 5 && !feature_exit_requested) {
-                        current_submenu_index = 5;
-                        in_sub_menu = true;
-                        BleSpoofer::spooferLoop();
-                        if (isButtonPressed(BTN_SELECT) || featureExitButtonPressed()) {
-                            in_sub_menu = true;
-                            is_main_menu = false;
-                            submenu_initialized = false;
-                            feature_active = false;
-                            feature_exit_requested = false;
-                            displaySubmenu();
-                            delay(200);
-                            waitForButtonRelease(BTN_SELECT);
-                            break;
-                        }
-                    }
-                    BleSpoofer::exit();
-                    if (feature_exit_requested) {
-                        in_sub_menu = true;
-                        is_main_menu = false;
-                        submenu_initialized = false;
-                        feature_active = false;
-                        feature_exit_requested = false;
-                        displaySubmenu();
-                        delay(200);
-                    }
+                    runBleSpamAll();
                 }
                 break;
             }
@@ -3259,8 +3243,7 @@ static void runSubmenuFeature(int idx, void (*setup)(), void (*loop)(),
             submenu_initialized = false;
             feature_active = false;
             feature_exit_requested = false;
-            displaySubmenu();
-            delay(200);
+            if (!g_toolFromHome) { displaySubmenu(); delay(200); }
             waitForButtonRelease(BTN_SELECT);
             break;
         }
@@ -3274,8 +3257,7 @@ static void runSubmenuFeature(int idx, void (*setup)(), void (*loop)(),
         submenu_initialized = false;
         feature_active = false;
         feature_exit_requested = false;
-        displaySubmenu();
-        delay(200);
+        if (!g_toolFromHome) { displaySubmenu(); delay(200); }
     }
 }
 
@@ -3291,6 +3273,13 @@ static void launchNrfFeature(int idx) {
     }
 }
 
+/* Chat channels: one chat UI (chat_core) over a chosen transport. The Chat
+ * tile's group grid is the channel picker -- idx selects the radio. */
+static void launchChatFeature(int idx) {
+    Chat::selectChannel(idx);
+    runSubmenuFeature(6, Chat::setup, Chat::loop, Chat::exit, true);
+}
+
 static void launchSubGhzFeature(int idx) {
     switch (idx) {
         case 0: runSubmenuFeature(0, replayat::ReplayAttackSetup, replayat::ReplayAttackLoop, nullptr, false); break;
@@ -3298,7 +3287,46 @@ static void launchSubGhzFeature(int idx) {
         case 2: runSubmenuFeature(2, SubBrute::subBruteSetup, SubBrute::subBruteLoop, nullptr, false); break;
         case 3: runSubmenuFeature(3, jammingdetector::Setup, jammingdetector::Loop, nullptr, false); break;
         case 4: runSubmenuFeature(4, SavedProfile::saveSetup, SavedProfile::saveLoop, nullptr, false); break;
-        case 5: runSubmenuFeature(5, SubChat::setup, SubChat::loop, SubChat::exit, true); break;
+        case 5: launchChatFeature(Chat::CH_SUBGHZ); break;   // SubGHz Chat -> unified chat core
+        default: break;
+    }
+}
+
+/* Wi-Fi and BLE features run inline in their submenu handlers; these give them
+ * the same callable launcher the other radios have, so the purpose-tile home can
+ * launch them through runSubmenuFeature. The index is just the run-loop sentinel,
+ * not the old menu layout. Pointers extracted from handleWiFi/BluetoothSubmenuButtons. */
+static void launchWifiFeature(int idx) {
+    switch (idx) {
+        case 0:  runSubmenuFeature(0,  PacketMonitor::ptmSetup, PacketMonitor::ptmLoop, nullptr, true); break;
+        case 1:  runSubmenuFeature(1,  BeaconSpammer::beaconSpamSetup, BeaconSpammer::beaconSpamLoop, nullptr, true); break;
+        case 2:  runSubmenuFeature(2,  Deauther::deautherSetup, Deauther::deautherLoop, nullptr, true); break;
+        case 3:  runSubmenuFeature(3,  ProbeRequestFlood::probeRequestFloodSetup, ProbeRequestFlood::probeRequestFloodLoop, nullptr, true); break;
+        case 4:  runSubmenuFeature(4,  DeauthDetect::deauthdetectSetup, DeauthDetect::deauthdetectLoop, nullptr, true); break;
+        case 5:  runSubmenuFeature(5,  WifiScan::wifiscanSetup, WifiScan::wifiscanLoop, nullptr, true); break;
+        case 6:  runSubmenuFeature(6,  CaptivePortal::cportalSetup, CaptivePortal::cportalLoop, nullptr, true); break;
+        case 7:  runSubmenuFeature(7,  HiddenSsidReveal::hiddenSsidSetup, HiddenSsidReveal::hiddenSsidLoop, nullptr, true); break;
+        case 8:  runSubmenuFeature(8,  WpsScanner::wpsScannerSetup, WpsScanner::wpsScannerLoop, nullptr, true); break;
+        case 9:  runSubmenuFeature(9,  ArpScanner::arpScannerSetup, ArpScanner::arpScannerLoop, nullptr, true); break;
+        case 10: runSubmenuFeature(10, KarmaAttack::karmaSetup, KarmaAttack::karmaLoop, nullptr, true); break;
+        case 11: runSubmenuFeature(11, ApTracker::setup, ApTracker::loop, ApTracker::exit, true); break;
+        default: break;
+    }
+}
+
+static void launchBleFeature(int idx) {
+    switch (idx) {
+        case 0:  runSubmenuFeature(0,  BleJammer::blejamSetup, BleJammer::blejamLoop, BleJammer::exit, true); break;
+        case 1:  runSubmenuFeature(1,  BleSpoofer::spooferSetup, BleSpoofer::spooferLoop, BleSpoofer::exit, true); break;
+        case 2:  runSubmenuFeature(2,  SourApple::sourappleSetup, SourApple::sourappleLoop, SourApple::exit, true); break;
+        case 3:  runSubmenuFeature(3,  AirTagSpoofer::airTagSetup, AirTagSpoofer::airTagLoop, AirTagSpoofer::exit, true); break;
+        case 4:  runSubmenuFeature(4,  AirTagSniffer::airTagSnifferSetup, AirTagSniffer::airTagSnifferLoop, AirTagSniffer::exit, true); break;
+        case 5:  runSubmenuFeature(5,  BleSniffer::blesnifferSetup, BleSniffer::blesnifferLoop, BleSniffer::exit, true); break;
+        case 6:  runSubmenuFeature(6,  BleScan::bleScanSetup, BleScan::bleScanLoop, BleScan::exit, true); break;
+        case 7:  runSubmenuFeature(7,  BleSkimmer::bleSkimmerSetup, BleSkimmer::bleSkimmerLoop, BleSkimmer::exit, true); break;
+        case 8:  runSubmenuFeature(8,  TrackerHunt::setup, TrackerHunt::loop, TrackerHunt::exit, true); break;
+        case 9:  runSubmenuFeature(9,  FastPairScan::fastPairSetup, FastPairScan::fastPairLoop, FastPairScan::exit, true); break;
+        case 10: runBleSpamAll(); break;   /* self-contained, blocks until done */
         default: break;
     }
 }
@@ -3473,7 +3501,7 @@ static void runToolsFeatureExitCleanup() {
     setTouchButtonInputEnabled(false);
     setTouchNavLabels(nullptr, nullptr, nullptr, nullptr, nullptr);
     resetTouchNavHeldState();
-    displaySubmenu();
+    if (!g_toolFromHome) displaySubmenu();
     delay(200);
     waitForButtonRelease(BTN_SELECT);
 }
@@ -3525,7 +3553,7 @@ static void reopenSystemSubmenu() {
     feature_exit_requested = false;
     updateActiveSubmenu();
     submenu_initialized = false;
-    displaySubmenu();
+    if (!g_toolFromHome) displaySubmenu();
 }
 
 static void launchToolsFeature(int idx) {
@@ -3803,7 +3831,7 @@ static void runDetectFeature(void (*setup)(), void (*loop)(),
     other_menu_grid_initialized = false;
     last_other_menu_index = -1;
     submenu_initialized = false;
-    displaySubmenu();
+    if (!g_toolFromHome) displaySubmenu();
     delay(200);
 }
 
@@ -4133,7 +4161,279 @@ void handleSettingsSubmenuButtons() {
   displayMenu();
 }
 
+/* ---------------------------- H.O.M.E purpose-tile home -----------------------
+ * The landing. Six PURPOSE tiles (what a tool is FOR, not which radio it uses);
+ * tapping one opens that group's tool grid, tapping a tool launches it and
+ * returns to the group. No old radio menu, no "All Tools". The profile tag at
+ * the top is a toggle -- tap to switch HOME<->COMBAT, which re-curates the tiles
+ * (HOME hides the purely-offensive tools). Launch reuses the existing per-radio
+ * launchers; the view is forced back here on exit so navigation stays ours.
+ * check_playbook_dispatch.py holds the registry honest. */
+#define PB_HOME   0x01
+#define PB_COMBAT 0x02
+#define PB_BOTH   (PB_HOME | PB_COMBAT)
+
+enum { GRP_SEE, GRP_DISRUPT, GRP_CHAT, GRP_CAPTURE, GRP_TRACK, GRP_SYSTEM, GRP_COUNT };
+static const char* const kGroupName[GRP_COUNT] = {
+    "See Nearby", "Disrupt", "Chat", "Capture/Log", "Track", "System" };
+
+/* label, group tile, profile mask, and the (category,index) the existing
+ * launcher dispatches. Flash table (no function pointers -> stays out of DRAM).
+ * Wi-Fi/BLE tools are added once their launchers exist (next unit). */
+struct Tool { const char* name; uint8_t group; uint8_t profiles; uint8_t cat; uint8_t idx; };
+static const Tool kTools[] = {
+    {"NRF Scanner",      GRP_SEE,     PB_BOTH,   1, 0},
+    {"ESB Sniffer",      GRP_SEE,     PB_BOTH,   1, 2},
+    {"MouseJack Scan",   GRP_SEE,     PB_BOTH,   1, 4},
+    {"Surveillance",     GRP_SEE,     PB_BOTH,   2, 0},
+    {"Drone Detector",   GRP_SEE,     PB_BOTH,   2, 1},
+    {"Jam Detector",     GRP_SEE,     PB_BOTH,   5, 3},
+    {"Wi-Fi Scanner",    GRP_SEE,     PB_BOTH,   0, 5},
+    {"Packet Monitor",   GRP_SEE,     PB_BOTH,   0, 0},
+    {"Deauth Detector",  GRP_SEE,     PB_BOTH,   0, 4},
+    {"Hidden SSID",      GRP_SEE,     PB_BOTH,   0, 7},
+    {"WPS Scanner",      GRP_SEE,     PB_BOTH,   0, 8},
+    {"ARP Scanner",      GRP_SEE,     PB_BOTH,   0, 9},
+    {"AP Tracker",       GRP_SEE,     PB_BOTH,   0, 11},
+    {"BLE Scanner",      GRP_SEE,     PB_BOTH,   4, 6},
+    {"BLE Sniffer",      GRP_SEE,     PB_BOTH,   4, 5},
+    {"AirTag Sniffer",   GRP_SEE,     PB_BOTH,   4, 4},
+    {"Skimmer Detect",   GRP_SEE,     PB_BOTH,   4, 7},
+    {"Tracker Hunt",     GRP_SEE,     PB_BOTH,   4, 8},
+    {"Fast Pair",        GRP_SEE,     PB_BOTH,   4, 9},
+    {"NRF Proto Kill",   GRP_DISRUPT, PB_COMBAT, 1, 1},
+    {"ESB Replay",       GRP_DISRUPT, PB_COMBAT, 1, 3},
+    {"MouseJack Inject", GRP_DISRUPT, PB_COMBAT, 1, 5},
+    {"SubGHz Replay",    GRP_DISRUPT, PB_COMBAT, 5, 0},
+    {"SubGHz Jammer",    GRP_DISRUPT, PB_COMBAT, 5, 1},
+    {"De Bruijn/Brute",  GRP_DISRUPT, PB_COMBAT, 5, 2},
+    {"Wi-Fi Deauther",   GRP_DISRUPT, PB_COMBAT, 0, 2},
+    {"Beacon Spam",      GRP_DISRUPT, PB_COMBAT, 0, 1},
+    {"Probe Flood",      GRP_DISRUPT, PB_COMBAT, 0, 3},
+    {"Captive Portal",   GRP_DISRUPT, PB_COMBAT, 0, 6},
+    {"Karma Attack",     GRP_DISRUPT, PB_COMBAT, 0, 10},
+    {"BLE Jammer",       GRP_DISRUPT, PB_COMBAT, 4, 0},
+    {"BLE Spoofer",      GRP_DISRUPT, PB_COMBAT, 4, 1},
+    {"Sour Apple",       GRP_DISRUPT, PB_COMBAT, 4, 2},
+    {"AirTag Spoofer",   GRP_DISRUPT, PB_COMBAT, 4, 3},
+    {"Spam All",         GRP_DISRUPT, PB_COMBAT, 4, 10},
+    {"SubGHz",           GRP_CHAT,    PB_BOTH,   6, 0},
+    {"ESP-NOW",          GRP_CHAT,    PB_BOTH,   6, 1},
+    {"LoRa Mesh",        GRP_CHAT,    PB_BOTH,   6, 2},
+    {"SD File Manager",  GRP_CAPTURE, PB_BOTH,   7, TOOLS_IDX_SD_FILES},
+    {"File Transfer",    GRP_CAPTURE, PB_BOTH,   7, TOOLS_IDX_XFER},
+    {"Wardriver",        GRP_TRACK,   PB_BOTH,   3, 0},
+    {"Satellite Scanner",GRP_TRACK,   PB_BOTH,   3, 1},
+    {"Settings",         GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_SETTINGS},
+    {"Device Info",      GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_DEVINFO},
+    {"About",            GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_ABOUT},
+    {"Radio Test",       GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_RADIOTEST},
+    {"Serial Monitor",   GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_TERMINAL},
+    {"Touch Calibrate",  GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_TOUCH},
+    {"Update Firmware",  GRP_SYSTEM,  PB_BOTH,   7, TOOLS_IDX_UPDATE},
+};
+static const int kToolCount = sizeof(kTools) / sizeof(kTools[0]);
+
+static int s_group = -1;   /* -1 = the six tiles; else the open group */
+
+static uint8_t pbActiveMask() {
+#if HOME_PROFILES_ENABLED
+    return (settings().profile == Profile::Combat) ? PB_COMBAT : PB_HOME;
+#else
+    return PB_BOTH;   /* profiles collapsed: every tile and tool shows */
+#endif
+}
+
+/* The live profile accent. NOT UI_ACCENT -- that macro is hard-coded to the
+ * brand purple in shared.h and never tracks accentColor, so the tiles would
+ * stay purple on COMBAT. accentColor is what the profile toggle / picker set. */
+static uint16_t homeAccent() {
+    return accentColor565(settings().accentColor);
+}
+
+/* A group tile shows only when the active profile has at least one tool in it. */
+static bool groupVisible(int g, uint8_t mask) {
+    for (int i = 0; i < kToolCount; i++)
+        if (kTools[i].group == g && (kTools[i].profiles & mask)) return true;
+    return false;
+}
+
+/* Run a tool through the existing per-radio launcher, then force the view back
+ * to the group grid it was launched from. */
+static void toolRun(uint8_t cat, uint8_t idx) {
+    current_menu_index = cat;
+    updateActiveSubmenu();
+    g_toolFromHome = true;
+    switch (cat) {
+        case 0: launchWifiFeature(idx);   break;
+        case 1: launchNrfFeature(idx);    break;
+        case 2: launchDetectFeature(idx); break;
+        case 4: launchBleFeature(idx);    break;
+        case 3: launchGpsFeature(idx);    break;
+        case 5: launchSubGhzFeature(idx); break;
+        case 6: launchChatFeature(idx);   break;
+        case 7: launchToolsFeature(idx);  break;
+        default: break;
+    }
+    g_toolFromHome = false;
+    in_sub_menu = false;
+    in_playbook_home = true;
+    pbHomeDirty = false;
+    drawPlaybookHome();   /* repaint our screen immediately, no Pueo submenu flash */
+}
+
+/* Full-width stacked tiles; same geometry for the home and a group grid. */
+static void pbTileRect(int vis, int visCount, int cols, int& x, int& y, int& w, int& h) {
+    const int top = 30;
+    const int pad = HOME_UI_PAD;
+    const int gap = HOME_UI_TILE_GAP;
+    if (cols < 1) cols = 1;
+    const int n    = (visCount < 1) ? 1 : visCount;
+    const int rows = (n + cols - 1) / cols;
+    const int col  = vis % cols;
+    const int row  = vis / cols;
+    w = (tft.width() - (cols + 1) * pad) / cols;
+    h = (tft.height() - top - pad - (rows - 1) * gap) / rows;
+    x = pad + col * (w + pad);
+    y = top + row * (h + gap);
+}
+
+/* GPS time/date come from gps.h (gpsUtcStr/gpsDateStr); "--" until a fix. */
+static uint32_t s_clockMs = 0;
+
+/* Right-aligned time + date in the header band. GPS-sourced -- updates while GPS
+ * is active, shows dashes otherwise. Repainted on a full draw and once a second. */
+static void drawHeaderClock() {
+    const int rx = tft.width() - HOME_UI_PAD;
+    tft.fillRect(tft.width() / 2, 0, tft.width() / 2, 28, UI_BG);
+    tft.setTextDatum(MR_DATUM);
+    tft.setTextColor(UI_TEXT, UI_BG);
+    tft.drawString(gpsUtcStr(), rx, 9, 1);
+    tft.drawString(gpsDateStr(), rx, 21, 1);
+    s_clockMs = millis();
+}
+
+static void drawHomeHeader() {
+    tft.setTextDatum(ML_DATUM);
+    if (s_group < 0) {
+        tft.setTextColor(UI_TEXT, UI_BG);
+#if HOME_PROFILES_ENABLED
+        tft.drawString(homeUiProfileTag(settings().profile), HOME_UI_PAD, 15, 2);
+#else
+        tft.drawString("H.O.M.E", HOME_UI_PAD, 15, 2);
+#endif
+        drawHeaderClock();
+    } else {
+        tft.setTextColor(homeAccent(), UI_BG);
+        tft.drawString("<", HOME_UI_PAD, 15, 2);
+        tft.setTextColor(UI_TEXT, UI_BG);
+        tft.drawString(kGroupName[s_group], HOME_UI_PAD + 16, 15, 2);
+    }
+}
+
+static void drawTile(int vis, int visCount, int cols, const char* label) {
+    const uint16_t accent = homeAccent();
+    int x, y, w, h; pbTileRect(vis, visCount, cols, x, y, w, h);
+    tft.fillRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, accent);
+    tft.drawRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, TFT_WHITE);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_WHITE, accent);
+    tft.drawString(label, x + w / 2, y + h / 2, (cols > 1) ? 1 : 2);
+}
+
+static void drawPlaybookHome() {
+    const uint8_t mask = pbActiveMask();
+    const int cols = (s_group < 0) ? 1 : 2;
+    tft.fillScreen(UI_BG);
+    drawHomeHeader();
+
+    if (s_group < 0) {
+        int visCount = 0;
+        for (int g = 0; g < GRP_COUNT; g++) if (groupVisible(g, mask)) visCount++;
+        int vis = 0;
+        for (int g = 0; g < GRP_COUNT; g++) {
+            if (!groupVisible(g, mask)) continue;
+            drawTile(vis++, visCount, cols, kGroupName[g]);
+        }
+    } else {
+        int visCount = 0;
+        for (int i = 0; i < kToolCount; i++)
+            if (kTools[i].group == s_group && (kTools[i].profiles & mask)) visCount++;
+        int vis = 0;
+        for (int i = 0; i < kToolCount; i++) {
+            if (kTools[i].group != s_group || !(kTools[i].profiles & mask)) continue;
+            drawTile(vis++, visCount, cols, kTools[i].name);
+        }
+    }
+    pbHomeDirty = false;
+}
+
+static void handlePlaybookHome() {
+    if (pbHomeDirty) drawPlaybookHome();
+    if (s_group < 0 && millis() - s_clockMs > 1000) drawHeaderClock();
+    int x, y;
+    if (!readTouchXY(x, y)) return;
+    const uint8_t mask = pbActiveMask();
+
+    /* Header band: on the home it toggles the profile; in a group it goes back. */
+    if (y < 30) {
+        while (isTouchDownDismiss()) delay(10);
+        if (s_group >= 0) {
+            s_group = -1;              /* group header: go back to the tiles */
+            pbHomeDirty = true;
+        }
+#if HOME_PROFILES_ENABLED
+        else {
+            const Profile np = (settings().profile == Profile::Combat)
+                                   ? Profile::Home : Profile::Combat;
+            settings().profile = np;
+            AppSettingsUI::applyAccent(homeUiDefaultAccent(np));
+            settingsSave();
+            pbHomeDirty = true;
+        }
+#endif
+        return;
+    }
+
+    if (s_group < 0) {
+        int visCount = 0;
+        for (int g = 0; g < GRP_COUNT; g++) if (groupVisible(g, mask)) visCount++;
+        int vis = 0;
+        for (int g = 0; g < GRP_COUNT; g++) {
+            if (!groupVisible(g, mask)) continue;
+            int tx, ty, tw, th; pbTileRect(vis, visCount, 1, tx, ty, tw, th);
+            if (x >= tx && x <= tx + tw && y >= ty && y <= ty + th) {
+                while (isTouchDownDismiss()) delay(10);
+                s_group = g; pbHomeDirty = true; return;
+            }
+            vis++;
+        }
+    } else {
+        int visCount = 0;
+        for (int i = 0; i < kToolCount; i++)
+            if (kTools[i].group == s_group && (kTools[i].profiles & mask)) visCount++;
+        int vis = 0;
+        for (int i = 0; i < kToolCount; i++) {
+            if (kTools[i].group != s_group || !(kTools[i].profiles & mask)) continue;
+            int tx, ty, tw, th; pbTileRect(vis, visCount, 2, tx, ty, tw, th);
+            if (x >= tx && x <= tx + tw && y >= ty && y <= ty + th) {
+                while (isTouchDownDismiss()) delay(10);
+                toolRun(kTools[i].cat, kTools[i].idx);
+                return;
+            }
+            vis++;
+        }
+    }
+}
+
 void handleButtons() {
+    if (in_playbook_home) { handlePlaybookHome(); return; }
+
+    /* Below here is the inherited radio-menu nav. The purpose-tile home now
+     * owns the top level and launches features directly (toolRun), so this
+     * path is only reached transiently and the old menu is retired from the
+     * UI. The handlers stay for the Wi-Fi/BLE features until those get their
+     * own launchers (next unit). */
     if (in_sub_menu) {
         switch (current_menu_index) {
 
@@ -4354,6 +4654,18 @@ void setup() {
   applyThemeToPalette(settings().theme);
   setBrightness(settings().brightness);
 
+#if defined(PUEO_HAS_MCP23017)
+  /* Bring the expander up before any radio inits (radios init lazily when a
+   * feature starts, so this is in time). Chip-selects/enables on the expander
+   * route here via Mcp23017::writeAny; a missing chip just means those radios
+   * refuse, same as an absent module. */
+  if (Mcp23017::begin(MCP23017_SDA, MCP23017_SCL, MCP23017_ADDR)) {
+    Serial.println("[boot] MCP23017 expander ready");
+  } else {
+    Serial.println("[boot] MCP23017 not found -- radios on it will refuse");
+  }
+#endif
+
 #if HAS_PCF8574_BUTTONS
   if (!initPcf8574Buttons()) {
     Serial.println("PCF8574 buttons unavailable");
@@ -4395,8 +4707,19 @@ void setup() {
    * menu, not the boot. See BootLock.h for what that is worth. */
   BootLock::require();
 
-  displayMenu();
-  drawStatusBar(currentBatteryVoltage, false);
+  /* First boot (or a card from before profiles existed): ask which audience
+   * this H.O.M.E is for, once, before the menu ever shows. The picker writes
+   * profileChosen=true, so it never asks again. */
+#if HOME_PROFILES_ENABLED
+  if (!settings().profileChosen) {
+    ProfilePicker::run();
+  }
+#endif
+
+  /* The purpose-tile home is the landing. The old radio menu is retired. */
+  in_playbook_home = true;
+  pbHomeDirty = true;
+  drawPlaybookHome();
 
   last_interaction_time = millis();
   Serial.println("[boot] ready");
@@ -4431,5 +4754,7 @@ void loop() {
 #endif
   applyThemeToPalette(settings().theme);
   handleButtons();
-  updateStatusBar();
+  /* The playbook home is our own full screen with no status bar; don't let the
+   * status-bar updater paint over its header. */
+  if (!in_playbook_home) updateStatusBar();
 }

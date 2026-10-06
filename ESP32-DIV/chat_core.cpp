@@ -1,28 +1,78 @@
+#include "chat_core.h"
 #include "shared.h"
 #include "utils.h"
 #include "KeyboardUI.h"
-#include "Branding.h"
 #include "Stealth.h"
-#include <ELECHOUSE_CC1101_SRC_DRV.h>
+#include "chat_subghz.h"
+#include "chat_espnow.h"
+#include "chat_lora.h"
 
-/* Bounded CC1101 presence check (subghz.cpp). ELECHOUSE's Init() below opens
- * with an unbounded `while (digitalRead(MISO));` that hangs forever with no
- * module wired, so radioInit() is only ever called once this says a chip is
- * there -- otherwise the chat still opens and exits, it just cannot transmit. */
-bool subghzCc1101Present();
+namespace Chat {
 
-namespace SubChat {
+/* ── channel dispatch ─────────────────────────────────────────────────────────
+ * One case per channel; adding a radio touches only these five switches and the
+ * enum in chat_core.h. No table of function pointers (DRAM is full). */
 
-/* Payload on the air: [nameLen][name...][text...]. Capped so the whole packet
- * fits the CC1101's 64-byte FIFO with room to spare. */
-static constexpr int CHAT_NAME_MAX = 10;
-static constexpr int CHAT_TEXT_MAX = 46;
-static constexpr int CHAT_PKT_MAX  = 1 + CHAT_NAME_MAX + CHAT_TEXT_MAX;   // 57
+int channelCount() { return CH_COUNT; }
+
+const char* channelLabel(int idx) {
+  switch (idx) {
+    case CH_SUBGHZ: return SubghzChat::label();
+    case CH_ESPNOW: return EspNowChat::label();
+    case CH_LORA:   return LoRaChat::label();
+    default:        return "?";
+  }
+}
+
+bool channelAvailable(int idx) {
+  switch (idx) {
+    case CH_SUBGHZ: return SubghzChat::available();
+    case CH_ESPNOW: return EspNowChat::available();
+    case CH_LORA:   return LoRaChat::available();
+    default:        return false;
+  }
+}
+
+static int s_ch = CH_SUBGHZ;
+void selectChannel(int idx) { s_ch = (idx >= 0 && idx < CH_COUNT) ? idx : CH_SUBGHZ; }
+
+static bool txInit() {
+  switch (s_ch) {
+    case CH_SUBGHZ: return SubghzChat::init();
+    case CH_ESPNOW: return EspNowChat::init();
+    case CH_LORA:   return LoRaChat::init();
+    default:        return false;
+  }
+}
+static void txDeinit() {
+  switch (s_ch) {
+    case CH_SUBGHZ: SubghzChat::deinit(); break;
+    case CH_ESPNOW: EspNowChat::deinit(); break;
+    case CH_LORA:   LoRaChat::deinit();   break;
+    default: break;
+  }
+}
+static bool txSend(const uint8_t* d, uint8_t n) {
+  switch (s_ch) {
+    case CH_SUBGHZ: return SubghzChat::send(d, n);
+    case CH_ESPNOW: return EspNowChat::send(d, n);
+    case CH_LORA:   return LoRaChat::send(d, n);
+    default:        return false;
+  }
+}
+static uint8_t txPoll(uint8_t* buf, uint8_t maxLen) {
+  switch (s_ch) {
+    case CH_SUBGHZ: return SubghzChat::poll(buf, maxLen);
+    case CH_ESPNOW: return EspNowChat::poll(buf, maxLen);
+    case CH_LORA:   return LoRaChat::poll(buf, maxLen);
+    default:        return 0;
+  }
+}
+
+/* ── session state (heap: this board's .bss is full) ──────────────────────────*/
+
 static constexpr int CHAT_LOG_LINES = 16;
-static constexpr float CHAT_MHZ = 433.92f;
 
-/* All chat state is heap-allocated while the feature runs; this board's DRAM is
- * full, so only the pointer lives in .bss. */
 struct ChatState {
   char log[CHAT_LOG_LINES][52];
   char name[CHAT_NAME_MAX + 1];
@@ -34,23 +84,6 @@ static ChatState* s_cs = nullptr;
 static void deriveName() {
   const uint64_t id = ESP.getEfuseMac();
   snprintf(s_cs->name, sizeof(s_cs->name), "H-%04X", (unsigned)(uint16_t)id);
-}
-
-static void radioInit() {
-  ELECHOUSE_cc1101.setSpiPin(CC1101_SCK, CC1101_MISO, CC1101_MOSI, CC1101_CS);
-  ELECHOUSE_cc1101.setGDO(CC1101_GDO0, CC1101_GDO2);
-  ELECHOUSE_cc1101.Init();
-  ELECHOUSE_cc1101.setCCMode(1);          // packet mode (FIFO + packet handler)
-  ELECHOUSE_cc1101.setModulation(0);      // 2-FSK
-  ELECHOUSE_cc1101.setMHZ(CHAT_MHZ);
-  ELECHOUSE_cc1101.setDRate(4.8);         // 4.8 kbps -- robust, plenty for text
-  ELECHOUSE_cc1101.setSyncMode(2);        // 16/16 sync bits
-  ELECHOUSE_cc1101.setSyncWord(0x48, 0x4D);  // "HM": the H.O.M.E net
-  ELECHOUSE_cc1101.setCrc(1);             // drop corrupt packets in hardware
-  ELECHOUSE_cc1101.setLengthConfig(1);    // variable length (length byte first)
-  ELECHOUSE_cc1101.setPacketLength((byte)CHAT_PKT_MAX);
-  ELECHOUSE_cc1101.SetRx();
-  s_cs->radioUp = true;
 }
 
 static void logLine(const char* who, const char* text) {
@@ -72,8 +105,8 @@ static void draw() {
   if (!s_cs) return;
   tft.setTextFont(1);
   tft.setTextSize(1);
-  char hdr[40];
-  snprintf(hdr, sizeof(hdr), "SubGHz Chat 433.92  %s", s_cs->name);
+  char hdr[44];
+  snprintf(hdr, sizeof(hdr), "%s chat  %s", channelLabel(s_ch), s_cs->name);
   tft.fillRect(0, 40, PUEO_SCREEN_W, 14, TFT_BLACK);
   tft.setCursor(8, 42);
   tft.setTextColor(UI_ACCENT, TFT_BLACK);
@@ -96,9 +129,10 @@ static void draw() {
   }
 }
 
+/* Build [nameLen][name][text] and hand it to the active transport. */
 static void sendMessage(const char* text) {
   if (!s_cs || !s_cs->radioUp) return;
-  uint8_t buf[CHAT_PKT_MAX];
+  uint8_t buf[CHAT_FRAME_MAX];
   int nameLen = (int)strlen(s_cs->name);
   if (nameLen > CHAT_NAME_MAX) nameLen = CHAT_NAME_MAX;
   int textLen = (int)strlen(text);
@@ -107,19 +141,18 @@ static void sendMessage(const char* text) {
   buf[p++] = (uint8_t)nameLen;
   memcpy(buf + p, s_cs->name, nameLen); p += nameLen;
   memcpy(buf + p, text, textLen);       p += textLen;
-  ELECHOUSE_cc1101.SendData(buf, (byte)p);
-  ELECHOUSE_cc1101.SetRx();              // back to listening after the burst
-  logLine(s_cs->name, text);
-  draw();
+  if (txSend(buf, (uint8_t)p)) {
+    logLine(s_cs->name, text);
+    draw();
+  }
 }
 
+/* Pull one frame from the transport and parse [nameLen][name][text]. */
 static void pollReceive() {
   if (!s_cs || !s_cs->radioUp) return;
-  if (!ELECHOUSE_cc1101.CheckReceiveFlag()) return;
-  uint8_t buf[64];
-  const int len = (int)ELECHOUSE_cc1101.ReceiveData(buf);
-  ELECHOUSE_cc1101.SetRx();
-  if (len < 1 || !ELECHOUSE_cc1101.CheckCRC()) return;
+  uint8_t buf[CHAT_FRAME_MAX];
+  const uint8_t len = txPoll(buf, (uint8_t)sizeof(buf));
+  if (len < 1) return;
   int nameLen = buf[0];
   if (nameLen < 1 || nameLen > CHAT_NAME_MAX || nameLen + 1 > len) return;
   char who[CHAT_NAME_MAX + 1];
@@ -138,14 +171,13 @@ static void pollReceive() {
 static void compose() {
   OnScreenKeyboardConfig cfg;
   osKeyboardUseStandardLayout(cfg);
-  cfg.titleLine1 = "SubGHz Chat";
+  cfg.titleLine1 = channelLabel(s_ch);
   cfg.titleLine2 = "Message";
   cfg.maxLen = CHAT_TEXT_MAX;
   cfg.okLabel = "Send";
   cfg.backLabel = "Cancel";
   cfg.requireNonEmpty = true;
   OnScreenKeyboardResult r = showOnScreenKeyboard(cfg, "");
-  // The keyboard repainted the screen; rebuild ours either way.
   featureClearContent(TFT_BLACK);
   drawStatusBar(readBatteryVoltage(), true);
   setTouchNavLabels("Type", nullptr, "Exit", nullptr, nullptr);
@@ -157,7 +189,7 @@ static void compose() {
 }
 
 void setup() {
-  if (Stealth::refuse("SubGHz Chat")) return;
+  if (Stealth::refuse("Chat")) return;
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
   featureClearContent(TFT_BLACK);
@@ -172,11 +204,15 @@ void setup() {
   s_cs->radioUp = false;
   deriveName();
   draw();
-  if (subghzCc1101Present()) {       // only Init a chip that is actually there
-    radioInit();
-    logLine("sys", "listening on 433.92");
+  if (channelAvailable(s_ch) && txInit()) {
+    s_cs->radioUp = true;
+    char msg[32];
+    snprintf(msg, sizeof(msg), "on %s", channelLabel(s_ch));
+    logLine("sys", msg);
   } else {
-    logLine("sys", "no CC1101 found");
+    char msg[32];
+    snprintf(msg, sizeof(msg), "no %s radio", channelLabel(s_ch));
+    logLine("sys", msg);
   }
   draw();
 }
@@ -196,10 +232,8 @@ void loop() {
 }
 
 void exit() {
-  if (s_cs && s_cs->radioUp) {
-    ELECHOUSE_cc1101.setSidle();
-  }
+  if (s_cs && s_cs->radioUp) txDeinit();
   if (s_cs) { delete s_cs; s_cs = nullptr; }
 }
 
-}  // namespace SubChat
+}  // namespace Chat

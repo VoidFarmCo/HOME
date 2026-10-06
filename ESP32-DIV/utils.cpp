@@ -1,4 +1,5 @@
 #include <SD.h>
+#include "Mcp23017.h"
 #include <SPI.h>
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,7 @@
 #include "SpiBus.h"
 #include "Branding.h"
 #include "BootLock.h"
+#include "profile_picker.h"
 #include "Stealth.h"
 
 
@@ -1323,8 +1325,8 @@ void reclaimSharedSpiBus() {
   digitalWrite(SD_CS, HIGH);
 #endif
 #if defined(CC1101_CS)
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 #if defined(PN532_SS)
   pinMode(PN532_SS, OUTPUT);
@@ -1365,8 +1367,8 @@ void reclaimSharedSpiBus() {
 #endif
 #if defined(CC1101_CS)
   gpio_reset_pin((gpio_num_t)CC1101_CS);
-  pinMode(CC1101_CS, OUTPUT);
-  digitalWrite(CC1101_CS, HIGH);
+  Mcp23017::pinModeAny(CC1101_CS, OUTPUT);
+  Mcp23017::writeAny(CC1101_CS, HIGH);
 #endif
 #endif // BOARD_HAS_ESP32S3
 #if defined(SD_SCLK) && defined(SD_MISO) && defined(SD_MOSI) && defined(SD_CS)
@@ -1875,7 +1877,8 @@ static const int kFirstSwitch     = sizeof(kFixedRows)/sizeof(kFixedRows[0]);
 static const int kMainSwitchCount = sizeof(kMainSwitches)/sizeof(kMainSwitches[0]);
 static const int kLinkRow         = kFirstSwitch + kMainSwitchCount;   /* SD Logging */
 static const int kBootRow         = kLinkRow + 1;                     /* Boot Lock  */
-static const int kMainRows        = kBootRow + 1;
+static const int kProfileRow      = kBootRow + 1;                     /* Profile    */
+static const int kMainRows        = kProfileRow + 1;
 
 /* Master switch, then one row per LogApp. The per-app rows are generated
  * from kLogApps, so a feature added to that table appears here without this
@@ -1902,7 +1905,8 @@ static const char* rowLabel(int i) {
   if (i < kFirstSwitch) return kFixedRows[i];
   if (i < kLinkRow)     return kMainSwitches[i - kFirstSwitch].label;
   if (i == kLinkRow)    return "SD Logging";
-  return "Boot Lock";
+  if (i == kBootRow)    return "Boot Lock";
+  return "Profile";
 }
 
 static bool rowIsSwitch(int i) {
@@ -2312,6 +2316,35 @@ static void drawBootRow(int row, bool selected) {
   drawBootWidget(row);
 }
 
+/* Profile row: an action row like Boot Lock, showing the active profile's tag
+ * on the right. Tapping it re-opens the full picker to switch HOME<->COMBAT,
+ * which is the one place that knows how to apply a profile's accent. */
+static void drawProfileWidget(int row) {
+  Rect r = rowRect(row);
+  tft.startWrite();
+  tft.fillRect(r.x + LABEL_W, r.y + 2, r.w - LABEL_W - 6, r.h - 4, UI_BG);
+
+  const char* state = homeUiProfileTag(settings().profile);   /* HOME / COMBAT */
+
+  setLabelFont();
+  const int ty    = r.y + (r.h / 2 - 6);
+  const int right = r.x + r.w - 6;
+  const int wChev = (int)tft.textWidth(">");
+  const int wSt   = (int)tft.textWidth(state);
+
+  tft.setTextColor(textStrong, UI_BG);
+  tft.setCursor(right - wChev, ty);
+  tft.print(">");
+  tft.setCursor(right - wChev - 8 - wSt, ty);
+  tft.print(state);
+
+  tft.endWrite();
+}
+static void drawProfileRow(int row, bool selected) {
+  drawCardStatic(row, selected);
+  drawProfileWidget(row);
+}
+
 /* One row, whichever kind it is. The four enumerating sites call this rather
  * than each deciding for themselves what row 3 is. */
 static void drawRow(int i, bool selected) {
@@ -2320,8 +2353,9 @@ static void drawRow(int i, bool selected) {
     drawSwitchRow(switchValue(s, i), selected, i);
     return;
   }
-  if (i == kLinkRow) { drawLinkRow(i, selected); return; }
-  if (i == kBootRow) { drawBootRow(i, selected); return; }
+  if (i == kLinkRow)    { drawLinkRow(i, selected);    return; }
+  if (i == kBootRow)    { drawBootRow(i, selected);    return; }
+  if (i == kProfileRow) { drawProfileRow(i, selected); return; }
   switch (i) {
     case 0: drawBrightness(s.brightness, selected); break;
     case 1: drawTheme(s.theme, selected); break;
@@ -2506,7 +2540,7 @@ static bool applyTheme(Theme t){
   lastChangeMs = millis();
   return true;
 }
-static bool applyAccent(uint8_t preset){
+bool applyAccent(uint8_t preset){
   auto& s = settings();
   preset = accentPresetClamp(preset);
   if (s.accentColor == preset) return false;
@@ -2598,7 +2632,7 @@ static void handleTouch() {
         lastToggleMs = now;
       }
     }
-  } else if (sel == kLinkRow || sel == kBootRow) {
+  } else if (sel == kLinkRow || sel == kBootRow || sel == kProfileRow) {
     /* The whole right-hand half opens it. A chevron is a small target and
      * these rows have nothing else on that side to hit by mistake. */
     Rect rr = rowRect(sel);
@@ -2608,10 +2642,14 @@ static void handleTouch() {
         lastToggleMs = now;
         if (sel == kLinkRow) {
           goToPage(Page::Logging);
-        } else {
+        } else if (sel == kBootRow) {
           /* Takes over the screen and hands it back in whatever state the
            * keyboard left it, so this repaints rather than trusting it. */
           BootLock::manage();
+          drawAll();
+        } else {
+          /* Profile: the picker owns switching (it applies the accent). */
+          ProfilePicker::run();
           drawAll();
         }
       }
@@ -2739,6 +2777,7 @@ void loop(){
     else if (sel==2)                   { applyAccent((s.accentColor + 1) % ACCENT_PRESET_COUNT); }
     else if (sel==kLinkRow)            { lastActionMs = now; goToPage(Page::Logging); return; }
     else if (sel==kBootRow)            { lastActionMs = now; BootLock::manage(); drawAll(); return; }
+    else if (sel==kProfileRow)         { lastActionMs = now; ProfilePicker::run(); drawAll(); return; }
     changedByButtons=true;
     lastActionMs = now;
   }

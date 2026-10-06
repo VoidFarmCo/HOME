@@ -57,3 +57,13 @@ cannot interleave a transfer halfway through ours.
 **`CC1101_SPI_HZ`, default 4 MHz.** The driver never set its own clock, so it
 ran at whatever the last device to touch the bus had left. The datasheet
 allows 10 MHz single-access but only 6.5 MHz for burst; 4 MHz clears both.
+
+## H.O.M.E: chip-select via MCP23017 (2026-10-06)
+
+All `digitalWrite(SS_PIN, ...)` and `pinMode(SS_PIN, OUTPUT)` are routed through
+`ccCsWrite()` / `ccCsMode()`, which call the extern wrappers `homeExpWrite` /
+`homeExpMode` (defined in `ESP32-DIV/Mcp23017.cpp`). This lets SS_PIN be an
+MCP23017 expander channel on the owner's board (pin >= Mcp23017::PIN_BASE) or a
+plain GPIO, with no change here. The lib is compiled apart from the sketch, so it
+cannot include the sketch header -- hence the link-time wrappers. Held by
+`tools/check_cc1101_expander.py`. build.sh now re-syncs this lib on every compile.

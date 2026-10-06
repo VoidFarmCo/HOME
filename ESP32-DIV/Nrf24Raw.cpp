@@ -1,4 +1,5 @@
 #include "Nrf24Raw.h"
+#include "Mcp23017.h"
 
 #include "SpiBus.h"
 #include "shared.h"
@@ -53,10 +54,10 @@ constexpr uint32_t kSettleUs  = 130;
 bool    s_present = false;
 uint8_t s_channel = 0xFF;
 
-inline void csnLow()  { digitalWrite(CSN_PIN_1, LOW); }
-inline void csnHigh() { digitalWrite(CSN_PIN_1, HIGH); }
-inline void ceLow()   { digitalWrite(CE_PIN_1, LOW); }
-inline void ceHigh()  { digitalWrite(CE_PIN_1, HIGH); }
+inline void csnLow()  { Mcp23017::writeAny(CSN_PIN_1, LOW); }
+inline void csnHigh() { Mcp23017::writeAny(CSN_PIN_1, HIGH); }
+inline void ceLow()   { Mcp23017::writeAny(CE_PIN_1, LOW); }
+inline void ceHigh()  { Mcp23017::writeAny(CE_PIN_1, HIGH); }
 
 uint8_t readReg(uint8_t r) {
   csnLow();
@@ -100,8 +101,8 @@ void commandWithData(uint8_t c, const uint8_t* d, uint8_t n) {
 }  // namespace
 
 bool begin() {
-  pinMode(CE_PIN_1, OUTPUT);
-  pinMode(CSN_PIN_1, OUTPUT);
+  Mcp23017::pinModeAny(CE_PIN_1, OUTPUT);
+  Mcp23017::pinModeAny(CSN_PIN_1, OUTPUT);
   ceLow();
   csnHigh();
 

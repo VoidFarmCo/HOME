@@ -3,14 +3,16 @@
 // Select the hardware target.
 // Leave all lines commented to use the ESP32-DIV V2 wiring.
 
-#define BOARD_PUEO
+#define BOARD_HOME        // owner's ESP32-32E board (board_home.h): CC1101/nRF chip-selects
+                          // on the MCP23017 expander, GDO0/GDO2 direct. See docs/home/board.md.
+// #define BOARD_PUEO     // magikh0e's Sunton board; NOT ours
 // #define BOARD_CYD
 // #define BOARD_ESP32_DIV_V1
 // #define BOARD_ESP32_DIV_V2
 
-// Pueo is a CYD with its own radio wiring. The overlay defines BOARD_CYD
-// for us and overrides the external-radio pins before shared.h's defaults run.
-#if defined(BOARD_PUEO)
+#if defined(BOARD_HOME)
+#include "board_home.h"
+#elif defined(BOARD_PUEO)
 #include "board_pueo.h"
 #endif
 

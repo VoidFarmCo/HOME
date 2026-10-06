@@ -8974,9 +8974,16 @@ static String telnetRead(WiFiClient& c, uint32_t ms) {
   String out;
   uint32_t t0 = millis();
   while (millis() - t0 < ms && out.length() < 120) {
+    if (feature_exit_requested || !c.connected()) break;   // bail on Exit or a closed peer
+    if (!c.available()) { delay(5); continue; }            // yield instead of busy-spinning the tick
     while (c.available() && out.length() < 120) {
       int b = c.read();
-      if (b == 0xFF) { c.read(); c.read(); continue; }   // skip IAC cmd + option
+      if (b == 0xFF) {                                     // IAC: consume cmd+option only when both bytes
+        while (c.available() < 2 && c.connected() &&       // are actually here, so a sequence split across
+               millis() - t0 < ms) delay(1);               // reads is not mis-parsed as text
+        if (c.available() >= 2) { c.read(); c.read(); }
+        continue;
+      }
       if (b >= 32 && b < 127) out += (char)b;
       else if (b == '\n' || b == '\r') out += ' ';
     }
@@ -8992,11 +8999,12 @@ static void telnetProbe(IPAddress ip, uint16_t port) {
   int total = reconCredCount();
   if (total > RECON_TELNET_CRED_MAX) total = RECON_TELNET_CRED_MAX;
   for (int k = 0; k < total; k++) {
+    if (feature_exit_requested) return;   // Exit pressed: stop probing now, don't hold the tick
     char user[24], pass[24];
     reconCredAt(k, user, sizeof(user), pass, sizeof(pass));
     WiFiClient c;
     c.setTimeout(RECON_TIMEOUT_MS);
-    if (!c.connect(ip, port)) return;   // not actually reachable
+    if (!c.connect(ip, port)) { delay(5); continue; }   // transient fail: try the next cred, not abort the host
     telnetRead(c, 700);                  // banner / login prompt
     c.print(user); c.print("\r\n");
     telnetRead(c, 500);                  // password prompt

@@ -252,6 +252,21 @@ sync_user_setup() {
   fi
 }
 
+# Vendored libraries carry our edits (e.g. the CC1101 chip-select routed through
+# the MCP23017 -- see libs/SmartRC-CC1101-Driver-Lib/VENDORED.md). setup() copies
+# them once, so an edit after that would silently never reach the build. This
+# re-syncs them on every compile, the same way User_Setup is kept current.
+sync_vendored_libs() {
+  local src="$REPO/libs/SmartRC-CC1101-Driver-Lib"
+  local dst="$ARDUINO_DIRECTORIES_USER/libraries/SmartRC-CC1101-Driver-Lib"
+  [ -d "$src" ] || return 0
+  [ -d "$dst" ] || return 0
+  if ! cmp -s "$src/ELECHOUSE_CC1101_SRC_DRV.cpp" "$dst/ELECHOUSE_CC1101_SRC_DRV.cpp"; then
+    cp -r "$src"/. "$dst/"
+    echo "== SmartRC-CC1101 lib re-synced from libs/ =="
+  fi
+}
+
 # -Wall -Wextra, and the sketch is expected to stay clean under both. If this
 # prints a warning, that is the whole point -- fix it rather than lowering the
 # level again.
@@ -262,6 +277,7 @@ sync_user_setup() {
 # shows everything.
 compile() {
   sync_user_setup
+  sync_vendored_libs
   python "$REPO/tools/check_pinmap.py"
   echo
   local log="$PUEO_ARDUINO_ROOT/compile.log"

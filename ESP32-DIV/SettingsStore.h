@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "shared.h"
+#include "home_ui.h"   /* Profile enum + H.O.M.E UI identity, used by AppSettings */
 
 /* shared.h owns this now, built from PUEO_DIR along with every other path
  * on the card. It was defined in both places behind its own #ifndef, so
@@ -17,6 +18,13 @@ struct AppSettings {
   uint8_t  brightness = BKL_LEVEL_MED;
   Theme    theme      = Theme::Dark;
   uint8_t  accentColor = 4;   // default to the Purple preset (H.O.M.E brand), was 0 (Orange)
+
+  /* Which audience profile is active (see home_ui.h). Curates the home screen,
+   * wording and accent; every capability stays reachable under All Tools. */
+  Profile  profile       = Profile::Home;
+  /* False until the first-boot picker has run once. Drives whether the picker
+   * shows, and persists so the picker asks exactly once per card. */
+  bool     profileChosen = false;
 
   bool     autoWifiScan    = true;
   bool     autoBleScan     = true;

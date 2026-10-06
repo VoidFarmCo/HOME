@@ -1341,6 +1341,10 @@ void spooferSetup() {
  * hand; this just presets it. */
 void spamAllSetup() {
   spooferSetup();
+  // spooferSetup() bails on Stealth::refuse or low BLE heap; both set
+  // feature_exit_requested. Honour that instead of arming the spoofer over the
+  // warning the guard just drew.
+  if (feature_exit_requested) return;
   deviceType = SPOOF_TYPE_ALL;
   setAdvertisingData();   // arms s_spamAll and seeds the first payload
   updateSpoofer();        // relabel the device-type well to "Spam All"
