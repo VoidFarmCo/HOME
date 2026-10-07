@@ -57,6 +57,13 @@ def main():
     anyuse = any("Mcp23017::writeAny" in f.read_text(encoding="utf-8", errors="replace")
                  for f in files)
     ok("the expander-aware helpers are used", anyuse)
+    sb = (SKETCH / "SpiBus.cpp").read_text(encoding="utf-8", errors="replace") if (SKETCH / "SpiBus.cpp").is_file() else ""
+    ut = (SKETCH / "utils.cpp").read_text(encoding="utf-8", errors="replace") if (SKETCH / "utils.cpp").is_file() else ""
+    ok("parkCs() routes CS through the MCP23017 (not raw GPIO)",
+       "Mcp23017::writeAny(pin" in sb and "Mcp23017::pinModeAny(pin" in sb)
+    ok("the CE_PIN_3 release routes through the MCP23017",
+       "Mcp23017::writeAny(CE_PIN_3" in ut)
+
 
     print()
     if FAILED:

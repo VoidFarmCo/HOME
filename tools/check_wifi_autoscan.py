@@ -55,6 +55,11 @@ def main():
     ok("the loop polls scanComplete() to finish the async scan in place",
        "WiFi.scanComplete()" in body and "s_bgScanPending = false" in body)
 
+    # The list is sticky: scans merge by BSSID + age out, not replace, so the
+    # count does not flicker while standing still.
+    ok("fillWifiCache merges by BSSID (sticky), not replace",
+       "memcmp(s_cache[j].bssid" in src and "WIFI_STICKY_GENS" in src)
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS))

@@ -1,3 +1,4 @@
+#include "Mcp23017.h"
 #include "SpiBus.h"
 
 #include <SPI.h>
@@ -89,8 +90,11 @@ void parkCs(int8_t pin) {
   if (pin < 0) {
     return;
   }
-  pinMode(pin, OUTPUT);
-  digitalWrite(pin, HIGH);
+  /* Chip-selects on the MCP23017 (pin >= PIN_BASE) are NOT real GPIOs; raw
+   * pinMode/digitalWrite on them makes the Arduino core log an invalid-pin
+   * error every bus claim. Route through the expander. */
+  Mcp23017::pinModeAny(pin, OUTPUT);
+  Mcp23017::writeAny(pin, HIGH);
 }
 
 /* The spi_t the shared peripheral is running on under the global SPI object,

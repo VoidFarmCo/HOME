@@ -2606,25 +2606,50 @@ static int last_rendered_index = -1;
 /* Stable snapshot of the last completed scan. The list/detail/station views
  * draw from this, not the live WiFi driver buffer, so a background re-scan can
  * run (buffer mid-scan / deleted) without the list glitching. */
-struct WifiNet { char ssid[33]; int rssi; uint8_t ch; int auth; uint8_t bssid[6]; };
+struct WifiNet { char ssid[33]; int rssi; uint8_t ch; int auth; uint8_t bssid[6]; uint32_t lastGen; };
 static constexpr int WIFI_CACHE_CAP = 48;
+/* A network stays in the list until it has been MISSING for this many scans.
+ * A single WiFi scan is probabilistic -- a weak AP shows up in one pass and not
+ * the next -- so without this the count flickers (3..14) while standing still.
+ * Sticky keeps the view stable and only drops APs that are really gone. */
+static constexpr uint32_t WIFI_STICKY_GENS = 4;
 static WifiNet s_cache[WIFI_CACHE_CAP];
 static int s_cacheCount = 0;
+static uint32_t s_scanGen = 0;
 
+/* Merge this scan into the cache by BSSID (update or add), then age out any AP
+ * not seen in the last WIFI_STICKY_GENS scans. The list is sticky, not replaced. */
 static void fillWifiCache() {
   int n = WiFi.scanComplete();
   if (n < 0) return;                 // mid-scan/failed: keep the previous snapshot
-  if (n > WIFI_CACHE_CAP) n = WIFI_CACHE_CAP;
+  s_scanGen++;
   for (int i = 0; i < n; i++) {
-    strncpy(s_cache[i].ssid, WiFi.SSID(i).c_str(), 32);
-    s_cache[i].ssid[32] = 0;
-    s_cache[i].rssi = WiFi.RSSI(i);
-    s_cache[i].ch   = (uint8_t)WiFi.channel(i);
-    s_cache[i].auth = WiFi.encryptionType(i);
+    uint8_t bssid[6];
     const uint8_t* b = WiFi.BSSID(i);
-    if (b) memcpy(s_cache[i].bssid, b, 6); else memset(s_cache[i].bssid, 0, 6);
+    if (b) memcpy(bssid, b, 6); else memset(bssid, 0, 6);
+    int slot = -1;
+    for (int j = 0; j < s_cacheCount; j++) {
+      if (memcmp(s_cache[j].bssid, bssid, 6) == 0) { slot = j; break; }
+    }
+    if (slot < 0 && s_cacheCount < WIFI_CACHE_CAP) slot = s_cacheCount++;
+    if (slot < 0) continue;          // cache full: ignore extra APs this pass
+    strncpy(s_cache[slot].ssid, WiFi.SSID(i).c_str(), 32);
+    s_cache[slot].ssid[32] = 0;
+    s_cache[slot].rssi = WiFi.RSSI(i);
+    s_cache[slot].ch   = (uint8_t)WiFi.channel(i);
+    s_cache[slot].auth = WiFi.encryptionType(i);
+    memcpy(s_cache[slot].bssid, bssid, 6);
+    s_cache[slot].lastGen = s_scanGen;
   }
-  s_cacheCount = n;
+  // Drop APs missing for too many scans (compact the array in place).
+  int w = 0;
+  for (int j = 0; j < s_cacheCount; j++) {
+    if (s_scanGen - s_cache[j].lastGen <= WIFI_STICKY_GENS) {
+      if (w != j) s_cache[w] = s_cache[j];
+      w++;
+    }
+  }
+  s_cacheCount = w;
 }
 
 static void drawNetworkRow(int i, int y, bool isSel) {

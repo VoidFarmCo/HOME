@@ -1106,8 +1106,8 @@ static void sdReleaseOtherChipSelects() {
   SpiBus::deselectAll();
   // Scanner bit-bangs CE/CSN on these pins; keep CE low / CSN high after leaving.
 #if defined(CE_PIN_3)
-  pinMode(CE_PIN_3, OUTPUT);
-  digitalWrite(CE_PIN_3, LOW);
+  Mcp23017::pinModeAny(CE_PIN_3, OUTPUT);
+  Mcp23017::writeAny(CE_PIN_3, LOW);
 #endif
 }
 
@@ -1142,7 +1142,6 @@ bool sdMountChipSelect(uint8_t cs) {
 }
 
 void initSDCard() {
-
 #ifdef SD_CD
   pinMode(SD_CD, INPUT_PULLUP);
 #endif
