@@ -439,37 +439,8 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #define SD_CS_PIN 5
 #endif
 
-/* PN532 RFID/NFC (SPI).
- * CYD has few spare GPIOs; these are suggested external wiring defaults.
- * Override any pin below if your wiring differs. Requires Adafruit PN532 library. */
-#ifndef PN532_SCK
-#if defined(BOARD_CYD)
-#define PN532_SCK  18
-#else
-#define PN532_SCK  12
-#endif
-#endif
-#ifndef PN532_MISO
-#if defined(BOARD_CYD)
-#define PN532_MISO 19
-#else
-#define PN532_MISO 11
-#endif
-#endif
-#ifndef PN532_MOSI
-#if defined(BOARD_CYD)
-#define PN532_MOSI 23
-#else
-#define PN532_MOSI 13
-#endif
-#endif
-#ifndef PN532_SS
-#if defined(BOARD_CYD)
-#define PN532_SS   25
-#else
-#define PN532_SS   5
-#endif
-#endif
+/* PN532 RFID/NFC removed (feature dropped). board_pueo.h keeps its own
+ * PN532_SS for upstream; nothing on board_home defines these. */
 
 /* UART (if you use hardware serial on external pins) */
 #ifndef RX_PIN

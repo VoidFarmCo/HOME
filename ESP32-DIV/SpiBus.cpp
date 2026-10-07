@@ -61,15 +61,13 @@ const Profile kProfiles[] = {
                 4000000, SPI_MODE0, MSBFIRST, true},
   /* Nrf24  */ {"nrf24",  CSN_PIN_1, NRF24_SPI_SCK, NRF24_SPI_MISO, NRF24_SPI_MOSI,
                 10000000, SPI_MODE0, MSBFIRST, true},
-  /* Pn532  */ {"pn532",  PN532_SS, PN532_SCK, PN532_MISO, PN532_MOSI,
-                0, SPI_MODE0, LSBFIRST, false},
 };
 static_assert(sizeof(kProfiles) / sizeof(kProfiles[0]) == (size_t)Dev::Count,
               "SpiBus: profile table does not match Dev");
 
 /* Every chip select on the shared bus, so a claim can park the others. */
 const int8_t kAllChipSelects[] = {
-  SD_CS, CC1101_CS, PN532_SS, CSN_PIN_1,
+  SD_CS, CC1101_CS, CSN_PIN_1,
 #if CSN_PIN_2 != CSN_PIN_1
   CSN_PIN_2,
 #endif
@@ -271,11 +269,6 @@ void park() {
       spiDetachMOSI(bus, old.mosi);
     }
   }
-
-  // Pads the PN532 bit-bang may have left configured as plain GPIO.
-  gpio_reset_pin((gpio_num_t)PN532_SCK);
-  gpio_reset_pin((gpio_num_t)PN532_MISO);
-  gpio_reset_pin((gpio_num_t)PN532_MOSI);
 
   deselectAll();
 

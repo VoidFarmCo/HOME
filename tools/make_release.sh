@@ -151,6 +151,7 @@ INCLUDE=(
   "tools/check_home_clock.py"
   "tools/check_home_grid.py"
   "tools/check_chat_name.py"
+  "tools/check_no_rfid.py"
   "tools/check_comms_chat.py"
   "tools/check_chat_keyboard.py"
   "tools/check_lora_mesh.py"

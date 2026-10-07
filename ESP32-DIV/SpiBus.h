@@ -39,7 +39,6 @@ enum class Dev : uint8_t {
   Sd,
   Cc1101,   // ELECHOUSE driver uses raw SPI.transfer(), so WE own its clock
   Nrf24,    // Nrf24Raw uses bare SPI.transfer(), so WE own its clock
-  Pn532,    // Adafruit_PN532 in software-SPI mode: bit-bangs these pads
   Count
 };
 

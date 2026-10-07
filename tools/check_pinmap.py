@@ -140,7 +140,6 @@ SIGNALS = {
     "SD_SCLK": "VSPI SCK",
     "CC1101_CS": "CC1101 CS", "CC1101_GDO0": "CC1101 GDO0 (TX)",
     "CC1101_GDO2": "CC1101 GDO2 (RX)",
-    "PN532_SS": "PN532 SS",
     "CE_PIN_1": "NRF24 CE", "CSN_PIN_1": "NRF24 CSN",
     "CE_PIN_2": "NRF24 #2 CE", "CSN_PIN_2": "NRF24 #2 CSN",
     "CE_PIN_3": "NRF24 #3 CE", "CSN_PIN_3": "NRF24 #3 CSN",
@@ -158,8 +157,7 @@ OPTIONAL = {"MCP23017_SDA", "MCP23017_SCL", "LORA_CS", "LORA_RESET", "LORA_BUSY"
 
 # Bus lines are shared on purpose; never report them against each other.
 SHARED_BUS = {"SD_MOSI", "SD_MISO", "SD_SCLK",
-              "CC1101_SCK", "CC1101_MOSI", "CC1101_MISO",
-              "PN532_SCK", "PN532_MOSI", "PN532_MISO"}
+              "CC1101_SCK", "CC1101_MOSI", "CC1101_MISO"}
 
 # Single-module build: alias -> the _1 macro it is expected to mirror. Sharing
 # a pad with that macro is intentional; sharing one with anything else is not.

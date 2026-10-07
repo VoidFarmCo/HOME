@@ -1,7 +1,6 @@
 #include "shared.h"
 #include "utils.h"
 #include "Nrf24Raw.h"
-#include "rfid.h"
 
 /* The bounded, bus-safe CC1101 presence check from subghz.cpp. NOT the ELECHOUSE
  * library: its Init()/getCC1101()/SpiReadStatus() all open with an unbounded
@@ -25,10 +24,6 @@ static bool probeNrf24() {
   const bool p = Nrf24Raw::present();
   Nrf24Raw::stop();
   return p;
-}
-
-static bool probePn532() {
-  return RfidNfc::begin();               // true when the firmware version reads back
 }
 
 static void row(int& y, const char* name, const char* pins, bool present) {
@@ -60,7 +55,6 @@ static void runProbes() {
   row(y, "SD card", "CS5",       isSDCardAvailable());
   row(y, "CC1101",  "CS21 G22/35", probeCC1101());
   row(y, "NRF24",   "CE16 CSN25",  probeNrf24());
-  row(y, "PN532",   "SS17",        probePn532());
 
   tft.setTextColor(0x8410, TFT_BLACK);
   tft.setCursor(8, y + 6);

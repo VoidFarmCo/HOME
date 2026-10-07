@@ -168,14 +168,6 @@ def main():
             ok("  and refuses before it touches the radio", gate < radio,
                "the gate is after the first radio call")
 
-    print("\nRFID is gated once, where all of it is launched:")
-    ino = (SKETCH / "ESP32-DIV.ino").read_text(encoding="utf-8", errors="replace")
-    rfid = func_body(ino, "static void otherRfidPlaceholderAction(int idx)")
-    # Reading a card energises the field and waits for an answer, so "read"
-    # transmits as much as "clone" -- the whole menu is one gate.
-    ok("otherRfidPlaceholderAction refuses",
-       bool(rfid) and "Stealth::refuse" in rfid)
-
     print("\nthe scans that transmit while looking like receivers go quiet:")
     for fname in ("wifi.cpp", "gps.cpp", "bluetooth.cpp"):
         src = read(fname)

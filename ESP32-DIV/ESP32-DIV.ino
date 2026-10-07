@@ -22,7 +22,6 @@
 #include "Mcp23017.h"
 #include "icon.h"
 #include "gps.h"
-#include "rfid.h"
 #include "shared.h"
 #include "utils.h"
 
@@ -51,7 +50,7 @@ bool feature_exit_requested = false;
  * Proto Kill, ESB Sniffer, MouseJack -- and naming it by its band put it in
  * competition with the two tiles above it, which are also 2.4 GHz radios.
  * Somebody looking for the BLE jammer had a sound reason to open it. */
-const int NUM_MENU_ITEMS = 8;
+const int NUM_MENU_ITEMS = 7;
 const char *menu_items[NUM_MENU_ITEMS] = {
     "WiFi",
     "NRF24",
@@ -59,7 +58,6 @@ const char *menu_items[NUM_MENU_ITEMS] = {
     "GPS",
     "Bluetooth",
     "SubGHz",
-    "RFID/NFC",
     "System"};
 
 /* These names are upstream's and several no longer describe where they are
@@ -75,7 +73,6 @@ const unsigned char *bitmap_icons[NUM_MENU_ITEMS] = {
     bitmap_icon_satellite,
     bitmap_icon_spoofer,
     bitmap_icon_analyzer,
-    bitmap_icon_rfid_chip,
     bitmap_icon_setting};
 
 int current_menu_index = 0;
@@ -201,18 +198,6 @@ const char *other_submenu_items[other_NUM_SUBMENU_ITEMS] = {
     "Drone Detector",
     "Main Menu"};
 
-const int rfid_NUM_SUBMENU_ITEMS = 9;
-const char *rfid_submenu_items[rfid_NUM_SUBMENU_ITEMS] = {
-    "Card Reader",
-    "Card Clone",
-    "Erase",
-    "Dump",
-    "Decode Access",
-    "Jam Reader",
-    "Tag Disrupt",
-    "Disrupt Emulate",
-    "Back to Main Menu"};
-
 const int gps_NUM_SUBMENU_ITEMS = 3;
 const char *gps_submenu_items[gps_NUM_SUBMENU_ITEMS] = {
     "Wardriver",
@@ -324,18 +309,6 @@ const unsigned char *tools_submenu_icons[tools_NUM_SUBMENU_ITEMS] = {
 const unsigned char *other_submenu_icons[other_NUM_SUBMENU_ITEMS] = {
     bitmap_icon_eye,
     bitmap_icon_satellite,
-    bitmap_icon_go_back
-};
-
-const unsigned char *rfid_submenu_icons[rfid_NUM_SUBMENU_ITEMS] = {
-    bitmap_icon_magnifying_glass,
-    bitmap_icon_follow,
-    bitmap_icon_recycle,
-    bitmap_icon_dot_matrix,
-    bitmap_icon_key,
-    bitmap_icon_kill,
-    bitmap_icon_flash,
-    bitmap_icon_devil,
     bitmap_icon_go_back
 };
 
@@ -577,11 +550,6 @@ void updateActiveSubmenu() {
             active_submenu_icons = subghz_submenu_icons;
             break;
         case 6:
-            active_submenu_items = rfid_submenu_items;
-            active_submenu_size = rfid_NUM_SUBMENU_ITEMS;
-            active_submenu_icons = rfid_submenu_icons;
-            break;
-        case 7:
             active_submenu_items = tools_submenu_items;
             active_submenu_size = tools_NUM_SUBMENU_ITEMS;
             active_submenu_icons = tools_submenu_icons;
@@ -1187,7 +1155,6 @@ namespace Nrf24Raw { bool begin(); }
 enum HwProbe : uint8_t { HW_UNKNOWN = 0, HW_THERE, HW_ABSENT };
 static HwProbe s_hwNrf  = HW_UNKNOWN;
 static HwProbe s_hwCc   = HW_UNKNOWN;
-static HwProbe s_hwNfc  = HW_UNKNOWN;
 
 static const char* submenuHardwareNote(int menuIndex) {
     switch (menuIndex) {
@@ -1201,11 +1168,6 @@ static const char* submenuHardwareNote(int menuIndex) {
                 s_hwCc = subghzCc1101Present() ? HW_THERE : HW_ABSENT;
             }
             return (s_hwCc == HW_ABSENT) ? "no CC1101" : nullptr;
-        case 6:   /* RFID/NFC */
-            if (s_hwNfc == HW_UNKNOWN) {
-                s_hwNfc = RfidNfc::begin() ? HW_THERE : HW_ABSENT;
-            }
-            return (s_hwNfc == HW_ABSENT) ? "no PN532" : nullptr;
         default:
             return nullptr;
     }
@@ -1429,7 +1391,6 @@ void displayMenu() {
   applyThemeToPalette(settings().theme);
 
 const uint16_t icon_colors[NUM_MENU_ITEMS] = {
-  UI_ICON,
   UI_ICON,
   UI_ICON,
   UI_ICON,
@@ -3594,7 +3555,6 @@ static void launchToolsFeature(int idx) {
 }
 
 static void launchGpsFeature(int idx)  { otherGpsPlaceholderAction(idx); }
-static void launchRfidFeature(int idx) { otherRfidPlaceholderAction(idx); }
 
 /* GPS, RFID/NFC and System are plain lists and differ only in what a row
  * launches and which row is Back, so they share this rather than carrying
@@ -3668,36 +3628,6 @@ void handleListSubmenuButtons(void (*launch)(int), int backIdx) {
     }
 }
 
-static void otherDismissPlaceholder() {
-    delay(25);
-    while (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
-        delay(5);
-    }
-    while (!isButtonPressed(BTN_SELECT) && !isButtonPressed(BTN_LEFT)) {
-        int x = 0, y = 0;
-        if (!readTouchXYDismiss(x, y) && !readTouchXY(x, y)) {
-            delay(12);
-            continue;
-        }
-        if (isNotificationVisible()) {
-            NotificationAction a = notificationHandleTouch(x, y);
-            if (a != NotificationAction::None) {
-                break;
-            }
-            hideNotification();
-        }
-        break;
-    }
-    if (in_sub_menu) {
-        submenu_initialized = false;
-        if (current_menu_index == 2) {
-            other_menu_grid_initialized = false;
-            last_other_menu_index = -1;
-        }
-        displaySubmenu();
-    }
-}
-
 static void otherRfidReturnGuard() {
     delay(120);
     for (int i = 0; i < 120; i++) {
@@ -3709,73 +3639,6 @@ static void otherRfidReturnGuard() {
         delay(5);
     }
     delay(120);
-}
-
-static void otherRfidPlaceholderAction(int idx) {
-    feature_active = true;
-    /* All of RFID/NFC, not one entry of it. A PN532 reads a card by
-     * energising a 13.56 MHz field and waiting for the card to answer, so
-     * "read" transmits exactly as much as "clone" does. Gated here because
-     * every entry in that menu comes through this one function. */
-    if (Stealth::refuse("RFID/NFC")) { feature_active = false; return; }
-    if (!RfidNfc::begin()) {
-        /* Same panel and the same amount of help as the nRF24 and CC1101
-         * messages. The DIP switches are in here because a PN532 left in
-         * I2C mode is the commonest reason one is fitted, wired and silent,
-         * and nothing on the board says which mode it is in. */
-        showNotification("RFID/NFC",
-                         "needs the PN532, and nothing answered on the SPI "
-                         "bus. Check the module is fitted and that MISO, "
-                         "MOSI, SCK and SS are wired, and that its DIP "
-                         "switches are set for SPI: CH1 off, CH2 on.");
-        otherDismissPlaceholder();
-        feature_active = false;
-        return;
-    }
-    feature_exit_requested = false;
-    setTouchButtonInputEnabled(true);
-    for (;;) {
-        RfidNfc::clearSessionRetry();
-        switch (idx) {
-            case 0:
-                RfidNfc::sessionCardReader();
-                break;
-            case 1:
-                RfidNfc::sessionClone();
-                break;
-            case 2:
-                RfidNfc::sessionErase();
-                break;
-            case 3:
-                RfidNfc::sessionDump();
-                break;
-            case 4:
-                RfidNfc::sessionDecodeAccess();
-                break;
-            case 5:
-                RfidNfc::sessionJamReader();
-                break;
-            case 6:
-                RfidNfc::sessionTagDisrupt();
-                break;
-            case 7:
-                RfidNfc::sessionDisruptEmulate();
-                break;
-            default:
-                feature_active = false;
-                restoreSdAfterSharedSpi();
-                return;
-        }
-        if (feature_exit_requested || !RfidNfc::consumeSessionRetry()) {
-            break;
-        }
-        feature_exit_requested = false;
-    }
-    restoreSdAfterSharedSpi();
-    otherRfidReturnGuard();
-    submenu_initialized = false;
-    displaySubmenu();
-    feature_active = false;
 }
 
 static void otherGpsPlaceholderAction(int idx) {
@@ -4449,9 +4312,7 @@ void handleButtons() {
                                              gps_NUM_SUBMENU_ITEMS - 1); break;
             case 4: handleBluetoothSubmenuButtons(); break;
             case 5: handleSubGHzSubmenuButtons(); break;
-            case 6: handleListSubmenuButtons(launchRfidFeature,
-                                             rfid_NUM_SUBMENU_ITEMS - 1); break;
-            case 7: handleListSubmenuButtons(launchToolsFeature,
+            case 6: handleListSubmenuButtons(launchToolsFeature,
                                              TOOLS_IDX_BACK); break;
             default: break;
         }
@@ -4493,13 +4354,16 @@ void handleButtons() {
 
         if (isButtonPressed(BTN_RIGHT) && !is_main_menu) {
             int row = current_menu_index % 4;
+            int cand;
             if (current_menu_index < 4) {
-                current_menu_index = row + 4;
-            } else if (current_menu_index == 7) {
-                current_menu_index = 0;
+                cand = row + 4;
+            } else if (current_menu_index == NUM_MENU_ITEMS - 1) {
+                cand = 0;
             } else {
-                current_menu_index = row + 5;
+                cand = row + 5;
             }
+            if (cand >= NUM_MENU_ITEMS) cand = 0;   /* ragged last column after RFID removal */
+            current_menu_index = cand;
             last_interaction_time = millis();
             displayMenu();
             delay(200);

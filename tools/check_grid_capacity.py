@@ -92,7 +92,6 @@ def main():
         "NRF24": ["nrf_submenu_items"],
         "SubGHz": ["subghz_submenu_items"],
         "System": ["tools_submenu_items"],
-        "RFID/NFC": ["rfid_submenu_items"],
         "GPS": ["gps_submenu_items"],
         "Detect": ["other_submenu_items"],
     }

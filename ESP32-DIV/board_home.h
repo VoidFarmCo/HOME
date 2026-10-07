@@ -64,9 +64,6 @@
 #define CE_PIN_3  CE_PIN_1
 #define PUEO_NRF24_MODULE_COUNT 1
 
-/* No PN532/RFID on this board (RFID is being dropped). -1 = unassigned. */
-#define PN532_SS -1
-
 /* ── LoRa (Core1262 / SX1262) ─────────────────────────────────────────────────
  * Shares the SPI header bus (18/23/19). CS + RESET on the MCP23017 (slow, fine
  * on the expander); BUSY on a DIRECT input (IO39) because the host must poll it
