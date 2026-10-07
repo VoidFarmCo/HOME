@@ -1385,6 +1385,16 @@ void displayOtherMenuGrid() {
 
 
 void displayMenu() {
+    /* A tool launched from the purpose-tile home must NOT repaint the retired
+     * radio menu on exit -- toolRun() returns to drawPlaybookHome(). Without
+     * this, exiting a feature flashed the old menu ("old screen popping up"),
+     * and worse: toolRun sets current_menu_index to the tool CATEGORY (Tools = 7),
+     * which is past menu_items[] (7 entries after RFID removal) -> an OOB
+     * char* -> TFT_eSPI::textWidth crash. */
+    if (g_toolFromHome || in_playbook_home) return;
+    if (current_menu_index < 0 || current_menu_index >= NUM_MENU_ITEMS) {
+        current_menu_index = 0;  // bounds safety for every other caller
+    }
     bleQuietDown();  /* a menu is up, so nothing may be transmitting */
 
   setTouchButtonInputEnabled(false);

@@ -152,6 +152,7 @@ INCLUDE=(
   "tools/check_profile_persist.py"
   "tools/check_profile_picker.py"
   "tools/check_playbook_dispatch.py"
+  "tools/check_menu_bounds.py"
   "tools/check_home_clock.py"
   "tools/check_home_grid.py"
   "tools/check_chat_name.py"
