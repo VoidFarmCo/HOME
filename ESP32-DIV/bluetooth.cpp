@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "DeviceInfo.h"
 #include "Stealth.h"
 #include "SettingsStore.h"
@@ -4132,6 +4133,19 @@ static void bleScanClearBody() {
   }
 }
 
+/* Continuous BLE scan on/off (Stop/Start button); on by default. Re-scan gap
+ * timed from scan COMPLETION, like the WiFi scanner. */
+static bool s_bleAutoScan = true;
+static unsigned long s_bleScanEndMs = 0;
+/* Small gap between background scans (continuous feel; brief radio breather). */
+static constexpr unsigned long BLE_AUTO_RESCAN_MS = 1500;
+static constexpr uint32_t BLE_SCAN_SECS = 3;        // per background pass
+static bool s_blePending = false;                   // an async scan is running
+static volatile bool s_bleDone = false;             // set by the scan-ended callback
+static char (*s_bleCache)[24] = nullptr;             // name snapshot (heap; list draws this)
+static int  s_bleCacheCount = 0;
+static void fillBleCache();                          // defined after startBLEScan
+
 static void bleScanUpdateNavLabels() {
   if (!featureHasTouchNavBar()) {
     return;
@@ -4139,7 +4153,7 @@ static void bleScanUpdateNavLabels() {
   if (isDetailView) {
     setTouchNavLabels("Scan", "Next", "Exit", "Prev", "Back");
   } else {
-    setTouchNavLabels("Scan", "Next", "Exit", "Prev", "View");
+    setTouchNavLabels(s_bleAutoScan ? "Stop" : "Start", "Next", "Exit", "Prev", "View");
   }
   redrawTouchButtonBar();
 }
@@ -4272,12 +4286,48 @@ void startBLEScan() {
   bleResults = bleScan->start(5, false);
   fgBleScanInProgress = false;
   isScanning = false;
+  s_bleScanEndMs = millis();
+  fillBleCache();
   screenNeedsUpdate = true;
 
   if (bleResults.getCount() >= 0) {
     bgHasResults = (bleResults.getCount() > 0);
     bgLastScanMs = millis();
   }
+}
+
+/* Snapshot the last completed scan into s_bleCache so the list can draw while a
+ * new scan runs. bleResults is refreshed too, for the (paused) detail view. */
+static void fillBleCache() {
+  if (!s_bleCache) {
+    s_bleCache = (char(*)[24])malloc(48 * 24);
+    if (!s_bleCache) { s_bleCacheCount = 0; return; }
+  }
+  bleResults = bleScan->getResults();
+  int n = bleResults.getCount();
+  if (n > 48) n = 48;
+  for (int i = 0; i < n; i++) {
+    BLEAdvertisedDevice d = bleResults.getDevice(i);
+    String nm = d.getName().length() > 0 ? d.getName().c_str() : "Unknown";
+    strncpy(s_bleCache[i], nm.c_str(), 23);
+    s_bleCache[i][23] = 0;
+  }
+  s_bleCacheCount = n;
+}
+
+static void bleScanEndedCB(BLEScanResults) { s_bleDone = true; }
+
+/* Non-blocking background scan: NimBLE scans for BLE_SCAN_SECS in its own task
+ * and calls bleScanEndedCB when done; bleScanLoop() snapshots + repaints in
+ * place. No Scanning takeover, no freeze. */
+static void startBLEScanAsync() {
+  if (s_blePending) return;
+  pauseBackgroundRadioTasks();
+  if (bgBleScanRunning) stopBgBleScanIfRunning();
+  ensureBleInit();
+  s_bleDone = false;
+  s_blePending = true;
+  bleScan->start(BLE_SCAN_SECS, bleScanEndedCB, false);
 }
 
 void handleButtons() {
@@ -4303,7 +4353,7 @@ void handleButtons() {
   }
 
   if (isButtonPressed(BTN_DOWN)) {
-    if (currentIndex < bleResults.getCount() - 1) {
+    if (currentIndex < s_bleCacheCount - 1) {
       currentIndex++;
       delay(200);
       if (!isDetailView) {
@@ -4334,7 +4384,9 @@ void handleButtons() {
       isDetailView = false;
       fullScreenUpdate = true;
     } else if (!isScanning) {
-      startBLEScan();
+      s_bleAutoScan = !s_bleAutoScan;        // Stop/Start the continuous scan
+      if (s_bleAutoScan) startBLEScanAsync();  // Start: background scan; Stop: hold list
+      bleScanUpdateNavLabels();              // reflect Stop/Start on the button
       fullScreenUpdate = true;
     }
     screenNeedsUpdate = true;
@@ -4343,7 +4395,7 @@ void handleButtons() {
 }
 
 void updateBLEList() {
-  int deviceCount = bleResults.getCount();
+  int deviceCount = s_bleCacheCount;
   tft.setTextSize(1);
 
   if (deviceCount <= 0) {
@@ -4373,8 +4425,8 @@ void updateBLEList() {
 
     // Clear only this row (avoid overlapping next row).
     tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
-    BLEAdvertisedDevice device = bleResults.getDevice(idx);
-    String name = device.getName().length() > 0 ? device.getName().c_str() : "Unknown";
+    if (!s_bleCache) return;
+    String name = s_bleCache[idx];
     if (name.length() > 22) name = name.substring(0, 22) + "...";
 
     tft.setCursor(10, y);
@@ -4892,6 +4944,21 @@ void bleScanLoop() {
 
   runUI();
   updateStatusBar();
+
+  /* An async scan finished: snapshot it, repaint the list in place (no freeze,
+   * no Scanning takeover), then kick the next pass -> continuous, wardriver-style. */
+  if (s_blePending && s_bleDone) {
+    s_blePending = false;
+    s_bleDone = false;
+    s_bleScanEndMs = millis();
+    fillBleCache();
+    bgHasResults = (s_bleCacheCount > 0);
+    screenNeedsUpdate = true;
+  }
+  if (s_bleAutoScan && !s_blePending && !isScanning && !isDetailView &&
+      currentIndex == 0 && (millis() - s_bleScanEndMs) >= BLE_AUTO_RESCAN_MS) {
+    startBLEScanAsync();
+  }
 
   if (screenNeedsUpdate) {
     screenNeedsUpdate = false;

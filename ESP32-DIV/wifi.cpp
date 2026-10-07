@@ -2330,6 +2330,9 @@ bool isScanning = false;
 /* Continuous scan on/off, driven by the Stop/Start button. On by default
  * so the list stays live; Stop holds the current results. */
 static bool s_autoScan = true;
+/* A background (async) scan is in flight: the list stays on screen untouched
+ * until results land, so continuous re-scans never flash the Scanning view. */
+static bool s_bgScanPending = false;
 bool exitRequested = false;
 
 /* ── Station scanner ─────────────────────────────────────────────────────
@@ -2523,9 +2526,10 @@ bool loadApListFromWifiCache(wifi_ap_record_t** ap_list, int* network_count,
 }
 
 unsigned long scan_StartTime = 0;
-/* Continuous scan: re-scan this long after the last one while the user is
- * watching the list. ~8 s keeps it live without hammering the radio. */
-static constexpr unsigned long WIFI_AUTO_RESCAN_MS = 8000;
+/* Continuous scan: minimum gap between background re-scans while watching the
+ * list. Small -> results trickle in continuously (wardriver feel); not zero, so
+ * the radio gets a brief breather between passes. */
+static constexpr unsigned long WIFI_AUTO_RESCAN_MS = 2000;
 /* When the last foreground scan FINISHED. The auto-rescan gap is measured
  * from here, not from scan start -- a scan can run longer than the gap, and
  * timing from start made it finish already overdue and loop forever. */
@@ -2599,14 +2603,38 @@ static void drawTabBar(const char* leftButton, bool leftDisabled,
 static int last_rendered_page = -1;
 static int last_rendered_index = -1;
 
+/* Stable snapshot of the last completed scan. The list/detail/station views
+ * draw from this, not the live WiFi driver buffer, so a background re-scan can
+ * run (buffer mid-scan / deleted) without the list glitching. */
+struct WifiNet { char ssid[33]; int rssi; uint8_t ch; int auth; uint8_t bssid[6]; };
+static constexpr int WIFI_CACHE_CAP = 48;
+static WifiNet s_cache[WIFI_CACHE_CAP];
+static int s_cacheCount = 0;
+
+static void fillWifiCache() {
+  int n = WiFi.scanComplete();
+  if (n < 0) return;                 // mid-scan/failed: keep the previous snapshot
+  if (n > WIFI_CACHE_CAP) n = WIFI_CACHE_CAP;
+  for (int i = 0; i < n; i++) {
+    strncpy(s_cache[i].ssid, WiFi.SSID(i).c_str(), 32);
+    s_cache[i].ssid[32] = 0;
+    s_cache[i].rssi = WiFi.RSSI(i);
+    s_cache[i].ch   = (uint8_t)WiFi.channel(i);
+    s_cache[i].auth = WiFi.encryptionType(i);
+    const uint8_t* b = WiFi.BSSID(i);
+    if (b) memcpy(s_cache[i].bssid, b, 6); else memset(s_cache[i].bssid, 0, 6);
+  }
+  s_cacheCount = n;
+}
+
 static void drawNetworkRow(int i, int y, bool isSel) {
   char buf[kRowBufChars];
   char ssid[kSsidField + 1];
-  fitSsid(ssid, WiFi.SSID(i).c_str());
+  fitSsid(ssid, s_cache[i].ssid);
 
-  const int rssi = WiFi.RSSI(i);
-  const int ch = WiFi.channel(i);
-  const int auth = WiFi.encryptionType(i);
+  const int rssi = s_cache[i].rssi;
+  const int ch = s_cache[i].ch;
+  const int auth = s_cache[i].auth;
   const char* enc = (auth == WIFI_AUTH_OPEN) ? "OPEN" : "WPA2";
   snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s", i + 1, kSsidField, ssid, rssi, ch, enc);
 
@@ -2624,7 +2652,7 @@ static void drawNetworkRow(int i, int y, bool isSel) {
 
 void displayWiFiList(bool fullRedraw = false) {
   uiDrawn = false;
-  int networkCount = WiFi.scanComplete();
+  int networkCount = s_cacheCount;
 
   if (fullRedraw) {
     tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
@@ -2751,6 +2779,7 @@ void startWiFiScan() {
   fgWifiScanInProgress = false;
   isScanning = false;
   s_lastScanEndMs = millis();
+  fillWifiCache();
 
   if (numNetworks >= 0) {
     bgHasResults = true;
@@ -2760,11 +2789,28 @@ void startWiFiScan() {
   displayWiFiList(true);
 }
 
+/* Non-blocking re-scan for continuous mode: kick the async scan and return at
+ * once, leaving the current list drawn. wifiscanLoop() polls WiFi.scanComplete()
+ * and repaints in place when results arrive -- no Scanning takeover, no freeze. */
+void startWiFiScanAsync() {
+  if (s_bgScanPending) return;
+  scan_StartTime = millis();
+  pauseBackgroundRadioTasks();
+  if (bgScanRunning) stopBgWifiScanIfRunning();
+  WiFi.scanDelete();
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  const uint32_t dwell = wifiStaScanMsPerChannel();
+  fgWifiScanInProgress = true;
+  WiFi.scanNetworks(true, true, Stealth::on(), dwell);   // async: do not wait
+  s_bgScanPending = true;
+}
+
 void displayWiFiDetails() {
   uiDrawn = false;
   wifiScanClearBody();
 
-  const int networkCount = WiFi.scanComplete();
+  const int networkCount = s_cacheCount;
   if (networkCount <= 0) {
     isDetailView = false;
     displayWiFiList(true);
@@ -2773,11 +2819,15 @@ void displayWiFiDetails() {
   if (currentIndex < 0) currentIndex = 0;
   if (currentIndex >= networkCount) currentIndex = networkCount - 1;
 
-  String ssid = WiFi.SSID(currentIndex);
-  String bssid = WiFi.BSSIDstr(currentIndex);
-  int rssi = WiFi.RSSI(currentIndex);
-  int channel = WiFi.channel(currentIndex);
-  int encryption = WiFi.encryptionType(currentIndex);
+  const WifiNet& d = s_cache[currentIndex];
+  String ssid = String(d.ssid);
+  char bb[18];
+  snprintf(bb, sizeof(bb), "%02X:%02X:%02X:%02X:%02X:%02X",
+           d.bssid[0], d.bssid[1], d.bssid[2], d.bssid[3], d.bssid[4], d.bssid[5]);
+  String bssid = String(bb);
+  int rssi = d.rssi;
+  int channel = d.ch;
+  int encryption = d.auth;
   bool isHidden = (ssid.length() == 0);
   int y = 50;
 
@@ -2848,7 +2898,7 @@ void handleButton() {
   }
 
   if (isButtonPressed(BTN_DOWN)) {
-    if (!isDetailView && currentIndex < WiFi.scanComplete() - 1) {
+    if (!isDetailView && currentIndex < s_cacheCount - 1) {
       currentIndex++;
       delay(200);
       current_page = currentIndex / max(1, wifiNetworksPerPage());
@@ -2872,7 +2922,7 @@ void handleButton() {
       isDetailView = false;
     } else if (!isScanning) {
       s_autoScan = !s_autoScan;          // Stop/Start the continuous scan
-      if (s_autoScan) startWiFiScan();   // Start: scan now; Stop: hold the list
+      if (s_autoScan) startWiFiScanAsync();   // Start: background scan; Stop: hold the list
       wifiScanUpdateNavLabels();         // reflect Stop/Start on the button
     }
     updated = true;
@@ -2958,7 +3008,7 @@ void runUI() {
                     }
                 }
             } else if (!isScanning) {
-                const int networkCount = WiFi.scanComplete();
+                const int networkCount = s_cacheCount;
 
                 // Deauther-like bottom bar has a large touch hitbox.
                 if (!featureHasTouchNavBar() && y >= 290 && y <= 320) {
@@ -3138,11 +3188,11 @@ static void stationBeginSniff() {
 }
 
 static void stationStart() {    // from the AP detail view: capture the target, then sniff
-  const int n = WiFi.scanComplete();
+  const int n = s_cacheCount;
   if (n <= 0 || currentIndex < 0 || currentIndex >= n) return;
-  memcpy(s_targetBssid, WiFi.BSSID(currentIndex), 6);
-  s_targetCh = (uint8_t)WiFi.channel(currentIndex);
-  strncpy(s_targetSsid, WiFi.SSID(currentIndex).c_str(), sizeof(s_targetSsid) - 1);
+  memcpy(s_targetBssid, s_cache[currentIndex].bssid, 6);
+  s_targetCh = s_cache[currentIndex].ch;
+  strncpy(s_targetSsid, s_cache[currentIndex].ssid, sizeof(s_targetSsid) - 1);
   s_targetSsid[sizeof(s_targetSsid) - 1] = 0;
   stationBeginSniff();
 }
@@ -3346,13 +3396,25 @@ void wifiscanLoop() {
   runUI();
   updateStatusBar();
 
+  /* An async re-scan finished: stamp the gap, mark results, and let the list
+   * block below repaint once -- in place, with no Scanning screen. */
+  if (s_bgScanPending) {
+    const int c = WiFi.scanComplete();
+    if (c != WIFI_SCAN_RUNNING) {
+      fgWifiScanInProgress = false;
+      s_bgScanPending = false;
+      s_lastScanEndMs = millis();
+      if (c >= 0) { fillWifiCache(); bgHasResults = (c > 0); bgLastScanMs = millis(); }
+      lastScanning = true;   // trigger the in-place list repaint below
+    }
+  }
+
   /* Continuous scan: while watching the list (not a detail view, not mid-scan,
-   * and parked at the top so scrolling is not interrupted), re-run the scan
-   * on a timer so results stay live without a Rescan press. */
-  if (s_autoScan && !isScanning && !isDetailView && currentIndex == 0 &&
-      (millis() - s_lastScanEndMs) >= WIFI_AUTO_RESCAN_MS) {
-    startWiFiScan();
-    return;
+   * and parked at the top), re-run it on a timer -- in the BACKGROUND, so the
+   * list stays up rather than flashing the Scanning view. */
+  if (s_autoScan && !s_bgScanPending && !isScanning && !isDetailView &&
+      currentIndex == 0 && (millis() - s_lastScanEndMs) >= WIFI_AUTO_RESCAN_MS) {
+    startWiFiScanAsync();
   }
 
   if (isScanning) {

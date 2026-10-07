@@ -147,6 +147,7 @@ INCLUDE=(
   "tools/check_ui_kit.py"
   "tools/check_screen_chrome.py"
   "tools/check_wifi_autoscan.py"
+  "tools/check_ble_autoscan.py"
   "tools/check_profile_persist.py"
   "tools/check_profile_picker.py"
   "tools/check_playbook_dispatch.py"

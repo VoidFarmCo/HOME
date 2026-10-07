@@ -38,7 +38,7 @@ def main():
     # a millis-timer re-trigger of the scan inside the loop
     ok("wifiscanLoop re-triggers startWiFiScan() on a timer",
        re.search(r"millis\(\)\s*-\s*s_lastScanEndMs[^;]*WIFI_AUTO_RESCAN_MS", body, re.S) is not None
-       and "startWiFiScan()" in body)
+       and "startWiFiScanAsync()" in body)
     # gated off during a detail view so it doesn't fight the user
     ok("auto-rescan is gated by !isDetailView",
        re.search(r"!isDetailView[^;{]*WIFI_AUTO_RESCAN_MS|WIFI_AUTO_RESCAN_MS[\s\S]{0,120}startWiFiScan", body) is not None
@@ -49,6 +49,11 @@ def main():
     ok("the left button is a Stop/Start toggle",
        's_autoScan ? "Stop" : "Start"' in src)
     ok("BTN_LEFT toggles s_autoScan", "s_autoScan = !s_autoScan" in src)
+
+    ok("has a non-blocking async re-scan kicker",
+       "void startWiFiScanAsync()" in src)
+    ok("the loop polls scanComplete() to finish the async scan in place",
+       "WiFi.scanComplete()" in body and "s_bgScanPending = false" in body)
 
     print()
     if FAILED:
