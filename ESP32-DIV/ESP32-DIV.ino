@@ -4112,6 +4112,7 @@ static const Tool kTools[] = {
     {"SubGHz",           GRP_CHAT,    PB_BOTH,   6, 0},
     {"ESP-NOW",          GRP_CHAT,    PB_BOTH,   6, 1},
     {"LoRa Mesh",        GRP_CHAT,    PB_BOTH,   6, 2},
+    {"BLE",              GRP_CHAT,    PB_BOTH,   6, 3},
     {"SD File Manager",  GRP_CAPTURE, PB_BOTH,   7, TOOLS_IDX_SD_FILES},
     {"File Transfer",    GRP_CAPTURE, PB_BOTH,   7, TOOLS_IDX_XFER},
     {"Wardriver",        GRP_TRACK,   PB_BOTH,   3, 0},

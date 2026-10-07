@@ -31,7 +31,7 @@ constexpr int CHAT_TEXT_MAX = 46;
 constexpr int CHAT_FRAME_MAX = 1 + CHAT_NAME_MAX + CHAT_TEXT_MAX;   // 57
 
 /* Channel registry (kept in step with the dispatch switches in chat_core.cpp). */
-enum Channel : uint8_t { CH_SUBGHZ = 0, CH_ESPNOW = 1, CH_LORA = 2, CH_COUNT };
+enum Channel : uint8_t { CH_SUBGHZ = 0, CH_ESPNOW = 1, CH_LORA = 2, CH_BLE = 3, CH_COUNT };
 
 int         channelCount();            // == CH_COUNT
 const char* channelLabel(int idx);     // transport label for the picker tile

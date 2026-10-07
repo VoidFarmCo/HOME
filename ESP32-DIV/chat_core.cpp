@@ -8,6 +8,7 @@
 #include "chat_subghz.h"
 #include "chat_espnow.h"
 #include "chat_lora.h"
+#include "chat_ble.h"
 
 namespace Chat {
 
@@ -22,6 +23,7 @@ const char* channelLabel(int idx) {
     case CH_SUBGHZ: return SubghzChat::label();
     case CH_ESPNOW: return EspNowChat::label();
     case CH_LORA:   return LoRaChat::label();
+    case CH_BLE:    return BleChat::label();
     default:        return "?";
   }
 }
@@ -31,6 +33,7 @@ bool channelAvailable(int idx) {
     case CH_SUBGHZ: return SubghzChat::available();
     case CH_ESPNOW: return EspNowChat::available();
     case CH_LORA:   return LoRaChat::available();
+    case CH_BLE:    return BleChat::available();
     default:        return false;
   }
 }
@@ -43,6 +46,7 @@ static bool txInit() {
     case CH_SUBGHZ: return SubghzChat::init();
     case CH_ESPNOW: return EspNowChat::init();
     case CH_LORA:   return LoRaChat::init();
+    case CH_BLE:    return BleChat::init();
     default:        return false;
   }
 }
@@ -51,6 +55,7 @@ static void txDeinit() {
     case CH_SUBGHZ: SubghzChat::deinit(); break;
     case CH_ESPNOW: EspNowChat::deinit(); break;
     case CH_LORA:   LoRaChat::deinit();   break;
+    case CH_BLE:    BleChat::deinit();    break;
     default: break;
   }
 }
@@ -59,6 +64,7 @@ static bool txSend(const uint8_t* d, uint8_t n) {
     case CH_SUBGHZ: return SubghzChat::send(d, n);
     case CH_ESPNOW: return EspNowChat::send(d, n);
     case CH_LORA:   return LoRaChat::send(d, n);
+    case CH_BLE:    return BleChat::send(d, n);
     default:        return false;
   }
 }
@@ -67,6 +73,7 @@ static uint8_t txPoll(uint8_t* buf, uint8_t maxLen) {
     case CH_SUBGHZ: return SubghzChat::poll(buf, maxLen);
     case CH_ESPNOW: return EspNowChat::poll(buf, maxLen);
     case CH_LORA:   return LoRaChat::poll(buf, maxLen);
+    case CH_BLE:    return BleChat::poll(buf, maxLen);
     default:        return 0;
   }
 }

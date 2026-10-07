@@ -22,6 +22,7 @@ TRANSPORTS = {
     "chat_subghz.cpp": "SubghzChat",
     "chat_espnow.cpp": "EspNowChat",
     "chat_lora.cpp":   "LoRaChat",
+    "chat_ble.cpp":    "BleChat",
 }
 IFACE = ["available", "init", "deinit", "send", "poll", "label"]
 
