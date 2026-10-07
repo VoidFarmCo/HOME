@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "Status.h"
 #include "DeviceInfo.h"
 #include "Stealth.h"
 #include "SettingsStore.h"
@@ -5026,38 +5027,22 @@ void exit() {
  * ───────────────────────────────────────────────────────────────────────── */
 
 static void nrfReportMissing(const char* feature) {
-  /* The same panel the Rubber Ducky uses for "requires ESP32-S3", rather
-   * than a screen only this file knows how to draw. The wiring is kept:
-   * whoever reads this is deciding which joint to reflow. */
-  char msg[200];
-  snprintf(msg, sizeof(msg),
-           "%s needs the 2.4 GHz module, and nothing answered on the SPI "
-           "bus. Check the module is fitted and that MISO, CSN, CE, SCK and "
-           "MOSI are wired.", feature);
-  showNotification("No nRF24", msg);
+  /* H.O.M.E's plain-language panel (Status::explain blocks until dismissed). */
+  char why[200];
+  snprintf(why, sizeof(why),
+           "%s needs the 2.4 GHz module, and nothing answered on the SPI bus.",
+           feature);
+  Status::explain("No nRF24 radio", why,
+                  "Check the module is fitted and that MISO, CSN, CE, SCK and MOSI are wired.");
 }
 
 static bool nrfReady(const char* feature) {
   if (Nrf24Raw::begin()) {
     return true;
   }
+  /* Status::explain is modal and blocks until the user dismisses it, so no
+   * separate wait loop is needed here -- returning drops back to the submenu. */
   nrfReportMissing(feature);
-
-  /* Modal, for the reason cc1101Ready is: setting the exit flag and
-   * returning puts the message on screen for one frame, which reads as the
-   * feature refusing to open for no reason. */
-  delay(250);
-  for (;;) {
-    int x, y;
-    if (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT) ||
-        readTouchXY(x, y)) {
-      break;
-    }
-    delay(20);
-  }
-  while (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
-    delay(10);
-  }
 
   feature_exit_requested = true;
   return false;

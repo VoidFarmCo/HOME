@@ -139,15 +139,19 @@ def main():
     print("\nthe refusal screen says what to do about it:")
     miss = func_body(src, "static void nrfReportMissing(const char* feature)")
     ok("nrfReportMissing() found", bool(miss))
-    ok("it names the chip", '"No nRF24"' in miss)
+    ok("it names the chip", '"No nRF24' in miss)
     ok("it names the pins to check",
        all(p in miss for p in ("MISO", "CSN", "CE", "SCK", "MOSI")),
        "a refusal that does not say where to look is a device that "
        "appears broken")
+    # The refusal is H.O.M.E's plain-language panel, which is modal: it blocks
+    # until the user dismisses it, so the message cannot flash for one frame.
+    ok("the refusal is Status::explain (modal, blocks until dismissed)",
+       "Status::explain(" in miss)
 
     ready = func_body(src, "static bool nrfReady(const char* feature)")
-    ok("nrfReady() waits for the user",
-       "feature_exit_requested = true" in ready and "for (;;)" in ready,
+    ok("nrfReady() shows the panel then exits the feature",
+       "feature_exit_requested = true" in ready and "nrfReportMissing" in ready,
        "a message drawn and then dropped is on screen for one frame")
 
     print()

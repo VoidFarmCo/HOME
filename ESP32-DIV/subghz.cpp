@@ -1,4 +1,5 @@
 #include "Stealth.h"
+#include "Status.h"
 #include "Mcp23017.h"
 #include <algorithm>
 #include <vector>
@@ -558,38 +559,22 @@ static bool cc1101Ready(const char* feature);
 /* Draw the "no radio" screen and wait for the user to leave. Returns when
  * they do; the caller must then exit the feature. */
 static void cc1101ReportMissing(const char* feature) {
-  /* The shared panel, as the nRF24 and the Rubber Ducky use. */
-  char msg[200];
-  snprintf(msg, sizeof(msg),
-           "%s needs the sub-GHz radio, and nothing answered on the SPI bus. "
-           "Check the module is fitted and that MISO, CS, SCK and MOSI are "
-           "wired.", feature);
-  showNotification("No CC1101", msg);
+  /* H.O.M.E's plain-language panel (Status::explain blocks until dismissed). */
+  char why[200];
+  snprintf(why, sizeof(why),
+           "%s needs the sub-GHz radio, and nothing answered on the SPI bus.",
+           feature);
+  Status::explain("No sub-GHz radio", why,
+                  "Check the CC1101 is fitted and that MISO, CS, SCK and MOSI are wired.");
 }
 
 static bool cc1101Ready(const char* feature) {
   if (cc1101Present()) {
     return true;
   }
+  /* Status::explain is modal and blocks until the user dismisses it, so no
+   * separate wait loop is needed here -- returning drops back to the submenu. */
   cc1101ReportMissing(feature);
-
-  /* Modal, deliberately. Setting the exit flag and returning would drop
-   * straight back to the submenu, and the message would be on screen for
-   * one frame -- which reads as the feature refusing to open for no reason,
-   * which is what the freeze looked like too. */
-  delay(250);
-  for (;;) {
-    int x, y;
-    if (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT) ||
-        readTouchXY(x, y)) {
-      break;
-    }
-    delay(20);
-  }
-  while (isButtonPressed(BTN_SELECT) || isButtonPressed(BTN_LEFT)) {
-    delay(10);
-  }
-
   feature_exit_requested = true;
   return false;
 }

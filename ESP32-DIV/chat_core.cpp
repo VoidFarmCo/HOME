@@ -1,6 +1,7 @@
 #include "chat_core.h"
 #include "shared.h"
 #include "utils.h"
+#include "Status.h"
 #include "KeyboardUI.h"
 #include "Stealth.h"
 #include "SettingsStore.h"
@@ -225,9 +226,16 @@ void setup() {
     snprintf(msg, sizeof(msg), "on %s", channelLabel(s_ch));
     logLine("sys", msg);
   } else {
-    char msg[32];
-    snprintf(msg, sizeof(msg), "no %s radio", channelLabel(s_ch));
-    logLine("sys", msg);
+    /* The chosen radio is not answering -- explain in plain words and drop
+     * back to the channel picker rather than open a chat that cannot send. */
+    char why[176];
+    snprintf(why, sizeof(why),
+             "The %s chat channel needs its radio, and nothing answered on the "
+             "bus. Chat cannot send or receive on it.", channelLabel(s_ch));
+    Status::explain("Chat radio not found", why,
+                    "Pick another channel, or check that radio is wired (see the wiring card).");
+    feature_exit_requested = true;
+    return;
   }
   draw();
 }

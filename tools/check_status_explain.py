@@ -48,6 +48,24 @@ def main():
             wired += 1
     ok("at least one failure site calls Status::explain", wired >= 1)
 
+    # The radio-absent sites are the whole point of the screen: an unwired
+    # module must say so in plain words, not fail silently or in a cryptic panel.
+    sub = (SK / "subghz.cpp").read_text(encoding="utf-8", errors="replace")
+    ble = (SK / "bluetooth.cpp").read_text(encoding="utf-8", errors="replace")
+    ok("CC1101-absent uses Status::explain (no sub-GHz radio)",
+       re.search(r'Status::explain\(\s*"No sub-GHz radio"', sub) is not None)
+    ok("nRF24-absent uses Status::explain (no nRF24 radio)",
+       re.search(r'Status::explain\(\s*"No nRF24 radio"', ble) is not None)
+    # The wardriver no-SD site stays wired too.
+    gps = (SK / "gps.cpp").read_text(encoding="utf-8", errors="replace")
+    ok("wardriver no-SD still uses Status::explain",
+       'Status::explain("No SD card"' in gps)
+    # Picking a chat channel whose radio is absent explains rather than opening
+    # a dead chat that cannot send.
+    chat = (SK / "chat_core.cpp").read_text(encoding="utf-8", errors="replace")
+    ok("chat channel picker explains an absent radio",
+       re.search(r'Status::explain\(\s*"Chat radio not found"', chat) is not None)
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS)); return 1
