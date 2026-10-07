@@ -104,6 +104,11 @@ def main():
     # present() proves the chip ACKs on the bus.
     ok("present() uses an I2C ACK (endTransmission)",
        re.search(r"present\b.*?endTransmission", src, re.S) is not None)
+    mc = (SKETCH / "Mcp23017.cpp").read_text(encoding="utf-8", errors="replace")
+    ok("expander I2C no-ops when the chip is absent (s_present guard)",
+       "bool s_present" in mc
+       and "if (!s_present) return;" in mc and "if (!s_present) return 0;" in mc)
+
 
     print()
     if FAILED:

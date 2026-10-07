@@ -18,8 +18,14 @@ uint8_t s_addr = 0x20;
 uint8_t s_iodir[2] = {0xFF, 0xFF};   // reset default: all inputs
 uint8_t s_gppu[2]  = {0x00, 0x00};
 uint8_t s_olat[2]  = {0x00, 0x00};
+/* Set once in begin() by probing the bus. When the chip is absent, every
+ * expander op below no-ops INSTANTLY -- otherwise each I2C transaction to a
+ * missing device stalls on the bus timeout (~1s, no pullups), which froze the
+ * LoRa/nRF/CC1101 paths that drive their CS through the expander. */
+bool s_present = false;
 
 void writeReg(uint8_t reg, uint8_t val) {
+  if (!s_present) return;
   Wire.beginTransmission(s_addr);
   Wire.write(reg);
   Wire.write(val);
@@ -27,6 +33,7 @@ void writeReg(uint8_t reg, uint8_t val) {
 }
 
 uint8_t readReg(uint8_t reg) {
+  if (!s_present) return 0;
   Wire.beginTransmission(s_addr);
   Wire.write(reg);
   Wire.endTransmission(false);                 // repeated start, keep the bus
@@ -39,13 +46,15 @@ uint8_t readReg(uint8_t reg) {
 bool begin(int sda, int scl, uint8_t addr) {
   s_addr = addr;
   Wire.begin(sda, scl);
+  s_present = present();                 // probe ONCE; gates every op below
+  if (!s_present) return false;          // absent: do not touch the bus again
   s_iodir[0] = s_iodir[1] = 0xFF;
   s_gppu[0]  = s_gppu[1]  = 0x00;
   s_olat[0]  = s_olat[1]  = 0x00;
   writeReg(IODIRA, s_iodir[0]);  writeReg(IODIRB, s_iodir[1]);
   writeReg(GPPUA,  s_gppu[0]);   writeReg(GPPUB,  s_gppu[1]);
   writeReg(OLATA,  s_olat[0]);   writeReg(OLATB,  s_olat[1]);
-  return present();
+  return true;
 }
 
 bool present() {

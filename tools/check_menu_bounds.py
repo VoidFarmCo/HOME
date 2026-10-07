@@ -31,6 +31,9 @@ def main():
     ok("displayMenu clamps current_menu_index to menu_items bounds",
        re.search(r"current_menu_index\s*>=\s*NUM_MENU_ITEMS", b) is not None
        and "current_menu_index = 0" in b)
+    ok("no raw menu_items[current_menu_index] (all via safeMenuIdx)",
+       "menu_items[current_menu_index]" not in src)
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS)); return 1

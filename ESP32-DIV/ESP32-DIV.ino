@@ -78,6 +78,14 @@ const unsigned char *bitmap_icons[NUM_MENU_ITEMS] = {
 int current_menu_index = 0;
 bool is_main_menu = false;
 
+/* current_menu_index doubles as a tool CATEGORY (Tools = 7), which is past
+ * menu_items[] (7 entries after RFID removal). Any menu_items[] access must go
+ * through this -- indexing with a raw category is the About-page crash class. */
+static inline int safeMenuIdx() {
+    return (current_menu_index >= 0 && current_menu_index < NUM_MENU_ITEMS)
+               ? current_menu_index : 0;
+}
+
 /* The playbook home is the landing screen: the active profile's one-tap tiles,
  * our own UI, organized by purpose (not the inherited radio menu). */
 bool in_playbook_home = true;
@@ -1246,7 +1254,7 @@ void displaySubmenu() {
     }
 
     drawMenuGrid(active_submenu_items, active_submenu_icons, tiles, sel,
-                 menu_items[current_menu_index]);
+                 menu_items[safeMenuIdx()]);
     drawSubmenuFooter();
 
     submenu_initialized = true;
@@ -1275,7 +1283,7 @@ void displayPagedSubmenu() {
     tft.setTextSize(1);
     tft.setTextColor(UI_ICON, UI_BG);
     tft.setCursor(8, 38);
-    tft.print(menu_items[current_menu_index]);
+    tft.print(menu_items[safeMenuIdx()]);
     char n[20];
     snprintf(n, sizeof(n), "%d features", total);
     tft.setTextColor(uiDimTextColor(), UI_BG);
@@ -1486,13 +1494,13 @@ const uint16_t icon_colors[NUM_MENU_ITEMS] = {
 
         tft.setTextColor(UI_BG, UI_ICON);
             drawBitmapScaled(x_position + (TILE_W - PUEO_TILE_ICON) / 2,
-                             y_position + TILE_ICON_DY, bitmap_icons[current_menu_index],
+                             y_position + TILE_ICON_DY, bitmap_icons[safeMenuIdx()],
                              16, 16, UI_BG, PUEO_TILE_ICON / 16);
-        int textWidth = tft.textWidth(menu_items[current_menu_index]);
+        int textWidth = tft.textWidth(menu_items[safeMenuIdx()]);
         int textX = x_position + (TILE_W - textWidth) / 2;
         int textY = y_position + TILE_TEXT_DY;
         tft.setCursor(textX, textY);
-        tft.print(menu_items[current_menu_index]);
+        tft.print(menu_items[safeMenuIdx()]);
 
         last_menu_index = current_menu_index;
     }
