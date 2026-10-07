@@ -146,6 +146,7 @@ SIGNALS = {
     "GPS_UART_RX": "GPS RX",
     "MCP23017_SDA": "MCP23017 SDA", "MCP23017_SCL": "MCP23017 SCL",
     "LORA_CS": "LoRa CS", "LORA_RESET": "LoRa RESET", "LORA_BUSY": "LoRa BUSY",
+    "LORA_TXEN": "LoRa TXEN",
 }
 
 # Control lines may live on an MCP23017 expander (owner's board): a pin value
@@ -153,7 +154,7 @@ SIGNALS = {
 MCP_BASE = 100
 
 # Signals that only exist on some boards; absence is not an error.
-OPTIONAL = {"MCP23017_SDA", "MCP23017_SCL", "LORA_CS", "LORA_RESET", "LORA_BUSY"}
+OPTIONAL = {"MCP23017_SDA", "MCP23017_SCL", "LORA_CS", "LORA_RESET", "LORA_BUSY", "LORA_TXEN"}
 
 # Bus lines are shared on purpose; never report them against each other.
 SHARED_BUS = {"SD_MOSI", "SD_MISO", "SD_SCLK",

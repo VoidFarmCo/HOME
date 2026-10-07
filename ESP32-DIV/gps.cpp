@@ -1,3 +1,4 @@
+#include "Status.h"
 #include "Stealth.h"
 #include <Arduino.h>
 #include <HardwareSerial.h>
@@ -3684,7 +3685,11 @@ static void wardStartBackground() {
     return;
   }
   if (!isSDCardAvailable()) {
-    wardNotify("Wardriver", "SD required for background log.");
+    Status::explain("No SD card",
+                    "The wardriver writes every network it sees to a log on the SD "
+                    "card. With no card in the slot there is nowhere to write, so it "
+                    "did not start.",
+                    "Insert a microSD card, then open the wardriver again.");
     return;
   }
   s_bgStop = false;

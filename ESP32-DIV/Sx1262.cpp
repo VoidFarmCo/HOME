@@ -137,6 +137,13 @@ void resetChip() {
   Mcp23017::pinModeAny(LORA_CS, OUTPUT);
   Mcp23017::pinModeAny(LORA_RESET, OUTPUT);
   pinMode(LORA_BUSY, INPUT);
+#if defined(LORA_TXEN)
+  /* Waveshare SX1262 Node RF switch: RXEN is driven by DIO2 on the module
+   * (SetDIO2AsRfSwitchCtrl, below); TXEN is the complement -- HIGH in RX/idle,
+   * LOW only during TX. HIGH here so the switch starts in receive. */
+  Mcp23017::pinModeAny(LORA_TXEN, OUTPUT);
+  Mcp23017::writeAny(LORA_TXEN, HIGH);
+#endif
   csHigh();
   Mcp23017::writeAny(LORA_RESET, LOW);
   delay(2);
@@ -209,15 +216,27 @@ bool send(const uint8_t* data, uint8_t len) {
   writeBuffer(0, data, len);
   setPacketLength(len);
   clearIrq(0xFFFF);
+#if defined(LORA_TXEN)
+  Mcp23017::writeAny(LORA_TXEN, LOW);              // switch to the TX path
+#endif
   p[0] = 0x00; p[1] = 0x00; p[2] = 0x00;           // SetTx timeout 0 = single shot
   cmd(OP_SET_TX, p, 3);
 
   const uint32_t start = millis();
   while (!(irqStatus() & IRQ_TX_DONE)) {
-    if (millis() - start > 4000) { clearIrq(0xFFFF); return false; }
+    if (millis() - start > 4000) {
+      clearIrq(0xFFFF);
+#if defined(LORA_TXEN)
+      Mcp23017::writeAny(LORA_TXEN, HIGH);         // back to RX/idle even on timeout
+#endif
+      return false;
+    }
     delay(2);
   }
   clearIrq(0xFFFF);
+#if defined(LORA_TXEN)
+  Mcp23017::writeAny(LORA_TXEN, HIGH);             // TX done -> back to RX/idle
+#endif
   return true;
 }
 
@@ -226,6 +245,9 @@ void startReceive() {
   p[0] = 0x00; cmd(OP_SET_STANDBY, p, 1);
   clearIrq(0xFFFF);
   setPacketLength(255);
+#if defined(LORA_TXEN)
+  Mcp23017::writeAny(LORA_TXEN, HIGH);             // RX path
+#endif
   p[0] = 0xFF; p[1] = 0xFF; p[2] = 0xFF;           // SetRx 0xFFFFFF = continuous
   cmd(OP_SET_RX, p, 3);
 }

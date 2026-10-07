@@ -68,9 +68,14 @@
  * Shares the SPI header bus (18/23/19). CS + RESET on the MCP23017 (slow, fine
  * on the expander); BUSY on a DIRECT input (IO39) because the host must poll it
  * before every command; DIO1 IRQ is polled over SPI (GetIrqStatus), no pin. */
-#define LORA_CS    103   /* MCP23017 ch3 */
-#define LORA_RESET 104   /* MCP23017 ch4 */
+#define LORA_CS    103   /* MCP23017 ch3 (PA3) */
+#define LORA_RESET 104   /* MCP23017 ch4 (PA4) */
 #define LORA_BUSY  39    /* direct input (poll before each command) */
+/* Waveshare SX1262 LoRa Node (HF) RF switch: DIO2 drives RXEN automatically on
+ * the module (SetDIO2AsRfSwitchCtrl), so RXEN/DIO2 are NOT wired to the ESP.
+ * TXEN is the complementary control -- HIGH in RX/idle, LOW during TX -- and is
+ * driven from the expander. */
+#define LORA_TXEN  105   /* MCP23017 ch5 (PA5) */
 
 /* ── GPS ATGM336H / NEO-7M ───────────────────────────────────────────────────
  * On the UART header. GPS TX wires to the header's **TXD** pin (IO1), NOT RXD:

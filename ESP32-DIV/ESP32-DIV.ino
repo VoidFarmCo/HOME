@@ -4040,6 +4040,17 @@ enum { GRP_SEE, GRP_DISRUPT, GRP_CHAT, GRP_CAPTURE, GRP_TRACK, GRP_SYSTEM, GRP_C
 static const char* const kGroupName[GRP_COUNT] = {
     "See Nearby", "Disrupt", "Chat", "Capture/Log", "Track", "System" };
 
+/* One glyph per purpose tile (icon.h). Flash-resident (const array of const
+ * pointers), so no DRAM cost. */
+static const unsigned char* const kGroupIcon[GRP_COUNT] = {
+    bitmap_icon_eye,       // See Nearby
+    bitmap_icon_sword,     // Disrupt
+    bitmap_icon_dialog,    // Chat
+    bitmap_icon_save,      // Capture/Log
+    bitmap_icon_satellite, // Track
+    bitmap_icon_setting,   // System
+};
+
 /* label, group tile, profile mask, and the (category,index) the existing
  * launcher dispatches. Flash table (no function pointers -> stays out of DRAM).
  * Wi-Fi/BLE tools are added once their launchers exist (next unit). */
@@ -4197,14 +4208,23 @@ static void drawHomeHeader() {
     }
 }
 
-static void drawTile(int vis, int visCount, int cols, const char* label) {
+static void drawTile(int vis, int visCount, int cols, const char* label,
+                     const unsigned char* icon = nullptr) {
     const uint16_t accent = homeAccent();
     int x, y, w, h; pbTileRect(vis, visCount, cols, x, y, w, h);
     tft.fillRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, accent);
     tft.drawRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_WHITE, accent);
-    tft.drawString(label, x + w / 2, y + h / 2, (cols > 1) ? 1 : 2);
+    if (icon) {
+        const int sc  = 2;                 // 16x16 glyph drawn at 32x32
+        const int isz = 16 * sc;
+        drawBitmapScaled(x + w / 2 - isz / 2, y + h / 2 - isz / 2 - 10,
+                         icon, 16, 16, TFT_WHITE, sc);
+        tft.drawString(label, x + w / 2, y + h - 16, 1);
+    } else {
+        tft.drawString(label, x + w / 2, y + h / 2, (cols > 1) ? 1 : 2);
+    }
 }
 
 static void drawPlaybookHome() {
@@ -4219,7 +4239,7 @@ static void drawPlaybookHome() {
         int vis = 0;
         for (int g = 0; g < GRP_COUNT; g++) {
             if (!groupVisible(g, mask)) continue;
-            drawTile(vis++, visCount, cols, kGroupName[g]);
+            drawTile(vis++, visCount, cols, kGroupName[g], kGroupIcon[g]);
         }
     } else {
         int visCount = 0;

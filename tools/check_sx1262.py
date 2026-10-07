@@ -75,6 +75,10 @@ def main():
        "IRQ_RX_DONE" in src and "IRQ_CRC_ERR" in src)
     ok("BUSY is polled before commands (waitBusy in cmd)",
        re.search(r"\bcmd\b[^{]*\{\s*waitBusy", src) is not None)
+    ok("TXEN RF switch driven LOW for TX and HIGH for RX/idle",
+       "LORA_TXEN" in src
+       and re.search(r"writeAny\(LORA_TXEN, LOW\)", src) is not None
+       and re.search(r"writeAny\(LORA_TXEN, HIGH\)", src) is not None)
 
     print()
     if FAILED:

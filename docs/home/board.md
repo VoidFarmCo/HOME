@@ -37,26 +37,67 @@ Rule for the expander: **slow lines go on the MCP23017** (chip-selects, nRF CE, 
 RESET — toggled once per transaction), **fast lines stay direct** (the SPI bus, CC1101
 GDO0, LoRa BUSY). I2C bus for the expander = IO32 (SDA) + IO25 (SCL).
 
-## Target wiring (with the MCP23017 — the full radio build)
+## Target wiring — the full radio build (matches board_home.h)
+
+### Step 1: the MCP23017 expander (do this first)
+It sits on the **I2C header** and carries the slow chip-select / control lines.
+| MCP23017 pin | Wire to |
+|---|---|
+| VDD | 3V3 (I2C header) |
+| GND | GND (I2C header) |
+| SDA | **IO32** (I2C header SDA) |
+| SCL | **IO25** (I2C header SCL) |
+| A0 / A1 / A2 | all GND -> I2C address **0x20** |
+| RESET | 3V3 (tie high, never reset) |
+
+### Step 2: the shared SPI bus (all three radios share these)
+From the **SPI header**: **SCK = IO18, MOSI = IO23, MISO = IO19**. Wire each radio's
+SCK/MOSI/MISO to these same three pins (plus 3V3 + GND to each).
+
+### Step 3: each radio's control lines
+| Radio | Line | Wire to |
+|---|---|---|
+| **CC1101** (433) | CS   | MCP23017 **GPA0** (channel 0) |
+| | GDO0 | **IO21** (direct — raw-TX data, must be fast; SPI header "CS" pin) |
+| | GDO2 | **IO35** (direct, input-only header pin) |
+| **nRF24** (2.4) | CSN | MCP23017 **GPA1** (channel 1) |
+| | CE  | MCP23017 **GPA2** (channel 2) |
+| | IRQ | not used (leave unconnected) |
+| **LoRa** (Waveshare SX1262 Node HF) | CS / NSS | MCP23017 **GPA3** (channel 3) |
+| | RESET | MCP23017 **GPA4** (channel 4) |
+| | BUSY  | **IO39** (direct, input-only header pin — polled fast) |
+| | TXEN  | MCP23017 **GPA5** (channel 5) — firmware drives HIGH in RX/idle, LOW during TX |
+| | RXEN / DIO2 | **leave on the module, do NOT wire to the ESP** (DIO2 drives RXEN automatically) |
+| | DIO1  | not wired (polled over SPI) |
+| | 3V3 / GND | power; ANT via u.FL to the spring antenna |
+
+**Which LoRa module:** use the **Waveshare "SX1262 LoRa Node (HF)"** (SX1262, SPI, 22 dBm — the
+one with RXEN/TXEN/BUSY). The others are NOT compatible with this firmware: **XL1276/XL1278** is
+a different chip (SX1276/78) and **REYAX RYLR998** is a UART AT module (not SPI). Set them aside.
+
+RF-switch note: the firmware follows Waveshare's stated TXEN polarity (HIGH=RX, LOW=TX) because
+it is the safe direction — the wrong guess could put 22 dBm into the receive LNA. Bench-test LoRa
+at low power first; if it receives but never transmits, TXEN polarity is one line to flip.
+
+(MCP23017 GPA0..GPA5 = the firmware's pin values 100..105 = `PIN_BASE + channel`.)
+
+### Step 4: GPS + SD (no expander)
 | Line | Where |
 |---|---|
-| SPI bus (all radios) | SCK **18**, MOSI **23**, MISO **19** (SPI header) |
-| MCP23017 | SDA **32**, SCL **25** (I2C header), addr 0x20 |
-| CC1101 CS | MCP23017 pin |
-| CC1101 GDO0 | **IO21** (direct — raw-TX data, must be fast) |
-| CC1101 GDO2 | **IO35** (direct input) |
-| nRF24 CSN / CE | MCP23017 pins |
-| LoRa (Core1262) CS / RESET | MCP23017 pins |
-| LoRa BUSY | **IO39** (direct input — polled fast) |
-| LoRa DIO1 | polled over SPI (no pin) |
-| GPS | UART header: GPS **TX -> board TXD (IO1)**, GPS VCC = **3.3 V** (not 5 V) |
-| SD | CS 5 (onboard) |
+| GPS | UART header: GPS **TX -> board TXD (IO1)**; GPS **VCC = 3.3 V** (NOT 5 V); GND |
+| SD | onboard, CS 5 (already wired) |
+
+Power note: give the radios a solid 3V3 supply — CC1101 + nRF24(PA/LNA) + LoRa all
+drawing at once off a weak rail is the kind of thing that causes brownout resets.
 
 ## Status
-- **Nothing is wired yet** — firmware pinout set first, then solder to match.
-- `board_home.h` exists (display-correct) but is NOT the active build yet: the radio pins
-  wait on the MCP23017 driver + CS-via-expander plumbing (the libraries drive CS as a
-  GPIO; routing it through the expander is the next unit). The UI build runs on the
-  identical BOARD_CYD display path meanwhile.
+- **Firmware side is DONE and active** — `board_home.h` is the live build (BOARD_HOME).
+  The MCP23017 driver, nRF/CC1101/LoRa CS-via-expander plumbing, and the SX1262 LoRa
+  driver are all in. The firmware probes each radio at runtime and refuses features whose
+  radio is absent, so a half-wired board is safe to boot.
+- **Nothing is wired yet on the hardware** — solder to the tables above, then the radios
+  come alive feature by feature as you connect them (boot log prints "MCP23017 not found"
+  until the expander is wired).
+- Can't be tested here until wired: LoRa mesh end-to-end, SubGHz chat TX, nRF presence.
 - Lean fallback (no expander): CC1101 + GPS only (CС1101 CS 21, GDO0 32, GDO2 35), nRF/LoRa
   need the expander.

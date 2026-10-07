@@ -46,6 +46,15 @@ def main():
     ok("home hit-test uses HOME_TILE_COLS",
        hit is not None and hit.group(1) == "HOME_TILE_COLS")
 
+    ok("purpose tiles have an icon map (kGroupIcon)",
+       re.search(r"kGroupIcon\[GRP_COUNT\]", src) is not None)
+    # the home draw passes a per-group icon to drawTile, and drawTile renders it
+    ok("home tiles pass their icon to drawTile",
+       re.search(r"drawTile\([^;]*kGroupIcon\[g\]\)", src) is not None)
+    ok("drawTile renders the tile icon (drawBitmapScaled)",
+       "drawBitmapScaled" in src and
+       re.search(r"static void drawTile\([^)]*const unsigned char\* icon", src) is not None)
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS))
