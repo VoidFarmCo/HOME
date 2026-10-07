@@ -4080,8 +4080,8 @@ static constexpr int yshift = 30;
 
 // Deauther-like list geometry (bigger rows + paging + bottom nav/tab bar).
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+static constexpr int LIST_ROW_H = 28;   // device name drawn big (size 2, 16 px)
 static int current_page = 0;
 
 static int bleListBottomY() {
@@ -4429,10 +4429,12 @@ void updateBLEList() {
     String name = s_bleCache[idx];
     if (name.length() > 22) name = name.substring(0, 22) + "...";
 
+    tft.setTextSize(2);
     tft.setCursor(10, y);
     tft.setTextColor(selected ? ORANGE : WHITE);
     tft.print(selected ? "> " : "  ");
-    tft.println(name);
+    tft.print(name);
+    tft.setTextSize(1);
   };
 
   const bool pageChanged = (current_page != last_rendered_page);

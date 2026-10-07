@@ -4199,6 +4199,7 @@ static uint32_t s_clockMs = 0;
 /* Right-aligned time + date in the header band. GPS-sourced -- updates while GPS
  * is active, shows dashes otherwise. Repainted on a full draw and once a second. */
 static void drawHeaderClock() {
+    tft.setTextSize(1);
     const int rx = tft.width() - HOME_UI_PAD;
     tft.fillRect(tft.width() / 2, 0, tft.width() / 2, 28, UI_BG);
     tft.setTextDatum(MR_DATUM);
@@ -4239,13 +4240,14 @@ static void drawTile(int vis, int visCount, int cols, const char* label,
         const int isz = 16 * sc;
         drawBitmapScaled(x + w / 2 - isz / 2, y + h / 2 - isz / 2 - 10,
                          icon, 16, 16, TFT_WHITE, sc);
-        tft.drawString(label, x + w / 2, y + h - 16, 1);
+        tft.drawString(label, x + w / 2, y + h - 16, 2);
     } else {
-        tft.drawString(label, x + w / 2, y + h / 2, (cols > 1) ? 1 : 2);
+        tft.drawString(label, x + w / 2, y + h / 2, 2);
     }
 }
 
 static void drawPlaybookHome() {
+    tft.setTextSize(1);   // a feature (e.g. File Transfer) may have left it at 2
     const uint8_t mask = pbActiveMask();
     const int cols = (s_group < 0) ? HOME_TILE_COLS : 2;
     tft.fillScreen(UI_BG);

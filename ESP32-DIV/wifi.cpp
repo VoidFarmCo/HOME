@@ -2542,8 +2542,10 @@ constexpr int MAX_SSID_LENGTH = 10;
 
 // Deauther-like list geometry (bigger rows + paging + bottom tab bar).
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+/* Two-line rows: the SSID big (size 2, 16 px) so it reads at arm's length, the
+ * signal/channel/auth below it small (size 1, 8 px). 16 + 8 + 6 gap = 30. */
+static constexpr int LIST_ROW_H = 30;
 
 static int wifiNetworksPerPage() {
   return max(1, (wifiListBottomY() - LIST_FIRST_ROW_Y) / LIST_ROW_H);
@@ -2653,7 +2655,6 @@ static void fillWifiCache() {
 }
 
 static void drawNetworkRow(int i, int y, bool isSel) {
-  char buf[kRowBufChars];
   char ssid[kSsidField + 1];
   fitSsid(ssid, s_cache[i].ssid);
 
@@ -2661,18 +2662,29 @@ static void drawNetworkRow(int i, int y, bool isSel) {
   const int ch = s_cache[i].ch;
   const int auth = s_cache[i].auth;
   const char* enc = (auth == WIFI_AUTH_OPEN) ? "OPEN" : "WPA2";
-  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s", i + 1, kSsidField, ssid, rssi, ch, enc);
+  const uint16_t nameCol = isSel ? ORANGE : (auth == WIFI_AUTH_OPEN ? ORANGE : WHITE);
 
   // Clear only this row (avoid overlapping next row).
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
 
+  // Line 1: selection marker + index + SSID, big enough to read at arm's length.
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG);
   tft.print(isSel ? ">" : " ");
+  char head[64];
+  snprintf(head, sizeof(head), "%02d %s", i + 1, ssid);
+  tft.setCursor(16, y);
+  tft.setTextColor(nameCol);
+  tft.print(head);
 
-  tft.setCursor(10, y);
-  tft.setTextColor(isSel ? ORANGE : (auth == WIFI_AUTH_OPEN ? ORANGE : WHITE));
-  tft.println(buf);
+  // Line 2: signal / channel / auth, small, indented under the name.
+  char det[64];
+  snprintf(det, sizeof(det), "%d dBm   Ch %d   %s", rssi, ch, enc);
+  tft.setTextSize(1);
+  tft.setCursor(16, y + 18);
+  tft.setTextColor(isSel ? ORANGE : TFT_LIGHTGREY);
+  tft.print(det);
 }
 
 void displayWiFiList(bool fullRedraw = false) {
@@ -2686,11 +2698,13 @@ void displayWiFiList(bool fullRedraw = false) {
   }
 
   if (networkCount <= 0) {
+    tft.setTextSize(2);
     tft.setTextColor(GREEN);
     tft.setCursor(10, LIST_HEADER_Y);
     tft.println("No networks found.");
-    tft.setCursor(10, LIST_HEADER_Y + 12);
+    tft.setCursor(10, LIST_HEADER_Y + 20);
     tft.println("Press Rescan.");
+    tft.setTextSize(1);
     drawTabBar("Rescan", false, "Prev", true, "Next", true);
     return;
   }
@@ -2708,6 +2722,7 @@ void displayWiFiList(bool fullRedraw = false) {
   if (needFull) {
     // Full redraw list (keeps UI consistent with Deauther).
     wifiScanClearBody();
+    tft.setTextSize(2);
     tft.setTextColor(GREEN);
     tft.setCursor(10, LIST_HEADER_Y);
     tft.println("Networks:");
@@ -2717,6 +2732,7 @@ void displayWiFiList(bool fullRedraw = false) {
     tft.setCursor(180, LIST_HEADER_Y);
     tft.setTextColor(GREEN);
     tft.println(page_buf);
+    tft.setTextSize(1);
 
     int y = LIST_FIRST_ROW_Y;
     const int end_index = min(listStartIndex + wifiNetworksPerPage(), networkCount);
@@ -4964,8 +4980,8 @@ static const unsigned long deautherDebounceTime = 200;
 
 // Larger row height = easier touch selection.
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+static constexpr int LIST_ROW_H = 30;   // two-line rows: name big + details small
 
 static int deautherNetworksPerPage() {
   return max(1, (wifiListBottomY() - LIST_FIRST_ROW_Y) / LIST_ROW_H);
@@ -5027,16 +5043,25 @@ static void deautherDrawApRow(int i, int y, bool isSel) {
     strcat(ssid, "...");
   }
   const char* enc = ap_list[i].authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2";
-  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s",
-           i + 1, kSsidField, ssid, ap_list[i].rssi, ap_list[i].primary, enc);
+  const uint16_t nameCol = isSel ? ORANGE : (ap_list[i].authmode == WIFI_AUTH_OPEN ? ORANGE : WHITE);
+  (void)buf;
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG);
   tft.print(isSel ? ">" : " ");
-  tft.setCursor(10, y);
-  tft.setTextColor(isSel ? ORANGE : (ap_list[i].authmode == WIFI_AUTH_OPEN ? ORANGE : WHITE));
-  tft.println(buf);
+  char head[64];
+  snprintf(head, sizeof(head), "%02d %s", i + 1, ssid);
+  tft.setCursor(16, y);
+  tft.setTextColor(nameCol);
+  tft.print(head);
+  char det[64];
+  snprintf(det, sizeof(det), "%d dBm   Ch %d   %s", ap_list[i].rssi, ap_list[i].primary, enc);
+  tft.setTextSize(1);
+  tft.setCursor(16, y + 18);
+  tft.setTextColor(isSel ? ORANGE : TFT_LIGHTGREY);
+  tft.print(det);
 }
 
 static void deautherOpenTarget(int index) {
@@ -5653,8 +5678,8 @@ constexpr int SCREEN_WIDTH = PUEO_SCREEN_W;
 
 // Larger row height = easier touch selection.
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+static constexpr int LIST_ROW_H = 30;   // two-line rows: name big + details small
 
 static unsigned long probeLastButtonPress = 0;
 static const unsigned long probeDebounceTime = 200;
@@ -5705,16 +5730,25 @@ static void probeDrawApRow(int i, int y, bool isSel) {
     strcat(ssid, "...");
   }
   const char* enc = ap_list[i].authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2";
-  snprintf(buf, sizeof(buf), "%02d: %-*s %3d dBm Ch%2d %s",
-           i + 1, kSsidField, ssid, ap_list[i].rssi, ap_list[i].primary, enc);
+  const uint16_t nameCol = isSel ? ORANGE : (ap_list[i].authmode == WIFI_AUTH_OPEN ? ORANGE : WHITE);
+  (void)buf;
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG);
   tft.print(isSel ? ">" : " ");
-  tft.setCursor(10, y);
-  tft.setTextColor(isSel ? ORANGE : (ap_list[i].authmode == WIFI_AUTH_OPEN ? ORANGE : WHITE));
-  tft.println(buf);
+  char head[64];
+  snprintf(head, sizeof(head), "%02d %s", i + 1, ssid);
+  tft.setCursor(16, y);
+  tft.setTextColor(nameCol);
+  tft.print(head);
+  char det[64];
+  snprintf(det, sizeof(det), "%d dBm   Ch %d   %s", ap_list[i].rssi, ap_list[i].primary, enc);
+  tft.setTextSize(1);
+  tft.setCursor(16, y + 18);
+  tft.setTextColor(isSel ? ORANGE : TFT_LIGHTGREY);
+  tft.print(det);
 }
 
 static void probeOpenTarget(int index) {
@@ -6356,8 +6390,8 @@ constexpr int ICON_SIZE = 16;
 constexpr int ICON_NUM = 2;
 
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+static constexpr int LIST_ROW_H = 30;   // two-line rows: name big + details small
 static constexpr int MAX_HIDDEN_APS = 40;
 static constexpr unsigned long LISTEN_HOP_MS = 1500;
 static constexpr unsigned long BTN_DEBOUNCE_MS = 200;
@@ -6747,16 +6781,25 @@ static void drawApRow(int i, int y, bool isSel) {
   }
 
   const char* tag = s_aps[i].has_name ? "OK" : "??";
-  snprintf(buf, sizeof(buf), "%02d: %-*s %3d Ch%2d %s",
-           i + 1, kSsidField, name, s_aps[i].rssi, s_aps[i].channel, tag);
+  const uint16_t nameCol = isSel ? ORANGE : (s_aps[i].has_name ? GREEN : WHITE);
+  (void)buf;
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG);
   tft.print(isSel ? ">" : " ");
-  tft.setCursor(10, y);
-  tft.setTextColor(isSel ? ORANGE : (s_aps[i].has_name ? GREEN : WHITE));
-  tft.println(buf);
+  char head[64];
+  snprintf(head, sizeof(head), "%02d %s", i + 1, name);
+  tft.setCursor(16, y);
+  tft.setTextColor(nameCol);
+  tft.print(head);
+  char det[64];
+  snprintf(det, sizeof(det), "%d dBm   Ch %d   %s", s_aps[i].rssi, s_aps[i].channel, tag);
+  tft.setTextSize(1);
+  tft.setCursor(16, y + 18);
+  tft.setTextColor(isSel ? ORANGE : TFT_LIGHTGREY);
+  tft.print(det);
 }
 
 static void drawScanScreen(bool fullRedraw) {
@@ -7482,8 +7525,8 @@ constexpr int ICON_SIZE = 16;
 constexpr int ICON_NUM = 2;
 
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+static constexpr int LIST_ROW_H = 30;   // two-line rows: name big + details small
 static constexpr int MAX_WPS_APS = 48;
 static constexpr unsigned long BTN_DEBOUNCE_MS = 200;
 
@@ -7597,17 +7640,25 @@ static void drawApRow(int i, int y, bool isSel) {
     snprintf(name, sizeof(name), "(hidden)");
   }
 
-  snprintf(buf, sizeof(buf), "%02d: %-*s %3d Ch%2d %s",
-           i + 1, kSsidField, name, (int)s_aps[i].rssi, (int)s_aps[i].channel,
-           authShort(s_aps[i].authmode));
+  (void)buf;
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG);
   tft.print(isSel ? ">" : " ");
-  tft.setCursor(10, y);
+  char head[64];
+  snprintf(head, sizeof(head), "%02d %s", i + 1, name);
+  tft.setCursor(16, y);
   tft.setTextColor(isSel ? ORANGE : WHITE);
-  tft.println(buf);
+  tft.print(head);
+  char det[64];
+  snprintf(det, sizeof(det), "%d dBm   Ch %d   %s", (int)s_aps[i].rssi, (int)s_aps[i].channel,
+           authShort(s_aps[i].authmode));
+  tft.setTextSize(1);
+  tft.setCursor(16, y + 18);
+  tft.setTextColor(isSel ? ORANGE : TFT_LIGHTGREY);
+  tft.print(det);
 }
 
 static void displayScanning() {
@@ -7957,8 +8008,8 @@ constexpr int ICON_SIZE = 16;
 constexpr int ICON_NUM = 2;
 
 static constexpr int LIST_HEADER_Y = 50;
-static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 20;
-static constexpr int LIST_ROW_H = 22;
+static constexpr int LIST_FIRST_ROW_Y = LIST_HEADER_Y + 24;
+static constexpr int LIST_ROW_H = 30;   // two-line rows: name big + details small
 static constexpr int MAX_APS = 40;
 static constexpr int MAX_HOSTS = 64;
 static constexpr unsigned long BTN_DEBOUNCE_MS = 200;
@@ -8213,21 +8264,21 @@ static void drawApRow(int i, int y, bool isSel) {
            (int)s_aps[i].rssi, (unsigned)s_aps[i].channel,
            authShort(s_aps[i].authmode));
 
+  const bool openNet = (s_aps[i].authmode == WIFI_AUTH_OPEN);
+  const uint16_t fg = isSel ? ORANGE : (openNet ? ORANGE : WHITE);
+
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG, TFT_BLACK);
   tft.print(isSel ? ">" : " ");
-
-  const bool openNet = (s_aps[i].authmode == WIFI_AUTH_OPEN);
-  const uint16_t fg = isSel ? ORANGE : (openNet ? ORANGE : WHITE);
-  const int rightW = tft.textWidth(right);
-  const int rightX = SCREEN_WIDTH - COL_RIGHT_MARGIN - rightW;
-
   tft.setTextColor(fg, TFT_BLACK);
-  tft.setCursor(COL_LEFT_X, y);
+  tft.setCursor(COL_LEFT_X + 6, y);
   tft.print(left);
 
-  tft.setCursor(rightX, y);
+  tft.setTextSize(1);
+  tft.setCursor(COL_LEFT_X + 6, y + 18);
+  tft.setTextColor(isSel ? ORANGE : TFT_LIGHTGREY, TFT_BLACK);
   tft.print(right);
 }
 
@@ -8243,19 +8294,17 @@ static void drawHostRow(int i, int y, bool isSel) {
            s_hosts[i].mac[3], s_hosts[i].mac[4], s_hosts[i].mac[5]);
 
   tft.fillRect(0, y, SCREEN_WIDTH, LIST_ROW_H, TFT_BLACK);
+  tft.setTextSize(2);
   tft.setCursor(2, y);
   tft.setTextColor(isSel ? ORANGE : FEATURE_BG, TFT_BLACK);
   tft.print(isSel ? ">" : " ");
-
-  const int macW = tft.textWidth(mac);
-  const int macX = SCREEN_WIDTH - COL_RIGHT_MARGIN - macW;
-
   tft.setTextColor(isSel ? ORANGE : WHITE, TFT_BLACK);
-  tft.setCursor(COL_LEFT_X, y);
+  tft.setCursor(COL_LEFT_X + 6, y);
   tft.print(left);
 
+  tft.setTextSize(1);
   tft.setTextColor(isSel ? ORANGE : UI_DIM_TEXT, TFT_BLACK);
-  tft.setCursor(macX, y);
+  tft.setCursor(COL_LEFT_X + 6, y + 18);
   tft.print(mac);
 }
 

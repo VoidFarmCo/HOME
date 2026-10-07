@@ -55,6 +55,15 @@ def main():
        "drawBitmapScaled" in src and
        re.search(r"static void drawTile\([^)]*const unsigned char\* icon", src) is not None)
 
+    # Tile labels draw in font 2, not the ~3.5pt font 1 that is unreadable at
+    # arm's length on this 165 ppi panel. Both drawString(label,...) calls in
+    # drawTile must pass font 2 and none may pass font 1.
+    body = re.search(r"static void drawTile\(.*?\n\}", src, re.S)
+    labels = re.findall(r"drawString\(label,[^;]*,\s*(\d+)\)",
+                        body.group(0) if body else "")
+    ok("tile labels use font 2 (readable), not font 1",
+       len(labels) >= 1 and all(f == "2" for f in labels))
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS))
