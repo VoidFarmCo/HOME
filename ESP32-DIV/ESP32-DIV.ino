@@ -4234,7 +4234,7 @@ static void drawTile(int vis, int visCount, int cols, const char* label,
     tft.fillRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, accent);
     tft.drawRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_WHITE, accent);
+    tft.setTextColor(TFT_BLACK, accent);   // black tile labels (owner request)
     if (icon) {
         const int sc  = 2;                 // 16x16 glyph drawn at 32x32
         const int isz = 16 * sc;

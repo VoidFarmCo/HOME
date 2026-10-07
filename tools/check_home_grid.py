@@ -64,6 +64,12 @@ def main():
     ok("tile labels use font 2 (readable), not font 1",
        len(labels) >= 1 and all(f == "2" for f in labels))
 
+    # Tile labels draw in black (owner request). drawTile sets the text colour
+    # once, against the accent fill, before drawing either label.
+    ok("tile labels draw in black",
+       body is not None and
+       re.search(r"setTextColor\(TFT_BLACK,\s*accent\)", body.group(0)) is not None)
+
     print()
     if FAILED:
         print("FAILED: %d of %d" % (len(FAILED), CHECKS))

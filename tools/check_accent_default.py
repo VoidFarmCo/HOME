@@ -46,6 +46,16 @@ def main():
     purple_idx = names.index("Purple") if "Purple" in names else -1
     ok("there is a Purple preset", purple_idx >= 0)
 
+    # ACCENT_PRESET_COUNT must match the table length, or the Settings cycle
+    # (next = (i + 1) % ACCENT_PRESET_COUNT) skips a preset or clamps a valid
+    # one away. This caught nothing until Tan/Olive were added -- now it pins it.
+    mc = re.search(r"ACCENT_PRESET_COUNT\s*=\s*(\d+)", store_h)
+    count = int(mc.group(1)) if mc else -1
+    ok("ACCENT_PRESET_COUNT matches the preset table length",
+       count == len(presets), "count=%d, table=%d" % (count, len(presets)))
+    ok("Tan and Olive presets are present",
+       "Tan" in names and "Olive" in names, "names=%s" % names)
+
     # 1. default accentColor == Purple index
     m = re.search(r"accentColor\s*=\s*(\d+)", store_h)
     default = int(m.group(1)) if m else -1

@@ -92,7 +92,7 @@ struct AccentOption {
   uint16_t color565;
 };
 
-constexpr uint8_t ACCENT_PRESET_COUNT = 7;
+constexpr uint8_t ACCENT_PRESET_COUNT = 9;
 
 AppSettings& settings();
 

@@ -54,6 +54,8 @@ static const AccentOption kAccentPresets[] = {
   {"Purple", 0x79DD},   // H.O.M.E brand purple (matches UI_ACCENT), was 0xF81F magenta
   {"Yellow", 0xFFE0},
   {"White",  0xFFFF},
+  {"Tan",    0xD5B1},   // warm sand (RGB ~210,180,140); black tile text reads well on it
+  {"Olive",  0x6CA4},   // olive green (RGB ~107,142,35)
 };
 
 uint8_t accentPresetClamp(uint8_t preset) {
