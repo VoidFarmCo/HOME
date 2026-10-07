@@ -161,6 +161,8 @@ bool settingsLoad() {
   s.autoWifiScan    = doc["autoWifiScan"]    | s.autoWifiScan;
   s.autoBleScan     = doc["autoBleScan"]     | s.autoBleScan;
   s.stealthMode     = doc["stealthMode"]     | s.stealthMode;
+  s.tileBorders     = doc["tileBorders"]     | s.tileBorders;
+  s.tileLabels      = doc["tileLabels"]      | s.tileLabels;
   s.logToSd         = doc["logToSd"]         | s.logToSd;
   s.logJson         = doc["logJson"]         | s.logJson;
   s.logSpotter      = doc["logSpotter"]      | s.logSpotter;
@@ -218,6 +220,8 @@ bool settingsSave() {
   doc["autoWifiScan"]    = s.autoWifiScan;
   doc["autoBleScan"]     = s.autoBleScan;
   doc["stealthMode"]     = s.stealthMode;
+  doc["tileBorders"]     = s.tileBorders;
+  doc["tileLabels"]      = s.tileLabels;
   doc["logToSd"]         = s.logToSd;
   doc["logJson"]         = s.logJson;
   doc["logSpotter"]      = s.logSpotter;

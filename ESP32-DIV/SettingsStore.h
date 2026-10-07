@@ -40,6 +40,11 @@ struct AppSettings {
    * cover. */
   bool     stealthMode    = false;
 
+  /* Home-tile look. Both default true (the current look); turning a toggle off
+   * drops the white tile outline, or the text caption (icon-only tiles). */
+  bool     tileBorders    = true;
+  bool     tileLabels     = true;
+
   /* Whether features may write their own log files.
    *
    * logToSd is the master: off means the card is left alone by every one of

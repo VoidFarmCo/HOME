@@ -1794,6 +1794,15 @@ void terminalLoop() {
  * so a restyled feature screen matches the home. */
 uint16_t homeAccent() { return accentColor565(settings().accentColor); }
 
+uint16_t accentInk(uint16_t bg) {
+  // RGB565 -> 8-bit channels, then perceptual luma (ITU-R BT.601 weights).
+  const uint16_t r = ((bg >> 11) & 0x1F) * 255 / 31;
+  const uint16_t g = ((bg >> 5)  & 0x3F) * 255 / 63;
+  const uint16_t b = (bg         & 0x1F) * 255 / 31;
+  const uint32_t luma = (r * 299 + g * 587 + b * 114) / 1000;
+  return (luma > 140) ? TFT_BLACK : TFT_WHITE;
+}
+
 void homeScreenHeader(const char* title) {
   featureClearContent(UI_BG);
   const uint16_t accent = homeAccent();
@@ -1889,6 +1898,8 @@ static const SwitchRow kMainSwitches[] = {
    * settings.json still loads, and settingsLoad() still forces them equal
    * if something ever writes them apart. */
   {"Auto Scan", &AppSettings::autoWifiScan, &AppSettings::autoBleScan},
+  {"Tile Borders", &AppSettings::tileBorders, nullptr},
+  {"Tile Labels",  &AppSettings::tileLabels,  nullptr},
 };
 
 static const char* const kFixedRows[] = {"Brightness", "Theme", "Accent"};
@@ -2147,21 +2158,13 @@ static void drawBrightness(uint8_t v, bool selected) {
   drawBrightnessWidget(v, selected);
 }
 
-static Rect rThemeDark()  {
+/* The theme control is a single cycling name ("[Midnight]"), like the accent
+ * row -- tap it (or press left/right) to step through the presets. Wide enough
+ * tap zone for the longest name. */
+static Rect rThemeName() {
   Rect r = rowRect(1);
   int right = r.x + r.w - 6;
-  tft.setTextFont(2);
-  int wD = (int)tft.textWidth("[Dark]");
-  int wL = (int)tft.textWidth("Light");
-  int gap = 6;
-  return makeRect(right - wD - gap - wL, r.y + 8, wD, r.h - 16);
-}
-static Rect rThemeLight() {
-  Rect r = rowRect(1);
-  int right = r.x + r.w - 6;
-  tft.setTextFont(2);
-  int wL = (int)tft.textWidth("[Light]");
-  return makeRect(right - wL, r.y + 8, wL, r.h - 16);
+  return makeRect(right - 120, r.y + 8, 120, r.h - 16);
 }
 
 static void drawThemeWidget(Theme th, bool ) {
@@ -2175,21 +2178,13 @@ static void drawThemeWidget(Theme th, bool ) {
 
   setLabelFont();
 
-  const char* darkLabel  = (th == Theme::Dark)  ? "[Dark]"  : "Dark";
-  const char* lightLabel = (th == Theme::Light) ? "[Light]" : "Light";
-
-  int wD = (int)tft.textWidth(darkLabel);
-  int wL = (int)tft.textWidth(lightLabel);
-  int gap = 6;
-
-  int lx = right - wL;
-  int dx = lx - gap - wD;
+  char buf[24];
+  snprintf(buf, sizeof(buf), "[%s]", themeName((uint8_t)th));
+  int w = (int)tft.textWidth(buf);
 
   tft.setTextColor(textStrong, UI_BG);
-  tft.setCursor(dx, ty);
-  tft.print(darkLabel);
-  tft.setCursor(lx, ty);
-  tft.print(lightLabel);
+  tft.setCursor(right - w, ty);
+  tft.print(buf);
 
   tft.endWrite();
 }
@@ -2750,17 +2745,12 @@ static void handleTouch() {
       applyBrightness(v);
     }
   } else if (sel == 1) {
-    Rect d = rThemeDark();
-    Rect l = rThemeLight();
+    Rect nm = rThemeName();
     uint32_t now = millis();
-    if (tx >= d.x && tx <= d.x+d.w && ty >= d.y && ty <= d.y+d.h) {
+    if (tx >= nm.x && tx <= nm.x+nm.w && ty >= nm.y && ty <= nm.y+nm.h) {
       if (now - lastToggleMs > 200) {
-        applyTheme(Theme::Dark);
-        lastToggleMs = now;
-      }
-    } else if (tx >= l.x && tx <= l.x+l.w && ty >= l.y && ty <= l.y+l.h) {
-      if (now - lastToggleMs > 200) {
-        applyTheme(Theme::Light);
+        uint8_t next = ((uint8_t)s.theme + 1) % THEME_PRESET_COUNT;
+        applyTheme((Theme)next);
         lastToggleMs = now;
       }
     }
@@ -2844,7 +2834,7 @@ void loop(){
     auto& s=settings();
     if (rowIsSwitch(sel))              { applySwitch(sel, false); }
     else if (sel==0 && s.brightness>0) { applyBrightness(s.brightness>8? s.brightness-8:0); }
-    else if (sel==1)                   { applyTheme(Theme::Dark); }
+    else if (sel==1)                   { applyTheme((Theme)(((uint8_t)s.theme + THEME_PRESET_COUNT - 1) % THEME_PRESET_COUNT)); }
     else if (sel==2)                   { applyAccent((s.accentColor + ACCENT_PRESET_COUNT - 1) % ACCENT_PRESET_COUNT); }
     changedByButtons=true;
     lastActionMs = now;
@@ -2853,7 +2843,7 @@ void loop(){
     auto& s=settings();
     if (rowIsSwitch(sel))              { applySwitch(sel, true); }
     else if (sel==0 && s.brightness<255) { applyBrightness(s.brightness+8); }
-    else if (sel==1)                   { applyTheme(Theme::Light); }
+    else if (sel==1)                   { applyTheme((Theme)(((uint8_t)s.theme + 1) % THEME_PRESET_COUNT)); }
     else if (sel==2)                   { applyAccent((s.accentColor + 1) % ACCENT_PRESET_COUNT); }
     else if (sel==kLinkRow)            { lastActionMs = now; goToPage(Page::Logging); return; }
     else if (sel==kBootRow)            { lastActionMs = now; BootLock::manage(); drawAll(); return; }

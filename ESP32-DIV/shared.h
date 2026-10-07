@@ -885,7 +885,10 @@ static const uint8_t OBF_WB[]   = {75, 97, 110, 109, 122, 92, 109, 107, 96, 38, 
 #endif
 
 /*──────────────────── Settings / Themes ────────────────────*/
-enum class Theme : uint8_t { Dark = 0, Light = 1 };
+enum class Theme : uint8_t { Dark = 0, Light = 1, Midnight = 2, Matrix = 3, Sand = 4, Contrast = 5 };
+constexpr uint8_t THEME_PRESET_COUNT = 6;
+/* Display name of a theme preset by index (clamps out-of-range to Dark). */
+const char* themeName(uint8_t idx);
 
 #ifndef SETTINGS_PATH
 #define SETTINGS_PATH CONFIG_DIR "/settings.json"

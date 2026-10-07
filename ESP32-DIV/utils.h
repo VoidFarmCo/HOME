@@ -141,6 +141,10 @@ void featureClearContent(uint16_t color = BLACK);
 /** The live accent colour (follows the user's accentColor setting). The
  *  one place feature-screen chrome reads the accent from. */
 uint16_t homeAccent();
+/** Black or white, whichever reads better on top of `bg` (by perceptual
+ *  luminance). Used so tile labels/icons stay legible on any accent -- black
+ *  on light accents (Tan, Yellow), white on dark ones (Purple, Red). */
+uint16_t accentInk(uint16_t bg);
 void homeScreenHeader(const char* title);
 /** True when the on-screen touch nav bar is active for the current feature. */
 bool featureHasTouchNavBar();

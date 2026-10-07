@@ -64,11 +64,15 @@ def main():
     ok("tile labels use font 2 (readable), not font 1",
        len(labels) >= 1 and all(f == "2" for f in labels))
 
-    # Tile labels draw in black (owner request). drawTile sets the text colour
-    # once, against the accent fill, before drawing either label.
-    ok("tile labels draw in black",
-       body is not None and
-       re.search(r"setTextColor\(TFT_BLACK,\s*accent\)", body.group(0)) is not None)
+    # Tile labels/icons draw with an auto-contrast ink: accentInk(accent) picks
+    # black or white by the accent's luminance, so a light accent (Tan) gets
+    # black text and a dark one (Purple) gets white -- never an invisible tile.
+    bodytext = body.group(0) if body else ""
+    ok("tile ink is auto-contrast (accentInk)",
+       "accentInk(accent)" in bodytext and
+       re.search(r"setTextColor\(ink,\s*accent\)", bodytext) is not None)
+    ok("tile icon uses the same auto-contrast ink",
+       re.search(r"drawBitmapScaled\([^;]*,\s*ink,\s*sc\)", bodytext) is not None)
 
     print()
     if FAILED:

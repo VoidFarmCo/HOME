@@ -4230,18 +4230,23 @@ static void drawHomeHeader() {
 static void drawTile(int vis, int visCount, int cols, const char* label,
                      const unsigned char* icon = nullptr) {
     const uint16_t accent = homeAccent();
+    const uint16_t ink = accentInk(accent);   // black on light accents, white on dark
     int x, y, w, h; pbTileRect(vis, visCount, cols, x, y, w, h);
+    const bool borders = settings().tileBorders;
+    const bool labels  = settings().tileLabels;
     tft.fillRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, accent);
-    tft.drawRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, TFT_WHITE);
+    if (borders) tft.drawRoundRect(x, y, w, h, HOME_UI_TILE_RADIUS, TFT_WHITE);
     tft.setTextDatum(MC_DATUM);
-    tft.setTextColor(TFT_BLACK, accent);   // black tile labels (owner request)
+    tft.setTextColor(ink, accent);
     if (icon) {
         const int sc  = 2;                 // 16x16 glyph drawn at 32x32
         const int isz = 16 * sc;
-        drawBitmapScaled(x + w / 2 - isz / 2, y + h / 2 - isz / 2 - 10,
-                         icon, 16, 16, TFT_WHITE, sc);
-        tft.drawString(label, x + w / 2, y + h - 16, 2);
-    } else {
+        // Centre the icon when there is no label under it.
+        const int iconDy = labels ? (-10) : 0;
+        drawBitmapScaled(x + w / 2 - isz / 2, y + h / 2 - isz / 2 + iconDy,
+                         icon, 16, 16, ink, sc);
+        if (labels) tft.drawString(label, x + w / 2, y + h - 16, 2);
+    } else if (labels) {
         tft.drawString(label, x + w / 2, y + h / 2, 2);
     }
 }

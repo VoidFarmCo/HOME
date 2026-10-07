@@ -158,6 +158,8 @@ INCLUDE=(
   "tools/check_menu_bounds.py"
   "tools/check_home_clock.py"
   "tools/check_home_grid.py"
+  "tools/check_theme_presets.py"
+  "tools/check_tile_toggles.py"
   "tools/check_home_fontreset.py"
   "tools/check_chat_name.py"
   "tools/check_no_rfid.py"
