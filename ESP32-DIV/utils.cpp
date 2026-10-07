@@ -1790,6 +1790,24 @@ void terminalLoop() {
   }
 }
 
+/* H.O.M.E feature-screen chrome -- see utils.h. Clears to the themed
+ * background and draws the title in the live accent (not fixed UI_ACCENT),
+ * so a restyled feature screen matches the home. */
+uint16_t homeAccent() { return accentColor565(settings().accentColor); }
+
+void homeScreenHeader(const char* title) {
+  featureClearContent(UI_BG);
+  const uint16_t accent = homeAccent();
+  tft.setTextFont(2);
+  tft.setTextSize(1);
+  tft.setTextColor(accent, UI_BG);
+  tft.setCursor(8, 40);
+  tft.print(title ? title : "");
+  /* Accent underline rule across the content width -- the H.O.M.E mark that
+   * tells a feature screen apart from the inherited plain title. */
+  tft.fillRect(8, 58, tft.width() - 16, 2, accent);
+}
+
 namespace AppSettingsUI {
 
 /* The panel, not a 240 px memory of one. This settings screen drew its rows

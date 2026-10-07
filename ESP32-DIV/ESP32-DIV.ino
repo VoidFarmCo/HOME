@@ -4110,9 +4110,7 @@ static uint8_t pbActiveMask() {
 /* The live profile accent. NOT UI_ACCENT -- that macro is hard-coded to the
  * brand purple in shared.h and never tracks accentColor, so the tiles would
  * stay purple on COMBAT. accentColor is what the profile toggle / picker set. */
-static uint16_t homeAccent() {
-    return accentColor565(settings().accentColor);
-}
+/* homeAccent() is now shared from utils.h (same live-accent value). */
 
 /* A group tile shows only when the active profile has at least one tool in it. */
 static bool groupVisible(int g, uint8_t mask) {

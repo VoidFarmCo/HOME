@@ -274,7 +274,7 @@ static void drawSettingsPage();
 
 static void drawIconHeader() {
     if (!uiDrawn) {
-        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
         tft.fillRect(0, 20, PUEO_SCREEN_W, 16, DARK_GRAY);
 
         for (int i = 0; i < ICON_NUM; i++) {

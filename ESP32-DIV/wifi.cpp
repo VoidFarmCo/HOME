@@ -1098,7 +1098,7 @@ void ptmLoop() {
 
   if (!s_sweep) {
     tft.drawFastHLine(0, 90, PUEO_SCREEN_W, UI_LINE);
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     do_sampling_FFT();
     delay(10);
@@ -1305,7 +1305,7 @@ static void spamUpdateNavLabels() {
 }
 
 static void spamRedrawChrome() {
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   tft.drawFastHLine(0, 35, tft.width(), UI_LINE);
 }
 
@@ -1925,7 +1925,7 @@ void displayPrint(String text, uint16_t color, bool extraSpace = false) {
     if (yPos + LINE_HEIGHT > bodyBottom) {
       break;
     }
-    tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+    tft.drawFastHLine(0, 19, tft.width(), homeAccent());
     tft.fillRect(5, yPos, tft.width() - 10, LINE_HEIGHT, TFT_BLACK);
     tft.setTextColor(colorBuffer[i], TFT_BLACK);
     tft.setCursor(5, yPos);
@@ -2145,7 +2145,7 @@ static bool uiDrawn = false;
 
 void runUI() {
 
-    tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+    tft.drawFastHLine(0, 19, tft.width(), homeAccent());
 
     static const unsigned char* icons[ICON_NUM] = {
         bitmap_icon_start,
@@ -2160,7 +2160,7 @@ void runUI() {
         tft.setCursor(35, 24);
         tft.print("Scanning WiFi");
 
-        tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+        tft.drawFastHLine(0, 19, tft.width(), homeAccent());
         tft.fillRect(140, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH - 140, STATUS_BAR_HEIGHT, DARK_GRAY);
 
         for (int i = 0; i < ICON_NUM; i++) {
@@ -2294,7 +2294,7 @@ void deauthdetectLoop() {
   deauthFlushPendingAlert();
   updateStatusBar();
   maintainTouchNavBar();
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
 
   if (exitMode) {
     deauthTeardown();
@@ -2327,6 +2327,9 @@ int currentIndex = 0;
 int listStartIndex = 0;
 bool isDetailView = false;
 bool isScanning = false;
+/* Continuous scan on/off, driven by the Stop/Start button. On by default
+ * so the list stays live; Stop holds the current results. */
+static bool s_autoScan = true;
 bool exitRequested = false;
 
 /* ── Station scanner ─────────────────────────────────────────────────────
@@ -2520,6 +2523,13 @@ bool loadApListFromWifiCache(wifi_ap_record_t** ap_list, int* network_count,
 }
 
 unsigned long scan_StartTime = 0;
+/* Continuous scan: re-scan this long after the last one while the user is
+ * watching the list. ~8 s keeps it live without hammering the radio. */
+static constexpr unsigned long WIFI_AUTO_RESCAN_MS = 8000;
+/* When the last foreground scan FINISHED. The auto-rescan gap is measured
+ * from here, not from scan start -- a scan can run longer than the gap, and
+ * timing from start made it finish already overdue and loop forever. */
+static unsigned long s_lastScanEndMs = 0;
 const unsigned long scanTimeout = 2000;
 unsigned long lastButtonPress = 0;
 const unsigned long debounceTime = 200;
@@ -2551,7 +2561,7 @@ static void wifiScanUpdateNavLabels() {
   } else if (isDetailView) {
     setTouchNavLabels("Scan", "Next", "Exit", "Stations", "Back");
   } else {
-    setTouchNavLabels("Scan", "Next", "Exit", "Prev", "View");
+    setTouchNavLabels(s_autoScan ? "Stop" : "Start", "Next", "Exit", "Prev", "View");
   }
   redrawTouchButtonBar();
 }
@@ -2617,7 +2627,7 @@ void displayWiFiList(bool fullRedraw = false) {
   int networkCount = WiFi.scanComplete();
 
   if (fullRedraw) {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     wifiScanClearBody();
     tft.setTextSize(1);
   }
@@ -2740,6 +2750,7 @@ void startWiFiScan() {
   }
   fgWifiScanInProgress = false;
   isScanning = false;
+  s_lastScanEndMs = millis();
 
   if (numNetworks >= 0) {
     bgHasResults = true;
@@ -2860,7 +2871,9 @@ void handleButton() {
     if (isDetailView) {
       isDetailView = false;
     } else if (!isScanning) {
-      startWiFiScan();
+      s_autoScan = !s_autoScan;          // Stop/Start the continuous scan
+      if (s_autoScan) startWiFiScan();   // Start: scan now; Stop: hold the list
+      wifiScanUpdateNavLabels();         // reflect Stop/Start on the button
     }
     updated = true;
     lastButtonPress = currentMillis;
@@ -2877,7 +2890,7 @@ void runUI() {
     static int iconY = STATUS_BAR_Y_OFFSET;
 
     if (!uiDrawn) {
-        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
         tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
         for (int i = 0; i < ICON_NUM; i++) {
@@ -3325,13 +3338,22 @@ void wifiscanLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   static bool lastDetailView = false;
   static bool lastScanning = true;
 
   handleButton();
   runUI();
   updateStatusBar();
+
+  /* Continuous scan: while watching the list (not a detail view, not mid-scan,
+   * and parked at the top so scrolling is not interrupted), re-run the scan
+   * on a timer so results stay live without a Rescan press. */
+  if (s_autoScan && !isScanning && !isDetailView && currentIndex == 0 &&
+      (millis() - s_lastScanEndMs) >= WIFI_AUTO_RESCAN_MS) {
+    startWiFiScan();
+    return;
+  }
 
   if (isScanning) {
     if (!lastScanning) {
@@ -3533,7 +3555,7 @@ void displayPrint(String text, uint16_t color, bool extraSpace = false) {
     if (yPos + CP_LINE_HEIGHT > bodyBottom) {
       break;
     }
-    tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+    tft.drawFastHLine(0, 19, tft.width(), homeAccent());
     tft.fillRect(5, yPos, tft.width() - 10, CP_LINE_HEIGHT, TFT_BLACK);
     tft.setTextColor(colorBuffer[i], TFT_BLACK);
     tft.setCursor(5, yPos);
@@ -3895,7 +3917,7 @@ void clearAllCredentials() {
 }
 
 static void cpDrawCloneFrame(const char* title, const char* subtitle = nullptr) {
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   wifiClearBody(TFT_BLACK);
   tft.setTextSize(1);
   const int headerY = cpCloneHeaderY();
@@ -3981,7 +4003,7 @@ static void cpCloneDrawNetworkList(int count, const int* idx, int selectedIdx, b
   const bool needFull = forceFull || pageChanged || s_cloneLastRenderedSel < 0;
 
   if (needFull) {
-    tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+    tft.drawFastHLine(0, 19, tft.width(), homeAccent());
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
     cpCloneDrawListHeader(count, page, totalPages);
@@ -4052,7 +4074,7 @@ static CpCloneAction cpCloneWaitInput(bool prevEnabled, bool nextEnabled, bool p
 
     if (featureHasTouchNavBar()) {
       maintainTouchNavBar();
-      tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+      tft.drawFastHLine(0, 19, tft.width(), homeAccent());
       if (isButtonPressedEdge(BTN_LEFT)) {
         return CpCloneAction::Back;
       }
@@ -4824,7 +4846,7 @@ void cportalLoop() {
   }
 
   maintainTouchNavBar();
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
 
   cportalHandleMainNavButtons();
   cportalHandleCredNavButtons();
@@ -5002,7 +5024,7 @@ void drawTabBar(const char* leftButton, bool leftDisabled, const char* prevButto
 }
 
 void drawScanScreen() {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -5120,7 +5142,7 @@ void resetWifi() {
 }
 
 void drawAttackScreen() {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -5430,7 +5452,7 @@ void deautherSetup() {
     redrawTouchButtonBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     tft.setTextColor(GREEN, BLACK);
     tft.setTextSize(1);
@@ -5460,14 +5482,14 @@ void deautherLoop() {
         return;
     }
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     deautherHandleNavButtons();
     handleTouch();
     updateStatusBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     uint32_t current_time = millis();
     if (attack_running && selected_ap_index != -1) {
@@ -5724,7 +5746,7 @@ void drawTabBar(const char* leftButton, bool leftDisabled, const char* prevButto
 }
 
 void drawScanScreen() {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -5842,7 +5864,7 @@ void resetWifi() {
 }
 
 void drawAttackScreen() {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     wifiClearBody(TFT_BLACK);
     tft.setTextSize(1);
 
@@ -6136,7 +6158,7 @@ void probeRequestFloodSetup() {
     redrawTouchButtonBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     tft.setTextColor(GREEN, BLACK);
     tft.setTextSize(1);
@@ -6166,14 +6188,14 @@ void probeRequestFloodLoop() {
         return;
     }
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     probeHandleNavButtons();
     handleTouch();
     updateStatusBar();
     runUI();
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     uint32_t current_time = millis();
     if (attack_running && selected_ap_index != -1) {
@@ -6651,7 +6673,7 @@ static void drawApRow(int i, int y, bool isSel) {
 }
 
 static void drawScanScreen(bool fullRedraw) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.setTextSize(1);
 
   if (s_scanning) {
@@ -6828,7 +6850,7 @@ static void drawRevealScreen(bool fullRedraw) {
     return;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   wifiClearBody(TFT_BLACK);
   tft.setTextSize(1);
   s_lastRenderedIndex = -1;
@@ -7297,7 +7319,7 @@ void hiddenSsidSetup() {
   redrawTouchButtonBar();
   runUI();
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.setTextColor(GREEN, BLACK);
   tft.setTextSize(1);
   tft.setCursor(10, 50);
@@ -7324,7 +7346,7 @@ void hiddenSsidLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   handleNavButtons();
   handleTouch();
@@ -7339,7 +7361,7 @@ void hiddenSsidLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   const bool onReveal = (s_selectedIndex >= 0 || s_listenAll);
   const uint32_t now = millis();
@@ -7502,7 +7524,7 @@ static void drawApRow(int i, int y, bool isSel) {
 }
 
 static void displayScanning() {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   wifiClearBody(TFT_BLACK);
   s_lastRenderedIndex = -1;
   s_lastRenderedPage = -1;
@@ -7516,7 +7538,7 @@ static void displayScanning() {
 }
 
 static void drawScanScreen(bool fullRedraw) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.setTextSize(1);
 
   if (s_scanning) {
@@ -7809,7 +7831,7 @@ void wpsScannerSetup() {
   runUI();
   updateNavLabels();
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   runScan();
 }
 
@@ -8053,7 +8075,7 @@ static struct netif* staNetif() {
 }
 
 static void displayBusy(const char* line1, const char* line2) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   wifiClearBody(TFT_BLACK);
   s_lastRenderedIndex = -1;
   s_lastRenderedPage = -1;
@@ -8152,7 +8174,7 @@ static void drawHostRow(int i, int y, bool isSel) {
 
 static void drawListCommon(bool fullRedraw, int count, const char* header,
                            void (*drawRow)(int, int, bool)) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.setTextSize(1);
 
   if (s_scanning) {
@@ -8765,7 +8787,7 @@ void arpScannerSetup() {
   runUI();
   updateNavLabels();
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   scanAccessPoints();
 }
 
@@ -8856,7 +8878,7 @@ void reconDraw(bool full) {
   if (!s_rc) return;
   if (full) {
     wifiClearBody(TFT_BLACK);
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   }
   tft.setTextFont(1);
   tft.setTextSize(1);
@@ -9970,7 +9992,7 @@ static void updateHeader(bool force) {
 }
 
 static void drawDashboard(bool full) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   if (full) {
     wifiClearBody(TFT_BLACK);
     invalidateHeaderCache();
@@ -10933,7 +10955,7 @@ static void drawNetworkTabBar(bool prevDisabled, bool nextDisabled) {
 }
 
 void drawMenu() {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   const int bodyBottom = fwContentBottom();
   tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
 
@@ -11293,7 +11315,7 @@ void performSDUpdate() {
 bool selectWiFiNetwork() {
   uiDrawn = false;
   tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.setCursor(10, 50);
   tft.setTextColor(GREEN);
   tft.setTextSize(1);
@@ -11305,7 +11327,7 @@ bool selectWiFiNetwork() {
   int numNetworks = WiFi.scanNetworks();
   if (numNetworks <= 0) {
     tft.fillRect(0, 37, PUEO_SCREEN_W, PUEO_SCREEN_H, TFT_BLACK);
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.setTextColor(GREEN);
     tft.setCursor(10, 50);
     tft.println("No networks found.");
@@ -11441,7 +11463,7 @@ bool selectWiFiNetwork() {
 }
 
 void drawNetworkList(int startIndex, int numNetworks, NetworkInfo* networks, int selectedIndex) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   const int bodyBottom = fwContentBottom();
   tft.fillRect(0, 37, PUEO_SCREEN_W, bodyBottom - 37, TFT_BLACK);
   tft.setTextSize(1);
@@ -11768,7 +11790,7 @@ void updateSetup() {
 
   fwResetNavCache();
   tft.fillScreen(TFT_BLACK);
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(0);

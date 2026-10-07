@@ -29,34 +29,28 @@ static bool probeNrf24() {
 static void row(int& y, const char* name, const char* pins, bool present) {
   tft.setTextFont(1);
   tft.setTextSize(1);
-  tft.fillRect(0, y, PUEO_SCREEN_W, 16, TFT_BLACK);
-  tft.setTextColor(C_TEXT, TFT_BLACK);
+  tft.fillRect(0, y, PUEO_SCREEN_W, 16, UI_BG);
+  tft.setTextColor(C_TEXT, UI_BG);
   tft.setCursor(8, y);
   tft.print(name);
-  tft.setTextColor(present ? C_OK : C_NO, TFT_BLACK);
+  tft.setTextColor(present ? C_OK : C_NO, UI_BG);
   tft.setCursor(118, y);
   tft.print(present ? "present" : "not found");
-  tft.setTextColor(0x8410, TFT_BLACK);   // grey
+  tft.setTextColor(0x8410, UI_BG);   // grey
   tft.setCursor(200, y);
   tft.print(pins);
   y += 18;
 }
 
 static void runProbes() {
-  const int bottom = featureHasTouchNavBar() ? (int)touchNavContentBottomY() : 300;
-  tft.fillRect(0, 38, PUEO_SCREEN_W, bottom - 38, TFT_BLACK);
-  tft.setTextFont(1);
-  tft.setTextSize(1);
-  tft.setTextColor(UI_ACCENT, TFT_BLACK);
-  tft.setCursor(8, 42);
-  tft.print("Radio Test");
+  homeScreenHeader("Radio Test");
 
   int y = 64;
   row(y, "SD card", "CS5",       isSDCardAvailable());
   row(y, "CC1101",  "CS21 G22/35", probeCC1101());
   row(y, "NRF24",   "CE16 CSN25",  probeNrf24());
 
-  tft.setTextColor(0x8410, TFT_BLACK);
+  tft.setTextColor(0x8410, UI_BG);
   tft.setCursor(8, y + 6);
   tft.print("Rescan to re-probe.");
 }
@@ -64,7 +58,7 @@ static void runProbes() {
 void setup() {
   pauseBackgroundRadioTasks();
   setTouchButtonInputEnabled(true);
-  featureClearContent(TFT_BLACK);
+  featureClearContent(UI_BG);
   drawStatusBar(readBatteryVoltage(), true);
   setTouchNavLabels("Rescan", nullptr, "Exit", nullptr, nullptr);
   redrawTouchButtonBar();

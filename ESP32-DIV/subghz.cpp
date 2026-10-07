@@ -1373,7 +1373,7 @@ void runUI() {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, UI_ICON);
             }
         }
-        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
         tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
@@ -1565,7 +1565,7 @@ void ReplayAttackLoop() {
     maintainTouchNavBar();
     runUI();
     if (uiDrawn) {
-      tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+      tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
       tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
       if (s_replayDisp.valid) {
         replayDrawStatusSeparator();
@@ -2261,7 +2261,7 @@ void runUI() {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, UI_ICON);
             }
         }
-        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
         tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
@@ -2757,7 +2757,7 @@ void runUI() {
                 tft.drawBitmap(iconX[i], iconY, icons[i], ICON_SIZE, ICON_SIZE, UI_ICON);
             }
         }
-        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+        tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
         tft.drawFastHLine(0, STATUS_BAR_Y_OFFSET + STATUS_BAR_HEIGHT, PUEO_SCREEN_W, UI_LINE);
         uiDrawn = true;
     }
@@ -2930,7 +2930,7 @@ void subjammerLoop() {
     maintainTouchNavBar();
     runUI();
     if (uiDrawn) {
-      tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+      tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
       tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
       if (s_jammerDisp.valid) {
         jammerDrawStatusSeparator();
@@ -3384,7 +3384,7 @@ static void updateDisplay(bool force = false) {
     if (bodyBottom > kBarBottom) {
       tft.fillRect(0, kBarBottom + 1, PUEO_SCREEN_W, bodyBottom - kBarBottom - 1, TFT_BLACK);
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarBottom, PUEO_SCREEN_W, UI_LINE);
 
     drawPanelFrame(settingsPanelY(), settingsPanelH(), "Settings");
@@ -3667,7 +3667,7 @@ void runUI() {
         tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
       }
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     s_uiDrawn = true;
   }
@@ -3815,7 +3815,7 @@ void subBruteLoop() {
   maintainTouchNavBar();
   runUI();
   if (s_uiDrawn) {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarBottom, PUEO_SCREEN_W, UI_LINE);
   }
   bruteHandleNavButtons();
@@ -4068,7 +4068,7 @@ static void jdRunUI() {
     for (int i = 0; i < kIconN; i++) {
       tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     s_jdUiDrawn = true;
   }

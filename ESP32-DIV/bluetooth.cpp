@@ -671,7 +671,7 @@ static bool spooferLineFits(int yPos) {
 }
 
 void Printspoofer(String text, uint16_t color, bool extraSpace = false) {
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   const int visibleLines = spooferVisibleLines();
   if (spooferlineIndex >= visibleLines) {
     for (int i = 0; i < visibleLines - 1; i++) {
@@ -1198,11 +1198,11 @@ void runUI() {
     bitmap_icon_go_back
   };
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   if (!uiDrawn) {
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.fillRect(80, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -1283,7 +1283,7 @@ void spooferSetup() {
   drawStatusBar(currentBatteryVoltage, true);
   redrawTouchButtonBar();
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   /* esp_random(), not analogRead(0). The PRNG behind random() is
    * deterministic from its seed, and an unconnected ADC pin is not a
@@ -1332,7 +1332,7 @@ void spooferSetup() {
 #endif
 
   uiDrawn = false;
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   redrawTouchButtonBar();
 }
 
@@ -1364,7 +1364,7 @@ void spooferLoop() {
     }
 
     runUI();
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     handleButtonPress(BTN_RIGHT, changeDeviceTypeNext);
     handleButtonPress(BTN_LEFT, changeDeviceTypePrev);
@@ -1444,11 +1444,11 @@ void runUI() {
     bitmap_icon_go_back
   };
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   if (!uiDrawn) {
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -1599,12 +1599,12 @@ void sourappleSetup() {
   redrawTouchButtonBar();
 
   tft.setTextSize(1);
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   uiDrawn = false;
 
   setupTouchscreen();
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9);
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
@@ -1622,7 +1622,7 @@ void sourappleLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   runUI();
 
   /* The payload changes every burst; the address changes once a second.
@@ -2179,7 +2179,7 @@ void airTagSetup() {
   runUI();
   updateNavLabels();
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9);
   esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
 
@@ -2883,7 +2883,7 @@ void airTagSnifferSetup() {
   redrawTouchButtonBar();
   runUI();
   updateNavLabels();
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   updateHeader(true);
   redrawList();
 
@@ -3681,7 +3681,7 @@ void bleSkimmerSetup() {
   redrawTouchButtonBar();
   runUI();
   updateNavLabels();
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   updateHeader(true);
   redrawList();
 
@@ -3961,7 +3961,7 @@ void updateTFT() {
     xPos += spacing;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.drawFastHLine(0, 35, PUEO_SCREEN_W, UI_LINE);
 }
 
@@ -4708,7 +4708,7 @@ void runUI() {
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   if (!uiDrawn) {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -4887,7 +4887,7 @@ void bleScanLoop() {
     return;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   handleButtons();
 
   runUI();
@@ -5305,7 +5305,7 @@ void runUI() {
     tft.setCursor(35, 24);
     tft.print("2.4GHz Scanner");
 
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.fillRect(160, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
     for (int i = 0; i < ICON_NUM; i++) {
@@ -5681,7 +5681,7 @@ static void scannerDrawStatusLineIfChanged(int line, const String& text, uint16_
 
 static void scannerDrawTextBoxes() {
   tft.fillRect(0, kScannerStatusY - 2, tft.width(), kScannerLogBottom - kScannerStatusY + 2, TFT_BLACK);
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   tft.drawRoundRect(4, kScannerStatusY, tft.width() - 8, kScannerStatusBoxH, 3, UI_LINE);
   tft.drawRoundRect(4, kScannerLogBoxTop, tft.width() - 8, kScannerLogBoxH, 3, UI_LINE);
   tft.setTextSize(1);
@@ -6175,7 +6175,7 @@ void updateTFT() {
     xPos += spacing;
   }
 
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
   tft.drawFastHLine(0, 35, PUEO_SCREEN_W, UI_LINE);
 
 }
@@ -6272,7 +6272,7 @@ void prokillLoop() {
   }
 
   maintainTouchNavBar();
-  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+  tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
   checkModeChange();
 
@@ -6734,7 +6734,7 @@ static void esbDrawTextBoxes() {
   const int logH = esbLogBoxH();
   const int endY = esbLogEndY();
   tft.fillRect(0, kEsbStatusY - 2, tft.width(), endY - kEsbStatusY + 4, TFT_BLACK);
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   tft.drawRoundRect(4, kEsbStatusY, tft.width() - 8, kEsbStatusBoxH, 3, UI_LINE);
   tft.drawRoundRect(4, kEsbLogBoxTop, tft.width() - 8, logH, 3, UI_LINE);
 
@@ -7057,7 +7057,7 @@ void runUI() {
         tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
       }
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
@@ -7606,7 +7606,7 @@ static void rpDrawTextBoxes() {
   const int logH = rpLogBoxH();
   const int endY = rpLogEndY();
   tft.fillRect(0, kRpStatusY - 2, tft.width(), endY - kRpStatusY + 4, TFT_BLACK);
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   tft.drawRoundRect(4, kRpStatusY, tft.width() - 8, kRpStatusBoxH, 3, UI_LINE);
   tft.drawRoundRect(4, kRpSelBoxTop, tft.width() - 8, kRpSelBoxH, 3, UI_LINE);
   tft.drawRoundRect(4, kRpLogBoxTop, tft.width() - 8, logH, 3, UI_LINE);
@@ -7898,7 +7898,7 @@ void runUI() {
     for (int i = 0; i < kIconN; i++) {
       if (icons[i]) tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
@@ -8455,7 +8455,7 @@ static void mjDrawTextBoxes() {
   const int logH = mjLogBoxH();
   const int endY = mjLogEndY();
   tft.fillRect(0, kMjStatusY - 2, tft.width(), endY - kMjStatusY + 4, TFT_BLACK);
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   tft.drawRoundRect(4, kMjStatusY, tft.width() - 8, kMjStatusBoxH, 3, UI_LINE);
   tft.drawRoundRect(4, kMjLogBoxTop, tft.width() - 8, logH, 3, UI_LINE);
 
@@ -8804,7 +8804,7 @@ void runUI() {
         tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
       }
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
@@ -9224,7 +9224,7 @@ static void injDrawTextBoxes() {
   const int logH = injLogBoxH();
   const int endY = injLogEndY();
   tft.fillRect(0, kInjStatusY - 2, tft.width(), endY - kInjStatusY + 4, TFT_BLACK);
-  tft.drawFastHLine(0, 19, tft.width(), UI_LINE);
+  tft.drawFastHLine(0, 19, tft.width(), homeAccent());
   tft.drawRoundRect(4, kInjStatusY, tft.width() - 8, kInjStatusBoxH, 3, UI_LINE);
   tft.drawRoundRect(4, kInjLogBoxTop, tft.width() - 8, logH, 3, UI_LINE);
 
@@ -9653,7 +9653,7 @@ void runUI() {
     for (int i = 0; i < kIconN; i++) {
       if (icons[i]) tft.drawBitmap(iconX[i], iconY, icons[i], kIconSz, kIconSz, UI_ICON);
     }
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, kBarY + kBarH, PUEO_SCREEN_W, UI_LINE);
     uiDrawn = true;
   }
@@ -10220,7 +10220,7 @@ void runUI() {
   static int iconY = STATUS_BAR_Y_OFFSET;
 
   if (!uiDrawn) {
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
     tft.drawFastHLine(0, 36, PUEO_SCREEN_W, UI_LINE);
     tft.fillRect(0, STATUS_BAR_Y_OFFSET, SCREEN_WIDTH, STATUS_BAR_HEIGHT, DARK_GRAY);
 
@@ -10344,7 +10344,7 @@ public:
     }
 
     unsigned long now = millis();
-    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, UI_LINE);
+    tft.drawFastHLine(0, 19, PUEO_SCREEN_W, homeAccent());
 
     runUI();
     if (feature_exit_requested || featureExitButtonPressed()) {

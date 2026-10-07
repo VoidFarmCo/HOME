@@ -134,6 +134,14 @@ int16_t touchNavReservedHeight();
 int16_t touchNavContentBottomY();
 /** Clear feature body only; leaves the touch nav bar intact. */
 void featureClearContent(uint16_t color = BLACK);
+/** H.O.M.E feature-screen chrome: clear the body to the themed background and
+ *  draw `title` in the LIVE accent, so every feature screen shares the home's
+ *  look. Call at the top of a feature's draw (after drawStatusBar()); draw the
+ *  screen's own content afterwards. */
+/** The live accent colour (follows the user's accentColor setting). The
+ *  one place feature-screen chrome reads the accent from. */
+uint16_t homeAccent();
+void homeScreenHeader(const char* title);
 /** True when the on-screen touch nav bar is active for the current feature. */
 bool featureHasTouchNavBar();
 /** Override nav slots with text labels (nullptr = default icon for that slot). */
