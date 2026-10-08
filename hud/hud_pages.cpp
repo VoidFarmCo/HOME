@@ -506,35 +506,54 @@ static void page_comms(uint32_t now) {
   if (s_kb) draw_kb(); else draw_strip();
 }
 
-// ---- ENGAGE: passive WiFi attack (deauth/jam) detector ----
+// metres + bearing(deg, 0=N) from (lat1,lon1) to (lat2,lon2)
+static double geo_dist_brg(double lat1, double lon1, double lat2, double lon2, float* brg) {
+  double dN = (lat2 - lat1) * 111320.0;
+  double dE = (lon2 - lon1) * 111320.0 * cos(lat1 * 0.01745);
+  float b = atan2f((float)dE, (float)dN) * 57.2958f; if (b < 0) b += 360;
+  *brg = b;
+  return sqrt(dN * dN + dE * dE);
+}
+
+// ---- ENGAGE: passive threat detector -- WiFi deauth attacks + Remote-ID drones ----
 static void page_engage(uint32_t now) {
   int cx = HUD_W / 2;
   bool recent = hud_engage_last_ms() && (now - hud_engage_last_ms() < 5000);
-  uint32_t deauth = hud_engage_deauth();
+  int dn = hud_engage_drone_count();
+  const GpsFix& g = hud_gps();
+  char ln[48];
 
-  hud_text(cx - hud_text_w("THREAT DETECT", 2) / 2, CONTENT_Y + 8, "THREAT DETECT", 2, HUD_C_RED);
+  hud_text(cx - hud_text_w("THREAT DETECT", 2) / 2, CONTENT_Y + 6, "THREAT DETECT", 2, HUD_C_RED);
 
-  // status: big ALERT (red, flashing) if a deauth attack is happening, else CLEAR (green)
-  int my = (CONTENT_Y + CONTENT_B) / 2 - 10;
-  if (recent) {
-    if ((now / 250) & 1) {                        // flash
-      hud_fill_rect(cx - 70, my - 6, 140, 34, HUD_C_RED);
-      hud_text(cx - hud_text_w("ALERT", 3) / 2, my, "ALERT", 3, HUD_C_BG);
-    } else {
-      hud_text(cx - hud_text_w("ALERT", 3) / 2, my, "ALERT", 3, HUD_C_RED);
+  int y = CONTENT_Y + 30;
+  if (recent) {                                   // WiFi deauth/jam attack
+    if ((now / 250) & 1) { hud_fill_rect(6, y - 2, HUD_W - 12, 13, HUD_C_RED); hud_text(10, y, "WIFI ATTACK: DEAUTH", 1, HUD_C_BG); }
+    else hud_text(10, y, "WIFI ATTACK: DEAUTH", 1, HUD_C_RED);
+  } else hud_text(10, y, "WIFI: CLEAR", 1, HUD_C_GREEN);
+  y += 18;
+
+  snprintf(ln, sizeof(ln), "DRONES: %d", dn);     // Remote-ID drones
+  hud_text(10, y, ln, 1, dn ? HUD_C_RED : HUD_C_GREY); y += 14;
+  for (int i = 0; i < dn && i < 3; i++) {
+    DroneInfo d; if (!hud_engage_drone(i, &d)) break;
+    hud_text(14, y, d.id[0] ? d.id : "(NO ID)", 1, HUD_C_AMBER); y += 12;
+    if (d.loc && g.valid) {
+      float b; int dist = (int)geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b);
+      snprintf(ln, sizeof(ln), " DRN %dM @%03d%s", dist, (int)b, cardinal(b));
+      hud_text(14, y, ln, 1, HUD_C_RED); y += 12;
+    } else if (d.loc) {
+      snprintf(ln, sizeof(ln), " %.5f %.5f", d.lat, d.lon); hud_text(14, y, ln, 1, HUD_C_GREY); y += 12;
     }
-    hud_text(cx - hud_text_w("DEAUTH ATTACK NEAR", 1) / 2, my + 34, "DEAUTH ATTACK NEAR", 1, HUD_C_RED);
-  } else {
-    hud_text(cx - hud_text_w("CLEAR", 3) / 2, my, "CLEAR", 3, HUD_C_GREEN);
-    hud_text(cx - hud_text_w("NO ATTACK SEEN", 1) / 2, my + 34, "NO ATTACK SEEN", 1, HUD_C_GREY);
+    if (d.op && g.valid) {
+      float b; int dist = (int)geo_dist_brg(g.lat, g.lon, d.oplat, d.oplon, &b);
+      snprintf(ln, sizeof(ln), " OP  %dM @%03d%s", dist, (int)b, cardinal(b));
+      hud_text(14, y, ln, 1, HUD_C_AMBER); y += 12;
+    }
   }
 
-  // readout: deauth count, sniffer-alive frame count, current channel
-  hud_fill_rect(0, CONTENT_B - 26, HUD_W, 26, HUD_C_STRIP);
-  char ln[48];
-  snprintf(ln, sizeof(ln), "DEAUTH %lu   CH %d", (unsigned long)deauth, hud_engage_channel());
-  hud_text(6, CONTENT_B - 22, ln, 1, recent ? HUD_C_RED : HUD_C_AMBER);
-  snprintf(ln, sizeof(ln), "SNIFF %lu FRM  (RX ONLY)", (unsigned long)hud_engage_frames());
+  hud_fill_rect(0, CONTENT_B - 13, HUD_W, 13, HUD_C_STRIP);   // sniffer readout
+  snprintf(ln, sizeof(ln), "DEAUTH %lu  SNIFF %lu  CH %d",
+           (unsigned long)hud_engage_deauth(), (unsigned long)hud_engage_frames(), hud_engage_channel());
   hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
 }
 

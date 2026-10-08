@@ -24,10 +24,17 @@ def main():
        "0x0C" in E and "0x0A" in E and "s_deauth" in E)
     ok("hops the 2.4 GHz channels to hear all nets",
        re.search(r"HOPS\[\]\s*=\s*\{\s*1,\s*6,\s*11", E) is not None and "esp_wifi_set_channel" in E)
-    ok("ENGAGE page shows ALERT on a recent attack, else CLEAR + a frame count",
-       re.search(r"page_engage\([^)]*\).*?ALERT.*?CLEAR.*?SNIFF", PG, re.S) is not None)
+    ok("ENGAGE page shows the WiFi attack status + a sniffer frame count",
+       re.search(r"page_engage\([^)]*\).*?WIFI.*?SNIFF", PG, re.S) is not None)
     ok("the loop gives ENGAGE the radio and restores it on exit",
        "hud_engage_enter()" in INO and "hud_engage_leave()" in INO and "hud_engage_tick(" in INO)
+    # --- Remote-ID drone detection ---
+    ok("decodes Open Drone ID from beacons (OUI FA-0B-BC, vendor type 0x0D)",
+       "0xFA" in E and "0x0B" in E and "0xBC" in E and "0x0D" in E and "parse_odid(" in E)
+    ok("parses drone location + operator location (int32 x1e-7)",
+       "M + 5" in E and "M + 9" in E and "M + 2" in E and "M + 6" in E and "1e-7" in E)
+    ok("ENGAGE shows drones with range + bearing from the GPS fix",
+       "hud_engage_drone_count()" in PG and "geo_dist_brg(" in PG and "DRN %dM" in PG)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
