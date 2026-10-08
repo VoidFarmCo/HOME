@@ -4,9 +4,28 @@
 #include <string.h>
 
 static uint32_t s_frames = 0, s_deauth = 0, s_lastMs = 0;  // written in WiFi task, read in UI
-static const int HOPS[] = { 1, 6, 11 };
-static int      s_hopIdx = 0, s_ch = 1;
+// hop both bands (C5 does one at a time): 2.4 GHz 1/6/11 + the common 5 GHz channels,
+// so we catch Remote-ID drones + attacks on either band.
+struct Hop { uint8_t band; uint8_t ch; };
+static const Hop HOPS[] = {
+  {2, 1}, {2, 6}, {2, 11},
+  {5, 36}, {5, 44}, {5, 149}, {5, 157}
+};
+#define NHOPS ((int)(sizeof(HOPS) / sizeof(HOPS[0])))
+static int      s_hopIdx = 0, s_ch = 1, s_curBand = 0;
 static uint32_t s_hopT = 0;
+
+// Point the radio at HOPS[i], switching band (and re-asserting promiscuous) when it changes.
+static void apply_hop(int i) {
+  const Hop& h = HOPS[i];
+  if (h.band != s_curBand) {
+    esp_wifi_set_band_mode(h.band == 5 ? WIFI_BAND_MODE_5G_ONLY : WIFI_BAND_MODE_2G_ONLY);
+    s_curBand = h.band;
+    esp_wifi_set_promiscuous(true);            // re-assert across the band switch
+  }
+  s_ch = h.ch;
+  esp_wifi_set_channel(s_ch, WIFI_SECOND_CHAN_NONE);
+}
 
 // ---- drone (Open Drone ID) tracking ----
 #define DRONE_MAX  8
@@ -72,13 +91,12 @@ static void rxcb(void* buf, wifi_promiscuous_pkt_type_t type) {
 }
 
 void hud_engage_enter() {
-  s_frames = 0; s_deauth = 0; s_lastMs = 0; s_hopIdx = 0; s_ch = HOPS[0]; s_hopT = 0;
-  WiFi.setBandMode(WIFI_BAND_MODE_2G_ONLY);
+  s_frames = 0; s_deauth = 0; s_lastMs = 0; s_hopIdx = 0; s_curBand = 0; s_hopT = 0;
   esp_wifi_set_promiscuous(true);
   wifi_promiscuous_filter_t filt = {}; filt.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT;
   esp_wifi_set_promiscuous_filter(&filt);
   esp_wifi_set_promiscuous_rx_cb(&rxcb);
-  esp_wifi_set_channel(s_ch, WIFI_SECOND_CHAN_NONE);
+  apply_hop(0);                               // sets band + channel
 }
 
 void hud_engage_leave() { esp_wifi_set_promiscuous(false); }
@@ -92,9 +110,8 @@ void hud_engage_tick(uint32_t now) {
   }
   if (now - s_hopT > 300) {
     s_hopT = now;
-    s_hopIdx = (s_hopIdx + 1) % (int)(sizeof(HOPS) / sizeof(HOPS[0]));
-    s_ch = HOPS[s_hopIdx];
-    esp_wifi_set_channel(s_ch, WIFI_SECOND_CHAN_NONE);
+    s_hopIdx = (s_hopIdx + 1) % NHOPS;
+    apply_hop(s_hopIdx);
   }
 }
 

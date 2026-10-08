@@ -22,8 +22,8 @@ def main():
        and "esp_wifi_set_promiscuous_rx_cb" in E and "esp_wifi_80211_tx" not in E)
     ok("counts deauth (0x0C) + disassoc (0x0A) frames",
        "0x0C" in E and "0x0A" in E and "s_deauth" in E)
-    ok("hops the 2.4 GHz channels to hear all nets",
-       re.search(r"HOPS\[\]\s*=\s*\{\s*1,\s*6,\s*11", E) is not None and "esp_wifi_set_channel" in E)
+    ok("hops BOTH bands (2.4 + 5 GHz) switching band per lap",
+       "{2, 1}" in E and "{5, 36}" in E and "esp_wifi_set_band_mode" in E and "apply_hop(" in E)
     ok("ENGAGE page shows the WiFi attack status + a sniffer frame count",
        re.search(r"page_engage\([^)]*\).*?WIFI.*?SNIFF", PG, re.S) is not None)
     ok("the loop gives ENGAGE the radio and restores it on exit",
