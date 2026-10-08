@@ -10,6 +10,7 @@
 #include "hud_gps.h"
 #include "hud_sd.h"
 #include "hud_comms.h"
+#include "hud_engage.h"
 #include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
@@ -267,15 +268,18 @@ void loop() {
   }
   wasDown = down;
 
-  // One radio: on the COMMS page the ESP-NOW chat owns it (scanner paused); elsewhere
-  // the WiFi scanner runs. Lock the channel once on entering COMMS.
+  // One radio: COMMS (ESP-NOW chat) and ENGAGE (promiscuous sniff) each take it over
+  // while on their page; everywhere else the WiFi scanner runs.
   static int lastMode = -1;
   int m = hud_mode_get();
-  if (m == M_COMMS) {
-    if (lastMode != M_COMMS) hud_comms_enter();
-  } else {
-    hud_scan_tick(millis());  // drive the async WiFi scan (non-blocking)
+  if (m != lastMode) {
+    if (lastMode == M_ENGAGE) hud_engage_leave();   // restore the radio on exit
+    if (m == M_COMMS)  hud_comms_enter();
+    if (m == M_ENGAGE) hud_engage_enter();
   }
+  if (m == M_COMMS)       { /* chat owns the radio */ }
+  else if (m == M_ENGAGE) { hud_engage_tick(millis()); }
+  else                    { hud_scan_tick(millis()); }
   lastMode = m;
 
   hud_gps_tick();             // drain the GPS UART (non-blocking)

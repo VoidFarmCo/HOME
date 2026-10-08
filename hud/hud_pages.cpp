@@ -3,6 +3,7 @@
 #include "hud_scan.h"
 #include "hud_gps.h"
 #include "hud_comms.h"
+#include "hud_engage.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
@@ -505,26 +506,36 @@ static void page_comms(uint32_t now) {
   if (s_kb) draw_kb(); else draw_strip();
 }
 
-// ---- ENGAGE (targeting) ----
+// ---- ENGAGE: passive WiFi attack (deauth/jam) detector ----
 static void page_engage(uint32_t now) {
-  int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2;
-  int b = 60;                                             // bracket half-size
-  // corner brackets
-  int bl = 16;
-  hud_line(cx - b, cy - b, cx - b + bl, cy - b, HUD_C_RED); hud_line(cx - b, cy - b, cx - b, cy - b + bl, HUD_C_RED);
-  hud_line(cx + b, cy - b, cx + b - bl, cy - b, HUD_C_RED); hud_line(cx + b, cy - b, cx + b, cy - b + bl, HUD_C_RED);
-  hud_line(cx - b, cy + b, cx - b + bl, cy + b, HUD_C_RED); hud_line(cx - b, cy + b, cx - b, cy + b - bl, HUD_C_RED);
-  hud_line(cx + b, cy + b, cx + b - bl, cy + b, HUD_C_RED); hud_line(cx + b, cy + b, cx + b, cy + b - bl, HUD_C_RED);
-  // crosshair + pulsing target
-  hud_line(cx - 12, cy, cx + 12, cy, HUD_C_RED); hud_line(cx, cy - 12, cx, cy + 12, HUD_C_RED);
-  int pr = 6 + (int)(4 * (0.5f + 0.5f * sinf(now * 0.008f)));
-  hud_ring(cx, cy, pr, HUD_C_AMBER);
-  // arming bar
-  int w = (now / 20) % (HUD_W - 40);
-  hud_rect(20, CONTENT_B - 14, HUD_W - 40, 10, HUD_C_RED);
-  hud_fill_rect(22, CONTENT_B - 12, w, 6, HUD_C_RED);
-  hud_text(cx - hud_text_w("TGT LOCK", 1) / 2, CONTENT_Y + 2, "TGT LOCK", 1, HUD_C_RED);
-  hud_text(8, FOOT_Y, "ARMED", 1, HUD_C_RED);
+  int cx = HUD_W / 2;
+  bool recent = hud_engage_last_ms() && (now - hud_engage_last_ms() < 5000);
+  uint32_t deauth = hud_engage_deauth();
+
+  hud_text(cx - hud_text_w("THREAT DETECT", 2) / 2, CONTENT_Y + 8, "THREAT DETECT", 2, HUD_C_RED);
+
+  // status: big ALERT (red, flashing) if a deauth attack is happening, else CLEAR (green)
+  int my = (CONTENT_Y + CONTENT_B) / 2 - 10;
+  if (recent) {
+    if ((now / 250) & 1) {                        // flash
+      hud_fill_rect(cx - 70, my - 6, 140, 34, HUD_C_RED);
+      hud_text(cx - hud_text_w("ALERT", 3) / 2, my, "ALERT", 3, HUD_C_BG);
+    } else {
+      hud_text(cx - hud_text_w("ALERT", 3) / 2, my, "ALERT", 3, HUD_C_RED);
+    }
+    hud_text(cx - hud_text_w("DEAUTH ATTACK NEAR", 1) / 2, my + 34, "DEAUTH ATTACK NEAR", 1, HUD_C_RED);
+  } else {
+    hud_text(cx - hud_text_w("CLEAR", 3) / 2, my, "CLEAR", 3, HUD_C_GREEN);
+    hud_text(cx - hud_text_w("NO ATTACK SEEN", 1) / 2, my + 34, "NO ATTACK SEEN", 1, HUD_C_GREY);
+  }
+
+  // readout: deauth count, sniffer-alive frame count, current channel
+  hud_fill_rect(0, CONTENT_B - 26, HUD_W, 26, HUD_C_STRIP);
+  char ln[48];
+  snprintf(ln, sizeof(ln), "DEAUTH %lu   CH %d", (unsigned long)deauth, hud_engage_channel());
+  hud_text(6, CONTENT_B - 22, ln, 1, recent ? HUD_C_RED : HUD_C_AMBER);
+  snprintf(ln, sizeof(ln), "SNIFF %lu FRM  (RX ONLY)", (unsigned long)hud_engage_frames());
+  hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
 }
 
 // ---- boot splash: the real H.O.M.E logo, shaking + glitch-distorting in place ----

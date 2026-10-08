@@ -38,8 +38,9 @@ def main():
     ok("keyboard SEND broadcasts the typed text; a strip chip broadcasts a quick-message",
        "hud_comms_send(s_compose)" in PG
        and re.search(r"z >= 0\) hud_comms_send\(HUD_QUICKMSG", PG) is not None)
-    ok("one radio: the loop PAUSES the scanner on COMMS + locks the channel",
-       re.search(r"if \(m == M_COMMS\)\s*\{[^}]*hud_comms_enter\(\)", INO, re.S) is not None
+    ok("one radio: COMMS takes it over; the scanner only runs in the else branch",
+       "hud_comms_enter()" in INO
+       and re.search(r"if \(m == M_COMMS\)\s*\{", INO) is not None
        and re.search(r"else\s*\{\s*hud_scan_tick", INO) is not None)
     CRY = (SK / "chat_crypt.h").read_text(encoding="utf-8", errors="replace")
     ok("NETS: passphrase-derived keys + a clear net tag + an OPEN net",
