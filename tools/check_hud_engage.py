@@ -35,6 +35,8 @@ def main():
        "M + 5" in E and "M + 9" in E and "M + 2" in E and "M + 6" in E and "1e-7" in E)
     ok("ENGAGE shows drones with range + bearing from the GPS fix",
        "hud_engage_drone_count()" in PG and "geo_dist_brg(" in PG and "DRN %dM" in PG)
+    ok("RADAR plots drones at their true bearing + range from the GPS fix",
+       re.search(r"page_radar\([^)]*\).*?hud_engage_drone\(.*?geo_dist_brg\(g\.lat", PG, re.S) is not None)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0

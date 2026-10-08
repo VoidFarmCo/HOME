@@ -16,12 +16,13 @@ static float rssi_unit(int8_t rssi) {
   float u = (rssi + 95) / 60.0f;          // -95 -> 0, -35 -> 1
   return u < 0 ? 0 : u > 1 ? 1 : u;
 }
-// Interim blip placement angle (NOT a real bearing -- true bearing needs the DF
-// antenna + compass; this just spreads contacts so the scope isn't a single dot).
-static float name_angle(const char* s) {
-  uint32_t h = 2166136261u;
-  for (const char* p = s; *p; p++) { h ^= (uint8_t)*p; h *= 16777619u; }
-  return (h % 3600) * 0.0017453f;         // 0..2pi
+// metres + bearing(deg, 0=N) from (lat1,lon1) to (lat2,lon2). Shared by RADAR + ENGAGE.
+static double geo_dist_brg(double lat1, double lon1, double lat2, double lon2, float* brg) {
+  double dN = (lat2 - lat1) * 111320.0;
+  double dE = (lon2 - lon1) * 111320.0 * cos(lat1 * 0.01745);
+  float b = atan2f((float)dE, (float)dN) * 57.2958f; if (b < 0) b += 360;
+  *brg = b;
+  return sqrt(dN * dN + dE * dE);
 }
 
 static int s_mode = M_RADAR;
@@ -154,31 +155,52 @@ static void draw_settings() {
   hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 16, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
 
-// ---- RADAR: detection scope for ALL signals, strong = near the centre ----
-// NOTE: blip ANGLE is not a true bearing yet -- real direction (blips at their
-// actual bearing, the scope rotating as you turn) needs the DF antenna + compass.
+// ---- RADAR: live spatial threat scope. Plots Remote-ID drones at their REAL bearing
+// + range (from your GPS + the drone's own broadcast position); flashes on a WiFi
+// attack. (RF-emitter bearings need the DF antenna -- added to this scope when it lands.)
 static void page_radar(uint32_t now) {
   static float sweep = 0.0f;
   int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2, R = (CONTENT_B - CONTENT_Y) / 2 - 4;
+  const GpsFix& g = hud_gps();
+  int dn = hud_engage_drone_count();
+
+  // auto range: farthest drone (min 300 m), rounded up to 100 m
+  double maxR = 300;
+  DroneInfo d;
+  if (g.valid)
+    for (int i = 0; i < dn; i++) {
+      if (hud_engage_drone(i, &d) && d.loc) { float b; double dist = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b); if (dist > maxR) maxR = dist; }
+    }
+  maxR = ((int)(maxR / 100) + 1) * 100.0;
+
+  // rings + crosshair + sweep + N
   hud_ring(cx, cy, R, HUD_C_DGREEN); hud_ring(cx, cy, R * 2 / 3, HUD_C_DGREEN); hud_ring(cx, cy, R / 3, HUD_C_DGREEN);
   hud_line(cx - R, cy, cx + R, cy, HUD_C_DGREEN); hud_line(cx, cy - R, cx, cy + R, HUD_C_DGREEN);
   sweep += 0.07f; if (sweep > 6.2832f) sweep -= 6.2832f;
   hud_line(cx, cy, cx + (int)(cosf(sweep) * R), cy + (int)(sinf(sweep) * R), HUD_C_GREEN);
+  hud_text(cx - 2, CONTENT_Y + 2, "N", 1, HUD_C_WHITE);
 
-  const Contact* c = hud_scan_list();
-  int n = hud_scan_count();
-  for (int i = 0; i < n; i++) {
-    float u = rssi_unit(c[i].rssi);                 // 1 = strong/near
-    int rr = (int)((1.0f - u) * R);                 // near centre when strong
-    float a = name_angle(c[i].name);
-    int bx = cx + (int)(cosf(a) * rr), by = cy + (int)(sinf(a) * rr);
-    uint16_t col = (u > 0.66f) ? HUD_C_AMBER : (u > 0.33f ? HUD_C_GREEN : HUD_C_DGREEN);
-    hud_disc(bx, by, 3, col);
-  }
+  // WiFi attack -> flashing red perimeter
+  if (hud_engage_last_ms() && (now - hud_engage_last_ms() < 5000) && ((now / 250) & 1))
+    hud_ring(cx, cy, R - 1, HUD_C_RED);
+
+  // drones at true bearing + range
+  if (g.valid)
+    for (int i = 0; i < dn; i++) {
+      if (!hud_engage_drone(i, &d) || !d.loc) continue;
+      float b; double dist = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b);
+      double rr = (dist / maxR) * R; if (rr > R) rr = R;
+      int bx = cx + (int)(sinf(b * 0.01745f) * rr), by = cy - (int)(cosf(b * 0.01745f) * rr);
+      hud_disc(bx, by, 3, HUD_C_RED); hud_ring(bx, by, 5, HUD_C_RED);
+    }
   hud_disc(cx, cy, 2, HUD_C_WHITE);                 // you
 
-  char foot[48]; snprintf(foot, sizeof(foot), "CON %d  2G%d 5G%d", n, hud_scan_band_count(2), hud_scan_band_count(5));
-  hud_text(8, FOOT_Y, foot, 1, HUD_C_GREEN);
+  // readout panel (in content, not the clipped strip)
+  hud_fill_rect(0, CONTENT_B - 13, HUD_W, 13, HUD_C_STRIP);
+  char ln[48];
+  if (!g.valid) snprintf(ln, sizeof(ln), "DRONES %d   NO GPS", dn);
+  else          snprintf(ln, sizeof(ln), "DRONES %d   RANGE %dM", dn, (int)maxR);
+  hud_text(6, CONTENT_B - 10, ln, 1, dn ? HUD_C_RED : HUD_C_GREEN);
 }
 
 // ---- SCAN list cursor (highlighted row) + scroll window ----
@@ -504,15 +526,6 @@ static void page_comms(uint32_t now) {
     y += 14;
   }
   if (s_kb) draw_kb(); else draw_strip();
-}
-
-// metres + bearing(deg, 0=N) from (lat1,lon1) to (lat2,lon2)
-static double geo_dist_brg(double lat1, double lon1, double lat2, double lon2, float* brg) {
-  double dN = (lat2 - lat1) * 111320.0;
-  double dE = (lon2 - lon1) * 111320.0 * cos(lat1 * 0.01745);
-  float b = atan2f((float)dE, (float)dN) * 57.2958f; if (b < 0) b += 360;
-  *brg = b;
-  return sqrt(dN * dN + dE * dE);
 }
 
 // ---- ENGAGE: passive threat detector -- WiFi deauth attacks + Remote-ID drones ----

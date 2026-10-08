@@ -268,18 +268,20 @@ void loop() {
   }
   wasDown = down;
 
-  // One radio: COMMS (ESP-NOW chat) and ENGAGE (promiscuous sniff) each take it over
-  // while on their page; everywhere else the WiFi scanner runs.
+  // One radio: COMMS (ESP-NOW) owns it on its page; RADAR + ENGAGE share the
+  // promiscuous threat sniffer (drones + deauth); everywhere else the WiFi scanner runs.
   static int lastMode = -1;
   int m = hud_mode_get();
+  bool promisc     = (m == M_RADAR || m == M_ENGAGE);
+  bool lastPromisc = (lastMode == M_RADAR || lastMode == M_ENGAGE);
   if (m != lastMode) {
-    if (lastMode == M_ENGAGE) hud_engage_leave();   // restore the radio on exit
-    if (m == M_COMMS)  hud_comms_enter();
-    if (m == M_ENGAGE) hud_engage_enter();
+    if (lastPromisc && !promisc) hud_engage_leave();   // leaving the sniffer pages
+    if (m == M_COMMS)            hud_comms_enter();
+    if (promisc && !lastPromisc) hud_engage_enter();   // entering the sniffer
   }
-  if (m == M_COMMS)       { /* chat owns the radio */ }
-  else if (m == M_ENGAGE) { hud_engage_tick(millis()); }
-  else                    { hud_scan_tick(millis()); }
+  if (m == M_COMMS) { /* chat owns the radio */ }
+  else if (promisc) { hud_engage_tick(millis()); }
+  else              { hud_scan_tick(millis()); }
   lastMode = m;
 
   hud_gps_tick();             // drain the GPS UART (non-blocking)
