@@ -45,7 +45,8 @@ static void parse(const char* line) {
     if (f[2][0] == 'A') {
       s_fix.lat = nmea_deg(f[3], f[4][0]);
       s_fix.lon = nmea_deg(f[5], f[6][0]);
-      s_fix.course = atof(f[8]);
+      s_fix.knots = atof(f[7]);          // speed over ground (knots)
+      s_fix.course = atof(f[8]);         // heading over ground (deg)
       s_fix.valid = true;
     }
   }

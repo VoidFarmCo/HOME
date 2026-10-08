@@ -11,6 +11,7 @@ struct GpsFix {
   float  hdop;       // horizontal dilution
   float  altm;       // altitude (m)
   float  course;     // heading over ground (deg), from RMC
+  float  knots;      // speed over ground (knots), from RMC
 };
 
 void          hud_gps_begin();              // open the UART

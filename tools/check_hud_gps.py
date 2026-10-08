@@ -29,6 +29,10 @@ def main():
        and "hud_gps_inject" not in INO)   # the self-test inject was removed
     ok("MAP page reads the live fix and shows ACQUIRING until a fix",
        re.search(r"page_map\([^)]*\).*?hud_gps\(\).*?ACQUIRING", PG, re.S) is not None)
+    ok("GPS parses speed (knots) from RMC",
+       re.search(r"s_fix\.knots = atof\(f\[7\]\)", G) is not None)
+    ok("MAP shows a breadcrumb trail + heading + speed",
+       "s_trLat" in PG and "cardinal(" in PG and "MPH" in PG)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0

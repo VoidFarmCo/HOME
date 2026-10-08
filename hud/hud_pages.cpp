@@ -273,10 +273,26 @@ static void draw_detail() {
 }
 
 // ---- MAP (grid + you + contacts) ----
-// ---- MAP: GPS moving-map base (grid + you-marker + live fix). Topo tiles render
-// under the grid once an SD card + tiles are present; for now it's the grid base. ----
+// ---- MAP: GPS moving-map base (grid + you-marker + breadcrumb trail + heading/speed).
+// Topo tiles render under the grid once an SD card + tiles are present. ----
+#define TRAIL_MAX 40
+#define MPP 3.0                       // metres per pixel on the MAP
+static double s_trLat[TRAIL_MAX], s_trLon[TRAIL_MAX];
+static int    s_trCount = 0;
+static uint32_t s_trLast = 0;
+// "moving" from real displacement over a window (rejects stationary GPS speed jitter)
+static double   s_refLat = 0, s_refLon = 0;
+static uint32_t s_refT = 0;
+static bool     s_moving = false;
+static float    s_spdMph = 0, s_hdg = 0;
+#define MOVE_M   4.0            // metres over the window to count as moving (~3 mph)
+#define MOVE_MS  3000
+static const char* cardinal(float deg) {
+  static const char* C[8] = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+  return C[((int)((deg + 22.5f) / 45.0f)) & 7];
+}
+
 static void page_map(uint32_t now) {
-  (void)now;
   const GpsFix& g = hud_gps();
   int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2;
 
@@ -290,24 +306,75 @@ static void page_map(uint32_t now) {
     hud_fill_rect(gx, CONTENT_Y, 1, CONTENT_B - CONTENT_Y, HUD_C_DGREEN);
   for (int gy = CONTENT_Y - 32 + ((oy % 32) + 32) % 32; gy < CONTENT_B; gy += 32)
     if (gy >= CONTENT_Y) hud_fill_rect(0, gy, HUD_W, 1, HUD_C_DGREEN);
-
   hud_text(cx + 8, CONTENT_Y + 4, "N", 1, HUD_C_WHITE);   // north hint
 
-  // you-marker: an arrow pointing along course (up if unknown)
-  float a = (g.valid ? g.course : 0.0f) * 0.01745329f;    // deg -> rad
-  int tx = cx + (int)(sinf(a) * 9), ty = cy - (int)(cosf(a) * 9);  // tip (0deg = up/N)
+  // breadcrumb: record a point ~once/sec when it has moved > ~2 m
+  if (g.valid && (now - s_trLast > 1000)) {
+    bool far = true;
+    if (s_trCount > 0) {
+      double dy = (g.lat - s_trLat[s_trCount - 1]) * 111320.0;
+      double dx = (g.lon - s_trLon[s_trCount - 1]) * 111320.0 * cos(g.lat * 0.01745);
+      far = (dx * dx + dy * dy) > 4.0;
+    }
+    if (far) {
+      if (s_trCount >= TRAIL_MAX) {
+        memmove(s_trLat, s_trLat + 1, sizeof(double) * (TRAIL_MAX - 1));
+        memmove(s_trLon, s_trLon + 1, sizeof(double) * (TRAIL_MAX - 1));
+        s_trCount = TRAIL_MAX - 1;
+      }
+      s_trLat[s_trCount] = g.lat; s_trLon[s_trCount] = g.lon; s_trCount++;
+      s_trLast = now;
+    }
+  }
+  // draw the trail relative to the current position (you = centre, N up)
+  if (g.valid) {
+    double cosl = cos(g.lat * 0.01745);
+    for (int i = 0; i < s_trCount; i++) {
+      int bx = cx + (int)(((s_trLon[i] - g.lon) * 111320.0 * cosl) / MPP);
+      int by = cy - (int)(((s_trLat[i] - g.lat) * 111320.0) / MPP);
+      if (bx >= 0 && bx < HUD_W && by >= CONTENT_Y && by < CONTENT_B)
+        hud_disc(bx, by, 1, HUD_C_AMBER);
+    }
+  }
+
+  // moving? decide from displacement over MOVE_MS, and derive speed+heading from it
+  if (g.valid) {
+    if (s_refT == 0) { s_refLat = g.lat; s_refLon = g.lon; s_refT = now; }
+    uint32_t dt = now - s_refT;
+    if (dt >= MOVE_MS) {
+      double dy = (g.lat - s_refLat) * 111320.0;
+      double dx = (g.lon - s_refLon) * 111320.0 * cos(g.lat * 0.01745);
+      double dist = sqrt(dx * dx + dy * dy);
+      if (dist > MOVE_M) {
+        s_moving = true;
+        s_spdMph = (float)(dist / (dt / 1000.0) * 2.23694);
+        s_hdg = atan2f((float)dx, (float)dy) * 57.2958f; if (s_hdg < 0) s_hdg += 360;
+      } else {
+        s_moving = false;
+      }
+      s_refLat = g.lat; s_refLon = g.lon; s_refT = now;   // new window
+    }
+  } else { s_moving = false; s_refT = 0; }
+
+  // you-marker: arrow along the travel heading when moving, else up (N)
+  float a = (s_moving ? s_hdg : 0.0f) * 0.01745329f;
+  int tx = cx + (int)(sinf(a) * 9), ty = cy - (int)(cosf(a) * 9);
   int lx2 = cx + (int)(sinf(a + 2.6f) * 7), ly2 = cy - (int)(cosf(a + 2.6f) * 7);
   int rx2 = cx + (int)(sinf(a - 2.6f) * 7), ry2 = cy - (int)(cosf(a - 2.6f) * 7);
   uint16_t mc = g.valid ? HUD_C_GREEN : HUD_C_GREY;
   hud_line(tx, ty, lx2, ly2, mc); hud_line(tx, ty, rx2, ry2, mc); hud_line(lx2, ly2, rx2, ry2, mc);
 
-  // readout panel (in the content area so it isn't clipped by the strip)
+  // readout panel (two lines): position, then heading/speed (moving) or status
   hud_fill_rect(0, CONTENT_B - 26, HUD_W, 26, HUD_C_STRIP);
-  char ln[40];
+  char ln[48];
   if (g.valid) {
     snprintf(ln, sizeof(ln), "%.5f %.5f", g.lat, g.lon);
     hud_text(6, CONTENT_B - 22, ln, 1, HUD_C_GREEN);
-    snprintf(ln, sizeof(ln), "SAT %d  ALT %dM  FIX", g.sats, (int)g.altm);
+    if (s_moving)
+      snprintf(ln, sizeof(ln), "HDG %03d %s  %.1f MPH  SAT %d",
+               (int)s_hdg, cardinal(s_hdg), s_spdMph, g.sats);
+    else
+      snprintf(ln, sizeof(ln), "STOPPED  SAT %d  ALT %dM", g.sats, (int)g.altm);
     hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
   } else {
     hud_text(6, CONTENT_B - 22, "ACQUIRING GPS...", 1, HUD_C_AMBER);
