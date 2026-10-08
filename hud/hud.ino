@@ -268,6 +268,6 @@ void loop() {
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
     t = millis();
-    Serial.printf("FPS ~%u disp=%d wifi=%d (2g%d/5g%d)\n", hud_fps_x10() / 10, s_dispOk, hud_scan_wifi_count(), hud_scan_band_count(2), hud_scan_band_count(5));
+    Serial.printf("FPS ~%u wifi=%d GPS rx=%lu sat=%d fix=%d\n", hud_fps_x10() / 10, hud_scan_wifi_count(), (unsigned long)hud_gps_rxbytes(), hud_gps().sats, hud_gps().valid);
   }
 }

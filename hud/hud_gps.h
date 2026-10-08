@@ -17,3 +17,4 @@ void          hud_gps_begin();              // open the UART
 void          hud_gps_tick();               // drain the UART, parse (non-blocking)
 const GpsFix& hud_gps();                     // latest fix
 void          hud_gps_inject(const char* nmea_line);  // feed one sentence (test/replay)
+uint32_t      hud_gps_rxbytes();            // total bytes seen on the UART (wiring check)

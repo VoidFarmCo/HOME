@@ -6,6 +6,7 @@
 static GpsFix s_fix = { false, 0, 0, 0, 0, 0, 0 };
 static char   s_line[96];
 static int    s_len = 0;
+static uint32_t s_rx = 0;   // total UART bytes (is the module talking at all?)
 
 // ddmm.mmmm + hemisphere -> decimal degrees
 static double nmea_deg(const char* v, char hemi) {
@@ -61,6 +62,7 @@ void hud_gps_begin() {
 void hud_gps_tick() {
   while (Serial1.available()) {
     char c = (char)Serial1.read();
+    s_rx++;
     if (c == '\n' || c == '\r') {
       if (s_len) { s_line[s_len] = 0; parse(s_line); s_len = 0; }
     } else if (s_len < (int)sizeof(s_line) - 1) {
@@ -70,3 +72,4 @@ void hud_gps_tick() {
 }
 
 const GpsFix& hud_gps() { return s_fix; }
+uint32_t      hud_gps_rxbytes() { return s_rx; }
