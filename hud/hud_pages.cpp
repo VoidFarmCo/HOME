@@ -1,6 +1,7 @@
 #include "hud_pages.h"
 #include "hud_core.h"
 #include "hud_scan.h"
+#include "hud_gps.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
@@ -89,9 +90,18 @@ static const char* tab_label(int m) {
   }
 }
 
+// trippy colour palette shared by the boot splash and the flashing HOME badge
+static const uint16_t s_trip[] = {
+  HUD_C_RED, HUD_C_AMBER, HUD_C_GREEN, HUD_C_CYAN,
+  hud_rgb(255, 0, 255), hud_rgb(130, 70, 255), hud_rgb(0, 120, 255), HUD_C_WHITE
+};
+#define S_NT ((int)(sizeof(s_trip) / sizeof(s_trip[0])))
+static inline uint16_t trip_now() { return s_trip[(millis() / 55) % S_NT]; }  // fast strobe
+
 // ---- top status strip + BOTTOM tab strip (shared chrome) ----
 static void draw_chrome(int mode) {
   hud_fill_rect(0, 0, HUD_W, STAT_H, HUD_C_STRIP);           // top status strip
+  hud_text(3, 6, "HOME", 2, trip_now());                     // flashing HOME badge, top-left
   const int tabY = HUD_H - TAB_H;                            // tabs along the bottom
   hud_fill_rect(0, tabY, HUD_W, TAB_H, HUD_C_STRIP);
   const int tabW = HUD_W / M_COUNT;
@@ -258,17 +268,47 @@ static void draw_detail() {
 }
 
 // ---- MAP (grid + you + contacts) ----
+// ---- MAP: GPS moving-map base (grid + you-marker + live fix). Topo tiles render
+// under the grid once an SD card + tiles are present; for now it's the grid base. ----
 static void page_map(uint32_t now) {
-  for (int gx = 0; gx < HUD_W; gx += 32) hud_fill_rect(gx, CONTENT_Y, 1, CONTENT_B - CONTENT_Y, HUD_C_DGREEN);
-  for (int gy = CONTENT_Y; gy < CONTENT_B; gy += 32) hud_fill_rect(0, gy, HUD_W, 1, HUD_C_DGREEN);
+  (void)now;
+  const GpsFix& g = hud_gps();
   int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2;
-  hud_line(cx - 7, cy, cx + 7, cy, HUD_C_GREEN); hud_line(cx, cy - 7, cx, cy + 7, HUD_C_GREEN);
-  hud_ring(cx, cy, 5, HUD_C_GREEN);
-  float a = now * 0.0012f;
-  hud_disc(cx + (int)(cosf(a) * 60), cy + (int)(sinf(a) * 40), 3, HUD_C_AMBER);
-  hud_disc(cx + (int)(cosf(a * 1.7f) * 90), cy + (int)(sinf(a * 1.7f) * 55), 3, HUD_C_RED);
-  hud_text(cx + 10, CONTENT_Y + 2, "N", 1, HUD_C_WHITE);
-  hud_text(8, FOOT_Y, "GPS 7 SAT", 1, HUD_C_GREEN);
+
+  // grid that scrolls with position (so it reads as a moving map once GPS is live)
+  int ox = 0, oy = 0;
+  if (g.valid) {
+    ox = (int)(fmod(g.lon * 100000.0, 32.0));
+    oy = (int)(fmod(g.lat * 100000.0, 32.0));
+  }
+  for (int gx = -32 + ((ox % 32) + 32) % 32; gx < HUD_W; gx += 32)
+    hud_fill_rect(gx, CONTENT_Y, 1, CONTENT_B - CONTENT_Y, HUD_C_DGREEN);
+  for (int gy = CONTENT_Y - 32 + ((oy % 32) + 32) % 32; gy < CONTENT_B; gy += 32)
+    if (gy >= CONTENT_Y) hud_fill_rect(0, gy, HUD_W, 1, HUD_C_DGREEN);
+
+  hud_text(cx + 8, CONTENT_Y + 4, "N", 1, HUD_C_WHITE);   // north hint
+
+  // you-marker: an arrow pointing along course (up if unknown)
+  float a = (g.valid ? g.course : 0.0f) * 0.01745329f;    // deg -> rad
+  int tx = cx + (int)(sinf(a) * 9), ty = cy - (int)(cosf(a) * 9);  // tip (0deg = up/N)
+  int lx2 = cx + (int)(sinf(a + 2.6f) * 7), ly2 = cy - (int)(cosf(a + 2.6f) * 7);
+  int rx2 = cx + (int)(sinf(a - 2.6f) * 7), ry2 = cy - (int)(cosf(a - 2.6f) * 7);
+  uint16_t mc = g.valid ? HUD_C_GREEN : HUD_C_GREY;
+  hud_line(tx, ty, lx2, ly2, mc); hud_line(tx, ty, rx2, ry2, mc); hud_line(lx2, ly2, rx2, ry2, mc);
+
+  // readout panel (in the content area so it isn't clipped by the strip)
+  hud_fill_rect(0, CONTENT_B - 26, HUD_W, 26, HUD_C_STRIP);
+  char ln[40];
+  if (g.valid) {
+    snprintf(ln, sizeof(ln), "%.5f %.5f", g.lat, g.lon);
+    hud_text(6, CONTENT_B - 22, ln, 1, HUD_C_GREEN);
+    snprintf(ln, sizeof(ln), "SAT %d  ALT %dM  FIX", g.sats, (int)g.altm);
+    hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
+  } else {
+    hud_text(6, CONTENT_B - 22, "ACQUIRING GPS...", 1, HUD_C_AMBER);
+    snprintf(ln, sizeof(ln), "SAT %d   NO FIX", g.sats);
+    hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
+  }
 }
 
 // ---- COMMS (chat placeholder) ----
@@ -335,12 +375,8 @@ void hud_draw_splash() {
   const uint32_t DUR = 2400;
   uint32_t t0 = millis();
 
-  // trippy palette the logo strobes through every frame (fast = hallucinate)
-  static const uint16_t trip[] = {
-    HUD_C_RED, HUD_C_AMBER, HUD_C_GREEN, HUD_C_CYAN,
-    hud_rgb(255, 0, 255), hud_rgb(130, 70, 255), hud_rgb(0, 120, 255), HUD_C_WHITE
-  };
-  const int NT = sizeof(trip) / sizeof(trip[0]);
+  // the logo strobes through the shared trippy palette every frame (fast = hallucinate)
+  const int NT = S_NT;
   uint32_t frame = 0;
 
   // phase 1: logo shakes + tears in place while the colours strobe fast
@@ -352,8 +388,8 @@ void hud_draw_splash() {
     int dy = amp ? (int)random(-amp, amp + 1) : 0;
 
     hud_clear(HUD_C_BG);
-    hud_bitmap1(lx + dx, ly + dy, HOME_LOGO_W, HOME_LOGO_H, bitmap_home_logo, trip[frame % NT], amp);
-    hud_text(cen(HUD_PRODUCT, 2), 186, HUD_PRODUCT, 2, trip[(frame + 3) % NT]);
+    hud_bitmap1(lx + dx, ly + dy, HOME_LOGO_W, HOME_LOGO_H, bitmap_home_logo, s_trip[frame % NT], amp);
+    hud_text(cen(HUD_PRODUCT, 2), 186, HUD_PRODUCT, 2, s_trip[(frame + 3) % NT]);
     hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);
     frame++;
     delay(16);                                     // ~60 fps -> colours cycle fast

@@ -7,6 +7,7 @@
 #include "freertos/semphr.h"
 #include "hud_pages.h"
 #include "hud_scan.h"
+#include "hud_gps.h"
 #include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
@@ -198,6 +199,7 @@ void setup() {
   }
   hud_draw_splash();                // HEADS OF MY ENEMIES logo (animated; self-timed)
   hud_scan_begin();                 // bring up WiFi for live scanning
+  hud_gps_begin();                  // NEO-7M GPS on UART (RX4/TX5), when wired
 
   cal_load();                       // load saved touch calibration if any
   bool held = (xpt(0xC0) < 3900);   // finger on the glass at boot -> force re-calibration
@@ -260,6 +262,7 @@ void loop() {
   wasDown = down;
 
   hud_scan_tick(millis());    // drive the async WiFi scan (non-blocking)
+  hud_gps_tick();             // drain the GPS UART (non-blocking)
   hud_tick(millis());
 
   static uint32_t t = 0;

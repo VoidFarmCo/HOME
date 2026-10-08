@@ -31,6 +31,8 @@ def main():
         ok("%s defined" % fn, re.search(r"static void %s\(" % fn, C) is not None)
     ok("every mode is named", all(('"%s"' % m.split("_")[1]) in C for m in modes))
     ok("a switch exists (auto-cycle)", "hud_mode_auto" in C and "% M_COUNT" in C)
+    ok("a flashing HOME badge is drawn in the header",
+       re.search(r"draw_chrome\([^)]*\)\s*\{.*?hud_text\(3, 6, \"HOME\", 2, trip_now\(\)\)", C, re.S) is not None)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
