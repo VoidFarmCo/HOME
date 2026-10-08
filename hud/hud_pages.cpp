@@ -63,12 +63,16 @@ void hud_mode_auto(uint32_t now) {
 
 // settings gear (top-right of the top strip) + the SETTINGS panel
 static bool s_settings = false;
+static int  s_band = 0;              // band filter: 0 = ALL, 1 = 2.4 GHz, 2 = 5 GHz
+static bool s_detail = false;        // network info view open
+static int  s_detail_ci = -1;        // which contact index it shows
 #define GEAR_X    (HUD_W - 13)
 #define GEAR_Y    (STAT_H / 2)
 #define SET_BTN_X 20
 #define SET_BTN_Y (CONTENT_Y + 44)
 #define SET_BTN_W (HUD_W - 40)
 #define SET_BTN_H 30
+#define SET_BND_Y (SET_BTN_Y + SET_BTN_H + 14)   // BAND filter row, below RECALIBRATE
 
 // Short tab labels so they're readable at 2x in a 64 px tab.
 static const char* tab_label(int m) {
@@ -121,6 +125,10 @@ static void draw_settings() {
   hud_rect(SET_BTN_X, SET_BTN_Y, SET_BTN_W, SET_BTN_H, HUD_C_CYAN);
   const char* b = "RECALIBRATE TOUCH";
   hud_text(HUD_W / 2 - hud_text_w(b, 1) / 2, SET_BTN_Y + (SET_BTN_H - 7) / 2, b, 1, HUD_C_CYAN);
+  // BAND filter toggle (ALL / 2.4 / 5 GHz)
+  hud_rect(SET_BTN_X, SET_BND_Y, SET_BTN_W, SET_BTN_H, HUD_C_AMBER);
+  char bl[24]; snprintf(bl, sizeof(bl), "BAND:  %s", s_band == 1 ? "2.4 GHZ" : s_band == 2 ? "5 GHZ" : "ALL");
+  hud_text(HUD_W / 2 - hud_text_w(bl, 1) / 2, SET_BND_Y + (SET_BTN_H - 7) / 2, bl, 1, HUD_C_AMBER);
   hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 16, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
 
@@ -147,7 +155,7 @@ static void page_radar(uint32_t now) {
   }
   hud_disc(cx, cy, 2, HUD_C_WHITE);                 // you
 
-  char foot[48]; snprintf(foot, sizeof(foot), "CON %d  W%d B%d", n, hud_scan_wifi_count(), hud_scan_ble_count());
+  char foot[48]; snprintf(foot, sizeof(foot), "CON %d  2G%d 5G%d", n, hud_scan_band_count(2), hud_scan_band_count(5));
   hud_text(8, FOOT_Y, foot, 1, HUD_C_GREEN);
 }
 
@@ -156,10 +164,26 @@ static int s_sel = 0, s_scroll = 0;
 #define ROW_H 20
 static int scan_rows() { return (CONTENT_B - CONTENT_Y) / ROW_H; }
 
-// Move the highlighted row by d, keeping it inside the scroll window.
+// Band filter: is this channel's band visible under the current filter?
+static bool band_ok(uint8_t ch) {
+  int b = hud_band_of(ch);
+  return s_band == 0 || (s_band == 1 && b == 2) || (s_band == 2 && b == 5);
+}
+static int vis_count() {
+  const Contact* c = hud_scan_list(); int n = hud_scan_count(), k = 0;
+  for (int i = 0; i < n; i++) if (band_ok(c[i].ch)) k++;
+  return k;
+}
+static int vis_index(int nth) {      // contact index of the nth visible row, or -1
+  const Contact* c = hud_scan_list(); int n = hud_scan_count(), k = 0;
+  for (int i = 0; i < n; i++) if (band_ok(c[i].ch)) { if (k == nth) return i; k++; }
+  return -1;
+}
+
+// Move the highlighted row by d, over the VISIBLE (filtered) set.
 static void scan_move(int d) {
-  int n = hud_scan_count();
-  if (n <= 0) return;
+  int n = vis_count();
+  if (n <= 0) { s_sel = 0; s_scroll = 0; return; }
   s_sel += d;
   if (s_sel < 0) s_sel = 0;
   if (s_sel > n - 1) s_sel = n - 1;
@@ -168,33 +192,64 @@ static void scan_move(int d) {
   if (s_sel >= s_scroll + rows) s_scroll = s_sel - rows + 1;
 }
 
-// ---- SCAN (live): the real contact list, strongest first; cursor + scroll ----
+// ---- SCAN (live): dual-band list, strongest first, band-tagged; cursor + scroll ----
 static void page_scan(uint32_t now) {
   (void)now;
   const Contact* c = hud_scan_list();
-  int n = hud_scan_count();
-  if (s_sel > n - 1) s_sel = n > 0 ? n - 1 : 0;      // clamp as the list changes
+  int n = vis_count();
+  if (s_sel > n - 1) s_sel = n > 0 ? n - 1 : 0;
   int rows = scan_rows();
   if (s_scroll > n - rows) s_scroll = n - rows > 0 ? n - rows : 0;
+  if (s_scroll < 0) s_scroll = 0;
 
-  if (n == 0) hud_text(8, CONTENT_Y + 8, "SCANNING...", 1, HUD_C_CYAN);
+  if (hud_scan_count() == 0) hud_text(8, CONTENT_Y + 8, "SCANNING...", 1, HUD_C_CYAN);
 
   for (int r = 0; r < rows; r++) {
-    int i = s_scroll + r;
-    if (i >= n) break;
+    int vi = s_scroll + r;
+    if (vi >= n) break;
+    int i = vis_index(vi);
+    if (i < 0) break;
     int y = CONTENT_Y + 2 + r * ROW_H;
-    bool cur = (i == s_sel);
+    bool cur = (vi == s_sel);
     bool tgt = hud_scan_has_target() && !strcmp(c[i].name, hud_scan_target_name());
-    if (cur) hud_fill_rect(0, y - 1, HUD_W, ROW_H - 2, HUD_C_STRIP);  // highlight the cursor row
-    hud_num(6, y + 1, c[i].rssi < 0 ? -c[i].rssi : c[i].rssi, 1, HUD_C_GREY);  // |dBm|
-    hud_text(32, y + 2, c[i].name, 1, tgt ? HUD_C_RED : HUD_C_WHITE);
-    int bar = (int)(rssi_unit(c[i].rssi) * 70);      // 0..70 px signal bar
-    hud_fill_rect(HUD_W - 8 - bar, y + 2, bar, 8, cur ? HUD_C_CYAN : HUD_C_DGREEN);
+    uint16_t bandcol = (hud_band_of(c[i].ch) == 5) ? HUD_C_CYAN : HUD_C_GREEN;
+    if (cur) hud_fill_rect(0, y - 1, HUD_W, ROW_H - 2, HUD_C_STRIP);           // cursor row
+    hud_num(4, y + 1, c[i].rssi < 0 ? -c[i].rssi : c[i].rssi, 1, HUD_C_GREY);  // |dBm|
+    hud_text(28, y + 2, hud_band_of(c[i].ch) == 5 ? "5G" : "2G", 1, bandcol);  // band tag
+    hud_text(48, y + 2, c[i].name, 1, tgt ? HUD_C_RED : HUD_C_WHITE);          // SSID
+    int bar = (int)(rssi_unit(c[i].rssi) * 56);
+    hud_fill_rect(HUD_W - 8 - bar, y + 2, bar, 8, bandcol);                    // bar, coloured by band
   }
-  // scroll-position hint: which block of the list is showing
+  // footer: band counts + active filter
+  const char* f = s_band == 1 ? "2.4" : s_band == 2 ? "5G" : "ALL";
   char foot[48];
-  snprintf(foot, sizeof(foot), "%d/%d  UP/ENTER/DN", n ? s_sel + 1 : 0, n);
+  snprintf(foot, sizeof(foot), "2G%d 5G%d [%s]", hud_scan_band_count(2), hud_scan_band_count(5), f);
   hud_text(8, FOOT_Y, foot, 1, HUD_C_CYAN);
+}
+
+// ---- network info view (Marauder/Bruce style): full detail for one AP ----
+static void draw_detail() {
+  hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
+  if (s_detail_ci < 0 || s_detail_ci >= hud_scan_count()) {
+    hud_text(8, CONTENT_Y + 8, "(CONTACT GONE)", 1, HUD_C_GREY);
+    hud_text(8, CONTENT_B - 16, "TAP TO CLOSE", 1, HUD_C_GREY);
+    return;
+  }
+  const Contact* c = &hud_scan_list()[s_detail_ci];
+  int b = hud_band_of(c->ch);
+  int y = CONTENT_Y + 6;
+  hud_text(8, y, c->name[0] ? c->name : "(hidden)", 1, HUD_C_WHITE); y += 20;
+  char ln[40];
+  snprintf(ln, sizeof(ln), "BAND  %s", b == 5 ? "5 GHZ" : "2.4 GHZ");
+  hud_text(8, y, ln, 1, b == 5 ? HUD_C_CYAN : HUD_C_GREEN); y += 15;
+  snprintf(ln, sizeof(ln), "CHAN  %d", c->ch);              hud_text(8, y, ln, 1, HUD_C_GREY);  y += 15;
+  snprintf(ln, sizeof(ln), "RSSI  %d DBM", c->rssi);        hud_text(8, y, ln, 1, HUD_C_GREY);  y += 15;
+  snprintf(ln, sizeof(ln), "ENC   %s", hud_enc_name(c->enc));
+  hud_text(8, y, ln, 1, c->enc == 0 ? HUD_C_RED : HUD_C_GREEN); y += 15;
+  snprintf(ln, sizeof(ln), "BSSID %02X:%02X:%02X:%02X:%02X:%02X",
+           c->bssid[0], c->bssid[1], c->bssid[2], c->bssid[3], c->bssid[4], c->bssid[5]);
+  hud_text(8, y, ln, 1, HUD_C_GREY);
+  hud_text(8, CONTENT_B - 16, "TAP TO CLOSE", 1, HUD_C_GREY);
 }
 
 // ---- MAP (grid + you + contacts) ----
@@ -250,7 +305,9 @@ static void page_engage(uint32_t now) {
 }
 
 void hud_page_draw(int mode, uint32_t now) {
-  if (s_settings) {
+  if (s_detail) {
+    draw_detail();     // network info view (modal over the content band)
+  } else if (s_settings) {
     draw_settings();   // modal panel over the content band
   } else {
     switch (mode) {
@@ -275,14 +332,21 @@ static int scan_zone(int y) {
 
 void hud_on_press(int x, int y) {
   // settings gear (top-right of the status strip) toggles the SETTINGS panel
-  if (y < STAT_H && x > HUD_W - 24) { s_settings = !s_settings; return; }
+  if (y < STAT_H && x > HUD_W - 24) { s_settings = !s_settings; s_detail = false; return; }
+
+  if (s_detail) { s_detail = false; return; } // info view: any tap closes it
 
   if (s_settings) {                           // panel open = modal
     if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
         y >= SET_BTN_Y && y <= SET_BTN_Y + SET_BTN_H) {
-      hud_request_recal();                    // RECALIBRATE TOUCH
+      hud_request_recal(); s_settings = false; // RECALIBRATE TOUCH
+    } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+               y >= SET_BND_Y && y <= SET_BND_Y + SET_BTN_H) {
+      s_band = (s_band + 1) % 3;              // BAND: ALL -> 2.4 -> 5 (stay in panel)
+      s_sel = 0; s_scroll = 0;
+    } else {
+      s_settings = false;                     // tap elsewhere closes
     }
-    s_settings = false;                       // any tap closes the panel
     return;
   }
 
@@ -295,13 +359,16 @@ void hud_on_press(int x, int y) {
     int z = scan_zone(y);                      // upper = scroll up, lower = scroll down
     if (z == -1) scan_move(-1);
     else if (z == +1) scan_move(+1);
-    // centre tap on SCAN is reserved for select-to-track (built with the real radar)
+    else {                                     // centre = ENTER: open the info view
+      int i = vis_index(s_sel);
+      if (i >= 0) { s_detail_ci = i; s_detail = true; }
+    }
   }
 }
 
 void hud_on_repeat(int x, int y) {
   (void)x;
-  if (s_settings) return;                     // no auto-repeat while the panel is open
+  if (s_settings || s_detail) return;         // no auto-repeat while a panel is open
   if (y >= HUD_H - TAB_H) return;             // tabs/enter don't auto-repeat
   if (hud_mode_get() == M_SCAN) {
     int z = scan_zone(y);

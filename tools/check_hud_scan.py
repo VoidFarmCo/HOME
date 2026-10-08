@@ -24,10 +24,17 @@ def main():
        "scanComplete()" in SCAN and "WIFI_SCAN_RUNNING" in SCAN)
     ok("results are copied out then freed (scanDelete)",
        "WiFi.SSID(" in SCAN and "WiFi.RSSI(" in SCAN and "scanDelete()" in SCAN)
-    # BLE is PARKED: the C5 core ships NimBLE (Bluedroid off), so the Bluedroid
-    # BLEDevice path crash-loops. hud_scan_begin runs WiFi-only until ported to NimBLE.
-    ok("BLE bring-up is disabled (no Bluedroid btStart call) so WiFi works + no crash",
-       re.search(r"if \(btStart\(\)\)", SCAN) is None and "BLEDevice::init(" not in SCAN)
+    ok("captures BSSID + encryption per AP (for the info view)",
+       "WiFi.BSSID(" in SCAN and "WiFi.encryptionType(" in SCAN)
+    # DUAL-BAND: the C5 does one band at a time, so scan 2.4 then switch to 5 GHz.
+    ok("scans BOTH bands (setBandMode 2G then 5G)",
+       "WIFI_BAND_MODE_2G_ONLY" in SCAN and "WIFI_BAND_MODE_5G_ONLY" in SCAN
+       and re.search(r"P_2G_RUN.*?P_5G_START.*?P_5G_RUN", SCAN, re.S) is not None)
+    ok("BLE stays parked (no Bluedroid controller bring-up)",
+       "btStart()" not in SCAN and "BLEDevice::init(" not in SCAN)
+    ok("list is STABLE: upsert by BSSID + age out, not rebuilt/re-sorted each cycle",
+       "find_ap(" in SCAN and "upsert_band(" in SCAN and "last_seen" in SCAN
+       and "AGE_MS" in SCAN and "sort_by_rssi" not in SCAN)
     ok("sketch brings the radio up and ticks the scanner every loop",
        "hud_scan_begin()" in INO and "hud_scan_tick(" in INO)
     ok("SCAN page draws the live list, not hardcoded SSIDs",

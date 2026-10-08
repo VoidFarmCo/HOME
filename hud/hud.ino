@@ -264,6 +264,6 @@ void loop() {
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
     t = millis();
-    Serial.printf("FPS ~%u disp=%d wifi=%d ble=%d\n", hud_fps_x10() / 10, s_dispOk, hud_scan_wifi_count(), hud_scan_ble_count());
+    Serial.printf("FPS ~%u disp=%d wifi=%d (2g%d/5g%d)\n", hud_fps_x10() / 10, s_dispOk, hud_scan_wifi_count(), hud_scan_band_count(2), hud_scan_band_count(5));
   }
 }
