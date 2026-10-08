@@ -61,6 +61,15 @@ void hud_mode_auto(uint32_t now) {
 #define CONTENT_B (HUD_H - TAB_H - 2)   // bottom of the content band
 #define FOOT_Y    8                     // page footer text sits in the top strip now
 
+// settings gear (top-right of the top strip) + the SETTINGS panel
+static bool s_settings = false;
+#define GEAR_X    (HUD_W - 13)
+#define GEAR_Y    (STAT_H / 2)
+#define SET_BTN_X 20
+#define SET_BTN_Y (CONTENT_Y + 44)
+#define SET_BTN_W (HUD_W - 40)
+#define SET_BTN_H 30
+
 // Short tab labels so they're readable at 2x in a 64 px tab.
 static const char* tab_label(int m) {
   switch (m) {
@@ -93,6 +102,26 @@ static void draw_chrome(int mode) {
     }
     if (i) hud_fill_rect(x, tabY + 2, 1, TAB_H - 4, HUD_C_BG);   // tab divider
   }
+
+  // settings gear, top-right of the status strip (amber when the panel is open)
+  uint16_t gc = s_settings ? HUD_C_AMBER : HUD_C_GREY;
+  for (int a = 0; a < 8; a++) {                               // cog teeth
+    float ang = a * 0.785398f;
+    hud_fill_rect(GEAR_X + (int)(cosf(ang) * 8) - 1, GEAR_Y + (int)(sinf(ang) * 8) - 1, 3, 3, gc);
+  }
+  hud_disc(GEAR_X, GEAR_Y, 6, gc);
+  hud_disc(GEAR_X, GEAR_Y, 2, HUD_C_STRIP);                  // centre hole (strip colour)
+}
+
+// ---- SETTINGS panel (opened by the gear) ----
+static void draw_settings() {
+  hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
+  hud_text(HUD_W / 2 - hud_text_w("SETTINGS", 2) / 2, CONTENT_Y + 10, "SETTINGS", 2, HUD_C_WHITE);
+  // RECALIBRATE TOUCH button
+  hud_rect(SET_BTN_X, SET_BTN_Y, SET_BTN_W, SET_BTN_H, HUD_C_CYAN);
+  const char* b = "RECALIBRATE TOUCH";
+  hud_text(HUD_W / 2 - hud_text_w(b, 1) / 2, SET_BTN_Y + (SET_BTN_H - 7) / 2, b, 1, HUD_C_CYAN);
+  hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 16, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
 
 // ---- RADAR: detection scope for ALL signals, strong = near the centre ----
@@ -221,15 +250,19 @@ static void page_engage(uint32_t now) {
 }
 
 void hud_page_draw(int mode, uint32_t now) {
-  switch (mode) {
-    case M_SCAN:   page_scan(now);   break;
-    case M_RADAR:  page_radar(now);  break;
-    case M_MAP:    page_map(now);    break;
-    case M_COMMS:  page_comms(now);  break;
-    case M_ENGAGE: page_engage(now); break;
-    default: break;
+  if (s_settings) {
+    draw_settings();   // modal panel over the content band
+  } else {
+    switch (mode) {
+      case M_SCAN:   page_scan(now);   break;
+      case M_RADAR:  page_radar(now);  break;
+      case M_MAP:    page_map(now);    break;
+      case M_COMMS:  page_comms(now);  break;
+      case M_ENGAGE: page_engage(now); break;
+      default: break;
+    }
   }
-  draw_chrome(mode);   // chrome last so tabs/strips sit on top of content
+  draw_chrome(mode);   // chrome last so strips/gear/tabs sit on top
 }
 
 // Which scan zone is y in? -1 = scroll up, +1 = scroll down, 0 = centre/enter.
@@ -241,6 +274,18 @@ static int scan_zone(int y) {
 }
 
 void hud_on_press(int x, int y) {
+  // settings gear (top-right of the status strip) toggles the SETTINGS panel
+  if (y < STAT_H && x > HUD_W - 24) { s_settings = !s_settings; return; }
+
+  if (s_settings) {                           // panel open = modal
+    if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+        y >= SET_BTN_Y && y <= SET_BTN_Y + SET_BTN_H) {
+      hud_request_recal();                    // RECALIBRATE TOUCH
+    }
+    s_settings = false;                       // any tap closes the panel
+    return;
+  }
+
   if (y >= HUD_H - TAB_H) {                   // bottom tab strip = switch page
     int m = x / (HUD_W / M_COUNT);
     if (m >= 0 && m < M_COUNT) { hud_mode_set(m); s_manual = true; }
@@ -256,6 +301,7 @@ void hud_on_press(int x, int y) {
 
 void hud_on_repeat(int x, int y) {
   (void)x;
+  if (s_settings) return;                     // no auto-repeat while the panel is open
   if (y >= HUD_H - TAB_H) return;             // tabs/enter don't auto-repeat
   if (hud_mode_get() == M_SCAN) {
     int z = scan_zone(y);

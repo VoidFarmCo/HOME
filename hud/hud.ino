@@ -177,6 +177,10 @@ static void cal_capture(uint16_t rx, uint16_t ry) {
   }
 }
 
+// Seam (declared in hud_core.h): the settings gear -> RECALIBRATE calls this to
+// re-enter the guided 5-point calibration from the start.
+void hud_request_recal() { s_cal_mode = true; s_cal_idx = 0; }
+
 void setup() {
   Serial.begin(115200);
   delay(200);

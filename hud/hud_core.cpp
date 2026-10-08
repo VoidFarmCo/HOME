@@ -14,8 +14,9 @@ static int       s_touch_x = -1, s_touch_y = -1;
 
 void hud_set_touch(int x, int y) { s_touch_x = x; s_touch_y = y; }
 
-// Weak default so the firmware links before the display seam is written.
+// Weak defaults so the firmware links before the sketch seams are written.
 void __attribute__((weak)) hud_present_fb(const uint16_t*, int, int) {}
+void __attribute__((weak)) hud_request_recal() {}
 
 // ---- framebuffer drawing API (all draw into s_fb) ----
 void hud_px(int x, int y, uint16_t c) {

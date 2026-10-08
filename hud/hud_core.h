@@ -60,3 +60,6 @@ void hud_set_touch(int x, int y);
 
 // ---- integration seam (implemented once in the sketch) ----
 void hud_present_fb(const uint16_t* fb, int w, int h);
+// Re-run the guided touch calibration (settings gear -> RECALIBRATE). The sketch
+// owns the cal state, so this is a seam it implements.
+void hud_request_recal();
