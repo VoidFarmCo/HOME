@@ -11,14 +11,18 @@
 #define COMMS_CH   1          // locked 2.4 GHz channel both ends sit on
 #define COMMS_LOG  16         // message ring-buffer depth
 
-struct ChatMsg { char from[12]; char text[48]; bool me; };
+struct ChatMsg { char from[12]; char text[48]; bool me; bool open; };
 
 void            hud_comms_begin();                 // init ESP-NOW (after WiFi STA is up)
 void            hud_comms_enter();                 // entering COMMS: lock 2.4 GHz + channel
-void            hud_comms_send(const char* text);  // broadcast an (encrypted) canned message
+void            hud_comms_send(const char* text);  // broadcast on the active net
 int             hud_comms_count();                 // messages in the log
 const ChatMsg*  hud_comms_log();                   // newest-last ring buffer (<= COMMS_LOG)
 const char*     hud_comms_name();                  // this unit's short name
+// Nets: a passphrase defines a private group ("" or "OPEN" = the open broadcast net).
+void            hud_comms_set_net(const char* passphrase);
+const char*     hud_comms_net();                   // active net name ("OPEN" or the passphrase)
+bool            hud_comms_net_open();               // is the active net the open broadcast?
 
 extern const char* const HUD_QUICKMSG[];           // the canned quick-messages
 int             hud_quickmsg_count();

@@ -73,6 +73,7 @@ static bool s_detail = false;        // network info view open
 static int  s_detail_ci = -1;        // which contact index it shows
 // COMMS composer
 static bool s_kb = false;            // keyboard expanded (vs the collapsed quick-strip)
+static bool s_setnet = false;        // keyboard is entering a NET passphrase (not a message)
 static char s_compose[CHAT_TEXT_MAX + 1] = {0};
 static int  s_qmpage = 0;            // quick-message page in the collapsed strip (4/page)
 #define GEAR_X    (HUD_W - 13)
@@ -440,7 +441,7 @@ static int strip_hit(int x, int y) {
 
 static void draw_kb() {
   int top = kb_top();
-  char cl[64]; snprintf(cl, sizeof(cl), ">%s", s_compose);     // compose line
+  char cl[64]; snprintf(cl, sizeof(cl), "%s%s", s_setnet ? "NET>" : ">", s_compose);  // compose line
   hud_text(6, top - 13, cl, 1, HUD_C_WHITE);
   for (int row = 0; row < KB_NROWS; row++) {
     const char* r = KB_ROWS[row]; int L = (int)strlen(r); int x0 = (HUD_W - L * 24) / 2;
@@ -478,19 +479,27 @@ static void draw_strip() {
   hud_text(184 + (55 - hud_text_w("KEYBD", 1)) / 2, ny + (NAV_H - 7) / 2, "KEYBD", 1, HUD_C_CYAN);
 }
 
+#define NET_Y (CONTENT_Y + 3)        // tappable "NET: xxx" header
 static void page_comms(uint32_t now) {
   (void)now;
+  // NET header (tap to set a passphrase); OPEN = green, a keyed group = cyan
+  char nh[32]; snprintf(nh, sizeof(nh), "NET: %s", hud_comms_net());
+  hud_text(6, NET_Y, nh, 1, hud_comms_net_open() ? HUD_C_GREEN : HUD_C_CYAN);
+  hud_text(HUD_W - hud_text_w("[SET]", 1) - 6, NET_Y, "[SET]", 1, HUD_C_GREY);
+
   int bottom = s_kb ? kb_top() - 14 : strip_top();
   const ChatMsg* L = hud_comms_log();
   int n = hud_comms_count();
-  int rowsFit = (bottom - CONTENT_Y - 4) / 14; if (rowsFit < 1) rowsFit = 1;
+  int logTop = CONTENT_Y + 16;
+  int rowsFit = (bottom - logTop) / 14; if (rowsFit < 1) rowsFit = 1;
   int start = n > rowsFit ? n - rowsFit : 0;
-  int y = CONTENT_Y + 4;
+  int y = logTop;
   if (n == 0) hud_text(8, y, "NO TRAFFIC", 1, HUD_C_GREY);
   for (int i = start; i < n; i++) {
-    char line[60];
-    snprintf(line, sizeof(line), "%s: %s", L[i].me ? "ME" : L[i].from, L[i].text);
-    hud_text(6, y, line, 1, L[i].me ? HUD_C_GREEN : HUD_C_AMBER);
+    char line[64];
+    snprintf(line, sizeof(line), "%s%s: %s", L[i].open ? "*" : "", L[i].me ? "ME" : L[i].from, L[i].text);
+    uint16_t col = L[i].me ? HUD_C_GREEN : (L[i].open ? HUD_C_CYAN : HUD_C_AMBER);
+    hud_text(6, y, line, 1, col);
     y += 14;
   }
   if (s_kb) draw_kb(); else draw_strip();
@@ -632,10 +641,16 @@ void hud_on_press(int x, int y) {
       if (i >= 0) { s_detail_ci = i; s_detail = true; }
     }
   } else if (hud_mode_get() == M_COMMS) {
+    if (!s_kb && y < CONTENT_Y + 14) {          // tap the NET header -> enter a passphrase
+      s_kb = true; s_setnet = true; s_compose[0] = 0; return;
+    }
     if (s_kb) {                                 // keyboard open: keys compose/send
       char k = kb_hit(x, y);
-      if (k == 0x1B) s_kb = false;              // collapse
-      else if (k == '\n') { if (s_compose[0]) { hud_comms_send(s_compose); s_compose[0] = 0; } }
+      if (k == 0x1B) { s_kb = false; s_setnet = false; }          // collapse
+      else if (k == '\n') {
+        if (s_setnet) { hud_comms_set_net(s_compose); s_setnet = false; s_compose[0] = 0; s_kb = false; }
+        else if (s_compose[0]) { hud_comms_send(s_compose); s_compose[0] = 0; }
+      }
       else if (k == '\b') { int l = (int)strlen(s_compose); if (l > 0) s_compose[l - 1] = 0; }
       else if (k >= ' ')  { int l = (int)strlen(s_compose); if (l < CHAT_TEXT_MAX) { s_compose[l] = k; s_compose[l + 1] = 0; } }
     } else {                                    // collapsed strip: arrows / chips / keyboard

@@ -22,9 +22,9 @@ def main():
        "esp_now_init()" in C and "esp_now_register_recv_cb" in C
        and "esp_now_add_peer" in C and "0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF" in C)
     CRY = (SK / "chat_crypt.h").read_text(encoding="utf-8", errors="replace")
-    ok("frames are PRIVATE: AES shared-key encrypt/decrypt (chat_crypt)",
-       "HOME_CHAT_KEY" in CRY and "mbedtls_aes_crypt_ctr" in CRY
-       and "chat_encrypt(" in C and "chat_decrypt(" in C)
+    ok("frames are PRIVATE: AES-CTR encrypt/decrypt (chat_crypt)",
+       "mbedtls_aes_crypt_ctr" in CRY
+       and "chat_encrypt(s_netKey" in C and "chat_decrypt(s_netKey" in C)
     ok("uses H.O.M.E's [nameLen][name][text] frame (interoperable)",
        "CHAT_NAME_MAX 10" in H and "CHAT_TEXT_MAX 46" in H
        and re.search(r"f\[0\] = \(uint8_t\)nl", C) is not None)
@@ -41,6 +41,14 @@ def main():
     ok("one radio: the loop PAUSES the scanner on COMMS + locks the channel",
        re.search(r"if \(m == M_COMMS\)\s*\{[^}]*hud_comms_enter\(\)", INO, re.S) is not None
        and re.search(r"else\s*\{\s*hud_scan_tick", INO) is not None)
+    CRY = (SK / "chat_crypt.h").read_text(encoding="utf-8", errors="replace")
+    ok("NETS: passphrase-derived keys + a clear net tag + an OPEN net",
+       "chat_key_from_pass" in CRY and "chat_net_id" in CRY
+       and "hud_comms_set_net" in C and 's_netOpen = true' in C and "id == 0" in C)
+    ok("active net is settable + persisted (survives reboot)",
+       re.search(r"void hud_comms_set_net\([^)]*\).*?Preferences.*?putString\(\"pass\"", C, re.S) is not None)
+    ok("COMMS shows the NET header + the keyboard sets a passphrase",
+       '"NET: %s"' in PG and "s_setnet" in PG and "hud_comms_set_net(s_compose)" in PG)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
