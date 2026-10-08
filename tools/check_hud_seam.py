@@ -23,8 +23,8 @@ def main():
        "esp_lcd_panel_draw_bitmap" in s)
     ok("panel brought up (esp_lcd ST7789 + init)",
        "esp_lcd_new_panel_st7789" in s and "esp_lcd_panel_init" in s)
-    ok("backlight pin 25 driven high",
-       re.search(r"digitalWrite\(\s*LCD_BL\s*,\s*HIGH\s*\)", s) is not None
+    ok("backlight pin 25 brought up full via LEDC PWM (dimmable for stealth)",
+       "ledcAttach(LCD_BL" in s and re.search(r"hud_set_backlight\(\s*255\s*\)", s) is not None
        and re.search(r"#define\s+LCD_BL\s+25", s) is not None)
     ok("hud_init called + alloc-fail reported", "hud_init()" in s and "alloc failed" in s)
     ok("loop ticks the HUD", "hud_tick(millis())" in s)

@@ -43,7 +43,36 @@ static bool IRAM_ATTR on_trans_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_
 // over SPI DMA, then WAIT for the transfer to finish before the caller reuses
 // the framebuffer -- otherwise the next frame overwrites it mid-DMA and tears.
 volatile uint32_t g_push_us = 0;
+
+// ---- NIGHT / STEALTH mode: dim backlight + red night-vision tint ----
+// Stealth keeps the screen from being a light source in the dark and preserves
+// night vision (red only). The tint rewrites the frame at this one seam, so no
+// page code changes; the UI's greens/cyans map to red *shades* by luminance so
+// they stay readable instead of blanking out under a plain red mask.
+#define HUD_BL_CH      0          // LEDC channel for the backlight
+#define HUD_BL_FREQ    5000
+#define HUD_BL_BITS    8
+#define STEALTH_DUTY   36         // ~14% backlight in stealth (bright = 255)
+static volatile bool s_stealth = false;
+
+void hud_set_backlight(uint8_t duty) { ledcWrite(LCD_BL, duty); }
+void hud_set_stealth(bool on) { s_stealth = on; hud_set_backlight(on ? STEALTH_DUTY : 255); }
+bool hud_stealth() { return s_stealth; }
+
+// Recolour the frame to dim red (night vision). Bytes are MSB-swapped (hud_rgb).
+static void stealth_tint(uint16_t* p, int n) {
+  for (int i = 0; i < n; i++) {
+    uint16_t s = p[i];
+    uint16_t c = (uint16_t)((s << 8) | (s >> 8));       // unswap to RGB565
+    int lum = ((c >> 11) & 0x1F) + (((c >> 5) & 0x3F) >> 1) + (c & 0x1F);  // 0..~93
+    if (lum > 31) lum = 31;                              // clamp to 5-bit red
+    uint16_t out = (uint16_t)(lum << 11);                // red channel only
+    p[i] = (uint16_t)((out << 8) | (out >> 8));          // reswap
+  }
+}
+
 void hud_present_fb(const uint16_t* fb, int w, int h) {
+  if (s_stealth) stealth_tint((uint16_t*)fb, w * h);     // in place; page redraws next frame
   uint32_t t0 = micros();
   esp_lcd_panel_draw_bitmap(s_panel, 0, 0, w, h, (void*)fb);
   xSemaphoreTake(s_flush_done, pdMS_TO_TICKS(100));
@@ -189,8 +218,8 @@ void setup() {
   Serial.begin(115200);
   delay(200);
 
-  pinMode(LCD_BL, OUTPUT);
-  digitalWrite(LCD_BL, HIGH);     // backlight on
+  ledcAttach(LCD_BL, HUD_BL_FREQ, HUD_BL_BITS);  // PWM backlight (for stealth dimming)
+  hud_set_backlight(255);                        // full brightness on boot (day)
 
   s_dispOk = lcd_init();
   touch_init();

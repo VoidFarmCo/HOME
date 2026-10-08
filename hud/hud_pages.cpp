@@ -4,12 +4,17 @@
 #include "hud_gps.h"
 #include "hud_comms.h"
 #include "hud_engage.h"
+#include "hud_oui.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+// NIGHT / STEALTH mode (dim backlight + red tint), implemented in hud.ino.
+bool hud_stealth();
+void hud_set_stealth(bool on);
 
 // Map a signal RSSI (dBm, ~-30 near .. ~-95 far) to 0..1 (1 = strongest).
 static float rssi_unit(int8_t rssi) {
@@ -66,7 +71,8 @@ void hud_mode_auto(uint32_t now) {
 #define TAB_H     28                    // bottom tab strip (the page switcher)
 #define CONTENT_Y (STAT_H + 2)
 #define CONTENT_B (HUD_H - TAB_H - 2)   // bottom of the content band
-#define FOOT_Y    8                     // page footer text sits in the top strip now
+#define FOOT_H    13                    // page footer bar, at the BOTTOM of the content band
+                                        // (chrome fills the TOP strip last, so a top-strip footer gets painted over)
 
 // settings gear (top-right of the top strip) + the SETTINGS panel
 static bool s_settings = false;
@@ -85,6 +91,7 @@ static int  s_qmpage = 0;            // quick-message page in the collapsed stri
 #define SET_BTN_W (HUD_W - 40)
 #define SET_BTN_H 30
 #define SET_BND_Y (SET_BTN_Y + SET_BTN_H + 14)   // BAND filter row, below RECALIBRATE
+#define SET_STL_Y (SET_BND_Y + SET_BTN_H + 14)    // NIGHT/STEALTH row, below BAND
 
 // Short tab labels so they're readable at 2x in a 64 px tab.
 static const char* tab_label(int m) {
@@ -136,6 +143,19 @@ static void draw_chrome(int mode) {
   }
   hud_disc(GEAR_X, GEAR_Y, 6, gc);
   hud_disc(GEAR_X, GEAR_Y, 2, HUD_C_STRIP);                  // centre hole (strip colour)
+
+  // ---- GLOBAL THREAT ALERT: strobes across the top strip on ANY page when the
+  // ENGAGE sniffer holds a live drone or a recent deauth. Detection only runs on
+  // RADAR/ENGAGE, but a drone contact stays live ~12 s and an attack ~8 s, so the
+  // warning follows you onto SCAN/MAP/COMMS for that window after you leave the scope.
+  bool threat_drone = hud_engage_drone_count() > 0;
+  uint32_t threat_lm = hud_engage_last_ms();
+  bool threat_atk = threat_lm && (millis() - threat_lm < 8000);
+  if ((threat_drone || threat_atk) && ((millis() / 250) & 1)) {   // ~2 Hz strobe
+    hud_fill_rect(0, 0, HUD_W, STAT_H, HUD_C_RED);
+    const char* t = threat_drone ? "! DRONE DETECTED" : "! WIFI ATTACK";
+    hud_text(HUD_W / 2 - hud_text_w(t, 1) / 2, (STAT_H - 7) / 2, t, 1, HUD_C_WHITE);
+  }
 }
 
 // ---- SETTINGS panel (opened by the gear) ----
@@ -152,6 +172,12 @@ static void draw_settings() {
   hud_rect(SET_BTN_X, SET_BND_Y, SET_BTN_W, SET_BTN_H, HUD_C_AMBER);
   char bl[24]; snprintf(bl, sizeof(bl), "BAND:  %s", s_band == 1 ? "2.4 GHZ" : s_band == 2 ? "5 GHZ" : "ALL");
   hud_text(HUD_W / 2 - hud_text_w(bl, 1) / 2, SET_BND_Y + (SET_BTN_H - 7) / 2, bl, 1, HUD_C_AMBER);
+  // NIGHT / STEALTH toggle (dim backlight + red night-vision tint)
+  bool st = hud_stealth();
+  uint16_t sc = st ? HUD_C_RED : HUD_C_GREY;
+  hud_rect(SET_BTN_X, SET_STL_Y, SET_BTN_W, SET_BTN_H, sc);
+  char sl[24]; snprintf(sl, sizeof(sl), "STEALTH:  %s", st ? "ON" : "OFF");
+  hud_text(HUD_W / 2 - hud_text_w(sl, 1) / 2, SET_STL_Y + (SET_BTN_H - 7) / 2, sl, 1, sc);
   hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 16, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
 
@@ -206,7 +232,7 @@ static void page_radar(uint32_t now) {
 // ---- SCAN list cursor (highlighted row) + scroll window ----
 static int s_sel = 0, s_scroll = 0;
 #define ROW_H 20
-static int scan_rows() { return (CONTENT_B - CONTENT_Y) / ROW_H; }
+static int scan_rows() { return (CONTENT_B - CONTENT_Y - FOOT_H) / ROW_H; }  // reserve the footer row
 
 // Band filter: is this channel's band visible under the current filter?
 static bool band_ok(uint8_t ch) {
@@ -268,7 +294,8 @@ static void page_scan(uint32_t now) {
   const char* f = s_band == 1 ? "2.4" : s_band == 2 ? "5G" : "ALL";
   char foot[48];
   snprintf(foot, sizeof(foot), "2G%d 5G%d [%s]", hud_scan_band_count(2), hud_scan_band_count(5), f);
-  hud_text(8, FOOT_Y, foot, 1, HUD_C_CYAN);
+  hud_fill_rect(0, CONTENT_B - FOOT_H, HUD_W, FOOT_H, HUD_C_STRIP);
+  hud_text(6, CONTENT_B - FOOT_H + 3, foot, 1, HUD_C_CYAN);
 }
 
 // ---- network info view (Marauder/Bruce style): full detail for one AP ----
@@ -292,7 +319,13 @@ static void draw_detail() {
   hud_text(8, y, ln, 1, c->enc == 0 ? HUD_C_RED : HUD_C_GREEN); y += 15;
   snprintf(ln, sizeof(ln), "BSSID %02X:%02X:%02X:%02X:%02X:%02X",
            c->bssid[0], c->bssid[1], c->bssid[2], c->bssid[3], c->bssid[4], c->bssid[5]);
-  hud_text(8, y, ln, 1, HUD_C_GREY);
+  hud_text(8, y, ln, 1, HUD_C_GREY); y += 15;
+  // vendor hint from the OUI (IEEE registry); drone makers stand out in red
+  const char* ven = hud_oui_vendor(c->bssid);
+  bool drone = ven && (!strcmp(ven, "DJI") || !strcmp(ven, "PARROT") ||
+                       !strcmp(ven, "SKYDIO") || !strcmp(ven, "AUTEL"));
+  snprintf(ln, sizeof(ln), "VENDOR %s", ven ? ven : "UNKNOWN");
+  hud_text(8, y, ln, 1, drone ? HUD_C_RED : (ven ? HUD_C_AMBER : HUD_C_GREY));
   hud_text(8, CONTENT_B - 16, "TAP TO CLOSE", 1, HUD_C_GREY);
 }
 
@@ -309,6 +342,9 @@ static double   s_refLat = 0, s_refLon = 0;
 static uint32_t s_refT = 0;
 static bool     s_moving = false;
 static float    s_spdMph = 0, s_hdg = 0;
+// MAP waypoint: one mark you drop at your position, then navigate back to (range+bearing).
+static bool     s_wpSet = false;
+static double   s_wpLat = 0, s_wpLon = 0;
 #define MOVE_M   4.0            // metres over the window to count as moving (~3 mph)
 #define MOVE_MS  3000
 static const char* cardinal(float deg) {
@@ -380,6 +416,17 @@ static void page_map(uint32_t now) {
     }
   } else { s_moving = false; s_refT = 0; }
 
+  // waypoint marker (cyan diamond) at its position relative to you, if on screen
+  if (g.valid && s_wpSet) {
+    double cosl = cos(g.lat * 0.01745);
+    int wx = cx + (int)(((s_wpLon - g.lon) * 111320.0 * cosl) / MPP);
+    int wy = cy - (int)(((s_wpLat - g.lat) * 111320.0) / MPP);
+    if (wx >= 2 && wx < HUD_W - 2 && wy >= CONTENT_Y + 2 && wy < CONTENT_B - 2) {
+      hud_line(wx, wy - 4, wx + 4, wy, HUD_C_CYAN); hud_line(wx + 4, wy, wx, wy + 4, HUD_C_CYAN);
+      hud_line(wx, wy + 4, wx - 4, wy, HUD_C_CYAN); hud_line(wx - 4, wy, wx, wy - 4, HUD_C_CYAN);
+    }
+  }
+
   // you-marker: arrow along the travel heading when moving, else up (N)
   float a = (s_moving ? s_hdg : 0.0f) * 0.01745329f;
   int tx = cx + (int)(sinf(a) * 9), ty = cy - (int)(cosf(a) * 9);
@@ -394,12 +441,18 @@ static void page_map(uint32_t now) {
   if (g.valid) {
     snprintf(ln, sizeof(ln), "%.5f %.5f", g.lat, g.lon);
     hud_text(6, CONTENT_B - 22, ln, 1, HUD_C_GREEN);
-    if (s_moving)
+    if (s_wpSet) {                               // navigating to a waypoint
+      float wb; double wd = geo_dist_brg(g.lat, g.lon, s_wpLat, s_wpLon, &wb);
+      snprintf(ln, sizeof(ln), "WP %dM  %03d %s  TAP:CLEAR", (int)wd, (int)wb, cardinal(wb));
+      hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_CYAN);
+    } else if (s_moving) {
       snprintf(ln, sizeof(ln), "HDG %03d %s  %.1f MPH  SAT %d",
                (int)s_hdg, cardinal(s_hdg), s_spdMph, g.sats);
-    else
-      snprintf(ln, sizeof(ln), "STOPPED  SAT %d  ALT %dM", g.sats, (int)g.altm);
-    hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
+      hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
+    } else {
+      snprintf(ln, sizeof(ln), "STOPPED  SAT %d  TAP:DROP WP", g.sats);
+      hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
+    }
   } else {
     hud_text(6, CONTENT_B - 22, "ACQUIRING GPS...", 1, HUD_C_AMBER);
     snprintf(ln, sizeof(ln), "SAT %d   NO FIX", g.sats);
@@ -664,6 +717,9 @@ void hud_on_press(int x, int y) {
                y >= SET_BND_Y && y <= SET_BND_Y + SET_BTN_H) {
       s_band = (s_band + 1) % 3;              // BAND: ALL -> 2.4 -> 5 (stay in panel)
       s_sel = 0; s_scroll = 0;
+    } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+               y >= SET_STL_Y && y <= SET_STL_Y + SET_BTN_H) {
+      hud_set_stealth(!hud_stealth());        // NIGHT/STEALTH toggle (stay in panel)
     } else {
       s_settings = false;                     // tap elsewhere closes
     }
@@ -703,6 +759,10 @@ void hud_on_press(int x, int y) {
       else if (z == STRIP_R) { if (s_qmpage < qm_pages() - 1) s_qmpage++; }
       else if (z >= 0) hud_comms_send(HUD_QUICKMSG[z]);
     }
+  } else if (hud_mode_get() == M_MAP) {
+    // tap toggles the waypoint: drop one at your position, or clear the one you have
+    if (s_wpSet) s_wpSet = false;
+    else { const GpsFix& g = hud_gps(); if (g.valid) { s_wpLat = g.lat; s_wpLon = g.lon; s_wpSet = true; } }
   }
 }
 
