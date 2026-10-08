@@ -3,6 +3,8 @@
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
 // The Arduino core SPIClass would not apply a >~10 MHz clock on the C5 and
@@ -21,13 +23,23 @@
 static esp_lcd_panel_io_handle_t s_io = NULL;
 static esp_lcd_panel_handle_t s_panel = NULL;
 static bool s_dispOk = false;
+static SemaphoreHandle_t s_flush_done = NULL;
+
+// Fires (in ISR) when a draw_bitmap DMA transfer finishes.
+static bool IRAM_ATTR on_trans_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void*) {
+  BaseType_t hp = pdFALSE;
+  xSemaphoreGiveFromISR(s_flush_done, &hp);
+  return hp == pdTRUE;
+}
 
 // Strong override of the weak default in hud_core.cpp: push the whole buffer
-// over SPI DMA. hud_rgb already stores bytes MSB-first for the ST7789.
+// over SPI DMA, then WAIT for the transfer to finish before the caller reuses
+// the framebuffer -- otherwise the next frame overwrites it mid-DMA and tears.
 volatile uint32_t g_push_us = 0;
 void hud_present_fb(const uint16_t* fb, int w, int h) {
   uint32_t t0 = micros();
   esp_lcd_panel_draw_bitmap(s_panel, 0, 0, w, h, (void*)fb);
+  xSemaphoreTake(s_flush_done, pdMS_TO_TICKS(100));
   g_push_us = micros() - t0;
 }
 
@@ -50,6 +62,11 @@ static bool lcd_init() {
   io_config.spi_mode = 0;
   io_config.trans_queue_depth = 10;
   if (esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &s_io) != ESP_OK) return false;
+
+  s_flush_done = xSemaphoreCreateBinary();
+  esp_lcd_panel_io_callbacks_t cbs = {};
+  cbs.on_color_trans_done = on_trans_done;
+  esp_lcd_panel_io_register_event_callbacks(s_io, &cbs, NULL);
 
   esp_lcd_panel_dev_config_t panel_config = {};
   panel_config.reset_gpio_num = LCD_RST;

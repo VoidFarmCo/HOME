@@ -2,20 +2,19 @@
 #include <stdint.h>
 
 // ============================================================
-//  Combat HUD - V1 render core (ESP32-C5, single-core RISC-V)
-//  Owns a PSRAM framebuffer, composites into it, pushes once.
-//  Drop into your existing firmware; wire ONE seam (below).
+//  Combat HUD render core (ESP32-C5). Owns a DMA framebuffer,
+//  composites into it, pushes once per frame via one seam.
+//  hud_core = framebuffer + drawing API; hud_pages = the HUD content.
 // ============================================================
 
-// ---- Config: match these to your panel + driver rotation ----
 #ifndef HUD_W
-#define HUD_W 320      // logical width  (landscape). Set your driver rotation to match.
+#define HUD_W 320      // logical width (landscape)
 #endif
 #ifndef HUD_H
 #define HUD_H 240      // logical height
 #endif
 #ifndef HUD_CAP_FPS
-#define HUD_CAP_FPS 0  // 0 = uncapped (measure your ceiling). Set e.g. 30 to cap later.
+#define HUD_CAP_FPS 0  // 0 = uncapped
 #endif
 
 // RGB565 helper. Bytes are pre-swapped (MSB-first) because the ST7789 over
@@ -25,14 +24,35 @@ static inline uint16_t hud_rgb(uint8_t r, uint8_t g, uint8_t b) {
   return (uint16_t)((c << 8) | (c >> 8));
 }
 
-// ---- Public API ----
-bool            hud_init();                // allocate PSRAM framebuffer. false = OOM
+// ---- shared palette ----
+#define HUD_C_BG     hud_rgb(7,10,7)
+#define HUD_C_STRIP  hud_rgb(14,20,14)
+#define HUD_C_GREEN  hud_rgb(77,255,47)
+#define HUD_C_DGREEN hud_rgb(22,59,22)
+#define HUD_C_CYAN   hud_rgb(40,220,220)
+#define HUD_C_AMBER  hud_rgb(255,176,0)
+#define HUD_C_RED    hud_rgb(255,59,59)
+#define HUD_C_GREY   hud_rgb(120,130,120)
+#define HUD_C_WHITE  hud_rgb(230,235,230)
+
+// ---- lifecycle ----
+bool            hud_init();                // allocate the framebuffer. false = OOM
 void            hud_tick(uint32_t now_ms); // call every loop(): composite + present
 uint16_t        hud_fps_x10();             // last measured FPS * 10
-const uint16_t* hud_framebuffer();         // raw buffer if you need it
+const uint16_t* hud_framebuffer();
 
-// ---- Integration seam ------------------------------------------------
-// YOU implement this once, bridging to YOUR existing display driver.
-// A weak no-op default is provided so the project links before you wire it.
-// See INTEGRATION_R1.md for TFT_eSPI / LovyanGFX / esp_lcd examples.
+// ---- drawing API (valid after hud_init(); draws into the framebuffer) ----
+void hud_clear(uint16_t c);
+void hud_px(int x, int y, uint16_t c);
+void hud_fill_rect(int x, int y, int w, int h, uint16_t c);
+void hud_rect(int x, int y, int w, int h, uint16_t c);      // outline
+void hud_line(int x0, int y0, int x1, int y1, uint16_t c);
+void hud_ring(int cx, int cy, int r, uint16_t c);
+void hud_disc(int cx, int cy, int r, uint16_t c);
+void hud_num(int x, int y, uint32_t v, int scale, uint16_t c);
+// 5x7 uppercase/digit/symbol text. Returns the x just past the string.
+int  hud_text(int x, int y, const char* s, int scale, uint16_t c);
+int  hud_text_w(const char* s, int scale);
+
+// ---- integration seam (implemented once in the sketch) ----
 void hud_present_fb(const uint16_t* fb, int w, int h);
