@@ -1,5 +1,7 @@
 #include "hud_core.h"
 #include "hud_pages.h"
+#include <Arduino.h>
+#include <pgmspace.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -109,6 +111,18 @@ int hud_text(int x, int y, const char* str, int s, uint16_t c) {
   return x;
 }
 int hud_text_w(const char* str, int s) { return (int)strlen(str) * 6 * s; }
+
+void hud_bitmap1(int x, int y, int w, int h, const unsigned char* bits, uint16_t color, int glitch) {
+  int stride = (w + 7) / 8;
+  int off = 0;
+  for (int j = 0; j < h; j++) {
+    if (glitch > 0 && (j % 6 == 0)) off = (int)random(-glitch, glitch + 1);  // per-band tear
+    const unsigned char* row = bits + j * stride;
+    for (int i = 0; i < w; i++)
+      if (pgm_read_byte(row + (i >> 3)) & (0x80 >> (i & 7)))
+        hud_px(x + i + off, y + j, color);
+  }
+}
 
 bool hud_init() {
   size_t bytes = (size_t)HUD_W * HUD_H * 2;

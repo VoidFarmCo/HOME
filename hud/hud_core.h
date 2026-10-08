@@ -50,6 +50,10 @@ void hud_line(int x0, int y0, int x1, int y1, uint16_t c);
 void hud_ring(int cx, int cy, int r, uint16_t c);
 void hud_disc(int cx, int cy, int r, uint16_t c);
 void hud_num(int x, int y, uint32_t v, int scale, uint16_t c);
+// Draw a 1-bpp (XBM/Adafruit drawBitmap) image; set bits drawn in `color`.
+// glitch > 0 tears rows horizontally by up to that many px (per 6-row band) for
+// a distortion effect; 0 = clean.
+void hud_bitmap1(int x, int y, int w, int h, const unsigned char* bits, uint16_t color, int glitch = 0);
 // 5x7 uppercase/digit/symbol text. Returns the x just past the string.
 int  hud_text(int x, int y, const char* s, int scale, uint16_t c);
 int  hud_text_w(const char* s, int scale);

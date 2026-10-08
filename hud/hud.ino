@@ -196,6 +196,7 @@ void setup() {
   if (!hud_init()) {
     Serial.println("HUD: framebuffer alloc failed - PSRAM/DMA RAM?");
   }
+  hud_draw_splash();                // HEADS OF MY ENEMIES logo (animated; self-timed)
   hud_scan_begin();                 // bring up WiFi for live scanning
 
   cal_load();                       // load saved touch calibration if any

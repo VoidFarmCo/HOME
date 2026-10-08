@@ -1,6 +1,9 @@
 #include "hud_pages.h"
 #include "hud_core.h"
 #include "hud_scan.h"
+#include "home_logo.h"
+#include "branding.h"
+#include <Arduino.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -120,7 +123,9 @@ static void draw_chrome(int mode) {
 // ---- SETTINGS panel (opened by the gear) ----
 static void draw_settings() {
   hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
-  hud_text(HUD_W / 2 - hud_text_w("SETTINGS", 2) / 2, CONTENT_Y + 10, "SETTINGS", 2, HUD_C_WHITE);
+  hud_text(HUD_W / 2 - hud_text_w("SETTINGS", 2) / 2, CONTENT_Y + 8, "SETTINGS", 2, HUD_C_WHITE);
+  char ver[40]; snprintf(ver, sizeof(ver), "%s  v.%s", HUD_BUILD, HUD_VERSION);
+  hud_text(HUD_W / 2 - hud_text_w(ver, 1) / 2, CONTENT_Y + 26, ver, 1, HUD_C_GREY);
   // RECALIBRATE TOUCH button
   hud_rect(SET_BTN_X, SET_BTN_Y, SET_BTN_W, SET_BTN_H, HUD_C_CYAN);
   const char* b = "RECALIBRATE TOUCH";
@@ -302,6 +307,64 @@ static void page_engage(uint32_t now) {
   hud_fill_rect(22, CONTENT_B - 12, w, 6, HUD_C_RED);
   hud_text(cx - hud_text_w("TGT LOCK", 1) / 2, CONTENT_Y + 2, "TGT LOCK", 1, HUD_C_RED);
   hud_text(8, FOOT_Y, "ARMED", 1, HUD_C_RED);
+}
+
+// ---- boot splash: the real H.O.M.E logo, shaking + glitch-distorting in place ----
+// Animated like the firmware's boot loader, but instead of bits dropping off the
+// screen the logo SHAKES in place with a distortion tear that decays to a steady
+// hold, then the HUD starts. (bitmap_home_logo is the 160x160 PUEO_LOGO_BITMAP.)
+static int cen(const char* s, int sc) { return HUD_W / 2 - hud_text_w(s, sc) / 2; }
+
+// The official info block under the logo: product, divider, build+version, byline,
+// target, and the URL pinned to the bottom. Matches the firmware's boot page.
+static void splash_info() {
+  int y = 186;
+  hud_text(cen(HUD_PRODUCT, 2), y, HUD_PRODUCT, 2, HUD_C_RED);  y += 24;
+  hud_fill_rect(14, y, HUD_W - 28, 1, HUD_C_AMBER);            y += 9;
+  char v[40]; snprintf(v, sizeof(v), "%s  v.%s", HUD_BUILD, HUD_VERSION);
+  hud_text(cen(v, 1), y, v, 1, HUD_C_AMBER);                   y += 15;
+  char by[40]; snprintf(by, sizeof(by), "BY %s", HUD_AUTHOR);
+  hud_text(cen(by, 1), y, by, 1, HUD_C_GREY);                  y += 14;
+  hud_text(cen(HUD_TARGET, 1), y, HUD_TARGET, 1, HUD_C_GREY);
+  hud_text(cen(HUD_URL, 1), HUD_H - 16, HUD_URL, 1, HUD_C_GREY);
+}
+
+void hud_draw_splash() {
+  const int lx = (HUD_W - HOME_LOGO_W) / 2;        // 160 wide -> x = 40
+  const int ly = 18;
+  const uint32_t DUR = 2400;
+  uint32_t t0 = millis();
+
+  // trippy palette the logo strobes through every frame (fast = hallucinate)
+  static const uint16_t trip[] = {
+    HUD_C_RED, HUD_C_AMBER, HUD_C_GREEN, HUD_C_CYAN,
+    hud_rgb(255, 0, 255), hud_rgb(130, 70, 255), hud_rgb(0, 120, 255), HUD_C_WHITE
+  };
+  const int NT = sizeof(trip) / sizeof(trip[0]);
+  uint32_t frame = 0;
+
+  // phase 1: logo shakes + tears in place while the colours strobe fast
+  while (millis() - t0 < DUR) {
+    uint32_t e = millis() - t0;
+    int amp = 7 - (int)(e * 7 / DUR);              // amplitude 7 -> 0 (settles)
+    if (amp < 0) amp = 0;
+    int dx = amp ? (int)random(-amp, amp + 1) : 0;
+    int dy = amp ? (int)random(-amp, amp + 1) : 0;
+
+    hud_clear(HUD_C_BG);
+    hud_bitmap1(lx + dx, ly + dy, HOME_LOGO_W, HOME_LOGO_H, bitmap_home_logo, trip[frame % NT], amp);
+    hud_text(cen(HUD_PRODUCT, 2), 186, HUD_PRODUCT, 2, trip[(frame + 3) % NT]);
+    hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);
+    frame++;
+    delay(16);                                     // ~60 fps -> colours cycle fast
+  }
+
+  // phase 2: steady official boot card (logo + full info block)
+  hud_clear(HUD_C_BG);
+  hud_bitmap1(lx, ly, HOME_LOGO_W, HOME_LOGO_H, bitmap_home_logo, HUD_C_WHITE, 0);
+  splash_info();
+  hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);
+  delay(1300);
 }
 
 void hud_page_draw(int mode, uint32_t now) {

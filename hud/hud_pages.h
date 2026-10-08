@@ -15,6 +15,10 @@ void hud_mode_auto(uint32_t now_ms);
 // Draw the given page (chrome + content) into the framebuffer for this frame.
 void hud_page_draw(int mode, uint32_t now_ms);
 
+// Boot splash: the HEADS OF MY ENEMIES crowned-skull identity. Draws one frame
+// into the framebuffer and presents it; the sketch holds it briefly at startup.
+void hud_draw_splash();
+
 // A fresh press at (x,y): bottom tab = switch page; on SCAN, the content band is
 // split into three touch zones -- upper = scroll the cursor up, lower (above the
 // tabs) = scroll down, centre = ENTER (lock the highlighted network, go to HUNT).
