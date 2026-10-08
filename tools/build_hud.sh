@@ -8,7 +8,10 @@ CLI="/c/Program Files/Arduino CLI/arduino-cli.exe"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKETCH="$ROOT/hud"
 LIBS="$ROOT/hud/libraries"                       # vendored TFT_eSPI (Task 2)
-FQBN="esp32:esp32:esp32c5:PSRAM=enabled,CDCOnBoot=cdc"
+# huge_app (3MB app) + 16M flash: BLE pushes the app past the default 1.25MB slice;
+# the N16R8 has 16MB so we give the app room. (Changing the partition can reset NVS,
+# i.e. the saved touch calibration, once.)
+FQBN="esp32:esp32:esp32c5:PSRAM=enabled,CDCOnBoot=cdc,FlashSize=16M,PartitionScheme=huge_app"
 
 LIBARG=()
 [ -d "$LIBS" ] && LIBARG=(--libraries "$LIBS")   # only when the vendored dir exists

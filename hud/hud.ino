@@ -197,7 +197,7 @@ void setup() {
   cal_load();                       // load saved touch calibration if any
   bool held = (xpt(0xC0) < 3900);   // finger on the glass at boot -> force re-calibration
   if (!s_cal_valid || held) { s_cal_mode = true; s_cal_idx = 0; }
-  Serial.printf("HUD up (esp_lcd). cal_valid=%d cal_mode=%d\n", s_cal_valid, s_cal_mode);
+  Serial.printf("HUD up (esp_lcd). cal_valid=%d cal_mode=%d ble_ready=%d\n", s_cal_valid, s_cal_mode, hud_scan_ble_ready());
 }
 
 // Read the touch and, if pressed, map to screen coords. true = pressed.
@@ -260,6 +260,6 @@ void loop() {
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
     t = millis();
-    Serial.printf("FPS ~%u disp=%d wifi=%d\n", hud_fps_x10() / 10, s_dispOk, hud_scan_count());
+    Serial.printf("FPS ~%u disp=%d wifi=%d ble=%d\n", hud_fps_x10() / 10, s_dispOk, hud_scan_wifi_count(), hud_scan_ble_count());
   }
 }

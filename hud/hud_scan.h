@@ -20,6 +20,7 @@ int            hud_scan_count();            // contacts in the current snapshot
 const Contact* hud_scan_list();             // the snapshot (<= HUD_SCAN_MAX)
 int            hud_scan_wifi_count();        // how many are wifi (for status)
 int            hud_scan_ble_count();
+bool           hud_scan_ble_ready();         // did the BT controller come up?
 
 // ---- fox-hunt target (lock one contact and track its live signal) ----
 void           hud_scan_set_target(const char* name);  // lock this contact as the hunt target

@@ -118,7 +118,7 @@ static void page_radar(uint32_t now) {
   }
   hud_disc(cx, cy, 2, HUD_C_WHITE);                 // you
 
-  char foot[32]; snprintf(foot, sizeof(foot), "CONTACTS %d", n);
+  char foot[48]; snprintf(foot, sizeof(foot), "CON %d  W%d B%d", n, hud_scan_wifi_count(), hud_scan_ble_count());
   hud_text(8, FOOT_Y, foot, 1, HUD_C_GREEN);
 }
 
