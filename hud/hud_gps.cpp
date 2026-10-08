@@ -53,7 +53,9 @@ static void parse(const char* line) {
 void hud_gps_inject(const char* line) { parse(line); }
 
 void hud_gps_begin() {
-  Serial1.begin(9600, SERIAL_8N1, 4, 5);    // NEO-7M: RX 4 (from GPS TX), TX 5, 9600 8N1
+  // NEO-7M @ 9600 8N1. RX = IO4 (on the P1 JST; wire GPS-TX here). TX = IO28, a free
+  // pin left UNWIRED (the module needs no commands) -- keeps IO8/IO9 free for I2C.
+  Serial1.begin(9600, SERIAL_8N1, 4, 28);
 }
 
 void hud_gps_tick() {

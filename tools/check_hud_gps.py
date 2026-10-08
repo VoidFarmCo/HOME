@@ -22,8 +22,8 @@ def main():
        re.search(r"hemi\s*==\s*'S'\s*\|\|\s*hemi\s*==\s*'W'", G) is not None)
     ok("parses GGA (fix quality + sats) and RMC (A status)",
        'strstr(f[0], "GGA")' in G and 'strstr(f[0], "RMC")' in G and 'f[2][0] == \'A\'' in G)
-    ok("UART opens at 9600 on RX4/TX5",
-       re.search(r"Serial1\.begin\(9600,\s*SERIAL_8N1,\s*4,\s*5\)", G) is not None)
+    ok("UART opens at 9600, RX=IO4, TX=IO28 (unwired; keeps IO8/IO9 for I2C)",
+       re.search(r"Serial1\.begin\(9600,\s*SERIAL_8N1,\s*4,\s*28\)", G) is not None)
     ok("sketch ticks the GPS each loop",
        "hud_gps_begin()" in INO and "hud_gps_tick()" in INO
        and "hud_gps_inject" not in INO)   # the self-test inject was removed
