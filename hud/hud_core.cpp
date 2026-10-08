@@ -136,9 +136,9 @@ void hud_tick(uint32_t now) {
   hud_mode_auto(now);                      // temporary: auto-cycle until touch is wired
   hud_clear(HUD_C_BG);
   hud_page_draw(hud_mode_get(), now);      // the active page draws its chrome + content
-  // FPS in the bottom-right status bar (out of the way of the top tabs).
-  hud_text(HUD_W - 70, HUD_H - 16, "FPS", 1, HUD_C_GREY);
-  hud_num(HUD_W - 42, HUD_H - 19, s_fps_x10 / 10, 2, HUD_C_GREEN);
+  // FPS in the top-right status strip (tabs now live on the bottom).
+  hud_text(HUD_W - 70, 6, "FPS", 1, HUD_C_GREY);
+  hud_num(HUD_W - 42, 3, s_fps_x10 / 10, 2, HUD_C_GREEN);
 
   // touch marker (feedback) wherever the user is pressing
   if (s_touch_y >= 0) { hud_disc(s_touch_x, s_touch_y, 4, HUD_C_WHITE); hud_ring(s_touch_x, s_touch_y, 7, HUD_C_WHITE); }

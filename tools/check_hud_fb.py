@@ -16,7 +16,7 @@ def ok(n, c):
 def main():
     c = C.read_text(encoding="utf-8", errors="replace")
     h = H.read_text(encoding="utf-8", errors="replace")
-    ok("framebuffer is RGB565 320x240", "HUD_W 320" in h and "HUD_H 240" in h)
+    ok("framebuffer is RGB565 240x320 (portrait)", "HUD_W 240" in h and "HUD_H 320" in h)
     ok("allocates from PSRAM (MALLOC_CAP_SPIRAM)", "MALLOC_CAP_SPIRAM" in c)
     ok("hud_init returns false on alloc failure",
        re.search(r"if \(!s_fb\) return false;", c) is not None)

@@ -1,6 +1,20 @@
 #include "hud_pages.h"
 #include "hud_core.h"
+#include "hud_scan.h"
 #include <math.h>
+#include <stdio.h>
+
+// Map a WiFi/BLE RSSI (dBm, ~-30 near .. ~-95 far) to 0..1 (1 = strongest).
+static float rssi_unit(int8_t rssi) {
+  float u = (rssi + 95) / 60.0f;          // -95 -> 0, -35 -> 1
+  return u < 0 ? 0 : u > 1 ? 1 : u;
+}
+// A stable angle per contact so each one keeps its spot on the radar frame to frame.
+static float name_angle(const char* s) {
+  uint32_t h = 2166136261u;
+  for (const char* p = s; *p; p++) { h ^= (uint8_t)*p; h *= 16777619u; }
+  return (h % 3600) * 0.0017453f;         // 0..2pi
+}
 
 static int s_mode = M_RADAR;
 
@@ -38,11 +52,12 @@ void hud_mode_auto(uint32_t now) {
   if (now - last >= 4000) { s_mode = (s_mode + 1) % M_COUNT; last = now; }
 }
 
-// ---- layout constants ----
-#define TOP_H     28
-#define BOT_H     26
-#define CONTENT_Y (TOP_H + 2)
-#define CONTENT_B (HUD_H - BOT_H - 2)   // bottom of the content band
+// ---- layout constants (portrait: status strip on top, TAB STRIP ON THE BOTTOM) ----
+#define STAT_H    26                    // top status strip (footer text + FPS)
+#define TAB_H     28                    // bottom tab strip (the page switcher)
+#define CONTENT_Y (STAT_H + 2)
+#define CONTENT_B (HUD_H - TAB_H - 2)   // bottom of the content band
+#define FOOT_Y    8                     // page footer text sits in the top strip now
 
 // Short tab labels so they're readable at 2x in a 64 px tab.
 static const char* tab_label(int m) {
@@ -56,28 +71,29 @@ static const char* tab_label(int m) {
   }
 }
 
-// ---- top tab strip + bottom status bar (shared chrome) ----
+// ---- top status strip + BOTTOM tab strip (shared chrome) ----
 static void draw_chrome(int mode) {
-  hud_fill_rect(0, 0, HUD_W, TOP_H, HUD_C_STRIP);
+  hud_fill_rect(0, 0, HUD_W, STAT_H, HUD_C_STRIP);           // top status strip
+  const int tabY = HUD_H - TAB_H;                            // tabs along the bottom
+  hud_fill_rect(0, tabY, HUD_W, TAB_H, HUD_C_STRIP);
   const int tabW = HUD_W / M_COUNT;
-  const int ty = (TOP_H - 14) / 2;              // 14 = 7-row font at scale 2
+  const int ty = tabY + (TAB_H - 14) / 2;                    // 14 = 7-row font at scale 2
   for (int i = 0; i < M_COUNT; i++) {
     int x = i * tabW;
     uint16_t acc = hud_mode_accent(i);
     const char* lbl = tab_label(i);
     int tx = x + (tabW - hud_text_w(lbl, 2)) / 2;
     if (i == mode) {
-      hud_fill_rect(x + 1, 1, tabW - 2, TOP_H - 2, acc);
+      hud_fill_rect(x + 1, tabY + 1, tabW - 2, TAB_H - 2, acc);
       hud_text(tx, ty, lbl, 2, HUD_C_BG);        // dark text on the accent fill
     } else {
       hud_text(tx, ty, lbl, 2, acc);             // accent-coloured text on dark (readable + colour-coded)
     }
-    if (i) hud_fill_rect(x, 2, 1, TOP_H - 4, HUD_C_BG);   // tab divider
+    if (i) hud_fill_rect(x, tabY + 2, 1, TAB_H - 4, HUD_C_BG);   // tab divider
   }
-  hud_fill_rect(0, HUD_H - BOT_H, HUD_W, BOT_H, HUD_C_STRIP);
 }
 
-// ---- RADAR ----
+// ---- RADAR (live): each WiFi/BLE contact is a blip, strong = near the centre ----
 static void page_radar(uint32_t now) {
   static float sweep = 0.0f;
   int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2, R = (CONTENT_B - CONTENT_Y) / 2 - 4;
@@ -85,26 +101,44 @@ static void page_radar(uint32_t now) {
   hud_line(cx - R, cy, cx + R, cy, HUD_C_DGREEN); hud_line(cx, cy - R, cx, cy + R, HUD_C_DGREEN);
   sweep += 0.07f; if (sweep > 6.2832f) sweep -= 6.2832f;
   hud_line(cx, cy, cx + (int)(cosf(sweep) * R), cy + (int)(sinf(sweep) * R), HUD_C_GREEN);
-  int pr = 3 + (int)(2 * (0.5f + 0.5f * sinf(now * 0.006f)));
-  hud_disc(cx + R / 2, cy - R / 3, pr, HUD_C_RED);
-  hud_disc(cx - R / 3, cy + R / 4, 3, HUD_C_AMBER);
-  hud_disc(cx + R / 4, cy + R / 2, 3, HUD_C_GREEN);
-  hud_disc(cx, cy, 2, HUD_C_WHITE);
-  hud_text(8, HUD_H - BOT_H + 9, "CONTACTS 3", 1, HUD_C_GREEN);
+
+  const Contact* c = hud_scan_list();
+  int n = hud_scan_count();
+  for (int i = 0; i < n; i++) {
+    float u = rssi_unit(c[i].rssi);                 // 1 = strong/near
+    int rr = (int)((1.0f - u) * R);                 // near centre when strong
+    float a = name_angle(c[i].name);
+    int bx = cx + (int)(cosf(a) * rr), by = cy + (int)(sinf(a) * rr);
+    uint16_t col = (u > 0.66f) ? HUD_C_AMBER : (u > 0.33f ? HUD_C_GREEN : HUD_C_DGREEN);
+    hud_disc(bx, by, 3, col);
+  }
+  hud_disc(cx, cy, 2, HUD_C_WHITE);                 // you
+
+  char foot[32]; snprintf(foot, sizeof(foot), "CONTACTS %d", n);
+  hud_text(8, FOOT_Y, foot, 1, HUD_C_GREEN);
 }
 
-// ---- SCAN (recon list placeholder) ----
+// ---- SCAN (live): the real contact list, strongest first ----
 static void page_scan(uint32_t now) {
-  static const char* names[6] = {"AP-NETGEAR", "IPHONE-7F", "ESP-A91C", "TPLINK_22", "HIDDEN", "PRINTER-9"};
+  (void)now;
+  const Contact* c = hud_scan_list();
+  int n = hud_scan_count();
+  int rows = (CONTENT_B - CONTENT_Y) / 20;          // how many fit in the band
+  if (n > rows) n = rows;
+
+  if (hud_scan_count() == 0) {
+    hud_text(8, CONTENT_Y + 8, "SCANNING...", 1, HUD_C_CYAN);
+  }
   int y = CONTENT_Y + 2;
-  for (int i = 0; i < 6; i++) {
-    hud_text(8, y + 2, names[i], 1, HUD_C_WHITE);
-    int rssi = 20 + (int)(70 * (0.5f + 0.5f * sinf(now * 0.002f + i)));   // animated bar
-    hud_fill_rect(HUD_W - 10 - rssi, y + 2, rssi, 8, (i == 0) ? HUD_C_CYAN : HUD_C_DGREEN);
-    hud_num(HUD_W - 10 - rssi - 26, y + 1, rssi, 1, HUD_C_GREY);
+  for (int i = 0; i < n; i++) {
+    hud_num(8, y + 1, c[i].rssi < 0 ? -c[i].rssi : c[i].rssi, 1, HUD_C_GREY);  // |dBm|
+    hud_text(34, y + 2, c[i].name, 1, HUD_C_WHITE);
+    int bar = (int)(rssi_unit(c[i].rssi) * 90);     // 0..90 px signal bar
+    hud_fill_rect(HUD_W - 10 - bar, y + 2, bar, 8, (i == 0) ? HUD_C_CYAN : HUD_C_DGREEN);
     y += 20;
   }
-  hud_text(8, HUD_H - BOT_H + 9, "SCANNING  6 SEEN", 1, HUD_C_CYAN);
+  char foot[32]; snprintf(foot, sizeof(foot), "SCANNING  %d SEEN", hud_scan_count());
+  hud_text(8, FOOT_Y, foot, 1, HUD_C_CYAN);
 }
 
 // ---- MAP (grid + you + contacts) ----
@@ -118,7 +152,7 @@ static void page_map(uint32_t now) {
   hud_disc(cx + (int)(cosf(a) * 60), cy + (int)(sinf(a) * 40), 3, HUD_C_AMBER);
   hud_disc(cx + (int)(cosf(a * 1.7f) * 90), cy + (int)(sinf(a * 1.7f) * 55), 3, HUD_C_RED);
   hud_text(cx + 10, CONTENT_Y + 2, "N", 1, HUD_C_WHITE);
-  hud_text(8, HUD_H - BOT_H + 9, "GPS 7 SAT", 1, HUD_C_GREEN);
+  hud_text(8, FOOT_Y, "GPS 7 SAT", 1, HUD_C_GREEN);
 }
 
 // ---- COMMS (chat placeholder) ----
@@ -134,7 +168,7 @@ static void page_comms(uint32_t now) {
     y += 18;
   }
   if ((now / 500) & 1) hud_fill_rect(12, y + 2, 6, 10, HUD_C_AMBER);     // blinking cursor
-  hud_text(8, HUD_H - BOT_H + 9, "COMMS  ONLINE", 1, HUD_C_AMBER);
+  hud_text(8, FOOT_Y, "COMMS  ONLINE", 1, HUD_C_AMBER);
 }
 
 // ---- ENGAGE (targeting) ----
@@ -156,7 +190,7 @@ static void page_engage(uint32_t now) {
   hud_rect(20, CONTENT_B - 14, HUD_W - 40, 10, HUD_C_RED);
   hud_fill_rect(22, CONTENT_B - 12, w, 6, HUD_C_RED);
   hud_text(cx - hud_text_w("TGT LOCK", 1) / 2, CONTENT_Y + 2, "TGT LOCK", 1, HUD_C_RED);
-  hud_text(8, HUD_H - BOT_H + 9, "ARMED", 1, HUD_C_RED);
+  hud_text(8, FOOT_Y, "ARMED", 1, HUD_C_RED);
 }
 
 void hud_page_draw(int mode, uint32_t now) {
@@ -172,7 +206,7 @@ void hud_page_draw(int mode, uint32_t now) {
 }
 
 void hud_on_touch(int x, int y) {
-  if (y >= 0 && y < TOP_H) {                 // tapped the top tab strip
+  if (y >= HUD_H - TAB_H) {                   // tapped the BOTTOM tab strip
     int m = x / (HUD_W / M_COUNT);
     if (m >= 0 && m < M_COUNT) { hud_mode_set(m); s_manual = true; }
   }

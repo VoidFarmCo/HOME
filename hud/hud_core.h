@@ -8,10 +8,10 @@
 // ============================================================
 
 #ifndef HUD_W
-#define HUD_W 320      // logical width (landscape)
+#define HUD_W 240      // logical width (portrait / vertical)
 #endif
 #ifndef HUD_H
-#define HUD_H 240      // logical height
+#define HUD_H 320      // logical height (portrait / vertical)
 #endif
 #ifndef HUD_CAP_FPS
 #define HUD_CAP_FPS 0  // 0 = uncapped

@@ -6,6 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "hud_pages.h"
+#include "hud_scan.h"
+#include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
 // The Arduino core SPIClass would not apply a >~10 MHz clock on the C5 and
@@ -78,8 +80,8 @@ static bool lcd_init() {
   esp_lcd_panel_reset(s_panel);
   esp_lcd_panel_init(s_panel);
   esp_lcd_panel_invert_color(s_panel, false);   // this panel wants inversion OFF (matches vendor)
-  esp_lcd_panel_swap_xy(s_panel, true);          // landscape 320x240
-  esp_lcd_panel_mirror(s_panel, false, true);    // = Arduino_GFX rotation 3 (the orientation that fit)
+  esp_lcd_panel_swap_xy(s_panel, false);         // portrait 240x320 (ST7789 native, no axis swap)
+  esp_lcd_panel_mirror(s_panel, false, false);   // provisional -- adjust after eyeballing orientation
   esp_lcd_panel_disp_on_off(s_panel, true);
   return true;
 }
@@ -104,19 +106,75 @@ static uint16_t xpt(uint8_t cmd) {
   spi_device_polling_transmit(s_touch, &t);
   return (uint16_t)(((rx[1] << 8) | rx[2]) >> 3);   // 12-bit
 }
-// true if pressed; fills mapped screen coords (and raw for calibration).
-static bool touch_read(int* sx, int* sy, uint16_t* rx, uint16_t* ry, uint16_t* zz) {
-  uint16_t z1 = xpt(0xB0);
-  *zz = z1;
-  if (z1 < 400) return false;                        // threshold -- tune if needed
-  uint16_t rawx = xpt(0xD0), rawy = xpt(0x90);
-  *rx = rawx; *ry = rawy;
-  // vendor cal: X 185..3700 -> 0..W, Y 250..3800 -> 0..H. Orientation TBD (calibrate by taps).
-  long x = (long)(rawx - 185) * (HUD_W - 1) / (3700 - 185);
-  long y = (long)(rawy - 250) * (HUD_H - 1) / (3800 - 250);
-  *sx = (int)(x < 0 ? 0 : x > HUD_W - 1 ? HUD_W - 1 : x);
-  *sy = (int)(y < 0 ? 0 : y > HUD_H - 1 ? HUD_H - 1 : y);
-  return true;
+
+// ---- guided touch calibration (on-screen targets, saved to flash) ----
+// Portrait axes line up: screen-x tracks raw X, screen-y tracks raw Y. We fit
+// sx = ax*rawX + bx and sy = ay*rawY + by from taps on 5 drawn targets, then
+// store the coefficients in NVS so the cal survives reboots (no reflash to keep it).
+static Preferences s_prefs;
+static float s_ax = 1, s_bx = 0, s_ay = 1, s_by = 0;
+static bool  s_cal_valid = false;
+
+static bool s_cal_mode = false;
+static int  s_cal_idx  = 0;
+#define CAL_N 5
+static const int s_cal_tx[CAL_N] = { 28, HUD_W - 28, 28, HUD_W - 28, HUD_W / 2 };
+static const int s_cal_ty[CAL_N] = { 54, 54, HUD_H - 60, HUD_H - 60, HUD_H / 2 };
+static uint16_t s_cal_rx[CAL_N], s_cal_ry[CAL_N];
+
+static void cal_load() {
+  s_prefs.begin("hudcal", true);
+  s_cal_valid = s_prefs.getBool("valid", false);
+  if (s_cal_valid) {
+    s_ax = s_prefs.getFloat("ax", 1); s_bx = s_prefs.getFloat("bx", 0);
+    s_ay = s_prefs.getFloat("ay", 1); s_by = s_prefs.getFloat("by", 0);
+  }
+  s_prefs.end();
+}
+static void cal_save() {
+  s_prefs.begin("hudcal", false);
+  s_prefs.putBool("valid", true);
+  s_prefs.putFloat("ax", s_ax); s_prefs.putFloat("bx", s_bx);
+  s_prefs.putFloat("ay", s_ay); s_prefs.putFloat("by", s_by);
+  s_prefs.end();
+}
+// Least-squares linear fit of screen target vs raw reading, each axis.
+static void cal_compute() {
+  double sX = 0, sRX = 0, sRX2 = 0, sXRX = 0;
+  double sY = 0, sRY = 0, sRY2 = 0, sYRY = 0;
+  for (int i = 0; i < CAL_N; i++) {
+    double rx = s_cal_rx[i], tx = s_cal_tx[i];
+    sX += tx; sRX += rx; sRX2 += rx * rx; sXRX += tx * rx;
+    double ry = s_cal_ry[i], ty = s_cal_ty[i];
+    sY += ty; sRY += ry; sRY2 += ry * ry; sYRY += ty * ry;
+  }
+  double n = CAL_N;
+  double denX = n * sRX2 - sRX * sRX, denY = n * sRY2 - sRY * sRY;
+  if (denX != 0) { s_ax = (n * sXRX - sRX * sX) / denX; s_bx = (sX - s_ax * sRX) / n; }
+  if (denY != 0) { s_ay = (n * sYRY - sRY * sY) / denY; s_by = (sY - s_ay * sRY) / n; }
+  s_cal_valid = true;
+}
+// Draw the current calibration target + prompt, then present.
+static void cal_draw() {
+  hud_clear(HUD_C_BG);
+  int tx = s_cal_tx[s_cal_idx], ty = s_cal_ty[s_cal_idx];
+  hud_ring(tx, ty, 11, HUD_C_AMBER); hud_ring(tx, ty, 4, HUD_C_AMBER);
+  hud_line(tx - 15, ty, tx + 15, ty, HUD_C_RED); hud_line(tx, ty - 15, tx, ty + 15, HUD_C_RED);
+  hud_text(18, 30, "TOUCH CALIBRATION", 1, HUD_C_WHITE);
+  char m[32]; snprintf(m, sizeof(m), "TAP TARGET %d/%d", s_cal_idx + 1, CAL_N);
+  hud_text(18, 46, m, 1, HUD_C_CYAN);
+  hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);
+}
+// Record one tap at the current target, advance, finish + save after the last.
+static void cal_capture(uint16_t rx, uint16_t ry) {
+  s_cal_rx[s_cal_idx] = rx; s_cal_ry[s_cal_idx] = ry;
+  if (Serial.availableForWrite() > 48) Serial.printf("CAL %d raw x=%u y=%u\n", s_cal_idx, rx, ry);
+  s_cal_idx++;
+  if (s_cal_idx >= CAL_N) {
+    cal_compute(); cal_save(); s_cal_mode = false;
+    if (Serial.availableForWrite() > 48)
+      Serial.printf("CAL DONE ax=%.4f bx=%.1f ay=%.4f by=%.1f\n", s_ax, s_bx, s_ay, s_by);
+  }
 }
 
 void setup() {
@@ -134,39 +192,70 @@ void setup() {
   if (!hud_init()) {
     Serial.println("HUD: framebuffer alloc failed - PSRAM/DMA RAM?");
   }
-  Serial.println("HUD V1 core up (esp_lcd).");
+  hud_scan_begin();                 // bring up WiFi for live scanning
+
+  cal_load();                       // load saved touch calibration if any
+  bool held = (xpt(0xC0) < 3900);   // finger on the glass at boot -> force re-calibration
+  if (!s_cal_valid || held) { s_cal_mode = true; s_cal_idx = 0; }
+  Serial.printf("HUD up (esp_lcd). cal_valid=%d cal_mode=%d\n", s_cal_valid, s_cal_mode);
 }
 
 // Read the touch and, if pressed, map to screen coords. true = pressed.
-// 5-point calibration (2026-10-08): in landscape the touch axes are swapped AND
-// inverted -- screen_x from raw Y, screen_y from raw X.
+// PORTRAIT map (provisional) -- to be fixed from the corner-tap raw dump below.
+// The raw X/Y are exposed so the loop can print them for calibration.
+static uint16_t g_rawX = 0, g_rawY = 0;
 static bool touch_now(int* sx, int* sy) {
   if (xpt(0xC0) >= 3900) return false;             // z2 drops from ~4080 when pressed
   uint16_t rawX = xpt(0xD0), rawY = xpt(0x90);
-  long x = (long)(3807 - rawY) * HUD_W / 3612;
-  long y = (long)(3873 - rawX) * HUD_H / 3622;
+  g_rawX = rawX; g_rawY = rawY;
+  long x, y;
+  if (s_cal_valid) {                               // saved 5-point calibration
+    x = (long)(s_ax * rawX + s_bx);
+    y = (long)(s_ay * rawY + s_by);
+  } else {                                         // provisional portrait fallback
+    x = (long)(3873 - rawX) * HUD_W / 3622;
+    y = (long)(3807 - rawY) * HUD_H / 3612;
+  }
   *sx = (int)(x < 0 ? 0 : x > HUD_W - 1 ? HUD_W - 1 : x);
   *sy = (int)(y < 0 ? 0 : y > HUD_H - 1 ? HUD_H - 1 : y);
   return true;
 }
 
 void loop() {
+  // Guided touch calibration takes over the screen until all targets are tapped.
+  if (s_cal_mode) {
+    static bool calWas = false;
+    bool pressed = (xpt(0xC0) < 3900);
+    if (pressed && !calWas) {
+      uint16_t rx = xpt(0xD0), ry = xpt(0x90);
+      cal_capture(rx, ry);
+    }
+    calWas = pressed;
+    if (s_cal_mode) cal_draw();
+    return;
+  }
+
   int sx, sy;
   bool down = touch_now(&sx, &sy);
   static bool wasDown = false;
   if (down) {
     hud_set_touch(sx, sy);                         // marker for feedback
-    if (!wasDown) hud_on_touch(sx, sy);            // act once per fresh press
+    if (!wasDown) {
+      hud_on_touch(sx, sy);                        // act once per fresh press
+      if (Serial.availableForWrite() > 48)         // calibration dump: raw at each tap
+        Serial.printf("TOUCH raw x=%u y=%u -> sx=%d sy=%d\n", g_rawX, g_rawY, sx, sy);
+    }
   } else {
     hud_set_touch(-1, -1);
   }
   wasDown = down;
 
+  hud_scan_tick(millis());    // drive the async WiFi scan (non-blocking)
   hud_tick(millis());
 
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
     t = millis();
-    Serial.printf("FPS ~%u disp=%d\n", hud_fps_x10() / 10, s_dispOk);
+    Serial.printf("FPS ~%u disp=%d wifi=%d\n", hud_fps_x10() / 10, s_dispOk, hud_scan_count());
   }
 }

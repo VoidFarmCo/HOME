@@ -23,8 +23,8 @@ def main():
        "spi_bus_add_device" in INO and re.search(r"#define\s+TOUCH_CS\s+1\b", INO) is not None)
     ok("touch is read + mapped", "touch_now" in INO and "3807 - rawY" in INO and "3873 - rawX" in INO)
     ok("a fresh press routes to hud_on_touch", "hud_on_touch(" in INO)
-    ok("hud_on_touch switches page by tab (top strip)",
-       re.search(r"void hud_on_touch\([^)]*\)\s*\{.*?TOP_H.*?hud_mode_set\(", PG, re.S) is not None)
+    ok("hud_on_touch switches page by tab (bottom strip)",
+       re.search(r"void hud_on_touch\([^)]*\)\s*\{.*?TAB_H.*?hud_mode_set\(", PG, re.S) is not None)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
