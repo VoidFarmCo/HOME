@@ -8,6 +8,8 @@
 #include "hud_pages.h"
 #include "hud_scan.h"
 #include "hud_gps.h"
+#include "hud_sd.h"
+#include "hud_comms.h"
 #include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
@@ -199,7 +201,11 @@ void setup() {
   }
   hud_draw_splash();                // HEADS OF MY ENEMIES logo (animated; self-timed)
   hud_scan_begin();                 // bring up WiFi for live scanning
+  hud_comms_begin();                // ESP-NOW team chat (shares the WiFi radio)
   hud_gps_begin();                  // NEO-7M GPS on UART (RX4/TX5), when wired
+
+  bool sd = hud_sd_begin();         // microSD on the shared SPI bus (CS 10)
+  Serial.printf("SD ok=%d size=%luMB files=%d\n", sd, (unsigned long)hud_sd_size_mb(), hud_sd_root_count());
 
   cal_load();                       // load saved touch calibration if any
   bool held = (xpt(0xC0) < 3900);   // finger on the glass at boot -> force re-calibration
@@ -261,13 +267,23 @@ void loop() {
   }
   wasDown = down;
 
-  hud_scan_tick(millis());    // drive the async WiFi scan (non-blocking)
+  // One radio: on the COMMS page the ESP-NOW chat owns it (scanner paused); elsewhere
+  // the WiFi scanner runs. Lock the channel once on entering COMMS.
+  static int lastMode = -1;
+  int m = hud_mode_get();
+  if (m == M_COMMS) {
+    if (lastMode != M_COMMS) hud_comms_enter();
+  } else {
+    hud_scan_tick(millis());  // drive the async WiFi scan (non-blocking)
+  }
+  lastMode = m;
+
   hud_gps_tick();             // drain the GPS UART (non-blocking)
   hud_tick(millis());
 
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
     t = millis();
-    Serial.printf("FPS ~%u wifi=%d GPS rx=%lu sat=%d fix=%d\n", hud_fps_x10() / 10, hud_scan_wifi_count(), (unsigned long)hud_gps_rxbytes(), hud_gps().sats, hud_gps().valid);
+    Serial.printf("FPS ~%u wifi=%d GPS sat=%d fix=%d SD ok=%d %luMB err=%s\n", hud_fps_x10() / 10, hud_scan_wifi_count(), hud_gps().sats, hud_gps().valid, hud_sd_ok(), (unsigned long)hud_sd_size_mb(), hud_sd_err());
   }
 }

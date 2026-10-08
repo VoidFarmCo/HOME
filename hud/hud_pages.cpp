@@ -2,6 +2,7 @@
 #include "hud_core.h"
 #include "hud_scan.h"
 #include "hud_gps.h"
+#include "hud_comms.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
@@ -70,6 +71,10 @@ static bool s_settings = false;
 static int  s_band = 0;              // band filter: 0 = ALL, 1 = 2.4 GHz, 2 = 5 GHz
 static bool s_detail = false;        // network info view open
 static int  s_detail_ci = -1;        // which contact index it shows
+// COMMS composer
+static bool s_kb = false;            // keyboard expanded (vs the collapsed quick-strip)
+static char s_compose[CHAT_TEXT_MAX + 1] = {0};
+static int  s_qmpage = 0;            // quick-message page in the collapsed strip (4/page)
 #define GEAR_X    (HUD_W - 13)
 #define GEAR_Y    (STAT_H / 2)
 #define SET_BTN_X 20
@@ -312,19 +317,116 @@ static void page_map(uint32_t now) {
 }
 
 // ---- COMMS (chat placeholder) ----
-static void page_comms(uint32_t now) {
-  static const char* msgs[4] = {"OVERWATCH: HOLD", "YOU: COPY", "ALPHA: MOVING E", "YOU: ON IT"};
-  int y = CONTENT_Y + 4;
-  for (int i = 0; i < 4; i++) {
-    bool me = (i % 2) == 1;
-    int tw = hud_text_w(msgs[i], 1);
-    int x = me ? (HUD_W - 12 - tw) : 12;
-    hud_fill_rect(x - 3, y - 2, tw + 6, 12, me ? HUD_C_DGREEN : HUD_C_STRIP);
-    hud_text(x, y, msgs[i], 1, me ? HUD_C_GREEN : HUD_C_AMBER);
-    y += 18;
+// ---- COMMS composer: a collapsible on-screen keyboard; when collapsed, a scrollable
+// strip of canned quick-messages. Free text (and later net passphrases) via the keyboard.
+#define KB_KEYH 19
+static const char* const KB_ROWS[] = { "1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM" };
+#define KB_NROWS 4
+// collapsed quick-message area: a 2x2 grid (4 per page) + a nav row; 2 pages for 8 msgs
+#define CHIP_ROWS 2
+#define CHIP_COLS 2
+#define CHIP_PP   (CHIP_ROWS * CHIP_COLS)
+#define CHIP_H    24
+#define NAV_H     20
+static int kb_top()    { return CONTENT_B - (KB_NROWS + 1) * KB_KEYH; }  // +1 = special row
+static int nav_y()     { return CONTENT_B - NAV_H; }
+static int strip_top() { return nav_y() - CHIP_ROWS * CHIP_H; }
+static int qm_pages()  { int n = hud_quickmsg_count(); return (n + CHIP_PP - 1) / CHIP_PP; }
+// collapsed-strip zones
+#define STRIP_L  (-3)
+#define STRIP_R  (-2)
+#define STRIP_KB (-4)
+#define STRIP_NONE (-99)
+
+static char kb_hit(int x, int y) {
+  int top = kb_top();
+  if (y < top) return 0;
+  int row = (y - top) / KB_KEYH;
+  if (row < KB_NROWS) {
+    const char* r = KB_ROWS[row]; int L = (int)strlen(r);
+    int x0 = (HUD_W - L * 24) / 2;
+    if (x < x0) return 0;
+    int i = (x - x0) / 24;
+    if (i < 0 || i >= L) return 0;
+    return r[i];
   }
-  if ((now / 500) & 1) hud_fill_rect(12, y + 2, 6, 10, HUD_C_AMBER);     // blinking cursor
-  hud_text(8, FOOT_Y, "COMMS  ONLINE", 1, HUD_C_AMBER);
+  int i = x / 60;                        // special row: SPC / DEL / SEND / collapse
+  if (i == 0) return ' ';
+  if (i == 1) return '\b';
+  if (i == 2) return '\n';
+  return 0x1B;
+}
+static int strip_hit(int x, int y) {
+  if (y < strip_top()) return STRIP_NONE;
+  if (y >= nav_y()) {                       // nav row
+    if (x < 56) return STRIP_L;             // prev page
+    if (x < 112) return STRIP_R;            // next page
+    if (x >= 184) return STRIP_KB;          // open keyboard
+    return STRIP_NONE;
+  }
+  int col = (x < 118) ? 0 : (x >= 122 ? 1 : -1);
+  if (col < 0) return STRIP_NONE;
+  int row = (y - strip_top()) / CHIP_H;
+  int idx = s_qmpage * CHIP_PP + row * CHIP_COLS + col;
+  return (idx < hud_quickmsg_count()) ? idx : STRIP_NONE;
+}
+
+static void draw_kb() {
+  int top = kb_top();
+  char cl[64]; snprintf(cl, sizeof(cl), ">%s", s_compose);     // compose line
+  hud_text(6, top - 13, cl, 1, HUD_C_WHITE);
+  for (int row = 0; row < KB_NROWS; row++) {
+    const char* r = KB_ROWS[row]; int L = (int)strlen(r); int x0 = (HUD_W - L * 24) / 2;
+    int y = top + row * KB_KEYH;
+    for (int i = 0; i < L; i++) {
+      int kx = x0 + i * 24; hud_rect(kx, y, 23, KB_KEYH - 1, HUD_C_GREY);
+      char s[2] = { r[i], 0 }; hud_text(kx + 8, y + (KB_KEYH - 7) / 2, s, 1, HUD_C_WHITE);
+    }
+  }
+  int y = top + KB_NROWS * KB_KEYH;
+  const char* lab[4] = { "SPC", "DEL", "SEND", "v" };
+  uint16_t col[4] = { HUD_C_GREY, HUD_C_AMBER, HUD_C_GREEN, HUD_C_CYAN };
+  for (int i = 0; i < 4; i++) {
+    int bx = i * 60; hud_rect(bx, y, 59, KB_KEYH - 1, col[i]);
+    hud_text(bx + (60 - hud_text_w(lab[i], 1)) / 2, y + (KB_KEYH - 7) / 2, lab[i], 1, col[i]);
+  }
+}
+static void draw_strip() {
+  int top = strip_top();
+  for (int i = 0; i < CHIP_PP; i++) {
+    int idx = s_qmpage * CHIP_PP + i;
+    if (idx >= hud_quickmsg_count()) break;
+    int col = i % CHIP_COLS, row = i / CHIP_COLS;
+    int bx = 4 + col * 118, by = top + row * CHIP_H;
+    hud_rect(bx, by, 114, CHIP_H - 2, HUD_C_AMBER);
+    const char* t = HUD_QUICKMSG[idx];
+    hud_text(bx + (114 - hud_text_w(t, 1)) / 2, by + (CHIP_H - 2 - 7) / 2, t, 1, HUD_C_AMBER);
+  }
+  int ny = nav_y();
+  hud_rect(0,  ny, 54, NAV_H, HUD_C_GREY);  hud_text(24, ny + (NAV_H - 7) / 2, "<", 1, HUD_C_WHITE);
+  hud_rect(58, ny, 54, NAV_H, HUD_C_GREY);  hud_text(82, ny + (NAV_H - 7) / 2, ">", 1, HUD_C_WHITE);
+  char pg[24]; snprintf(pg, sizeof(pg), "P%d/%d", s_qmpage + 1, qm_pages());
+  hud_text(120, ny + (NAV_H - 7) / 2, pg, 1, HUD_C_GREY);
+  hud_rect(184, ny, 55, NAV_H, HUD_C_CYAN);
+  hud_text(184 + (55 - hud_text_w("KEYBD", 1)) / 2, ny + (NAV_H - 7) / 2, "KEYBD", 1, HUD_C_CYAN);
+}
+
+static void page_comms(uint32_t now) {
+  (void)now;
+  int bottom = s_kb ? kb_top() - 14 : strip_top();
+  const ChatMsg* L = hud_comms_log();
+  int n = hud_comms_count();
+  int rowsFit = (bottom - CONTENT_Y - 4) / 14; if (rowsFit < 1) rowsFit = 1;
+  int start = n > rowsFit ? n - rowsFit : 0;
+  int y = CONTENT_Y + 4;
+  if (n == 0) hud_text(8, y, "NO TRAFFIC", 1, HUD_C_GREY);
+  for (int i = start; i < n; i++) {
+    char line[60];
+    snprintf(line, sizeof(line), "%s: %s", L[i].me ? "ME" : L[i].from, L[i].text);
+    hud_text(6, y, line, 1, L[i].me ? HUD_C_GREEN : HUD_C_AMBER);
+    y += 14;
+  }
+  if (s_kb) draw_kb(); else draw_strip();
 }
 
 // ---- ENGAGE (targeting) ----
@@ -461,6 +563,20 @@ void hud_on_press(int x, int y) {
     else {                                     // centre = ENTER: open the info view
       int i = vis_index(s_sel);
       if (i >= 0) { s_detail_ci = i; s_detail = true; }
+    }
+  } else if (hud_mode_get() == M_COMMS) {
+    if (s_kb) {                                 // keyboard open: keys compose/send
+      char k = kb_hit(x, y);
+      if (k == 0x1B) s_kb = false;              // collapse
+      else if (k == '\n') { if (s_compose[0]) { hud_comms_send(s_compose); s_compose[0] = 0; } }
+      else if (k == '\b') { int l = (int)strlen(s_compose); if (l > 0) s_compose[l - 1] = 0; }
+      else if (k >= ' ')  { int l = (int)strlen(s_compose); if (l < CHAT_TEXT_MAX) { s_compose[l] = k; s_compose[l + 1] = 0; } }
+    } else {                                    // collapsed strip: arrows / chips / keyboard
+      int z = strip_hit(x, y);
+      if (z == STRIP_KB) s_kb = true;
+      else if (z == STRIP_L) { if (s_qmpage > 0) s_qmpage--; }
+      else if (z == STRIP_R) { if (s_qmpage < qm_pages() - 1) s_qmpage++; }
+      else if (z >= 0) hud_comms_send(HUD_QUICKMSG[z]);
     }
   }
 }
