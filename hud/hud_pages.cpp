@@ -3,13 +3,15 @@
 #include "hud_scan.h"
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
-// Map a WiFi/BLE RSSI (dBm, ~-30 near .. ~-95 far) to 0..1 (1 = strongest).
+// Map a signal RSSI (dBm, ~-30 near .. ~-95 far) to 0..1 (1 = strongest).
 static float rssi_unit(int8_t rssi) {
   float u = (rssi + 95) / 60.0f;          // -95 -> 0, -35 -> 1
   return u < 0 ? 0 : u > 1 ? 1 : u;
 }
-// A stable angle per contact so each one keeps its spot on the radar frame to frame.
+// Interim blip placement angle (NOT a real bearing -- true bearing needs the DF
+// antenna + compass; this just spreads contacts so the scope isn't a single dot).
 static float name_angle(const char* s) {
   uint32_t h = 2166136261u;
   for (const char* p = s; *p; p++) { h ^= (uint8_t)*p; h *= 16777619u; }
@@ -93,7 +95,9 @@ static void draw_chrome(int mode) {
   }
 }
 
-// ---- RADAR (live): each WiFi/BLE contact is a blip, strong = near the centre ----
+// ---- RADAR: detection scope for ALL signals, strong = near the centre ----
+// NOTE: blip ANGLE is not a true bearing yet -- real direction (blips at their
+// actual bearing, the scope rotating as you turn) needs the DF antenna + compass.
 static void page_radar(uint32_t now) {
   static float sweep = 0.0f;
   int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2, R = (CONTENT_B - CONTENT_Y) / 2 - 4;
@@ -118,26 +122,49 @@ static void page_radar(uint32_t now) {
   hud_text(8, FOOT_Y, foot, 1, HUD_C_GREEN);
 }
 
-// ---- SCAN (live): the real contact list, strongest first ----
+// ---- SCAN list cursor (highlighted row) + scroll window ----
+static int s_sel = 0, s_scroll = 0;
+#define ROW_H 20
+static int scan_rows() { return (CONTENT_B - CONTENT_Y) / ROW_H; }
+
+// Move the highlighted row by d, keeping it inside the scroll window.
+static void scan_move(int d) {
+  int n = hud_scan_count();
+  if (n <= 0) return;
+  s_sel += d;
+  if (s_sel < 0) s_sel = 0;
+  if (s_sel > n - 1) s_sel = n - 1;
+  int rows = scan_rows();
+  if (s_sel < s_scroll) s_scroll = s_sel;
+  if (s_sel >= s_scroll + rows) s_scroll = s_sel - rows + 1;
+}
+
+// ---- SCAN (live): the real contact list, strongest first; cursor + scroll ----
 static void page_scan(uint32_t now) {
   (void)now;
   const Contact* c = hud_scan_list();
   int n = hud_scan_count();
-  int rows = (CONTENT_B - CONTENT_Y) / 20;          // how many fit in the band
-  if (n > rows) n = rows;
+  if (s_sel > n - 1) s_sel = n > 0 ? n - 1 : 0;      // clamp as the list changes
+  int rows = scan_rows();
+  if (s_scroll > n - rows) s_scroll = n - rows > 0 ? n - rows : 0;
 
-  if (hud_scan_count() == 0) {
-    hud_text(8, CONTENT_Y + 8, "SCANNING...", 1, HUD_C_CYAN);
+  if (n == 0) hud_text(8, CONTENT_Y + 8, "SCANNING...", 1, HUD_C_CYAN);
+
+  for (int r = 0; r < rows; r++) {
+    int i = s_scroll + r;
+    if (i >= n) break;
+    int y = CONTENT_Y + 2 + r * ROW_H;
+    bool cur = (i == s_sel);
+    bool tgt = hud_scan_has_target() && !strcmp(c[i].name, hud_scan_target_name());
+    if (cur) hud_fill_rect(0, y - 1, HUD_W, ROW_H - 2, HUD_C_STRIP);  // highlight the cursor row
+    hud_num(6, y + 1, c[i].rssi < 0 ? -c[i].rssi : c[i].rssi, 1, HUD_C_GREY);  // |dBm|
+    hud_text(32, y + 2, c[i].name, 1, tgt ? HUD_C_RED : HUD_C_WHITE);
+    int bar = (int)(rssi_unit(c[i].rssi) * 70);      // 0..70 px signal bar
+    hud_fill_rect(HUD_W - 8 - bar, y + 2, bar, 8, cur ? HUD_C_CYAN : HUD_C_DGREEN);
   }
-  int y = CONTENT_Y + 2;
-  for (int i = 0; i < n; i++) {
-    hud_num(8, y + 1, c[i].rssi < 0 ? -c[i].rssi : c[i].rssi, 1, HUD_C_GREY);  // |dBm|
-    hud_text(34, y + 2, c[i].name, 1, HUD_C_WHITE);
-    int bar = (int)(rssi_unit(c[i].rssi) * 90);     // 0..90 px signal bar
-    hud_fill_rect(HUD_W - 10 - bar, y + 2, bar, 8, (i == 0) ? HUD_C_CYAN : HUD_C_DGREEN);
-    y += 20;
-  }
-  char foot[32]; snprintf(foot, sizeof(foot), "SCANNING  %d SEEN", hud_scan_count());
+  // scroll-position hint: which block of the list is showing
+  char foot[48];
+  snprintf(foot, sizeof(foot), "%d/%d  UP/ENTER/DN", n ? s_sel + 1 : 0, n);
   hud_text(8, FOOT_Y, foot, 1, HUD_C_CYAN);
 }
 
@@ -205,9 +232,34 @@ void hud_page_draw(int mode, uint32_t now) {
   draw_chrome(mode);   // chrome last so tabs/strips sit on top of content
 }
 
-void hud_on_touch(int x, int y) {
-  if (y >= HUD_H - TAB_H) {                   // tapped the BOTTOM tab strip
+// Which scan zone is y in? -1 = scroll up, +1 = scroll down, 0 = centre/enter.
+static int scan_zone(int y) {
+  int band = CONTENT_B - CONTENT_Y;
+  if (y < CONTENT_Y + band / 3) return -1;
+  if (y > CONTENT_B - band / 3) return +1;
+  return 0;
+}
+
+void hud_on_press(int x, int y) {
+  if (y >= HUD_H - TAB_H) {                   // bottom tab strip = switch page
     int m = x / (HUD_W / M_COUNT);
     if (m >= 0 && m < M_COUNT) { hud_mode_set(m); s_manual = true; }
+    return;
+  }
+  if (hud_mode_get() == M_SCAN) {
+    int z = scan_zone(y);                      // upper = scroll up, lower = scroll down
+    if (z == -1) scan_move(-1);
+    else if (z == +1) scan_move(+1);
+    // centre tap on SCAN is reserved for select-to-track (built with the real radar)
+  }
+}
+
+void hud_on_repeat(int x, int y) {
+  (void)x;
+  if (y >= HUD_H - TAB_H) return;             // tabs/enter don't auto-repeat
+  if (hud_mode_get() == M_SCAN) {
+    int z = scan_zone(y);
+    if (z == -1) scan_move(-1);
+    else if (z == +1) scan_move(+1);
   }
 }

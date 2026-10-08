@@ -21,4 +21,12 @@ const Contact* hud_scan_list();             // the snapshot (<= HUD_SCAN_MAX)
 int            hud_scan_wifi_count();        // how many are wifi (for status)
 int            hud_scan_ble_count();
 
+// ---- fox-hunt target (lock one contact and track its live signal) ----
+void           hud_scan_set_target(const char* name);  // lock this contact as the hunt target
+void           hud_scan_clear_target();
+bool           hud_scan_has_target();
+const char*    hud_scan_target_name();
+int            hud_scan_target_rssi();       // live RSSI of the target (dBm), or -127 if lost
+bool           hud_scan_target_seen();       // was the target in the latest scan?
+
 #define HUD_SCAN_MAX 24

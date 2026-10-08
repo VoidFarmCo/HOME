@@ -238,12 +238,16 @@ void loop() {
   int sx, sy;
   bool down = touch_now(&sx, &sy);
   static bool wasDown = false;
+  static uint32_t lastRepeat = 0;
   if (down) {
     hud_set_touch(sx, sy);                         // marker for feedback
+    uint32_t nowMs = millis();
     if (!wasDown) {
-      hud_on_touch(sx, sy);                        // act once per fresh press
-      if (Serial.availableForWrite() > 48)         // calibration dump: raw at each tap
-        Serial.printf("TOUCH raw x=%u y=%u -> sx=%d sy=%d\n", g_rawX, g_rawY, sx, sy);
+      hud_on_press(sx, sy);                        // fresh press: tab / enter / one scroll step
+      lastRepeat = nowMs;
+    } else if (nowMs - lastRepeat > 160) {         // held: auto-repeat the scroll zones
+      hud_on_repeat(sx, sy);
+      lastRepeat = nowMs;
     }
   } else {
     hud_set_touch(-1, -1);

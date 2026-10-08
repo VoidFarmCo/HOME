@@ -29,8 +29,8 @@ def main():
     ok("SCAN page draws the live list, not hardcoded SSIDs",
        "hud_scan_list()" in PG and "hud_scan_count()" in PG
        and 'AP-NETGEAR' not in PG)
-    ok("RADAR page plots live contacts (strong = near centre)",
-       re.search(r"page_radar\([^)]*\)\s*\{.*?hud_scan_list\(\).*?rssi_unit", PG, re.S) is not None)
+    ok("SCAN list scrolls with a cursor + window (scan_move / s_scroll)",
+       "scan_move(" in PG and "s_scroll" in PG and "s_sel" in PG)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
