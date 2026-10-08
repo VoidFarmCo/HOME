@@ -14,3 +14,8 @@ void hud_mode_auto(uint32_t now_ms);
 
 // Draw the given page (chrome + content) into the framebuffer for this frame.
 void hud_page_draw(int mode, uint32_t now_ms);
+
+// A tap at screen (x,y): if it lands on a top tab, switch to that page and take
+// over from the auto-cycle.
+void hud_on_touch(int x, int y);
+

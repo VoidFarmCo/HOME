@@ -10,6 +10,9 @@ static uint16_t* s_fb      = nullptr;
 static uint16_t  s_fps_x10 = 0;
 static uint32_t  s_frames  = 0;
 static uint32_t  s_fps_t0  = 0;
+static int       s_touch_x = -1, s_touch_y = -1;
+
+void hud_set_touch(int x, int y) { s_touch_x = x; s_touch_y = y; }
 
 // Weak default so the firmware links before the display seam is written.
 void __attribute__((weak)) hud_present_fb(const uint16_t*, int, int) {}
@@ -136,6 +139,9 @@ void hud_tick(uint32_t now) {
   // FPS in the bottom-right status bar (out of the way of the top tabs).
   hud_text(HUD_W - 70, HUD_H - 16, "FPS", 1, HUD_C_GREY);
   hud_num(HUD_W - 42, HUD_H - 19, s_fps_x10 / 10, 2, HUD_C_GREEN);
+
+  // touch marker (feedback) wherever the user is pressing
+  if (s_touch_y >= 0) { hud_disc(s_touch_x, s_touch_y, 4, HUD_C_WHITE); hud_ring(s_touch_x, s_touch_y, 7, HUD_C_WHITE); }
 
   hud_present_fb(s_fb, HUD_W, HUD_H);       // the one seam
 

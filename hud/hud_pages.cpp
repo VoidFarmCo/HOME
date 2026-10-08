@@ -28,8 +28,11 @@ uint16_t hud_mode_accent(int m) {
   }
 }
 
-// Temporary auto-cycle (every 4 s) so all pages can be seen before touch exists.
+static bool s_manual = false;   // once the user taps a tab, stop auto-cycling
+
+// Auto-cycle (every 4 s) so all pages can be seen -- until the user takes over.
 void hud_mode_auto(uint32_t now) {
+  if (s_manual) return;
   static uint32_t last = 0;
   if (last == 0) last = now;
   if (now - last >= 4000) { s_mode = (s_mode + 1) % M_COUNT; last = now; }
@@ -166,4 +169,11 @@ void hud_page_draw(int mode, uint32_t now) {
     default: break;
   }
   draw_chrome(mode);   // chrome last so tabs/strips sit on top of content
+}
+
+void hud_on_touch(int x, int y) {
+  if (y >= 0 && y < TOP_H) {                 // tapped the top tab strip
+    int m = x / (HUD_W / M_COUNT);
+    if (m >= 0 && m < M_COUNT) { hud_mode_set(m); s_manual = true; }
+  }
 }

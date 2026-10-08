@@ -54,5 +54,9 @@ void hud_num(int x, int y, uint32_t v, int scale, uint16_t c);
 int  hud_text(int x, int y, const char* s, int scale, uint16_t c);
 int  hud_text_w(const char* s, int scale);
 
+// Set the current touch point (screen coords) so hud_tick draws a marker there;
+// pass y < 0 for "not touched".
+void hud_set_touch(int x, int y);
+
 // ---- integration seam (implemented once in the sketch) ----
 void hud_present_fb(const uint16_t* fb, int w, int h);
