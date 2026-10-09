@@ -848,13 +848,55 @@ static void draw_files() {
     char sz[12]; fm_size_str(s_fmSize[idx], sz, sizeof(sz));
     hud_text(HUD_W - hud_text_w(sz, 1) - 6, y + 2, sz, 1, HUD_C_GREY);
   }
-  // DELETE (left) + CLOSE (right)
-  int bw = HUD_W / 2;
-  hud_rect(2, FM_BTN_Y, bw - 4, 18, s_fmN ? HUD_C_RED : HUD_C_GREY);
-  const char* del = s_fmConfirm ? "CONFIRM DELETE" : "DELETE";
-  hud_text(bw / 2 - hud_text_w(del, 1) / 2, FM_BTN_Y + 6, del, 1, s_fmN ? HUD_C_RED : HUD_C_GREY);
-  hud_rect(bw + 2, FM_BTN_Y, bw - 4, 18, HUD_C_CYAN);
-  hud_text(bw + bw / 2 - hud_text_w("CLOSE", 1) / 2, FM_BTN_Y + 6, "CLOSE", 1, HUD_C_CYAN);
+  // VIEW | DELETE | CLOSE (three columns)
+  int bw = HUD_W / 3;
+  uint16_t vc = s_fmN ? HUD_C_CYAN : HUD_C_GREY;
+  hud_rect(2, FM_BTN_Y, bw - 4, 18, vc);
+  hud_text(bw / 2 - hud_text_w("VIEW", 1) / 2, FM_BTN_Y + 6, "VIEW", 1, vc);
+  uint16_t dc = s_fmN ? HUD_C_RED : HUD_C_GREY;
+  const char* del = s_fmConfirm ? "CONFIRM" : "DELETE";
+  hud_rect(bw + 2, FM_BTN_Y, bw - 4, 18, dc);
+  hud_text(bw + bw / 2 - hud_text_w(del, 1) / 2, FM_BTN_Y + 6, del, 1, dc);
+  hud_rect(2 * bw + 2, FM_BTN_Y, bw - 4, 18, HUD_C_CYAN);
+  hud_text(2 * bw + bw / 2 - hud_text_w("CLOSE", 1) / 2, FM_BTN_Y + 6, "CLOSE", 1, HUD_C_CYAN);
+}
+
+// ---- LOG / FILE VIEWER (shows the recent end of a file so you can decide before delete) ----
+#define VIEW_BUF   4096
+#define VIEW_LINES 220
+static bool  s_view = false;
+static char  s_vbuf[VIEW_BUF];
+static char* s_vline[VIEW_LINES];
+static int   s_vlines = 0, s_vscroll = 0;
+
+static void view_open(const char* name) {
+  s_vlines = 0; s_vscroll = 0;
+  int n = hud_sd_read_tail(name, s_vbuf, VIEW_BUF);
+  if (n <= 0) return;
+  int start = 0;
+  if (n >= VIEW_BUF - 1)                              // tail may start mid-line: skip to the next newline
+    for (int i = 0; i < n; i++) if (s_vbuf[i] == '\n') { start = i + 1; break; }
+  bool fresh = true;
+  for (int i = start; i < n && s_vlines < VIEW_LINES; i++) {
+    if (fresh) { s_vline[s_vlines++] = &s_vbuf[i]; fresh = false; }
+    if (s_vbuf[i] == '\n' || s_vbuf[i] == '\r') { s_vbuf[i] = 0; fresh = true; }
+  }
+}
+
+static void draw_view() {
+  hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
+  hud_text(6, CONTENT_Y + 4, s_fmName[s_fmSel], 1, HUD_C_WHITE);
+  char pos[16]; snprintf(pos, sizeof(pos), "%d/%d", s_vscroll + 1, s_vlines);
+  hud_text(HUD_W - hud_text_w(pos, 1) - 6, CONTENT_Y + 4, pos, 1, HUD_C_GREY);
+  int y0 = CONTENT_Y + 16, rh = 10;
+  int rows = (CONTENT_B - 14 - y0) / rh;
+  if (s_vlines == 0) hud_text(6, y0, "(empty)", 1, HUD_C_GREY);
+  for (int r = 0; r < rows; r++) {
+    int li = s_vscroll + r;
+    if (li >= s_vlines) break;
+    hud_text(4, y0 + r * rh, s_vline[li], 1, HUD_C_GREEN);
+  }
+  hud_text(cen("TOP/BOT=SCROLL  MID=CLOSE", 1), CONTENT_B - 11, "TOP/BOT=SCROLL  MID=CLOSE", 1, HUD_C_GREY);
 }
 
 // ---- DEVICE INFO + GPS status (modal; tap to close) ----
@@ -887,7 +929,9 @@ static void draw_info() {
 }
 
 void hud_page_draw(int mode, uint32_t now) {
-  if (s_info) {
+  if (s_view) {
+    draw_view();       // log / file viewer (modal)
+  } else if (s_info) {
     draw_info();       // device info + GPS status (modal)
   } else if (s_files) {
     draw_files();      // SD file manager (modal)
@@ -949,13 +993,24 @@ void hud_on_press(int x, int y) {
   // drone alarm is modal: the first tap just acknowledges it
   if (hud_engage_drone_count() > 0 && !s_droneAck) { s_droneAck = true; return; }
 
+  if (s_view) {                                 // log/file viewer modal: top/bot scroll, mid closes
+    int third = (CONTENT_B - CONTENT_Y) / 3;
+    if (y < CONTENT_Y + third) s_vscroll -= 3;
+    else if (y > CONTENT_B - third) s_vscroll += 3;
+    else { s_view = false; return; }
+    if (s_vscroll < 0) s_vscroll = 0;
+    if (s_vscroll >= s_vlines) s_vscroll = s_vlines > 0 ? s_vlines - 1 : 0;
+    return;
+  }
+
   if (s_info) { s_info = false; return; }       // device info modal: any tap closes
 
   if (s_files) {                                // SD file manager modal
     if (!hud_sd_ok()) { s_files = false; return; }
     if (y >= FM_BTN_Y) {
-      int bw = HUD_W / 2;
-      if (x < bw) {                             // DELETE (two-tap confirm)
+      int bw = HUD_W / 3, col = x / bw;         // 0 = VIEW, 1 = DELETE, 2 = CLOSE
+      if (col == 0) { if (s_fmN > 0) { view_open(s_fmName[s_fmSel]); s_view = true; } }
+      else if (col == 1) {                      // DELETE (two-tap confirm)
         if (s_fmN > 0) {
           if (!s_fmConfirm) s_fmConfirm = true;
           else { hud_sd_remove(s_fmName[s_fmSel]); fm_refresh(); }
@@ -1044,7 +1099,15 @@ void hud_on_press(int x, int y) {
 }
 
 void hud_on_repeat(int x, int y) {
-  if (s_settings || s_detail) return;         // no auto-repeat while a panel is open
+  if (s_view) {                                // hold to keep scrolling the viewer
+    int third = (CONTENT_B - CONTENT_Y) / 3;
+    if (y < CONTENT_Y + third) s_vscroll -= 2;
+    else if (y > CONTENT_B - third) s_vscroll += 2;
+    if (s_vscroll < 0) s_vscroll = 0;
+    if (s_vscroll >= s_vlines) s_vscroll = s_vlines > 0 ? s_vlines - 1 : 0;
+    return;
+  }
+  if (s_settings || s_detail || s_files || s_info) return;  // no auto-repeat while a panel is open
   if (y >= HUD_H - TAB_H) return;             // tabs/enter don't auto-repeat
   if (hud_mode_get() == M_SCAN) {
     int z = scan_zone(y);

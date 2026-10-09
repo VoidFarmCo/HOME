@@ -86,6 +86,23 @@ int hud_sd_list(char names[][24], uint32_t* sizes, int maxn) {
 
 bool hud_sd_remove(const char* name) {
   if (!s_ok || !name || !*name) return false;
-  char full[80]; snprintf(full, sizeof(full), "/sd/%s", name);
+  char full[300]; snprintf(full, sizeof(full), "/sd/%s", name);
   return remove(full) == 0;
+}
+
+// Read the LAST (bufsz-1) bytes of a file (the recent end of a log), NUL-terminated.
+int hud_sd_read_tail(const char* name, char* buf, int bufsz) {
+  if (!s_ok || !name || bufsz < 2) return 0;
+  char full[300]; snprintf(full, sizeof(full), "/sd/%s", name);
+  FILE* fp = fopen(full, "rb");
+  if (!fp) return 0;
+  fseek(fp, 0, SEEK_END);
+  long sz = ftell(fp);
+  long want = bufsz - 1;
+  if (fseek(fp, (sz > want) ? sz - want : 0, SEEK_SET) != 0) { fclose(fp); return 0; }
+  int n = (int)fread(buf, 1, bufsz - 1, fp);
+  if (n < 0) n = 0;
+  buf[n] = 0;
+  fclose(fp);
+  return n;
 }

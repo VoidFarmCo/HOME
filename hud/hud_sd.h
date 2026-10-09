@@ -12,3 +12,4 @@ const char* hud_sd_err();       // esp_err name of the last mount attempt
 bool     hud_sd_append(const char* path, const char* line);  // append line + '\n' to /sd/<path>
 int      hud_sd_list(char names[][24], uint32_t* sizes, int maxn);  // list files -> names/sizes, returns count
 bool     hud_sd_remove(const char* name);                    // delete /sd/<name>
+int      hud_sd_read_tail(const char* name, char* buf, int bufsz);  // read the LAST bufsz-1 bytes, NUL-term
