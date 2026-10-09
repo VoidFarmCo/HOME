@@ -6,6 +6,7 @@
 #include "hud_engage.h"
 #include "hud_oui.h"
 #include "hud_sd.h"
+#include "hud_log.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
@@ -91,13 +92,14 @@ static int  s_qmpage = 0;            // quick-message page in the collapsed stri
 #define GEAR_Y    (STAT_H / 2)
 #define SET_BTN_X 20
 #define SET_BTN_W (HUD_W - 40)
-#define SET_BTN_H 26
-#define SET_BTN_Y (CONTENT_Y + 24)                // first row (denser; fits 6 rows)
-#define SET_ROW   (SET_BTN_H + 8)                 // 34 px pitch
-#define SET_BND_Y (SET_BTN_Y + SET_ROW)           // BAND filter
+#define SET_BTN_H 24
+#define SET_BTN_Y (CONTENT_Y + 22)                // first row (denser; fits 7 rows)
+#define SET_ROW   (SET_BTN_H + 8)                 // 32 px pitch
+#define SET_BND_Y (SET_BTN_Y + SET_ROW)           // BAND
 #define SET_STL_Y (SET_BND_Y + SET_ROW)           // NIGHT/STEALTH
 #define SET_BRT_Y (SET_STL_Y + SET_ROW)           // BRIGHTNESS
-#define SET_FIL_Y (SET_BRT_Y + SET_ROW)           // SD FILES
+#define SET_LOG_Y (SET_BRT_Y + SET_ROW)           // LOGGING on/off
+#define SET_FIL_Y (SET_LOG_Y + SET_ROW)           // SD FILES
 #define SET_INF_Y (SET_FIL_Y + SET_ROW)           // DEVICE INFO
 
 // Short tab labels so they're readable at 2x in a 64 px tab.
@@ -184,6 +186,9 @@ static void draw_settings() {
   int bpct = (hud_brightness() * 100 + 127) / 255;
   char br[24]; snprintf(br, sizeof(br), "BRIGHTNESS:  %d%%", bpct);
   set_row(SET_BRT_Y, br, HUD_C_GREEN);
+  bool lg = hud_log_enabled();
+  char ll[24]; snprintf(ll, sizeof(ll), "LOGGING:  %s", lg ? "ON" : "OFF");
+  set_row(SET_LOG_Y, ll, lg ? HUD_C_GREEN : HUD_C_GREY);
   set_row(SET_FIL_Y, hud_sd_ok() ? "SD FILES" : "SD: NO CARD / FORMAT", hud_sd_ok() ? HUD_C_CYAN : HUD_C_AMBER);
   set_row(SET_INF_Y, "DEVICE INFO + GPS", HUD_C_CYAN);
   hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 12, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
@@ -1065,6 +1070,9 @@ void hud_on_press(int x, int y) {
                y >= SET_BRT_Y && y <= SET_BRT_Y + SET_BTN_H) {
       uint8_t c = hud_brightness();           // BRIGHTNESS cycle 100->63->35->16%
       hud_set_brightness(c > 200 ? 160 : c > 120 ? 90 : c > 60 ? 40 : 255);
+    } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+               y >= SET_LOG_Y && y <= SET_LOG_Y + SET_BTN_H) {
+      hud_log_set_enabled(!hud_log_enabled());   // LOGGING on/off (the log button)
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_FIL_Y && y <= SET_FIL_Y + SET_BTN_H) {
       s_files = true; s_settings = false; fm_refresh();   // open SD file manager (works even with no card -> FORMAT)

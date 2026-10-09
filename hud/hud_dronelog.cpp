@@ -2,6 +2,7 @@
 #include "hud_engage.h"
 #include "hud_gps.h"
 #include "hud_sd.h"
+#include "hud_log.h"
 #include <Arduino.h>
 #include <stdio.h>
 #include <string.h>
@@ -25,7 +26,7 @@ static void stamp(char* out, int n) {
 }
 
 void hud_dronelog_tick(uint32_t now) {
-  if (!hud_sd_ok()) return;                 // no card / not FAT32 -> nothing to do
+  if (!hud_log_enabled() || !hud_sd_ok()) return;   // LOG off or no card -> nothing to do
   int dn = hud_engage_drone_count();
   if (dn <= 0) return;                      // only log when a drone is actually present
   if (now - s_last < LOG_INTERVAL) return;

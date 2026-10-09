@@ -24,6 +24,7 @@ static uint8_t  s_netKey[16];
 static uint16_t s_netId = 0;      // 0 = OPEN
 static bool     s_netOpen = true;
 
+static uint32_t s_total = 0;   // monotonic message count (for the logger; the ring itself scrolls)
 static void push(const char* from, const char* text, bool me, bool open) {
   ChatMsg* m;
   if (s_count < COMMS_LOG) { m = &s_log[s_count++]; }
@@ -31,7 +32,9 @@ static void push(const char* from, const char* text, bool me, bool open) {
   strncpy(m->from, from, sizeof(m->from) - 1); m->from[sizeof(m->from) - 1] = 0;
   strncpy(m->text, text, sizeof(m->text) - 1); m->text[sizeof(m->text) - 1] = 0;
   m->me = me; m->open = open;
+  s_total++;
 }
+uint32_t hud_comms_total() { return s_total; }
 
 // H.O.M.E wire frame: [nameLen][name][text].
 static int build_frame(const char* from, const char* text, uint8_t* f) {

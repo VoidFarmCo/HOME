@@ -20,7 +20,7 @@ def ok(n, c):
     if not c: FAILED.append(n)
 def main():
     ok("logs ONLY when the SD is mounted and a drone is present",
-       "if (!hud_sd_ok()) return;" in DL and "hud_engage_drone_count()" in DL
+       "if (!hud_log_enabled() || !hud_sd_ok()) return;" in DL and "hud_engage_drone_count()" in DL
        and "if (dn <= 0) return;" in DL)
     ok("logging is rate-limited (not every frame)",
        "LOG_INTERVAL" in DL and re.search(r"now - s_last < LOG_INTERVAL", DL) is not None)

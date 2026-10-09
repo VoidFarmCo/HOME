@@ -16,7 +16,8 @@ struct ChatMsg { char from[12]; char text[48]; bool me; bool open; };
 void            hud_comms_begin();                 // init ESP-NOW (after WiFi STA is up)
 void            hud_comms_enter();                 // entering COMMS: lock 2.4 GHz + channel
 void            hud_comms_send(const char* text);  // broadcast on the active net
-int             hud_comms_count();                 // messages in the log
+int             hud_comms_count();                 // messages in the ring (<= COMMS_LOG)
+uint32_t        hud_comms_total();                 // monotonic total messages ever (for logging)
 const ChatMsg*  hud_comms_log();                   // newest-last ring buffer (<= COMMS_LOG)
 const char*     hud_comms_name();                  // this unit's short name
 // Nets: a passphrase defines a private group ("" or "OPEN" = the open broadcast net).

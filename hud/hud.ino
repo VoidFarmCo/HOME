@@ -12,6 +12,7 @@
 #include "hud_comms.h"
 #include "hud_engage.h"
 #include "hud_dronelog.h"
+#include "hud_log.h"
 #include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
@@ -322,6 +323,7 @@ void loop() {
   hud_gps_tick();             // drain the GPS UART (non-blocking)
   hud_tick(millis());
   hud_dronelog_tick(millis()); // after the frame flush: SD shares the SPI bus, now free
+  hud_log_tick(millis());      // field logs (threats/track/comms/wifi), gated by the LOG toggle
 
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
