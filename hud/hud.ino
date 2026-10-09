@@ -13,6 +13,8 @@
 #include "hud_engage.h"
 #include "hud_dronelog.h"
 #include "hud_log.h"
+#include "hud_compass.h"
+#include "hud_df.h"
 #include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
@@ -238,6 +240,9 @@ void setup() {
   hud_scan_begin();                 // bring up WiFi for live scanning
   hud_comms_begin();                // ESP-NOW team chat (shares the WiFi radio)
   hud_gps_begin();                  // NEO-7M GPS on UART (RX4/TX5), when wired
+  hud_compass_begin();              // QMC5883L on I2C (SDA9/SCL8), when wired
+  Serial.printf("compass present=%d\n", hud_compass_present());
+  hud_df_begin();                   // direction-finder state
 
   bool sd = hud_sd_begin();         // microSD on the shared SPI bus (CS 10)
   Serial.printf("SD ok=%d size=%luMB files=%d\n", sd, (unsigned long)hud_sd_size_mb(), hud_sd_root_count());
@@ -321,6 +326,8 @@ void loop() {
   lastMode = m;
 
   hud_gps_tick();             // drain the GPS UART (non-blocking)
+  hud_compass_tick(millis()); // read the magnetometer (~20 Hz) when present
+  hud_df_tick(millis());      // update the direction-finder sweep for the locked target
   hud_tick(millis());
   hud_dronelog_tick(millis()); // after the frame flush: SD shares the SPI bus, now free
   hud_log_tick(millis());      // field logs (threats/track/comms/wifi), gated by the LOG toggle

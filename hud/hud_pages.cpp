@@ -7,6 +7,8 @@
 #include "hud_oui.h"
 #include "hud_sd.h"
 #include "hud_log.h"
+#include "hud_compass.h"
+#include "hud_df.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
@@ -258,14 +260,36 @@ static void page_radar(uint32_t now) {
       int fx = cx + (int)(sinf(b * 0.01745f) * rr), fy = cy - (int)(cosf(b * 0.01745f) * rr);
       hud_disc(fx, fy, 3, HUD_C_GREEN); hud_ring(fx, fy, 5, HUD_C_GREEN);
     }
+  // DIRECTION-FINDER: amber arrow to the locked target's RSSI peak (needs the compass
+  // + directional antenna). Bin decays, so sweep slowly; RID drones keep their GPS bearing.
+  float dfb = hud_df_active() ? hud_df_bearing() : -1.0f;
+  if (dfb >= 0) {
+    float a = dfb * 0.01745f;
+    int ax = cx + (int)(sinf(a) * (R - 6)), ay = cy - (int)(cosf(a) * (R - 6));
+    hud_line(cx, cy, ax, ay, HUD_C_AMBER);
+    hud_line(ax, ay, ax - (int)(sinf(a + 2.5f) * 7), ay + (int)(cosf(a + 2.5f) * 7), HUD_C_AMBER);
+    hud_line(ax, ay, ax - (int)(sinf(a - 2.5f) * 7), ay + (int)(cosf(a - 2.5f) * 7), HUD_C_AMBER);
+  }
   hud_disc(cx, cy, 2, HUD_C_WHITE);                 // you
+
+  // heading / cal status, top-left of the scope
+  if (hud_compass_calibrating())
+    hud_text(4, CONTENT_Y + 2, "CAL: SPIN 360", 1, HUD_C_RED);
+  else if (hud_compass_present()) {
+    char hd[16]; snprintf(hd, sizeof(hd), "HDG %03d", (int)hud_compass_heading());
+    hud_text(4, CONTENT_Y + 2, hd, 1, HUD_C_CYAN);
+  }
 
   // readout panel (in content, not the clipped strip)
   hud_fill_rect(0, CONTENT_B - 13, HUD_W, 13, HUD_C_STRIP);
   char ln[48];
-  if (!g.valid) snprintf(ln, sizeof(ln), "DRONES %d   NO GPS", dn);
-  else          snprintf(ln, sizeof(ln), "DRONES %d  TEAM %d  RANGE %dM", dn, fn, (int)maxR);
-  hud_text(6, CONTENT_B - 10, ln, 1, dn ? HUD_C_RED : HUD_C_GREEN);
+  if (dfb >= 0)
+    snprintf(ln, sizeof(ln), "DF %s  %03d  %ddBm", hud_scan_target_name(), (int)dfb, hud_df_peak_rssi());
+  else if (!g.valid)
+    snprintf(ln, sizeof(ln), "DRONES %d   NO GPS", dn);
+  else
+    snprintf(ln, sizeof(ln), "DRONES %d  TEAM %d  RANGE %dM", dn, fn, (int)maxR);
+  hud_text(6, CONTENT_B - 10, ln, 1, dfb >= 0 ? HUD_C_AMBER : dn ? HUD_C_RED : HUD_C_GREEN);
 }
 
 // ---- SCAN list cursor (highlighted row) + scroll window ----
@@ -520,7 +544,10 @@ static void page_map(uint32_t now) {
     hud_text(6, ry1, ln, 1, s_wpSet ? HUD_C_CYAN : HUD_C_GREEN);
     if (s_moving)                                                  // line 2: heading/speed or status
       snprintf(ln, sizeof(ln), "HDG %03d %s  %.1f MPH  SAT %d", (int)s_hdg, cardinal(s_hdg), s_spdMph, g.sats);
-    else
+    else if (hud_compass_present()) {                              // compass gives heading while stopped
+      float ch = hud_compass_heading();
+      snprintf(ln, sizeof(ln), "HDG %03d %s  SAT %d  ALT %dM", (int)ch, cardinal(ch), g.sats, (int)g.altm);
+    } else
       snprintf(ln, sizeof(ln), "STOPPED  SAT %d  ALT %dM", g.sats, (int)g.altm);
     hud_text(6, ry2, ln, 1, HUD_C_GREY);
   } else {
@@ -1121,6 +1148,13 @@ void hud_on_press(int x, int y) {
     }
   } else if (hud_mode_get() == M_MAP) {
     map_touch(x, y, false);                    // zoom / mark / send / recentre / pan
+  } else if (hud_mode_get() == M_RADAR) {
+    if (hud_compass_present() && y < CONTENT_Y + (CONTENT_B - CONTENT_Y) / 4) {
+      if (hud_compass_calibrating()) hud_compass_end_cal();  // top = compass cal: tap to start, spin, tap to finish
+      else hud_compass_start_cal();
+    } else {
+      hud_df_reset();                          // elsewhere = reset the DF sweep (re-aim)
+    }
   }
 }
 
