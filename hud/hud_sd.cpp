@@ -42,7 +42,12 @@ bool hud_sd_begin() {
   bool fmt = p.getBool("fmt1", false);
   if (fmt) p.putBool("fmt1", false);
   p.end();
-  s_err = do_mount(fmt);                      // format ONLY if the one-shot flag was set
+  for (int tries = 0; tries < 3; tries++) {  // retry: a marginal slot contact often misses the first init
+    s_err = do_mount(fmt);
+    if (s_err == ESP_OK) break;
+    fmt = false;                             // only attempt the format once
+    delay(120);
+  }
   s_ok = (s_err == ESP_OK);
   return s_ok;
 }
