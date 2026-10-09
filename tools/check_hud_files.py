@@ -25,8 +25,8 @@ def main():
        "s_fmName[idx]" in DF and "fm_size_str" in DF and '"DELETE"' in DF and '"CLOSE"' in DF)
     ok("DELETE needs a confirm tap before it removes the file",
        re.search(r"if \(!s_fmConfirm\) s_fmConfirm = true;\s*\n\s*else \{ hud_sd_remove\(s_fmName\[s_fmSel\]\); fm_refresh\(\)", PR) is not None)
-    ok("the manager is modal in the input handler + guards a missing card",
-       "if (s_files) {" in PR and "if (!hud_sd_ok()) { s_files = false; return; }" in PR)
+    ok("the manager is modal in the input handler + offers FORMAT when no card",
+       "if (s_files) {" in PR and "if (!hud_sd_ok()) {" in PR and "hud_sd_format();" in PR)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
