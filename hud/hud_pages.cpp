@@ -13,9 +13,11 @@
 #include <stdio.h>
 #include <string.h>
 
-// NIGHT / STEALTH mode (dim backlight + red tint), implemented in hud.ino.
+// NIGHT / STEALTH mode (dim backlight + red tint) + brightness, implemented in hud.ino.
 bool hud_stealth();
 void hud_set_stealth(bool on);
+void hud_set_brightness(uint8_t duty);
+uint8_t hud_brightness();
 
 // Map a signal RSSI (dBm, ~-30 near .. ~-95 far) to 0..1 (1 = strongest).
 static float rssi_unit(int8_t rssi) {
@@ -88,12 +90,15 @@ static int  s_qmpage = 0;            // quick-message page in the collapsed stri
 #define GEAR_X    (HUD_W - 13)
 #define GEAR_Y    (STAT_H / 2)
 #define SET_BTN_X 20
-#define SET_BTN_Y (CONTENT_Y + 44)
 #define SET_BTN_W (HUD_W - 40)
-#define SET_BTN_H 30
-#define SET_BND_Y (SET_BTN_Y + SET_BTN_H + 14)   // BAND filter row, below RECALIBRATE
-#define SET_STL_Y (SET_BND_Y + SET_BTN_H + 14)    // NIGHT/STEALTH row, below BAND
-#define SET_FIL_Y (SET_STL_Y + SET_BTN_H + 14)     // SD FILES row, below STEALTH
+#define SET_BTN_H 26
+#define SET_BTN_Y (CONTENT_Y + 24)                // first row (denser; fits 6 rows)
+#define SET_ROW   (SET_BTN_H + 8)                 // 34 px pitch
+#define SET_BND_Y (SET_BTN_Y + SET_ROW)           // BAND filter
+#define SET_STL_Y (SET_BND_Y + SET_ROW)           // NIGHT/STEALTH
+#define SET_BRT_Y (SET_STL_Y + SET_ROW)           // BRIGHTNESS
+#define SET_FIL_Y (SET_BRT_Y + SET_ROW)           // SD FILES
+#define SET_INF_Y (SET_FIL_Y + SET_ROW)           // DEVICE INFO
 
 // Short tab labels so they're readable at 2x in a 64 px tab.
 static const char* tab_label(int m) {
@@ -161,31 +166,27 @@ static void draw_chrome(int mode) {
 }
 
 // ---- SETTINGS panel (opened by the gear) ----
+// one settings row: outlined box + centred label, all in colour `c`
+static void set_row(int y, const char* label, uint16_t c) {
+  hud_rect(SET_BTN_X, y, SET_BTN_W, SET_BTN_H, c);
+  hud_text(HUD_W / 2 - hud_text_w(label, 1) / 2, y + (SET_BTN_H - 7) / 2, label, 1, c);
+}
+
 static void draw_settings() {
   hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
-  hud_text(HUD_W / 2 - hud_text_w("SETTINGS", 2) / 2, CONTENT_Y + 8, "SETTINGS", 2, HUD_C_WHITE);
-  char ver[40]; snprintf(ver, sizeof(ver), "%s  v.%s", HUD_BUILD, HUD_VERSION);
-  hud_text(HUD_W / 2 - hud_text_w(ver, 1) / 2, CONTENT_Y + 26, ver, 1, HUD_C_GREY);
-  // RECALIBRATE TOUCH button
-  hud_rect(SET_BTN_X, SET_BTN_Y, SET_BTN_W, SET_BTN_H, HUD_C_CYAN);
-  const char* b = "RECALIBRATE TOUCH";
-  hud_text(HUD_W / 2 - hud_text_w(b, 1) / 2, SET_BTN_Y + (SET_BTN_H - 7) / 2, b, 1, HUD_C_CYAN);
-  // BAND filter toggle (ALL / 2.4 / 5 GHz)
-  hud_rect(SET_BTN_X, SET_BND_Y, SET_BTN_W, SET_BTN_H, HUD_C_AMBER);
+  hud_text(HUD_W / 2 - hud_text_w("SETTINGS", 2) / 2, CONTENT_Y + 4, "SETTINGS", 2, HUD_C_WHITE);
+  set_row(SET_BTN_Y, "RECALIBRATE TOUCH", HUD_C_CYAN);
   char bl[24]; snprintf(bl, sizeof(bl), "BAND:  %s", s_band == 1 ? "2.4 GHZ" : s_band == 2 ? "5 GHZ" : "ALL");
-  hud_text(HUD_W / 2 - hud_text_w(bl, 1) / 2, SET_BND_Y + (SET_BTN_H - 7) / 2, bl, 1, HUD_C_AMBER);
-  // NIGHT / STEALTH toggle (dim backlight + red night-vision tint)
+  set_row(SET_BND_Y, bl, HUD_C_AMBER);
   bool st = hud_stealth();
-  uint16_t sc = st ? HUD_C_RED : HUD_C_GREY;
-  hud_rect(SET_BTN_X, SET_STL_Y, SET_BTN_W, SET_BTN_H, sc);
   char sl[24]; snprintf(sl, sizeof(sl), "STEALTH:  %s", st ? "ON" : "OFF");
-  hud_text(HUD_W / 2 - hud_text_w(sl, 1) / 2, SET_STL_Y + (SET_BTN_H - 7) / 2, sl, 1, sc);
-  // SD FILES (open the file manager)
-  uint16_t fc = hud_sd_ok() ? HUD_C_CYAN : HUD_C_GREY;
-  hud_rect(SET_BTN_X, SET_FIL_Y, SET_BTN_W, SET_BTN_H, fc);
-  const char* fb = hud_sd_ok() ? "SD FILES" : "SD FILES (NO CARD)";
-  hud_text(HUD_W / 2 - hud_text_w(fb, 1) / 2, SET_FIL_Y + (SET_BTN_H - 7) / 2, fb, 1, fc);
-  hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 16, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
+  set_row(SET_STL_Y, sl, st ? HUD_C_RED : HUD_C_GREY);
+  int bpct = (hud_brightness() * 100 + 127) / 255;
+  char br[24]; snprintf(br, sizeof(br), "BRIGHTNESS:  %d%%", bpct);
+  set_row(SET_BRT_Y, br, HUD_C_GREEN);
+  set_row(SET_FIL_Y, hud_sd_ok() ? "SD FILES" : "SD FILES (NO CARD)", hud_sd_ok() ? HUD_C_CYAN : HUD_C_GREY);
+  set_row(SET_INF_Y, "DEVICE INFO + GPS", HUD_C_CYAN);
+  hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 12, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
 
 // ---- RADAR: live spatial threat scope. Plots Remote-ID drones at their REAL bearing
@@ -855,8 +856,39 @@ static void draw_files() {
   hud_text(bw + bw / 2 - hud_text_w("CLOSE", 1) / 2, FM_BTN_Y + 6, "CLOSE", 1, HUD_C_CYAN);
 }
 
+// ---- DEVICE INFO + GPS status (modal; tap to close) ----
+static bool s_info = false;
+static void draw_info() {
+  hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
+  int y = CONTENT_Y + 6;
+  char l[44];
+  hud_text(cen(HUD_PRODUCT, 2), y, HUD_PRODUCT, 2, HUD_C_RED); y += 20;
+  snprintf(l, sizeof(l), "%s v.%s", HUD_BUILD, HUD_VERSION); hud_text(cen(l, 1), y, l, 1, HUD_C_AMBER); y += 12;
+  snprintf(l, sizeof(l), "BY %s", HUD_AUTHOR); hud_text(cen(l, 1), y, l, 1, HUD_C_GREY); y += 16;
+  snprintf(l, sizeof(l), "UNIT  %s", hud_comms_name()); hud_text(8, y, l, 1, HUD_C_WHITE); y += 13;
+  snprintf(l, sizeof(l), "RAM   %u KB free", (unsigned)(ESP.getFreeHeap() / 1024)); hud_text(8, y, l, 1, HUD_C_GREY); y += 13;
+  uint32_t up = millis() / 1000;
+  snprintf(l, sizeof(l), "UP    %luh %lum %lus", (unsigned long)(up / 3600), (unsigned long)((up / 60) % 60), (unsigned long)(up % 60));
+  hud_text(8, y, l, 1, HUD_C_GREY); y += 13;
+  if (hud_sd_ok()) snprintf(l, sizeof(l), "SD    OK  %luMB", (unsigned long)hud_sd_size_mb());
+  else             snprintf(l, sizeof(l), "SD    none");
+  hud_text(8, y, l, 1, hud_sd_ok() ? HUD_C_GREEN : HUD_C_GREY); y += 16;
+  const GpsFix& g = hud_gps();
+  hud_text(8, y, "-- GPS --", 1, HUD_C_WHITE); y += 13;
+  snprintf(l, sizeof(l), "FIX %s  SAT %d  HDOP %.1f", g.valid ? "YES" : "no", g.sats, g.hdop);
+  hud_text(8, y, l, 1, g.valid ? HUD_C_GREEN : HUD_C_AMBER); y += 13;
+  if (g.valid) {
+    snprintf(l, sizeof(l), "%.5f %.5f", g.lat, g.lon); hud_text(8, y, l, 1, HUD_C_GREEN); y += 13;
+    snprintf(l, sizeof(l), "ALT %dM  UTC %s", (int)g.altm, g.utc[0] ? g.utc : "--"); hud_text(8, y, l, 1, HUD_C_GREY); y += 13;
+  }
+  snprintf(l, sizeof(l), "GPS RX %lu bytes", (unsigned long)hud_gps_rxbytes()); hud_text(8, y, l, 1, HUD_C_GREY);
+  hud_text(cen("TAP TO CLOSE", 1), CONTENT_B - 12, "TAP TO CLOSE", 1, HUD_C_GREY);
+}
+
 void hud_page_draw(int mode, uint32_t now) {
-  if (s_files) {
+  if (s_info) {
+    draw_info();       // device info + GPS status (modal)
+  } else if (s_files) {
     draw_files();      // SD file manager (modal)
   } else if (s_detail) {
     draw_detail();     // network info view (modal over the content band)
@@ -914,6 +946,8 @@ void hud_on_press(int x, int y) {
   // drone alarm is modal: the first tap just acknowledges it
   if (hud_engage_drone_count() > 0 && !s_droneAck) { s_droneAck = true; return; }
 
+  if (s_info) { s_info = false; return; }       // device info modal: any tap closes
+
   if (s_files) {                                // SD file manager modal
     if (!hud_sd_ok()) { s_files = false; return; }
     if (y >= FM_BTN_Y) {
@@ -951,8 +985,15 @@ void hud_on_press(int x, int y) {
                y >= SET_STL_Y && y <= SET_STL_Y + SET_BTN_H) {
       hud_set_stealth(!hud_stealth());        // NIGHT/STEALTH toggle (stay in panel)
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+               y >= SET_BRT_Y && y <= SET_BRT_Y + SET_BTN_H) {
+      uint8_t c = hud_brightness();           // BRIGHTNESS cycle 100->63->35->16%
+      hud_set_brightness(c > 200 ? 160 : c > 120 ? 90 : c > 60 ? 40 : 255);
+    } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_FIL_Y && y <= SET_FIL_Y + SET_BTN_H) {
       if (hud_sd_ok()) { s_files = true; s_settings = false; fm_refresh(); }  // open SD file manager
+    } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+               y >= SET_INF_Y && y <= SET_INF_Y + SET_BTN_H) {
+      s_info = true; s_settings = false;      // open DEVICE INFO + GPS
     } else {
       s_settings = false;                     // tap elsewhere closes
     }

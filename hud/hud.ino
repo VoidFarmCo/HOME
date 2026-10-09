@@ -56,9 +56,12 @@ volatile uint32_t g_push_us = 0;
 #define STEALTH_DUTY   36         // ~14% backlight in stealth (bright = 255)
 static volatile bool s_stealth = false;
 
+static uint8_t s_bright = 255;            // day-mode backlight duty (stealth overrides it)
 void hud_set_backlight(uint8_t duty) { ledcWrite(LCD_BL, duty); }
-void hud_set_stealth(bool on) { s_stealth = on; hud_set_backlight(on ? STEALTH_DUTY : 255); }
+void hud_set_stealth(bool on) { s_stealth = on; hud_set_backlight(on ? STEALTH_DUTY : s_bright); }
 bool hud_stealth() { return s_stealth; }
+void hud_set_brightness(uint8_t duty) { s_bright = duty; if (!s_stealth) hud_set_backlight(duty); }
+uint8_t hud_brightness() { return s_bright; }
 
 // Recolour the frame to dim red (night vision). Bytes are MSB-swapped (hud_rgb).
 static void stealth_tint(uint16_t* p, int n) {
