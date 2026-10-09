@@ -5,6 +5,7 @@
 #include "hud_comms.h"
 #include "hud_engage.h"
 #include "hud_oui.h"
+#include "hud_sd.h"
 #include "home_logo.h"
 #include "branding.h"
 #include <Arduino.h>
@@ -92,6 +93,7 @@ static int  s_qmpage = 0;            // quick-message page in the collapsed stri
 #define SET_BTN_H 30
 #define SET_BND_Y (SET_BTN_Y + SET_BTN_H + 14)   // BAND filter row, below RECALIBRATE
 #define SET_STL_Y (SET_BND_Y + SET_BTN_H + 14)    // NIGHT/STEALTH row, below BAND
+#define SET_FIL_Y (SET_STL_Y + SET_BTN_H + 14)     // SD FILES row, below STEALTH
 
 // Short tab labels so they're readable at 2x in a 64 px tab.
 static const char* tab_label(int m) {
@@ -178,6 +180,11 @@ static void draw_settings() {
   hud_rect(SET_BTN_X, SET_STL_Y, SET_BTN_W, SET_BTN_H, sc);
   char sl[24]; snprintf(sl, sizeof(sl), "STEALTH:  %s", st ? "ON" : "OFF");
   hud_text(HUD_W / 2 - hud_text_w(sl, 1) / 2, SET_STL_Y + (SET_BTN_H - 7) / 2, sl, 1, sc);
+  // SD FILES (open the file manager)
+  uint16_t fc = hud_sd_ok() ? HUD_C_CYAN : HUD_C_GREY;
+  hud_rect(SET_BTN_X, SET_FIL_Y, SET_BTN_W, SET_BTN_H, fc);
+  const char* fb = hud_sd_ok() ? "SD FILES" : "SD FILES (NO CARD)";
+  hud_text(HUD_W / 2 - hud_text_w(fb, 1) / 2, SET_FIL_Y + (SET_BTN_H - 7) / 2, fb, 1, fc);
   hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 16, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
 
@@ -791,8 +798,67 @@ static void draw_drone_alarm() {
   hud_text(cen("TAP TO ACK", 1), CONTENT_B - 14, "TAP TO ACK", 1, fg);
 }
 
+// ---- SD FILE MANAGER (modal over the content band): list /sd, select, delete ----
+#define FM_MAX   32
+#define FM_ROW_H 15
+#define FM_LIST_Y (CONTENT_Y + 20)
+#define FM_BTN_Y  (CONTENT_B - 22)
+static bool     s_files = false;           // file manager open
+static char     s_fmName[FM_MAX][24];
+static uint32_t s_fmSize[FM_MAX];
+static int      s_fmN = 0, s_fmSel = 0, s_fmScroll = 0;
+static bool     s_fmConfirm = false;       // DELETE armed (2-tap confirm)
+
+static void fm_refresh() {
+  s_fmN = hud_sd_ok() ? hud_sd_list(s_fmName, s_fmSize, FM_MAX) : 0;
+  if (s_fmSel >= s_fmN) s_fmSel = s_fmN > 0 ? s_fmN - 1 : 0;
+  if (s_fmScroll > s_fmSel) s_fmScroll = s_fmSel;
+  s_fmConfirm = false;
+}
+static int fm_rows() { return (FM_BTN_Y - 4 - FM_LIST_Y) / FM_ROW_H; }
+
+static void fm_size_str(uint32_t b, char* out, int n) {
+  if (b >= 1048576) snprintf(out, n, "%luM", (unsigned long)(b / 1048576));
+  else if (b >= 1024) snprintf(out, n, "%luK", (unsigned long)(b / 1024));
+  else snprintf(out, n, "%luB", (unsigned long)b);
+}
+
+static void draw_files() {
+  hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
+  if (!hud_sd_ok()) {
+    hud_text(cen("NO SD CARD", 2), CONTENT_Y + 40, "NO SD CARD", 2, HUD_C_RED);
+    hud_text(cen("TAP TO CLOSE", 1), CONTENT_B - 14, "TAP TO CLOSE", 1, HUD_C_GREY);
+    return;
+  }
+  char hdr[24]; snprintf(hdr, sizeof(hdr), "SD FILES  %d", s_fmN);
+  hud_text(6, CONTENT_Y + 6, hdr, 1, HUD_C_WHITE);
+  char cap[16]; snprintf(cap, sizeof(cap), "%luMB", (unsigned long)hud_sd_size_mb());
+  hud_text(HUD_W - hud_text_w(cap, 1) - 6, CONTENT_Y + 6, cap, 1, HUD_C_GREY);
+
+  if (s_fmN == 0) hud_text(8, FM_LIST_Y + 6, "(no files)", 1, HUD_C_GREY);
+  int rows = fm_rows();
+  for (int r = 0; r < rows; r++) {
+    int idx = s_fmScroll + r;
+    if (idx >= s_fmN) break;
+    int y = FM_LIST_Y + r * FM_ROW_H;
+    if (idx == s_fmSel) hud_fill_rect(0, y - 1, HUD_W, FM_ROW_H - 1, HUD_C_STRIP);
+    hud_text(6, y + 2, s_fmName[idx], 1, idx == s_fmSel ? HUD_C_WHITE : HUD_C_GREY);
+    char sz[12]; fm_size_str(s_fmSize[idx], sz, sizeof(sz));
+    hud_text(HUD_W - hud_text_w(sz, 1) - 6, y + 2, sz, 1, HUD_C_GREY);
+  }
+  // DELETE (left) + CLOSE (right)
+  int bw = HUD_W / 2;
+  hud_rect(2, FM_BTN_Y, bw - 4, 18, s_fmN ? HUD_C_RED : HUD_C_GREY);
+  const char* del = s_fmConfirm ? "CONFIRM DELETE" : "DELETE";
+  hud_text(bw / 2 - hud_text_w(del, 1) / 2, FM_BTN_Y + 6, del, 1, s_fmN ? HUD_C_RED : HUD_C_GREY);
+  hud_rect(bw + 2, FM_BTN_Y, bw - 4, 18, HUD_C_CYAN);
+  hud_text(bw + bw / 2 - hud_text_w("CLOSE", 1) / 2, FM_BTN_Y + 6, "CLOSE", 1, HUD_C_CYAN);
+}
+
 void hud_page_draw(int mode, uint32_t now) {
-  if (s_detail) {
+  if (s_files) {
+    draw_files();      // SD file manager (modal)
+  } else if (s_detail) {
     draw_detail();     // network info view (modal over the content band)
   } else if (s_settings) {
     draw_settings();   // modal panel over the content band
@@ -848,6 +914,26 @@ void hud_on_press(int x, int y) {
   // drone alarm is modal: the first tap just acknowledges it
   if (hud_engage_drone_count() > 0 && !s_droneAck) { s_droneAck = true; return; }
 
+  if (s_files) {                                // SD file manager modal
+    if (!hud_sd_ok()) { s_files = false; return; }
+    if (y >= FM_BTN_Y) {
+      int bw = HUD_W / 2;
+      if (x < bw) {                             // DELETE (two-tap confirm)
+        if (s_fmN > 0) {
+          if (!s_fmConfirm) s_fmConfirm = true;
+          else { hud_sd_remove(s_fmName[s_fmSel]); fm_refresh(); }
+        }
+      } else s_files = false;                   // CLOSE
+    } else if (y >= FM_LIST_Y) {                // tap a row to select (+ edge-scroll)
+      int r = (y - FM_LIST_Y) / FM_ROW_H, idx = s_fmScroll + r;
+      if (idx >= 0 && idx < s_fmN) { s_fmSel = idx; s_fmConfirm = false; }
+      if (r == 0 && s_fmScroll > 0) s_fmScroll--;
+      int rows = fm_rows();
+      if (r >= rows - 1 && s_fmScroll + rows < s_fmN) s_fmScroll++;
+    }
+    return;
+  }
+
   // settings gear (top-right of the status strip) toggles the SETTINGS panel
   if (y < STAT_H && x > HUD_W - 24) { s_settings = !s_settings; s_detail = false; return; }
 
@@ -864,6 +950,9 @@ void hud_on_press(int x, int y) {
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_STL_Y && y <= SET_STL_Y + SET_BTN_H) {
       hud_set_stealth(!hud_stealth());        // NIGHT/STEALTH toggle (stay in panel)
+    } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
+               y >= SET_FIL_Y && y <= SET_FIL_Y + SET_BTN_H) {
+      if (hud_sd_ok()) { s_files = true; s_settings = false; fm_refresh(); }  // open SD file manager
     } else {
       s_settings = false;                     // tap elsewhere closes
     }

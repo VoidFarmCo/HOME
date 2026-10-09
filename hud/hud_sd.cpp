@@ -5,6 +5,7 @@
 #include "esp_vfs_fat.h"
 #include <dirent.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #define SD_HOST SPI2_HOST       // the same bus esp_lcd + touch already use
 #define SD_CS   10
@@ -63,4 +64,28 @@ bool hud_sd_append(const char* path, const char* line) {
   fputc('\n', fp);
   fclose(fp);                       // flush now; logging is infrequent (per few sec)
   return true;
+}
+
+// List files in /sd (one dir pass). Fills names[0..maxn)/sizes, returns the count.
+int hud_sd_list(char names[][24], uint32_t* sizes, int maxn) {
+  if (!s_ok) return 0;
+  DIR* d = opendir("/sd");
+  if (!d) return 0;
+  int n = 0;
+  struct dirent* e;
+  while ((e = readdir(d)) && n < maxn) {
+    if (e->d_type == DT_DIR) continue;
+    strncpy(names[n], e->d_name, 23); names[n][23] = 0;
+    char full[300]; snprintf(full, sizeof(full), "/sd/%s", e->d_name);
+    struct stat st; sizes[n] = (stat(full, &st) == 0) ? (uint32_t)st.st_size : 0;
+    n++;
+  }
+  closedir(d);
+  return n;
+}
+
+bool hud_sd_remove(const char* name) {
+  if (!s_ok || !name || !*name) return false;
+  char full[80]; snprintf(full, sizeof(full), "/sd/%s", name);
+  return remove(full) == 0;
 }
