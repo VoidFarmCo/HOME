@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <Preferences.h>
 
 #define SD_HOST SPI2_HOST       // the same bus esp_lcd + touch already use
 #define SD_CS   10
@@ -34,20 +35,32 @@ static esp_err_t do_mount(bool allowFormat) {
 }
 
 bool hud_sd_begin() {
-  s_err = do_mount(false);                   // boot: never auto-format
+  // A one-shot "format on next boot" flag (set by the FORMAT button). Formatting a big
+  // card needs a large work buffer that only allocates reliably at boot, when the heap
+  // is pristine -- at runtime it fails ESP_ERR_NO_MEM. So we format here, once, then clear.
+  Preferences p; p.begin("hudsd", false);
+  bool fmt = p.getBool("fmt1", false);
+  if (fmt) p.putBool("fmt1", false);
+  p.end();
+  s_err = do_mount(fmt);                      // format ONLY if the one-shot flag was set
   s_ok = (s_err == ESP_OK);
   return s_ok;
 }
 
-// Deliberate format (owner action via the FORMAT button): wipe to FAT32 and remount.
-// Blocks for up to ~1-2 min on a big card. Returns true if the card is mounted after.
+// FORMAT button: arm a one-shot boot format, then the caller reboots (format runs in
+// hud_sd_begin with a pristine heap). Runtime formatting is unreliable (ESP_ERR_NO_MEM).
+void hud_sd_request_format() {
+  Preferences p; p.begin("hudsd", false); p.putBool("fmt1", true); p.end();
+}
+
+// Runtime format (used only for a mounted card; big-card recovery goes via reboot).
 bool hud_sd_format() {
   if (s_ok && s_card) {                      // mounted: wipe it in place
     s_err = esp_vfs_fat_sdcard_format("/sd", s_card);
     s_ok = (s_err == ESP_OK);
     return s_ok;
   }
-  s_err = do_mount(true);                     // unmountable: mount-with-format recovers it
+  s_err = do_mount(true);
   s_ok = (s_err == ESP_OK);
   return s_ok;
 }

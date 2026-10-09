@@ -1015,12 +1015,12 @@ void hud_on_press(int x, int y) {
         if (!s_fmConfirm) s_fmConfirm = true;
         else {
           hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
-          hud_text(cen("FORMATTING SD...", 2), CONTENT_Y + 50, "FORMATTING SD...", 2, HUD_C_AMBER);
-          hud_text(cen("WAIT ~1-2 MIN", 1), CONTENT_Y + 74, "WAIT ~1-2 MIN", 1, HUD_C_GREY);
-          hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);   // show it before the blocking format
-          hud_sd_format();
-          s_fmConfirm = false;
-          fm_refresh();
+          hud_text(cen("FORMATTING ON REBOOT", 1), CONTENT_Y + 50, "FORMATTING ON REBOOT", 1, HUD_C_AMBER);
+          hud_text(cen("~1-2 MIN, THEN BACK", 1), CONTENT_Y + 66, "~1-2 MIN, THEN BACK", 1, HUD_C_GREY);
+          hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);
+          hud_sd_request_format();           // format runs at the next boot (pristine heap)
+          delay(600);
+          ESP.restart();
         }
       } else { s_files = false; s_fmConfirm = false; }
       return;

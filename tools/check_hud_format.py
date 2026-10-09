@@ -16,13 +16,12 @@ def ok(n, c):
     print(("  ok    " if c else "  FAIL  ") + n)
     if not c: FAILED.append(n)
 def main():
-    ok("boot mount never auto-formats; format is a separate deliberate call",
-       "do_mount(false)" in SD and "bool hud_sd_format()" in SD
-       and ("esp_vfs_fat_sdcard_format" in SD or "do_mount(true)" in SD))
+    ok("boot formats ONLY on a one-shot flag (deliberate), never unconditionally",
+       'getBool("fmt1"' in SD and "do_mount(fmt)" in SD and "void hud_sd_request_format()" in SD)
     ok("the file manager opens even with no card (to reach FORMAT)",
        "s_files = true; s_settings = false; fm_refresh();" in PR)
     ok("FORMAT needs a two-tap confirm and shows a wait message before blocking",
-       "s_fmConfirm = true;" in PR and "FORMATTING SD..." in PG and "hud_sd_format();" in PR)
+       "s_fmConfirm = true;" in PR and "FORMATTING ON REBOOT" in PG and "hud_sd_request_format();" in PR)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
