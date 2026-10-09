@@ -27,9 +27,13 @@ def main():
     ok("captures BSSID + encryption per AP (for the info view)",
        "WiFi.BSSID(" in SCAN and "WiFi.encryptionType(" in SCAN)
     # DUAL-BAND: the C5 does one band at a time, so scan 2.4 then switch to 5 GHz.
-    ok("scans BOTH bands, alternating one per cycle (one setBandMode per cycle)",
+    ok("scans ONE user-selected band, switching only when the user changes it (no auto-switch)",
        "WIFI_BAND_MODE_2G_ONLY" in SCAN and "WIFI_BAND_MODE_5G_ONLY" in SCAN
-       and re.search(r"s_band_cur == 2\) \? 5 : 2", SCAN) is not None)
+       and "hud_scan_set_band(" in SCAN
+       and re.search(r"if \(s_band_want != s_band_applied\)", SCAN) is not None)
+    ok("SCAN has a start/stop: paused = no scanNetworks (list frozen, no FPS hitch)",
+       "hud_scan_set_enabled(" in SCAN
+       and re.search(r"if \(!s_scanEnabled && s_phase != P_RUN\) return;", SCAN) is not None)
     ok("BLE stays parked (no Bluedroid controller bring-up)",
        "btStart()" not in SCAN and "BLEDevice::init(" not in SCAN)
     ok("list is STABLE: upsert by BSSID + age out, not rebuilt/re-sorted each cycle",

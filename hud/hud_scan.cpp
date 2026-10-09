@@ -23,14 +23,22 @@ static char     s_target[24] = {0};
 static int8_t   s_target_rssi = -127;
 static bool     s_target_seen = false;
 
-// One band per cycle, ALTERNATING, so each tick does at most one WiFi.setBandMode +
-// one scanNetworks start -- the pair that blocks the loop ~100 ms on the C5. Spacing
-// the cycles keeps that hitch rare (the SCAN page is the only page that scans).
+// SINGLE band, user-selected (no automatic 2.4<->5 switching -- that WiFi.setBandMode
+// is what blocked the loop ~100 ms on the C5). We scan only s_band_want and call
+// setBandMode ONLY when the user actually changes the band, so steady scanning does
+// just a scanNetworks each cycle. The SCAN page is the only page that scans.
 enum Phase { P_START, P_RUN, P_WAIT };
 static Phase    s_phase = P_START;
 static uint32_t s_next = 0;
-static int      s_band_cur = 2;     // alternate 2 GHz <-> 5 GHz each cycle
-#define SCAN_GAP 1500               // ms between single-band scans (each band ~every 3 s)
+static int      s_band_want = 2;    // band to scan (2 = 2.4 GHz, 5 = 5 GHz); set by the UI
+static int      s_band_applied = -1;// last band actually set on the radio
+#define SCAN_GAP 1200               // ms between scans
+
+void hud_scan_set_band(int band) { s_band_want = (band == 5) ? 5 : 2; }
+
+static bool s_scanEnabled = true;    // SCAN start/stop: when off, the list freezes (no scanNetworks hitch)
+void hud_scan_set_enabled(bool en) { s_scanEnabled = en; }
+bool hud_scan_enabled() { return s_scanEnabled; }
 
 void hud_scan_begin() {
   WiFi.mode(WIFI_STA);              // station mode = able to scan, not an AP
@@ -111,9 +119,13 @@ static void finish_cycle(uint32_t now) {
 }
 
 void hud_scan_tick(uint32_t now) {
+  if (!s_scanEnabled && s_phase != P_RUN) return;   // paused: no new scans (list frozen), let a running one finish
   switch (s_phase) {
     case P_START:
-      WiFi.setBandMode(s_band_cur == 5 ? WIFI_BAND_MODE_5G_ONLY : WIFI_BAND_MODE_2G_ONLY);
+      if (s_band_want != s_band_applied) {       // only switch when the user changed band
+        WiFi.setBandMode(s_band_want == 5 ? WIFI_BAND_MODE_5G_ONLY : WIFI_BAND_MODE_2G_ONLY);
+        s_band_applied = s_band_want;
+      }
       WiFi.scanNetworks(true, true);             // async, show hidden
       s_phase = P_RUN;
       break;
@@ -124,7 +136,6 @@ void hud_scan_tick(uint32_t now) {
       if (r >= 0) upsert_band(r, now);
       WiFi.scanDelete();
       finish_cycle(now);                         // recount whole list + age out
-      s_band_cur = (s_band_cur == 2) ? 5 : 2;    // other band next cycle
       s_phase = P_WAIT;
       s_next = now + SCAN_GAP;
       break;

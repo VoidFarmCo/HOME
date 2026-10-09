@@ -79,7 +79,7 @@ void hud_mode_auto(uint32_t now) {
 
 // settings gear (top-right of the top strip) + the SETTINGS panel
 static bool s_settings = false;
-static int  s_band = 0;              // band filter: 0 = ALL, 1 = 2.4 GHz, 2 = 5 GHz
+static int  s_band = 1;              // which band we scan+show: 1 = 2.4 GHz, 2 = 5 GHz (no auto-switch)
 static bool s_detail = false;        // network info view open
 static int  s_detail_ci = -1;        // which contact index it shows
 // COMMS composer
@@ -270,8 +270,7 @@ static int scan_rows() { return (CONTENT_B - CONTENT_Y - FOOT_H) / ROW_H; }  // 
 
 // Band filter: is this channel's band visible under the current filter?
 static bool band_ok(uint8_t ch) {
-  int b = hud_band_of(ch);
-  return s_band == 0 || (s_band == 1 && b == 2) || (s_band == 2 && b == 5);
+  (void)ch; return true;   // single-band scan now: the list only holds the scanned band
 }
 static int vis_count() {
   const Contact* c = hud_scan_list(); int n = hud_scan_count(), k = 0;
@@ -324,12 +323,14 @@ static void page_scan(uint32_t now) {
     int bar = (int)(rssi_unit(c[i].rssi) * 56);
     hud_fill_rect(HUD_W - 8 - bar, y + 2, bar, 8, bandcol);                    // bar, coloured by band
   }
-  // footer: band counts + active filter
-  const char* f = s_band == 1 ? "2.4" : s_band == 2 ? "5G" : "ALL";
-  char foot[48];
-  snprintf(foot, sizeof(foot), "2G%d 5G%d [%s]", hud_scan_band_count(2), hud_scan_band_count(5), f);
+  // footer: SCAN start/stop button (left) + band + AP count (right)
   hud_fill_rect(0, CONTENT_B - FOOT_H, HUD_W, FOOT_H, HUD_C_STRIP);
-  hud_text(6, CONTENT_B - FOOT_H + 3, foot, 1, HUD_C_CYAN);
+  bool en = hud_scan_enabled();
+  const char* sb = en ? "SCANNING" : "PAUSED-TAP";
+  hud_text(6, CONTENT_B - FOOT_H + 3, sb, 1, en ? HUD_C_GREEN : HUD_C_AMBER);
+  char foot[20];
+  snprintf(foot, sizeof(foot), "%s  %dAP", s_band == 2 ? "5G" : "2.4", hud_scan_count());
+  hud_text(HUD_W - hud_text_w(foot, 1) - 6, CONTENT_B - FOOT_H + 3, foot, 1, HUD_C_CYAN);
 }
 
 // ---- network info view (Marauder/Bruce style): full detail for one AP ----
@@ -911,10 +912,12 @@ void hud_page_draw(int mode, uint32_t now) {
 
 // Which scan zone is y in? -1 = scroll up, +1 = scroll down, 0 = centre/enter.
 static int scan_zone(int y) {
-  int band = CONTENT_B - CONTENT_Y;
-  if (y < CONTENT_Y + band / 3) return -1;
-  if (y > CONTENT_B - band / 3) return +1;
-  return 0;
+  if (y >= CONTENT_B - FOOT_H) return 2;            // footer strip = SCAN start/stop
+  int bot = CONTENT_B - FOOT_H;                     // list area excludes the footer
+  int band = bot - CONTENT_Y;
+  if (y < CONTENT_Y + band / 3) return -1;          // upper third = scroll up
+  if (y > bot - band / 3) return +1;                // lower third = scroll down
+  return 0;                                         // middle = ENTER
 }
 
 // MAP controls: the button row (press only) + edge-pan (press or hold).
@@ -979,7 +982,8 @@ void hud_on_press(int x, int y) {
       hud_request_recal(); s_settings = false; // RECALIBRATE TOUCH
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_BND_Y && y <= SET_BND_Y + SET_BTN_H) {
-      s_band = (s_band + 1) % 3;              // BAND: ALL -> 2.4 -> 5 (stay in panel)
+      s_band = (s_band == 1) ? 2 : 1;         // BAND: 2.4 <-> 5 (controls the scan band)
+      hud_scan_set_band(s_band == 2 ? 5 : 2);
       s_sel = 0; s_scroll = 0;
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_STL_Y && y <= SET_STL_Y + SET_BTN_H) {
@@ -1009,6 +1013,7 @@ void hud_on_press(int x, int y) {
     int z = scan_zone(y);                      // upper = scroll up, lower = scroll down
     if (z == -1) scan_move(-1);
     else if (z == +1) scan_move(+1);
+    else if (z == 2) hud_scan_set_enabled(!hud_scan_enabled());   // footer = SCAN start/stop
     else {                                     // centre = ENTER: open the info view
       int i = vis_index(s_sel);
       if (i >= 0) { s_detail_ci = i; s_detail = true; }

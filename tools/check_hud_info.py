@@ -18,8 +18,9 @@ def main():
        re.search(r"page_scan\(.*?hud_band_of\(c\[i\]\.ch\).*?\"5G\".*?\"2G\"", PG, re.S) is not None)
     ok("a band filter hides the other band (vis_count / vis_index / band_ok)",
        "band_ok(" in PG and "vis_count()" in PG and "vis_index(" in PG)
-    ok("SETTINGS has a BAND toggle that cycles ALL/2.4/5",
-       "BAND:" in PG and re.search(r"s_band = \(s_band \+ 1\) % 3", PG) is not None)
+    ok("SETTINGS has a BAND toggle that switches the scan band (2.4 <-> 5)",
+       "BAND:" in PG and re.search(r"s_band = \(s_band == 1\) \? 2 : 1", PG) is not None
+       and "hud_scan_set_band(" in PG)
     ok("centre-ENTER on a SCAN row opens the info view",
        re.search(r"else \{\s*//[^\n]*ENTER.*?s_detail = true", PG, re.S) is not None)
     ok("info view shows band + channel + RSSI + encryption + BSSID",

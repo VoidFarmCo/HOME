@@ -24,6 +24,9 @@ const char* hud_enc_name(uint8_t enc);
 
 void           hud_scan_begin();            // bring up the radios (call in setup)
 void           hud_scan_tick(uint32_t now); // drive async scans; non-blocking
+void           hud_scan_set_band(int band); // choose the band to scan (2 = 2.4, 5 = 5 GHz)
+void           hud_scan_set_enabled(bool en);  // SCAN start/stop (off = freeze list, no FPS hitch)
+bool           hud_scan_enabled();
 int            hud_scan_count();            // contacts in the current snapshot
 const Contact* hud_scan_list();             // the snapshot (<= HUD_SCAN_MAX)
 int            hud_scan_wifi_count();        // total wifi contacts (both bands)
