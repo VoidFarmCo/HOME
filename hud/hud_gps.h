@@ -12,6 +12,8 @@ struct GpsFix {
   float  altm;       // altitude (m)
   float  course;     // heading over ground (deg), from RMC
   float  knots;      // speed over ground (knots), from RMC
+  char   utc[7];     // UTC time hhmmss (empty until parsed) -- for log timestamps
+  char   date[7];    // UTC date ddmmyy (empty until parsed)
 };
 
 void          hud_gps_begin();              // open the UART

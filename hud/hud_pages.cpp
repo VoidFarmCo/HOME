@@ -721,6 +721,49 @@ void hud_draw_splash() {
   delay(1300);
 }
 
+// ---- full-screen DRONE ALARM: a loud takeover of the content band when a drone
+// appears, headlined by the nearest drone's range/bearing and the PILOT's bearing.
+// A tap acknowledges it (drops back to the small strip banner); re-arms when clear.
+static bool s_droneAck = false;
+static void draw_drone_alarm() {
+  int dn = hud_engage_drone_count();
+  const GpsFix& g = hud_gps();
+  bool flash = (millis() / 300) & 1;
+  hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, flash ? HUD_C_RED : HUD_C_BG);
+  uint16_t fg = flash ? HUD_C_BG : HUD_C_RED;
+  int y = CONTENT_Y + 14;
+  hud_text(cen("DRONE", 3), y, "DRONE", 3, fg);         y += 30;
+  hud_text(cen("DETECTED", 2), y, "DETECTED", 2, fg);   y += 26;
+  char ln[40];
+  snprintf(ln, sizeof(ln), "COUNT %d", dn);
+  hud_text(cen(ln, 2), y, ln, 2, fg);                   y += 30;
+  if (g.valid) {
+    double best = 1e18; float db = 0; int bi = -1;
+    DroneInfo d, nd = {};
+    for (int i = 0; i < dn; i++) {
+      if (!hud_engage_drone(i, &d) || !d.loc) continue;
+      float b; double dist = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b);
+      if (dist < best) { best = dist; db = b; bi = i; nd = d; }
+    }
+    if (bi >= 0) {
+      snprintf(ln, sizeof(ln), "DRONE %dM  %03d", (int)best, (int)db);
+      hud_text(cen(ln, 2), y, ln, 2, fg);               y += 26;
+      if (nd.op) {
+        float pb; double pd = geo_dist_brg(g.lat, g.lon, nd.oplat, nd.oplon, &pb);
+        snprintf(ln, sizeof(ln), "PILOT %dM  %03d", (int)pd, (int)pb);
+        hud_text(cen(ln, 2), y, ln, 2, fg);
+      } else {
+        hud_text(cen("PILOT: NO SIGNAL YET", 1), y, "PILOT: NO SIGNAL YET", 1, fg);
+      }
+    } else {
+      hud_text(cen("LOCATION PENDING", 1), y, "LOCATION PENDING", 1, fg);
+    }
+  } else {
+    hud_text(cen("NO GPS - NO RANGE", 1), y, "NO GPS - NO RANGE", 1, fg);
+  }
+  hud_text(cen("TAP TO ACK", 1), CONTENT_B - 14, "TAP TO ACK", 1, fg);
+}
+
 void hud_page_draw(int mode, uint32_t now) {
   if (s_detail) {
     draw_detail();     // network info view (modal over the content band)
@@ -737,6 +780,8 @@ void hud_page_draw(int mode, uint32_t now) {
     }
   }
   draw_chrome(mode);   // chrome last so strips/gear/tabs sit on top
+  if (hud_engage_drone_count() == 0) s_droneAck = false;      // re-arm when the sky is clear
+  else if (!s_droneAck) draw_drone_alarm();                   // loud takeover until acknowledged
 }
 
 // Which scan zone is y in? -1 = scroll up, +1 = scroll down, 0 = centre/enter.
@@ -748,6 +793,9 @@ static int scan_zone(int y) {
 }
 
 void hud_on_press(int x, int y) {
+  // drone alarm is modal: the first tap just acknowledges it
+  if (hud_engage_drone_count() > 0 && !s_droneAck) { s_droneAck = true; return; }
+
   // settings gear (top-right of the status strip) toggles the SETTINGS panel
   if (y < STAT_H && x > HUD_W - 24) { s_settings = !s_settings; s_detail = false; return; }
 

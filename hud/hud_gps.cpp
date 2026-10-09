@@ -34,6 +34,7 @@ static void parse(const char* line) {
     s_fix.sats = atoi(f[7]);
     s_fix.hdop = atof(f[8]);
     s_fix.altm = atof(f[9]);
+    if (f[1][0]) { strncpy(s_fix.utc, f[1], 6); s_fix.utc[6] = 0; }   // UTC hhmmss
     if (q > 0 && f[2][0]) {
       s_fix.lat = nmea_deg(f[2], f[3][0]);
       s_fix.lon = nmea_deg(f[4], f[5][0]);
@@ -49,6 +50,8 @@ static void parse(const char* line) {
       s_fix.course = atof(f[8]);         // heading over ground (deg)
       s_fix.valid = true;
     }
+    if (f[1][0]) { strncpy(s_fix.utc, f[1], 6); s_fix.utc[6] = 0; }           // UTC hhmmss
+    if (nf >= 10 && f[9][0]) { strncpy(s_fix.date, f[9], 6); s_fix.date[6] = 0; }  // date ddmmyy
   }
 }
 

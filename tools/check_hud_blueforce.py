@@ -27,8 +27,9 @@ def main():
        re.search(r"frame\[0\] == POS_TYPE\)\s*parse_pos_frame", CM) is not None)
     ok("teammate store ages out and ignores our own echo",
        "FRIEND_AGE" in CM and 'strcmp(name, s_name)' in CM and "friend_update(" in CM)
-    ok("the loop beacons our position only on the COMMS page",
-       re.search(r"M_COMMS.*hud_comms_tick\(millis\(\), g\.valid, g\.lat, g\.lon\)", INO) is not None)
+    ok("the loop beacons our position on the comms-radio pages (COMMS + MAP)",
+       re.search(r"commsRadio\s*=\s*\(m == M_COMMS \|\| m == M_MAP\)", INO) is not None
+       and re.search(r"commsRadio\)\s*\{[^}]*hud_comms_tick\(millis\(\), g\.valid, g\.lat, g\.lon\)", INO) is not None)
     radar = re.search(r"static void page_radar\(.*?\n\}", PG, re.S)
     rb = radar.group(0) if radar else ""
     mapfn = re.search(r"static void page_map\(.*?\n\}", PG, re.S)

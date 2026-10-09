@@ -4,6 +4,7 @@
 #include "sdmmc_cmd.h"
 #include "esp_vfs_fat.h"
 #include <dirent.h>
+#include <stdio.h>
 
 #define SD_HOST SPI2_HOST       // the same bus esp_lcd + touch already use
 #define SD_CS   10
@@ -24,9 +25,9 @@ bool hud_sd_begin() {
   dev.host_id  = SD_HOST;
 
   esp_vfs_fat_sdmmc_mount_config_t mcfg = {};
-  mcfg.format_if_mount_failed = false;       // never reformat the owner's card
+  mcfg.format_if_mount_failed = true;        // owner opted in: wipe + FAT32 a card we can't mount
   mcfg.max_files = 4;
-  mcfg.allocation_unit_size = 16 * 1024;
+  mcfg.allocation_unit_size = 16 * 1024;     // 16 KB clusters (used for the format too)
 
   s_err = esp_vfs_fat_sdspi_mount("/sd", &host, &dev, &mcfg, &s_card);
   s_ok = (s_err == ESP_OK);
@@ -50,4 +51,16 @@ int hud_sd_root_count() {
   while (readdir(d)) n++;
   closedir(d);
   return n;
+}
+
+bool hud_sd_append(const char* path, const char* line) {
+  if (!s_ok || !path || !line) return false;
+  char full[80];
+  snprintf(full, sizeof(full), "/sd/%s", path);
+  FILE* fp = fopen(full, "a");
+  if (!fp) return false;
+  fputs(line, fp);
+  fputc('\n', fp);
+  fclose(fp);                       // flush now; logging is infrequent (per few sec)
+  return true;
 }

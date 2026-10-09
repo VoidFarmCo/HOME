@@ -11,6 +11,7 @@
 #include "hud_sd.h"
 #include "hud_comms.h"
 #include "hud_engage.h"
+#include "hud_dronelog.h"
 #include <Preferences.h>
 
 // NM-CYD-C5: ST7789 on the shared SPI bus, driven via esp_lcd (IDF native).
@@ -302,19 +303,22 @@ void loop() {
   static int lastMode = -1;
   int m = hud_mode_get();
   bool promisc     = (m == M_RADAR || m == M_ENGAGE);
+  bool commsRadio  = (m == M_COMMS || m == M_MAP);    // MAP runs ESP-NOW too: no scan stall + live team data
   bool lastPromisc = (lastMode == M_RADAR || lastMode == M_ENGAGE);
+  bool lastComms   = (lastMode == M_COMMS || lastMode == M_MAP);
   if (m != lastMode) {
-    if (lastPromisc && !promisc) hud_engage_leave();   // leaving the sniffer pages
-    if (m == M_COMMS)            hud_comms_enter();
-    if (promisc && !lastPromisc) hud_engage_enter();   // entering the sniffer
+    if (lastPromisc && !promisc)  hud_engage_leave();  // leaving the sniffer pages
+    if (commsRadio && !lastComms) hud_comms_enter();   // COMMS or MAP: lock the team channel
+    if (promisc && !lastPromisc)  hud_engage_enter();  // entering the sniffer
   }
-  if (m == M_COMMS) { const GpsFix& g = hud_gps(); hud_comms_tick(millis(), g.valid, g.lat, g.lon); }  // chat + blue-force beacon
+  if (commsRadio)   { const GpsFix& g = hud_gps(); hud_comms_tick(millis(), g.valid, g.lat, g.lon); }  // chat + blue-force + marks
   else if (promisc) { hud_engage_tick(millis()); }
   else              { hud_scan_tick(millis()); }
   lastMode = m;
 
   hud_gps_tick();             // drain the GPS UART (non-blocking)
   hud_tick(millis());
+  hud_dronelog_tick(millis()); // after the frame flush: SD shares the SPI bus, now free
 
   static uint32_t t = 0;
   if (millis() - t > 1000 && Serial.availableForWrite() > 48) {
