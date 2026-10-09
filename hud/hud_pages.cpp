@@ -184,7 +184,7 @@ static void draw_settings() {
   int bpct = (hud_brightness() * 100 + 127) / 255;
   char br[24]; snprintf(br, sizeof(br), "BRIGHTNESS:  %d%%", bpct);
   set_row(SET_BRT_Y, br, HUD_C_GREEN);
-  set_row(SET_FIL_Y, hud_sd_ok() ? "SD FILES" : "SD FILES (NO CARD)", hud_sd_ok() ? HUD_C_CYAN : HUD_C_GREY);
+  set_row(SET_FIL_Y, hud_sd_ok() ? "SD FILES" : "SD: NO CARD / FORMAT", hud_sd_ok() ? HUD_C_CYAN : HUD_C_AMBER);
   set_row(SET_INF_Y, "DEVICE INFO + GPS", HUD_C_CYAN);
   hud_text(HUD_W / 2 - hud_text_w("TAP GEAR TO CLOSE", 1) / 2, CONTENT_B - 12, "TAP GEAR TO CLOSE", 1, HUD_C_GREY);
 }
@@ -828,8 +828,12 @@ static void fm_size_str(uint32_t b, char* out, int n) {
 static void draw_files() {
   hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
   if (!hud_sd_ok()) {
-    hud_text(cen("NO SD CARD", 2), CONTENT_Y + 40, "NO SD CARD", 2, HUD_C_RED);
-    hud_text(cen("TAP TO CLOSE", 1), CONTENT_B - 14, "TAP TO CLOSE", 1, HUD_C_GREY);
+    hud_text(cen("NO SD / UNREADABLE", 1), CONTENT_Y + 30, "NO SD / UNREADABLE", 1, HUD_C_RED);
+    hud_text(cen("reseat the card, or:", 1), CONTENT_Y + 46, "reseat the card, or:", 1, HUD_C_GREY);
+    hud_rect(SET_BTN_X, SET_BRT_Y, SET_BTN_W, 22, HUD_C_RED);
+    const char* fb = s_fmConfirm ? "CONFIRM FORMAT (WIPES ALL)" : "FORMAT CARD -> FAT32";
+    hud_text(HUD_W / 2 - hud_text_w(fb, 1) / 2, SET_BRT_Y + 7, fb, 1, HUD_C_RED);
+    hud_text(cen("TAP ELSEWHERE TO CLOSE", 1), CONTENT_B - 14, "TAP ELSEWHERE TO CLOSE", 1, HUD_C_GREY);
     return;
   }
   char hdr[24]; snprintf(hdr, sizeof(hdr), "SD FILES  %d", s_fmN);
@@ -1006,7 +1010,21 @@ void hud_on_press(int x, int y) {
   if (s_info) { s_info = false; return; }       // device info modal: any tap closes
 
   if (s_files) {                                // SD file manager modal
-    if (!hud_sd_ok()) { s_files = false; return; }
+    if (!hud_sd_ok()) {                         // no card: offer FORMAT (two-tap), else close
+      if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W && y >= SET_BRT_Y && y <= SET_BRT_Y + 22) {
+        if (!s_fmConfirm) s_fmConfirm = true;
+        else {
+          hud_fill_rect(0, CONTENT_Y, HUD_W, CONTENT_B - CONTENT_Y, HUD_C_BG);
+          hud_text(cen("FORMATTING SD...", 2), CONTENT_Y + 50, "FORMATTING SD...", 2, HUD_C_AMBER);
+          hud_text(cen("WAIT ~1-2 MIN", 1), CONTENT_Y + 74, "WAIT ~1-2 MIN", 1, HUD_C_GREY);
+          hud_present_fb(hud_framebuffer(), HUD_W, HUD_H);   // show it before the blocking format
+          hud_sd_format();
+          s_fmConfirm = false;
+          fm_refresh();
+        }
+      } else { s_files = false; s_fmConfirm = false; }
+      return;
+    }
     if (y >= FM_BTN_Y) {
       int bw = HUD_W / 3, col = x / bw;         // 0 = VIEW, 1 = DELETE, 2 = CLOSE
       if (col == 0) { if (s_fmN > 0) { view_open(s_fmName[s_fmSel]); s_view = true; } }
@@ -1049,7 +1067,7 @@ void hud_on_press(int x, int y) {
       hud_set_brightness(c > 200 ? 160 : c > 120 ? 90 : c > 60 ? 40 : 255);
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_FIL_Y && y <= SET_FIL_Y + SET_BTN_H) {
-      if (hud_sd_ok()) { s_files = true; s_settings = false; fm_refresh(); }  // open SD file manager
+      s_files = true; s_settings = false; fm_refresh();   // open SD file manager (works even with no card -> FORMAT)
     } else if (x >= SET_BTN_X && x <= SET_BTN_X + SET_BTN_W &&
                y >= SET_INF_Y && y <= SET_INF_Y + SET_BTN_H) {
       s_info = true; s_settings = false;      // open DEVICE INFO + GPS

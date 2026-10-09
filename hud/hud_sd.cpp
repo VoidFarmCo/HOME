@@ -14,9 +14,10 @@ static sdmmc_card_t* s_card = nullptr;
 static bool s_ok = false;
 static esp_err_t s_err = ESP_FAIL;
 
-bool hud_sd_begin() {
-  // The SPI bus is already up (esp_lcd's spi_bus_initialize), so we only add the
-  // SD as a device on it -- do NOT re-init the bus here.
+// Mount the SD on the shared SPI bus (already up from esp_lcd). allowFormat=true lets
+// the driver reformat a card it cannot mount -- used ONLY by the deliberate FORMAT path,
+// never at boot (a flaky card must not get auto-wiped).
+static esp_err_t do_mount(bool allowFormat) {
   sdmmc_host_t host = SDSPI_HOST_DEFAULT();
   host.slot = SD_HOST;
   host.max_freq_khz = 20000;                 // 20 MHz; the driver negotiates down if needed
@@ -26,14 +27,27 @@ bool hud_sd_begin() {
   dev.host_id  = SD_HOST;
 
   esp_vfs_fat_sdmmc_mount_config_t mcfg = {};
-  // The card is already FAT32 (we formatted it once). Auto-reformat is OFF now: a flaky
-  // card that fails to mount on one boot must NOT get wiped -- that would erase the logs.
-  // A non-FAT32 card just reads ESP_FAIL; format it deliberately (PC, or a FORMAT button).
-  mcfg.format_if_mount_failed = false;
+  mcfg.format_if_mount_failed = allowFormat;
   mcfg.max_files = 4;
   mcfg.allocation_unit_size = 16 * 1024;
+  return esp_vfs_fat_sdspi_mount("/sd", &host, &dev, &mcfg, &s_card);
+}
 
-  s_err = esp_vfs_fat_sdspi_mount("/sd", &host, &dev, &mcfg, &s_card);
+bool hud_sd_begin() {
+  s_err = do_mount(false);                   // boot: never auto-format
+  s_ok = (s_err == ESP_OK);
+  return s_ok;
+}
+
+// Deliberate format (owner action via the FORMAT button): wipe to FAT32 and remount.
+// Blocks for up to ~1-2 min on a big card. Returns true if the card is mounted after.
+bool hud_sd_format() {
+  if (s_ok && s_card) {                      // mounted: wipe it in place
+    s_err = esp_vfs_fat_sdcard_format("/sd", s_card);
+    s_ok = (s_err == ESP_OK);
+    return s_ok;
+  }
+  s_err = do_mount(true);                     // unmountable: mount-with-format recovers it
   s_ok = (s_err == ESP_OK);
   return s_ok;
 }
