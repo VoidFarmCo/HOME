@@ -26,9 +26,12 @@ bool hud_sd_begin() {
   dev.host_id  = SD_HOST;
 
   esp_vfs_fat_sdmmc_mount_config_t mcfg = {};
-  mcfg.format_if_mount_failed = true;        // owner opted in: wipe + FAT32 a card we can't mount
+  // The card is already FAT32 (we formatted it once). Auto-reformat is OFF now: a flaky
+  // card that fails to mount on one boot must NOT get wiped -- that would erase the logs.
+  // A non-FAT32 card just reads ESP_FAIL; format it deliberately (PC, or a FORMAT button).
+  mcfg.format_if_mount_failed = false;
   mcfg.max_files = 4;
-  mcfg.allocation_unit_size = 16 * 1024;     // 16 KB clusters (used for the format too)
+  mcfg.allocation_unit_size = 16 * 1024;
 
   s_err = esp_vfs_fat_sdspi_mount("/sd", &host, &dev, &mcfg, &s_card);
   s_ok = (s_err == ESP_OK);
