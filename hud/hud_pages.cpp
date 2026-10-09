@@ -189,14 +189,22 @@ static void page_radar(uint32_t now) {
   int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2, R = (CONTENT_B - CONTENT_Y) / 2 - 4;
   const GpsFix& g = hud_gps();
   int dn = hud_engage_drone_count();
+  int fn = g.valid ? hud_comms_friend_count() : 0;   // teammates (blue force)
+  FriendInfo fi;
 
-  // auto range: farthest drone (min 300 m), rounded up to 100 m
+  // auto range: farthest drone / pilot / teammate (min 300 m), rounded up to 100 m
   double maxR = 300;
   DroneInfo d;
-  if (g.valid)
+  if (g.valid) {
     for (int i = 0; i < dn; i++) {
-      if (hud_engage_drone(i, &d) && d.loc) { float b; double dist = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b); if (dist > maxR) maxR = dist; }
+      if (!hud_engage_drone(i, &d)) continue;
+      float b;
+      if (d.loc) { double dd = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b); if (dd > maxR) maxR = dd; }
+      if (d.op)  { double od = geo_dist_brg(g.lat, g.lon, d.oplat, d.oplon, &b); if (od > maxR) maxR = od; }
     }
+    for (int i = 0; i < fn; i++)
+      if (hud_comms_friend(i, &fi)) { float b; double fd = geo_dist_brg(g.lat, g.lon, fi.lat, fi.lon, &b); if (fd > maxR) maxR = fd; }
+  }
   maxR = ((int)(maxR / 100) + 1) * 100.0;
 
   // rings + crosshair + sweep + N
@@ -210,14 +218,32 @@ static void page_radar(uint32_t now) {
   if (hud_engage_last_ms() && (now - hud_engage_last_ms() < 5000) && ((now / 250) & 1))
     hud_ring(cx, cy, R - 1, HUD_C_RED);
 
-  // drones at true bearing + range
+  // drones (red disc) + their pilot/operator (amber cross) at true bearing + range
   if (g.valid)
     for (int i = 0; i < dn; i++) {
-      if (!hud_engage_drone(i, &d) || !d.loc) continue;
-      float b; double dist = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b);
+      if (!hud_engage_drone(i, &d)) continue;
+      float b;
+      if (d.loc) {
+        double dist = geo_dist_brg(g.lat, g.lon, d.lat, d.lon, &b);
+        double rr = (dist / maxR) * R; if (rr > R) rr = R;
+        int bx = cx + (int)(sinf(b * 0.01745f) * rr), by = cy - (int)(cosf(b * 0.01745f) * rr);
+        hud_disc(bx, by, 3, HUD_C_RED); hud_ring(bx, by, 5, HUD_C_RED);
+      }
+      if (d.op) {                                   // the pilot, from the drone's own broadcast
+        double dist = geo_dist_brg(g.lat, g.lon, d.oplat, d.oplon, &b);
+        double rr = (dist / maxR) * R; if (rr > R) rr = R;
+        int px = cx + (int)(sinf(b * 0.01745f) * rr), py = cy - (int)(cosf(b * 0.01745f) * rr);
+        hud_line(px - 3, py, px + 3, py, HUD_C_AMBER); hud_line(px, py - 3, px, py + 3, HUD_C_AMBER);
+      }
+    }
+  // teammates (blue force) at true bearing + range -- green
+  if (g.valid)
+    for (int i = 0; i < fn; i++) {
+      if (!hud_comms_friend(i, &fi)) continue;
+      float b; double dist = geo_dist_brg(g.lat, g.lon, fi.lat, fi.lon, &b);
       double rr = (dist / maxR) * R; if (rr > R) rr = R;
-      int bx = cx + (int)(sinf(b * 0.01745f) * rr), by = cy - (int)(cosf(b * 0.01745f) * rr);
-      hud_disc(bx, by, 3, HUD_C_RED); hud_ring(bx, by, 5, HUD_C_RED);
+      int fx = cx + (int)(sinf(b * 0.01745f) * rr), fy = cy - (int)(cosf(b * 0.01745f) * rr);
+      hud_disc(fx, fy, 3, HUD_C_GREEN); hud_ring(fx, fy, 5, HUD_C_GREEN);
     }
   hud_disc(cx, cy, 2, HUD_C_WHITE);                 // you
 
@@ -225,7 +251,7 @@ static void page_radar(uint32_t now) {
   hud_fill_rect(0, CONTENT_B - 13, HUD_W, 13, HUD_C_STRIP);
   char ln[48];
   if (!g.valid) snprintf(ln, sizeof(ln), "DRONES %d   NO GPS", dn);
-  else          snprintf(ln, sizeof(ln), "DRONES %d   RANGE %dM", dn, (int)maxR);
+  else          snprintf(ln, sizeof(ln), "DRONES %d  TEAM %d  RANGE %dM", dn, fn, (int)maxR);
   hud_text(6, CONTENT_B - 10, ln, 1, dn ? HUD_C_RED : HUD_C_GREEN);
 }
 
@@ -427,6 +453,22 @@ static void page_map(uint32_t now) {
     }
   }
 
+  // teammates (blue force) relative to you -- green dot + short name
+  if (g.valid) {
+    double cosl = cos(g.lat * 0.01745);
+    int fn = hud_comms_friend_count();
+    FriendInfo fi;
+    for (int i = 0; i < fn; i++) {
+      if (!hud_comms_friend(i, &fi)) continue;
+      int fx = cx + (int)(((fi.lon - g.lon) * 111320.0 * cosl) / MPP);
+      int fy = cy - (int)(((fi.lat - g.lat) * 111320.0) / MPP);
+      if (fx >= 0 && fx < HUD_W && fy >= CONTENT_Y + 2 && fy < CONTENT_B - 2) {
+        hud_disc(fx, fy, 2, HUD_C_GREEN);
+        hud_text(fx + 4, fy - 3, fi.name, 1, HUD_C_GREEN);
+      }
+    }
+  }
+
   // you-marker: arrow along the travel heading when moving, else up (N)
   float a = (s_moving ? s_hdg : 0.0f) * 0.01745329f;
   int tx = cx + (int)(sinf(a) * 9), ty = cy - (int)(cosf(a) * 9);
@@ -562,6 +604,8 @@ static void page_comms(uint32_t now) {
   char nh[32]; snprintf(nh, sizeof(nh), "NET: %s", hud_comms_net());
   hud_text(6, NET_Y, nh, 1, hud_comms_net_open() ? HUD_C_GREEN : HUD_C_CYAN);
   hud_text(HUD_W - hud_text_w("[SET]", 1) - 6, NET_Y, "[SET]", 1, HUD_C_GREY);
+  if (hud_comms_beaconing())                       // blue-force position beacon is live
+    hud_text(HUD_W - hud_text_w("[SET]", 1) - hud_text_w("BF", 1) - 12, NET_Y, "BF", 1, HUD_C_GREEN);
 
   int bottom = s_kb ? kb_top() - 14 : strip_top();
   const ChatMsg* L = hud_comms_log();

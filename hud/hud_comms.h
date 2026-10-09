@@ -26,3 +26,18 @@ bool            hud_comms_net_open();               // is the active net the ope
 
 extern const char* const HUD_QUICKMSG[];           // the canned quick-messages
 int             hud_quickmsg_count();
+
+// ---- Blue-force tracking ----
+// Teammates' GPS shared over the SAME private net as chat (keyed nets ONLY -- we never
+// beacon your position on the OPEN net). A position beacon is tagged 0xFF, an invalid
+// chat nameLen, so chat-only H.O.M.E devices drop it. Wire (before net crypto):
+//   [0xFF][nameLen][name...][lat float32][lon float32]
+// Friends age off the scope after FRIEND_AGE. One radio -> this only runs on COMMS.
+#define FRIEND_MAX    8
+#define FRIEND_AGE    120000     // ms a teammate stays plotted after last heard
+#define POS_BEACON_MS 3000       // how often we beacon our own position (on COMMS)
+struct FriendInfo { char name[12]; double lat, lon; uint32_t age_ms; };
+void hud_comms_tick(uint32_t now, bool gps_valid, double lat, double lon);  // beacon; COMMS only
+int  hud_comms_friend_count();                 // teammates heard within FRIEND_AGE
+bool hud_comms_friend(int i, FriendInfo* out); // i-th fresh teammate (name + lat/lon + age)
+bool hud_comms_beaconing();                    // are we broadcasting our position right now?

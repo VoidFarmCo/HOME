@@ -308,7 +308,7 @@ void loop() {
     if (m == M_COMMS)            hud_comms_enter();
     if (promisc && !lastPromisc) hud_engage_enter();   // entering the sniffer
   }
-  if (m == M_COMMS) { /* chat owns the radio */ }
+  if (m == M_COMMS) { const GpsFix& g = hud_gps(); hud_comms_tick(millis(), g.valid, g.lat, g.lon); }  // chat + blue-force beacon
   else if (promisc) { hud_engage_tick(millis()); }
   else              { hud_scan_tick(millis()); }
   lastMode = m;

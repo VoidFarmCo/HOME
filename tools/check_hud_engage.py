@@ -37,6 +37,11 @@ def main():
        "hud_engage_drone_count()" in PG and "geo_dist_brg(" in PG and "DRN %dM" in PG)
     ok("RADAR plots drones at their true bearing + range from the GPS fix",
        re.search(r"page_radar\([^)]*\).*?hud_engage_drone\(.*?geo_dist_brg\(g\.lat", PG, re.S) is not None)
+    radar = re.search(r"static void page_radar\(.*?\n\}", PG, re.S)
+    rbody = radar.group(0) if radar else ""
+    ok("RADAR also plots the pilot/operator (amber) from the drone's broadcast",
+       "geo_dist_brg(g.lat, g.lon, d.oplat, d.oplon" in rbody
+       and "px + 3, py, HUD_C_AMBER" in rbody)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0
