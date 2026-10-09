@@ -83,6 +83,34 @@ static void parse_pos_frame(const uint8_t* f, int len) {
   friend_update(name, (double)lat, (double)lon);
 }
 
+// ---- shared marks: a point a teammate dropped and SENT over the net ----
+#define MARK_TYPE 0xFE
+#define MARK_AGE  600000              // marks persist 10 min (longer than a position)
+static Friend s_mk[FRIEND_MAX];       // same shape: sender name + lat/lon + last-heard
+static int    s_mkN = 0;
+
+static void mark_update(const char* name, double lat, double lon) {
+  uint32_t now = millis();
+  for (int i = 0; i < s_mkN; i++)                        // one latest mark per sender
+    if (!strcmp(s_mk[i].name, name)) { s_mk[i].lat = lat; s_mk[i].lon = lon; s_mk[i].last = now; return; }
+  Friend* m;
+  if (s_mkN < FRIEND_MAX) m = &s_mk[s_mkN++];
+  else { int o = 0; for (int i = 1; i < s_mkN; i++) if (s_mk[i].last < s_mk[o].last) o = i; m = &s_mk[o]; }
+  strncpy(m->name, name, sizeof(m->name) - 1); m->name[sizeof(m->name) - 1] = 0;
+  m->lat = lat; m->lon = lon; m->last = now;
+}
+
+// Mark frame: [0xFE][nameLen][name][lat f32][lon f32].
+static void parse_mark_frame(const uint8_t* f, int len) {
+  if (len < 2 || f[0] != MARK_TYPE) return;
+  int nl = f[1];
+  if (nl < 1 || nl > CHAT_NAME_MAX || 2 + nl + 8 > len) return;
+  char name[CHAT_NAME_MAX + 1]; memcpy(name, f + 2, nl); name[nl] = 0;
+  if (!strcmp(name, s_name)) return;
+  float lat, lon; memcpy(&lat, f + 2 + nl, 4); memcpy(&lon, f + 2 + nl + 4, 4);
+  mark_update(name, (double)lat, (double)lon);
+}
+
 // ESP-NOW receive (arduino-esp32 3.x). Packet = [netId(2)][payload]. We accept the
 // active net (decrypt) and always the OPEN net (plaintext); other nets are ignored.
 static void on_recv(const esp_now_recv_info_t* info, const uint8_t* data, int len) {
@@ -96,8 +124,9 @@ static void on_recv(const esp_now_recv_info_t* info, const uint8_t* data, int le
   } else if (!s_netOpen && id == s_netId) {        // our keyed net: decrypt
     int fl = chat_decrypt(s_netKey, payload, plen, frame);
     if (fl > 0) {
-      if (frame[0] == POS_TYPE) parse_pos_frame(frame, fl);   // blue-force position beacon
-      else                      parse_frame(frame, fl, false);
+      if (frame[0] == POS_TYPE)       parse_pos_frame(frame, fl);   // blue-force position beacon
+      else if (frame[0] == MARK_TYPE) parse_mark_frame(frame, fl);  // a teammate's shared mark
+      else                            parse_frame(frame, fl, false);
     }
   }
 }
@@ -203,3 +232,42 @@ bool hud_comms_friend(int i, FriendInfo* out) {
   return false;
 }
 bool hud_comms_beaconing() { return s_beaconing; }
+
+// ---- shared mark TX + accessors ----
+// Broadcast a dropped point on the active KEYED net (never OPEN). Same framing as a
+// position beacon but tagged 0xFE; teammates store it and show it on their map.
+void hud_comms_send_mark(double lat, double lon) {
+  if (!s_ready || s_netOpen) return;
+  uint8_t frame[2 + CHAT_NAME_MAX + 8];
+  int nl = (int)strlen(s_name); if (nl > CHAT_NAME_MAX) nl = CHAT_NAME_MAX;
+  frame[0] = MARK_TYPE; frame[1] = (uint8_t)nl;
+  memcpy(frame + 2, s_name, nl);
+  float la = (float)lat, lo = (float)lon;
+  memcpy(frame + 2 + nl, &la, 4); memcpy(frame + 2 + nl + 4, &lo, 4);
+  int fl = 2 + nl + 8;
+  uint8_t pkt[2 + sizeof(frame) + 16];
+  pkt[0] = (uint8_t)(s_netId >> 8); pkt[1] = (uint8_t)(s_netId & 0xFF);
+  int plen = chat_encrypt(s_netKey, frame, fl, pkt + 2);
+  if (plen <= 0) return;
+  esp_now_send(BCAST, pkt, 2 + plen);
+  push(s_name, "[MARK SENT]", true, false);         // confirm it in the chat log
+}
+
+int hud_comms_mark_count() {
+  uint32_t now = millis(); int k = 0;
+  for (int i = 0; i < s_mkN; i++) if (now - s_mk[i].last < MARK_AGE) k++;
+  return k;
+}
+bool hud_comms_mark(int i, FriendInfo* out) {
+  uint32_t now = millis(); int k = 0;
+  for (int j = 0; j < s_mkN; j++) {
+    if (now - s_mk[j].last >= MARK_AGE) continue;
+    if (k == i) {
+      strncpy(out->name, s_mk[j].name, sizeof(out->name) - 1); out->name[sizeof(out->name) - 1] = 0;
+      out->lat = s_mk[j].lat; out->lon = s_mk[j].lon; out->age_ms = now - s_mk[j].last;
+      return true;
+    }
+    k++;
+  }
+  return false;
+}

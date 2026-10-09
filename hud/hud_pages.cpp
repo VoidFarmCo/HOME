@@ -359,7 +359,12 @@ static void draw_detail() {
 // ---- MAP: GPS moving-map base (grid + you-marker + breadcrumb trail + heading/speed).
 // Topo tiles render under the grid once an SD card + tiles are present. ----
 #define TRAIL_MAX 40
-#define MPP 3.0                       // metres per pixel on the MAP
+static const double MAP_MPP[] = { 1, 3, 8, 25, 80 };   // metres/pixel zoom steps
+#define MAP_ZOOM_N ((int)(sizeof(MAP_MPP) / sizeof(MAP_MPP[0])))
+static int    s_mapZoom = 1;              // index into MAP_MPP (default 3 m/px)
+static double s_panE = 0, s_panN = 0;     // view-centre offset from you: metres east / north
+#define MAP_BTN_H 20                      // bottom button row height
+#define MAP_BOT (CONTENT_B - MAP_BTN_H - 24)   // map area bottom (above 2 readout lines + buttons)
 static double s_trLat[TRAIL_MAX], s_trLon[TRAIL_MAX];
 static int    s_trCount = 0;
 static uint32_t s_trLast = 0;
@@ -378,28 +383,41 @@ static const char* cardinal(float deg) {
   return C[((int)((deg + 22.5f) / 45.0f)) & 7];
 }
 
+// MAP button row: [-] [+] [MARK] [SEND] [ME]
+static const char* const MAP_BTN[] = { "-", "+", "MARK", "SEND", "ME" };
+#define MAP_BTN_N 5
+#define MAP_BTN_W (HUD_W / MAP_BTN_N)
+
 static void page_map(uint32_t now) {
   const GpsFix& g = hud_gps();
-  int cx = HUD_W / 2, cy = (CONTENT_Y + CONTENT_B) / 2;
+  double mpp = MAP_MPP[s_mapZoom];
+  double cosl = g.valid ? cos(g.lat * 0.01745) : 1.0;
+  int cx = HUD_W / 2;
+  int mapBot = MAP_BOT;
+  int cy = (CONTENT_Y + mapBot) / 2;
+  // project a geo point to screen (you-centred, with zoom + pan). true = inside the map area.
+  auto proj = [&](double la, double lo, int& sx, int& sy) -> bool {
+    double mE = (lo - g.lon) * 111320.0 * cosl;
+    double mN = (la - g.lat) * 111320.0;
+    sx = cx + (int)((mE - s_panE) / mpp);
+    sy = cy - (int)((mN - s_panN) / mpp);
+    return (sx >= 0 && sx < HUD_W && sy >= CONTENT_Y && sy < mapBot);
+  };
 
-  // grid that scrolls with position (so it reads as a moving map once GPS is live)
-  int ox = 0, oy = 0;
-  if (g.valid) {
-    ox = (int)(fmod(g.lon * 100000.0, 32.0));
-    oy = (int)(fmod(g.lat * 100000.0, 32.0));
-  }
-  for (int gx = -32 + ((ox % 32) + 32) % 32; gx < HUD_W; gx += 32)
-    hud_fill_rect(gx, CONTENT_Y, 1, CONTENT_B - CONTENT_Y, HUD_C_DGREEN);
-  for (int gy = CONTENT_Y - 32 + ((oy % 32) + 32) % 32; gy < CONTENT_B; gy += 32)
-    if (gy >= CONTENT_Y) hud_fill_rect(0, gy, HUD_W, 1, HUD_C_DGREEN);
-  hud_text(cx + 8, CONTENT_Y + 4, "N", 1, HUD_C_WHITE);   // north hint
+  hud_fill_rect(0, CONTENT_Y, HUD_W, mapBot - CONTENT_Y, HUD_C_BG);
+  // reference grid, shifted by the pan so panning reads as movement
+  int offx = ((int)(-s_panE / mpp) % 32 + 32) % 32;
+  int offy = ((int)(s_panN / mpp) % 32 + 32) % 32;
+  for (int x = offx; x < HUD_W; x += 32) hud_fill_rect(x, CONTENT_Y, 1, mapBot - CONTENT_Y, HUD_C_DGREEN);
+  for (int y = CONTENT_Y + offy; y < mapBot; y += 32) hud_fill_rect(0, y, HUD_W, 1, HUD_C_DGREEN);
+  hud_text(HUD_W - 10, CONTENT_Y + 3, "N", 1, HUD_C_WHITE);
 
-  // breadcrumb: record a point ~once/sec when it has moved > ~2 m
+  // breadcrumb trail (record when moved > ~2 m)
   if (g.valid && (now - s_trLast > 1000)) {
     bool far = true;
     if (s_trCount > 0) {
       double dy = (g.lat - s_trLat[s_trCount - 1]) * 111320.0;
-      double dx = (g.lon - s_trLon[s_trCount - 1]) * 111320.0 * cos(g.lat * 0.01745);
+      double dx = (g.lon - s_trLon[s_trCount - 1]) * 111320.0 * cosl;
       far = (dx * dx + dy * dy) > 4.0;
     }
     if (far) {
@@ -412,93 +430,102 @@ static void page_map(uint32_t now) {
       s_trLast = now;
     }
   }
-  // draw the trail relative to the current position (you = centre, N up)
-  if (g.valid) {
-    double cosl = cos(g.lat * 0.01745);
-    for (int i = 0; i < s_trCount; i++) {
-      int bx = cx + (int)(((s_trLon[i] - g.lon) * 111320.0 * cosl) / MPP);
-      int by = cy - (int)(((s_trLat[i] - g.lat) * 111320.0) / MPP);
-      if (bx >= 0 && bx < HUD_W && by >= CONTENT_Y && by < CONTENT_B)
-        hud_disc(bx, by, 1, HUD_C_AMBER);
-    }
-  }
+  int sx, sy;
+  if (g.valid)
+    for (int i = 0; i < s_trCount; i++)
+      if (proj(s_trLat[i], s_trLon[i], sx, sy)) hud_disc(sx, sy, 1, HUD_C_AMBER);
 
-  // moving? decide from displacement over MOVE_MS, and derive speed+heading from it
+  // moving? displacement over MOVE_MS -> speed + heading
   if (g.valid) {
     if (s_refT == 0) { s_refLat = g.lat; s_refLon = g.lon; s_refT = now; }
     uint32_t dt = now - s_refT;
     if (dt >= MOVE_MS) {
       double dy = (g.lat - s_refLat) * 111320.0;
-      double dx = (g.lon - s_refLon) * 111320.0 * cos(g.lat * 0.01745);
+      double dx = (g.lon - s_refLon) * 111320.0 * cosl;
       double dist = sqrt(dx * dx + dy * dy);
       if (dist > MOVE_M) {
         s_moving = true;
         s_spdMph = (float)(dist / (dt / 1000.0) * 2.23694);
         s_hdg = atan2f((float)dx, (float)dy) * 57.2958f; if (s_hdg < 0) s_hdg += 360;
-      } else {
-        s_moving = false;
-      }
-      s_refLat = g.lat; s_refLon = g.lon; s_refT = now;   // new window
+      } else s_moving = false;
+      s_refLat = g.lat; s_refLon = g.lon; s_refT = now;
     }
   } else { s_moving = false; s_refT = 0; }
 
-  // waypoint marker (cyan diamond) at its position relative to you, if on screen
-  if (g.valid && s_wpSet) {
-    double cosl = cos(g.lat * 0.01745);
-    int wx = cx + (int)(((s_wpLon - g.lon) * 111320.0 * cosl) / MPP);
-    int wy = cy - (int)(((s_wpLat - g.lat) * 111320.0) / MPP);
-    if (wx >= 2 && wx < HUD_W - 2 && wy >= CONTENT_Y + 2 && wy < CONTENT_B - 2) {
-      hud_line(wx, wy - 4, wx + 4, wy, HUD_C_CYAN); hud_line(wx + 4, wy, wx, wy + 4, HUD_C_CYAN);
-      hud_line(wx, wy + 4, wx - 4, wy, HUD_C_CYAN); hud_line(wx - 4, wy, wx, wy - 4, HUD_C_CYAN);
-    }
-  }
-
-  // teammates (blue force) relative to you -- green dot + short name
+  // teammates' shared MARKS (amber X + sender name)
   if (g.valid) {
-    double cosl = cos(g.lat * 0.01745);
-    int fn = hud_comms_friend_count();
-    FriendInfo fi;
-    for (int i = 0; i < fn; i++) {
-      if (!hud_comms_friend(i, &fi)) continue;
-      int fx = cx + (int)(((fi.lon - g.lon) * 111320.0 * cosl) / MPP);
-      int fy = cy - (int)(((fi.lat - g.lat) * 111320.0) / MPP);
-      if (fx >= 0 && fx < HUD_W && fy >= CONTENT_Y + 2 && fy < CONTENT_B - 2) {
-        hud_disc(fx, fy, 2, HUD_C_GREEN);
-        hud_text(fx + 4, fy - 3, fi.name, 1, HUD_C_GREEN);
+    int mn = hud_comms_mark_count(); FriendInfo mk;
+    for (int i = 0; i < mn; i++)
+      if (hud_comms_mark(i, &mk) && proj(mk.lat, mk.lon, sx, sy)) {
+        hud_line(sx - 4, sy - 4, sx + 4, sy + 4, HUD_C_AMBER);
+        hud_line(sx - 4, sy + 4, sx + 4, sy - 4, HUD_C_AMBER);
+        hud_text(sx + 5, sy - 3, mk.name, 1, HUD_C_AMBER);
       }
-    }
   }
 
-  // you-marker: arrow along the travel heading when moving, else up (N)
-  float a = (s_moving ? s_hdg : 0.0f) * 0.01745329f;
-  int tx = cx + (int)(sinf(a) * 9), ty = cy - (int)(cosf(a) * 9);
-  int lx2 = cx + (int)(sinf(a + 2.6f) * 7), ly2 = cy - (int)(cosf(a + 2.6f) * 7);
-  int rx2 = cx + (int)(sinf(a - 2.6f) * 7), ry2 = cy - (int)(cosf(a - 2.6f) * 7);
-  uint16_t mc = g.valid ? HUD_C_GREEN : HUD_C_GREY;
-  hud_line(tx, ty, lx2, ly2, mc); hud_line(tx, ty, rx2, ry2, mc); hud_line(lx2, ly2, rx2, ry2, mc);
+  // YOUR dropped mark (cyan diamond)
+  if (g.valid && s_wpSet && proj(s_wpLat, s_wpLon, sx, sy)) {
+    hud_line(sx, sy - 4, sx + 4, sy, HUD_C_CYAN); hud_line(sx + 4, sy, sx, sy + 4, HUD_C_CYAN);
+    hud_line(sx, sy + 4, sx - 4, sy, HUD_C_CYAN); hud_line(sx - 4, sy, sx, sy - 4, HUD_C_CYAN);
+  }
 
-  // readout panel (two lines): position, then heading/speed (moving) or status
-  hud_fill_rect(0, CONTENT_B - 26, HUD_W, 26, HUD_C_STRIP);
+  // teammates (blue force) -- green dot + name
+  if (g.valid) {
+    int fn = hud_comms_friend_count(); FriendInfo fi;
+    for (int i = 0; i < fn; i++)
+      if (hud_comms_friend(i, &fi) && proj(fi.lat, fi.lon, sx, sy)) {
+        hud_disc(sx, sy, 2, HUD_C_GREEN);
+        hud_text(sx + 4, sy - 3, fi.name, 1, HUD_C_GREEN);
+      }
+  }
+
+  // you-marker: heading arrow, at your projected position (off-centre when panned)
+  int yx = cx, yy = cy;
+  if (g.valid) proj(g.lat, g.lon, yx, yy);
+  float a = (s_moving ? s_hdg : 0.0f) * 0.01745329f;
+  uint16_t mc = g.valid ? HUD_C_GREEN : HUD_C_GREY;
+  if (yx >= -8 && yx < HUD_W + 8 && yy >= CONTENT_Y - 8 && yy < mapBot + 8) {
+    int tx = yx + (int)(sinf(a) * 9), ty = yy - (int)(cosf(a) * 9);
+    int lx2 = yx + (int)(sinf(a + 2.6f) * 7), ly2 = yy - (int)(cosf(a + 2.6f) * 7);
+    int rx2 = yx + (int)(sinf(a - 2.6f) * 7), ry2 = yy - (int)(cosf(a - 2.6f) * 7);
+    hud_line(tx, ty, lx2, ly2, mc); hud_line(tx, ty, rx2, ry2, mc); hud_line(lx2, ly2, rx2, ry2, mc);
+  }
+
+  // centre crosshair = where MARK drops (the view centre)
+  hud_line(cx - 5, cy, cx + 5, cy, HUD_C_WHITE); hud_line(cx, cy - 5, cx, cy + 5, HUD_C_WHITE);
+
+  // ---- readout (two lines, above the buttons) ----
+  int ry1 = CONTENT_B - MAP_BTN_H - 22, ry2 = CONTENT_B - MAP_BTN_H - 11;
+  hud_fill_rect(0, ry1 - 2, HUD_W, 22, HUD_C_STRIP);
   char ln[48];
   if (g.valid) {
-    snprintf(ln, sizeof(ln), "%.5f %.5f", g.lat, g.lon);
-    hud_text(6, CONTENT_B - 22, ln, 1, HUD_C_GREEN);
-    if (s_wpSet) {                               // navigating to a waypoint
+    if (s_wpSet) {                                                 // line 1: position or mark nav
       float wb; double wd = geo_dist_brg(g.lat, g.lon, s_wpLat, s_wpLon, &wb);
-      snprintf(ln, sizeof(ln), "WP %dM  %03d %s  TAP:CLEAR", (int)wd, (int)wb, cardinal(wb));
-      hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_CYAN);
-    } else if (s_moving) {
-      snprintf(ln, sizeof(ln), "HDG %03d %s  %.1f MPH  SAT %d",
-               (int)s_hdg, cardinal(s_hdg), s_spdMph, g.sats);
-      hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
-    } else {
-      snprintf(ln, sizeof(ln), "STOPPED  SAT %d  TAP:DROP WP", g.sats);
-      hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
-    }
+      snprintf(ln, sizeof(ln), "MARK %dM %03d %s", (int)wd, (int)wb, cardinal(wb));
+    } else snprintf(ln, sizeof(ln), "%.5f %.5f", g.lat, g.lon);
+    hud_text(6, ry1, ln, 1, s_wpSet ? HUD_C_CYAN : HUD_C_GREEN);
+    if (s_moving)                                                  // line 2: heading/speed or status
+      snprintf(ln, sizeof(ln), "HDG %03d %s  %.1f MPH  SAT %d", (int)s_hdg, cardinal(s_hdg), s_spdMph, g.sats);
+    else
+      snprintf(ln, sizeof(ln), "STOPPED  SAT %d  ALT %dM", g.sats, (int)g.altm);
+    hud_text(6, ry2, ln, 1, HUD_C_GREY);
   } else {
-    hud_text(6, CONTENT_B - 22, "ACQUIRING GPS...", 1, HUD_C_AMBER);
+    hud_text(6, ry1, "ACQUIRING GPS...", 1, HUD_C_AMBER);
     snprintf(ln, sizeof(ln), "SAT %d   NO FIX", g.sats);
-    hud_text(6, CONTENT_B - 10, ln, 1, HUD_C_GREY);
+    hud_text(6, ry2, ln, 1, HUD_C_GREY);
+  }
+  char zl[12]; snprintf(zl, sizeof(zl), "%dm/px", (int)mpp);        // scale, right-aligned on line 1
+  hud_text(HUD_W - hud_text_w(zl, 1) - 4, ry1, zl, 1, HUD_C_GREY);
+
+  // ---- button row ----
+  int by = CONTENT_B - MAP_BTN_H;
+  bool canSend = s_wpSet && !hud_comms_net_open();
+  for (int i = 0; i < MAP_BTN_N; i++) {
+    int bx = i * MAP_BTN_W;
+    uint16_t c = (i == 3) ? (canSend ? HUD_C_GREEN : HUD_C_GREY)
+               : (i == 2) ? HUD_C_CYAN : (i == 4) ? HUD_C_AMBER : HUD_C_CYAN;
+    hud_fill_rect(bx, by, MAP_BTN_W - 1, MAP_BTN_H, HUD_C_STRIP);
+    hud_text(bx + (MAP_BTN_W - hud_text_w(MAP_BTN[i], 1)) / 2, by + (MAP_BTN_H - 7) / 2, MAP_BTN[i], 1, c);
   }
 }
 
@@ -792,6 +819,31 @@ static int scan_zone(int y) {
   return 0;
 }
 
+// MAP controls: the button row (press only) + edge-pan (press or hold).
+static void map_touch(int x, int y, bool repeat) {
+  int mapBot = MAP_BOT;
+  int by = CONTENT_B - MAP_BTN_H;
+  if (!repeat && y >= by) {                          // button row
+    int b = x / MAP_BTN_W;
+    const GpsFix& g = hud_gps();
+    double cosl = g.valid ? cos(g.lat * 0.01745) : 1.0;
+    if (b == 0) { if (s_mapZoom < MAP_ZOOM_N - 1) s_mapZoom++; }     // [-] zoom out
+    else if (b == 1) { if (s_mapZoom > 0) s_mapZoom--; }            // [+] zoom in
+    else if (b == 2) {                                             // [MARK] at the view centre
+      if (g.valid) { s_wpLat = g.lat + s_panN / 111320.0;
+                     s_wpLon = g.lon + s_panE / (111320.0 * cosl); s_wpSet = true; }
+    } else if (b == 3) {                                           // [SEND] the mark on the net
+      if (s_wpSet && !hud_comms_net_open()) hud_comms_send_mark(s_wpLat, s_wpLon);
+    } else if (b == 4) { s_panE = 0; s_panN = 0; }                 // [ME] recentre on yourself
+    return;
+  }
+  if (y < CONTENT_Y || y >= mapBot) return;          // map area: edge-pan toward the tap
+  int cx = HUD_W / 2, cy = (CONTENT_Y + mapBot) / 2;
+  double step = 40.0 * MAP_MPP[s_mapZoom];
+  if (x > cx + 20) s_panE += step; else if (x < cx - 20) s_panE -= step;
+  if (y < cy - 20) s_panN += step; else if (y > cy + 20) s_panN -= step;
+}
+
 void hud_on_press(int x, int y) {
   // drone alarm is modal: the first tap just acknowledges it
   if (hud_engage_drone_count() > 0 && !s_droneAck) { s_droneAck = true; return; }
@@ -852,19 +904,18 @@ void hud_on_press(int x, int y) {
       else if (z >= 0) hud_comms_send(HUD_QUICKMSG[z]);
     }
   } else if (hud_mode_get() == M_MAP) {
-    // tap toggles the waypoint: drop one at your position, or clear the one you have
-    if (s_wpSet) s_wpSet = false;
-    else { const GpsFix& g = hud_gps(); if (g.valid) { s_wpLat = g.lat; s_wpLon = g.lon; s_wpSet = true; } }
+    map_touch(x, y, false);                    // zoom / mark / send / recentre / pan
   }
 }
 
 void hud_on_repeat(int x, int y) {
-  (void)x;
   if (s_settings || s_detail) return;         // no auto-repeat while a panel is open
   if (y >= HUD_H - TAB_H) return;             // tabs/enter don't auto-repeat
   if (hud_mode_get() == M_SCAN) {
     int z = scan_zone(y);
     if (z == -1) scan_move(-1);
     else if (z == +1) scan_move(+1);
+  } else if (hud_mode_get() == M_MAP) {
+    map_touch(x, y, true);                     // hold to keep panning
   }
 }

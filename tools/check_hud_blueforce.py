@@ -38,8 +38,8 @@ def main():
        "hud_comms_friend(i, &fi)" in rb and "geo_dist_brg(g.lat, g.lon, fi.lat, fi.lon" in rb
        and "hud_disc(fx, fy, 3, HUD_C_GREEN)" in rb)
     ok("MAP plots teammates in green",
-       "hud_comms_friend(i, &fi)" in mb and "fi.lon - g.lon" in mb
-       and "hud_disc(fx, fy, 2, HUD_C_GREEN)" in mb)
+       "hud_comms_friend(i, &fi)" in mb and "proj(fi.lat, fi.lon" in mb
+       and "hud_disc(sx, sy, 2, HUD_C_GREEN)" in mb)
     print()
     if FAILED: print("FAILED: %d" % len(FAILED)); return 1
     print("all checks passed"); return 0

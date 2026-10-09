@@ -41,3 +41,8 @@ void hud_comms_tick(uint32_t now, bool gps_valid, double lat, double lon);  // b
 int  hud_comms_friend_count();                 // teammates heard within FRIEND_AGE
 bool hud_comms_friend(int i, FriendInfo* out); // i-th fresh teammate (name + lat/lon + age)
 bool hud_comms_beaconing();                    // are we broadcasting our position right now?
+
+// Shared marks: a point you dropped and SENT, received by teammates on the keyed net.
+void hud_comms_send_mark(double lat, double lon);  // broadcast a dropped point (keyed net only)
+int  hud_comms_mark_count();                       // teammates' shared marks (within MARK_AGE)
+bool hud_comms_mark(int i, FriendInfo* out);       // i-th shared mark (sender name + lat/lon + age)
