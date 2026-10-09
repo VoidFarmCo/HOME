@@ -3,12 +3,13 @@
 #include <string.h>
 
 // ---- live WiFi contacts, DUAL-BAND (2.4 GHz + 5 GHz), PERSISTENT/TRACKED ----
-// The ESP32-C5 is dual-band but its radio does ONE band at a time, so each cycle
-// scans 2.4 GHz, switches the band, scans 5 GHz. The list is STABLE: an AP is kept
-// in place and only its signal updates (keyed by BSSID), new APs are appended, and
-// APs not seen for a while (gone) or too distant (below the add cutoff) drop off.
-// No per-cycle re-sort -> the list doesn't jump under the cursor. Scans are async
-// (WiFi.scanNetworks(true)) so they don't block the ~29 FPS loop.
+// The ESP32-C5 is dual-band but its radio does ONE band at a time. Each cycle scans
+// just ONE band, alternating 2.4 <-> 5 GHz, because WiFi.setBandMode + scanNetworks
+// START blocks the loop ~100 ms on the C5 -- one switch per cycle (not two) spaced by
+// SCAN_GAP keeps that hitch rare (SCAN is the only page that scans). The list is
+// STABLE: an AP is kept in place and only its signal updates (keyed by BSSID), new
+// APs are appended, and APs gone for AGE_MS (> 2 cycles, so the un-scanned band does
+// not age out) or too distant (below ADD_RSSI) drop off. No per-cycle re-sort.
 // (BLE is parked: the C5's BT controller crash-loops in arduino-esp32 3.3.12 -- a
 // known upstream coexistence bug. The ble_* accessors stay, returning empty.)
 
@@ -22,14 +23,19 @@ static char     s_target[24] = {0};
 static int8_t   s_target_rssi = -127;
 static bool     s_target_seen = false;
 
-enum Phase { P_2G_START, P_2G_RUN, P_5G_START, P_5G_RUN, P_WAIT };
-static Phase    s_phase = P_2G_START;
+// One band per cycle, ALTERNATING, so each tick does at most one WiFi.setBandMode +
+// one scanNetworks start -- the pair that blocks the loop ~100 ms on the C5. Spacing
+// the cycles keeps that hitch rare (the SCAN page is the only page that scans).
+enum Phase { P_START, P_RUN, P_WAIT };
+static Phase    s_phase = P_START;
 static uint32_t s_next = 0;
+static int      s_band_cur = 2;     // alternate 2 GHz <-> 5 GHz each cycle
+#define SCAN_GAP 1500               // ms between single-band scans (each band ~every 3 s)
 
 void hud_scan_begin() {
   WiFi.mode(WIFI_STA);              // station mode = able to scan, not an AP
   WiFi.disconnect(false, true);     // don't join anything; forget stored creds in RAM
-  s_phase = P_2G_START;
+  s_phase = P_START;
   s_next = 0;
 }
 
@@ -106,41 +112,26 @@ static void finish_cycle(uint32_t now) {
 
 void hud_scan_tick(uint32_t now) {
   switch (s_phase) {
-    case P_2G_START:
-      if ((int32_t)(now - s_next) < 0) break;
-      WiFi.setBandMode(WIFI_BAND_MODE_2G_ONLY);
+    case P_START:
+      WiFi.setBandMode(s_band_cur == 5 ? WIFI_BAND_MODE_5G_ONLY : WIFI_BAND_MODE_2G_ONLY);
       WiFi.scanNetworks(true, true);             // async, show hidden
-      s_phase = P_2G_RUN;
+      s_phase = P_RUN;
       break;
 
-    case P_2G_RUN: {
+    case P_RUN: {
       int r = WiFi.scanComplete();
       if (r == WIFI_SCAN_RUNNING) break;
       if (r >= 0) upsert_band(r, now);
       WiFi.scanDelete();
-      s_phase = P_5G_START;
-      break;
-    }
-
-    case P_5G_START:
-      WiFi.setBandMode(WIFI_BAND_MODE_5G_ONLY);
-      WiFi.scanNetworks(true, true);
-      s_phase = P_5G_RUN;
-      break;
-
-    case P_5G_RUN: {
-      int r = WiFi.scanComplete();
-      if (r == WIFI_SCAN_RUNNING) break;
-      if (r >= 0) upsert_band(r, now);
-      WiFi.scanDelete();
-      finish_cycle(now);
+      finish_cycle(now);                         // recount whole list + age out
+      s_band_cur = (s_band_cur == 2) ? 5 : 2;    // other band next cycle
       s_phase = P_WAIT;
-      s_next = now + 600;
+      s_next = now + SCAN_GAP;
       break;
     }
 
     case P_WAIT:
-      if ((int32_t)(now - s_next) >= 0) s_phase = P_2G_START;
+      if ((int32_t)(now - s_next) >= 0) s_phase = P_START;
       break;
   }
 }
